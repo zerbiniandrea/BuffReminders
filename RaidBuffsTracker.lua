@@ -354,11 +354,16 @@ local function InitializeFrames()
 
     -- Anchor indicator (shown when unlocked) - use separate frame to draw on top
     mainFrame.anchorFrame = CreateFrame("Frame", nil, mainFrame)
-    mainFrame.anchorFrame:SetSize(12, 36)
+    mainFrame.anchorFrame:SetSize(65, 26)
     mainFrame.anchorFrame:SetFrameLevel(mainFrame:GetFrameLevel() + 100)
-    mainFrame.anchor = mainFrame.anchorFrame:CreateTexture(nil, "OVERLAY")
+    mainFrame.anchor = mainFrame.anchorFrame:CreateTexture(nil, "BACKGROUND")
     mainFrame.anchor:SetAllPoints()
-    mainFrame.anchor:SetColorTexture(0, 1, 0, 0.8)
+    mainFrame.anchor:SetColorTexture(0, 0.8, 0, 0.9)
+    mainFrame.anchorText = mainFrame.anchorFrame:CreateFontString(nil, "OVERLAY")
+    mainFrame.anchorText:SetPoint("CENTER", 0, 0)
+    mainFrame.anchorText:SetFont(STANDARD_TEXT_FONT, 10, "OUTLINE")
+    mainFrame.anchorText:SetTextColor(1, 1, 1, 1)
+    mainFrame.anchorText:SetText("ANCHOR")
     mainFrame.anchorFrame:Hide()
 
     for i, buffData in ipairs(RaidBuffs) do
