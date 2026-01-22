@@ -528,7 +528,7 @@ local function CreateOptionsPanel()
     end
 
     -- Icon Size slider
-    local sizeSlider, sizeValue = CreateInlineSlider(yOffset, "Icon Size:", 16, 64, 2, RaidBuffsTrackerDB.iconSize, "", function(val)
+    local sizeSlider, sizeValue = CreateInlineSlider(yOffset, "Icon Size:", 16, 128, 2, RaidBuffsTrackerDB.iconSize, "", function(val)
         RaidBuffsTrackerDB.iconSize = val
         UpdateVisuals()
     end)
