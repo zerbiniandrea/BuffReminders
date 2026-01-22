@@ -702,8 +702,6 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         SLASH_RAIDBUFFSTRACKER2 = "/raidbuffstracker"
         SlashCmdList["RAIDBUFFSTRACKER"] = SlashHandler
 
-        print("|cff00ff00RaidBuffsTracker|r loaded. Type /rbt for options.")
-
     elseif event == "PLAYER_ENTERING_WORLD" then
         if not mainFrame then
             InitializeFrames()
