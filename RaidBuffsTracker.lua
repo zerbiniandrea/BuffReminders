@@ -27,6 +27,7 @@ local defaults = {
     textScale = 0.32,   -- multiplier of iconSize
     showBuffReminder = true,
     showOnlyInGroup = true,
+    growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT"
 }
 
 -- Locals
@@ -105,7 +106,7 @@ local function CountMissingBuff(spellIDs)
 end
 
 -- Forward declarations
-local UpdateDisplay, PositionBuffFrames
+local UpdateDisplay, PositionBuffFrames, UpdateAnchor
 
 -- Create icon frame for a buff
 local function CreateBuffFrame(buffData, index)
@@ -180,6 +181,7 @@ PositionBuffFrames = function()
     local db = RaidBuffsTrackerDB
     local iconSize = db.iconSize or 32
     local spacing = math.floor(iconSize * (db.spacing or 0.2))
+    local direction = db.growDirection or "CENTER"
 
     local visibleFrames = {}
     for _, frame in pairs(buffFrames) do
@@ -191,12 +193,19 @@ PositionBuffFrames = function()
     local count = #visibleFrames
     if count == 0 then return end
 
-    local totalWidth = count * iconSize + (count - 1) * spacing
-    local startX = -totalWidth / 2 + iconSize / 2
-
     for i, frame in ipairs(visibleFrames) do
         frame:ClearAllPoints()
-        frame:SetPoint("CENTER", mainFrame, "CENTER", startX + (i - 1) * (iconSize + spacing), 0)
+        if direction == "LEFT" then
+            -- Grow right from left anchor
+            frame:SetPoint("LEFT", mainFrame, "LEFT", (i - 1) * (iconSize + spacing), 0)
+        elseif direction == "RIGHT" then
+            -- Grow left from right anchor
+            frame:SetPoint("RIGHT", mainFrame, "RIGHT", -((i - 1) * (iconSize + spacing)), 0)
+        else -- CENTER
+            local totalWidth = count * iconSize + (count - 1) * spacing
+            local startX = -totalWidth / 2 + iconSize / 2
+            frame:SetPoint("CENTER", mainFrame, "CENTER", startX + (i - 1) * (iconSize + spacing), 0)
+        end
     end
 end
 
@@ -245,6 +254,7 @@ UpdateDisplay = function()
     if anyVisible then
         mainFrame:Show()
         PositionBuffFrames()
+        UpdateAnchor()
     else
         mainFrame:Hide()
     end
@@ -296,12 +306,43 @@ local function InitializeFrames()
 
     SetupDragging()
 
+    -- Anchor indicator (shown when unlocked) - use separate frame to draw on top
+    mainFrame.anchorFrame = CreateFrame("Frame", nil, mainFrame)
+    mainFrame.anchorFrame:SetSize(12, 36)
+    mainFrame.anchorFrame:SetFrameLevel(mainFrame:GetFrameLevel() + 100)
+    mainFrame.anchor = mainFrame.anchorFrame:CreateTexture(nil, "OVERLAY")
+    mainFrame.anchor:SetAllPoints()
+    mainFrame.anchor:SetColorTexture(0, 1, 0, 0.8)
+    mainFrame.anchorFrame:Hide()
+
     for i, buffData in ipairs(RaidBuffs) do
         local key = buffData[2]
         buffFrames[key] = CreateBuffFrame(buffData, i)
     end
 
     mainFrame:Hide()
+end
+
+-- Update anchor position and visibility
+UpdateAnchor = function()
+    if not mainFrame or not mainFrame.anchorFrame then return end
+    local db = RaidBuffsTrackerDB
+    local direction = db.growDirection or "CENTER"
+
+    mainFrame.anchorFrame:ClearAllPoints()
+    if direction == "LEFT" then
+        mainFrame.anchorFrame:SetPoint("LEFT", mainFrame, "LEFT", 0, 0)
+    elseif direction == "RIGHT" then
+        mainFrame.anchorFrame:SetPoint("RIGHT", mainFrame, "RIGHT", 0, 0)
+    else -- CENTER
+        mainFrame.anchorFrame:SetPoint("CENTER", mainFrame, "CENTER", 0, 0)
+    end
+
+    if not db.locked and mainFrame:IsShown() then
+        mainFrame.anchorFrame:Show()
+    else
+        mainFrame.anchorFrame:Hide()
+    end
 end
 
 -- Update icon sizes and text (called when settings change)
@@ -522,6 +563,7 @@ local function CreateOptionsPanel()
     -- Lock checkbox
     local lockCb = CreateCenteredCheckbox("Lock Position", yOffset, RaidBuffsTrackerDB.locked, function(self)
         RaidBuffsTrackerDB.locked = self:GetChecked()
+        UpdateAnchor()
     end)
     panel.lockCheckbox = lockCb
 
@@ -543,7 +585,49 @@ local function CreateOptionsPanel()
     end)
     panel.groupCheckbox = groupCb
 
-    yOffset = yOffset - 45
+    yOffset = yOffset - 35
+
+    -- Grow direction label
+    local growLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    growLabel:SetPoint("TOP", 0, yOffset)
+    growLabel:SetText("Grow Direction:")
+
+    yOffset = yOffset - 25
+
+    -- Grow direction buttons
+    local growBtnWidth = 80
+    local growBtnSpacing = 10
+    local totalGrowWidth = (growBtnWidth * 3) + (growBtnSpacing * 2)
+
+    local growBtns = {}
+    local directions = {"LEFT", "CENTER", "RIGHT"}
+    local dirLabels = {"← Left", "Center", "Right →"}
+
+    for i, dir in ipairs(directions) do
+        local btn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+        btn:SetSize(growBtnWidth, 22)
+        btn:SetPoint("TOP", -totalGrowWidth/2 + growBtnWidth/2 + (i-1) * (growBtnWidth + growBtnSpacing), yOffset)
+        btn:SetText(dirLabels[i])
+        btn.direction = dir
+        btn:SetScript("OnClick", function()
+            RaidBuffsTrackerDB.growDirection = dir
+            for _, b in ipairs(growBtns) do
+                if b.direction == dir then
+                    b:SetEnabled(false)
+                else
+                    b:SetEnabled(true)
+                end
+            end
+            UpdateDisplay()
+        end)
+        if RaidBuffsTrackerDB.growDirection == dir then
+            btn:SetEnabled(false)
+        end
+        growBtns[i] = btn
+    end
+    panel.growBtns = growBtns
+
+    yOffset = yOffset - 40
 
     -- Buttons row 1 (centered)
     local btnWidth = 135
@@ -646,6 +730,9 @@ local function ToggleOptions()
         optionsPanel.lockCheckbox:SetChecked(db.locked)
         optionsPanel.reminderCheckbox:SetChecked(db.showBuffReminder ~= false)
         optionsPanel.groupCheckbox:SetChecked(db.showOnlyInGroup ~= false)
+        for _, btn in ipairs(optionsPanel.growBtns) do
+            btn:SetEnabled(btn.direction ~= db.growDirection)
+        end
         if testMode then
             optionsPanel.testBtn:SetText("Stop Test")
         else
