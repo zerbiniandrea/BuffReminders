@@ -6,5 +6,6 @@
 ## SavedVariables: RaidBuffsTrackerDB
 ## X-Curse-Project-ID: 1441094
 ## X-Wago-ID: qGYZZjNg
+## IconTexture: Interface\AddOns\RaidBuffsTracker\icon.tga
 
 RaidBuffsTracker.lua

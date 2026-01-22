@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" alt="RaidBuffsTracker" width="200">
+  <img src="images/logo.png" alt="RaidBuffsTracker" width="200">
 </p>
 
 <h1 align="center">RaidBuffsTracker</h1>
@@ -11,11 +11,11 @@
 ## Screenshots
 
 <p align="center">
-  <img src="screenshot-addon.png" alt="Addon Display">
+  <img src="images/screenshot-addon.png" alt="Addon Display">
 </p>
 
 <p align="center">
-  <img src="screenshot-options.png" alt="Options Panel" width="300">
+  <img src="images/screenshot-options.png" alt="Options Panel" width="300">
 </p>
 
 ## Features
