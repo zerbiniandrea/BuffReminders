@@ -28,6 +28,7 @@ local defaults = {
     showBuffReminder = true,
     showOnlyInGroup = true,
     hideBuffsWithoutProvider = false,
+    showOnlyPlayerClassBuff = false,
     growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT"
 }
 
@@ -269,6 +270,8 @@ UpdateDisplay = function()
         presentClasses = GetGroupClasses()
     end
 
+    local _, playerClass = UnitClass("player")
+
     local anyVisible = false
 
     for _, buffData in ipairs(RaidBuffs) do
@@ -276,10 +279,13 @@ UpdateDisplay = function()
         local frame = buffFrames[key]
 
         local showBuff = true
-        if presentClasses then
-            if not presentClasses[classProvider] then
-                showBuff = false
-            end
+        -- Filter: only show player's class buff
+        if db.showOnlyPlayerClassBuff and classProvider ~= playerClass then
+            showBuff = false
+        end
+        -- Filter: hide buffs without provider in group
+        if showBuff and presentClasses and not presentClasses[classProvider] then
+            showBuff = false
         end
 
         if frame and db.enabledBuffs[key] and showBuff then
@@ -618,6 +624,15 @@ local function CreateOptionsPanel()
     end)
     panel.providerCheckbox = providerCb
 
+    yOffset = yOffset - 30
+
+    -- Show only player class buff checkbox
+    local playerClassCb = CreateCenteredCheckbox("Show only my class buff", yOffset, RaidBuffsTrackerDB.showOnlyPlayerClassBuff, function(self)
+        RaidBuffsTrackerDB.showOnlyPlayerClassBuff = self:GetChecked()
+        UpdateDisplay()
+    end)
+    panel.playerClassCheckbox = playerClassCb
+
     yOffset = yOffset - 35
 
     -- Grow direction label
@@ -773,6 +788,9 @@ local function ToggleOptions()
         optionsPanel.groupCheckbox:SetChecked(db.showOnlyInGroup ~= false)
         if optionsPanel.providerCheckbox then
             optionsPanel.providerCheckbox:SetChecked(db.hideBuffsWithoutProvider)
+        end
+        if optionsPanel.playerClassCheckbox then
+            optionsPanel.playerClassCheckbox:SetChecked(db.showOnlyPlayerClassBuff)
         end
         for _, btn in ipairs(optionsPanel.growBtns) do
             btn:SetEnabled(btn.direction ~= db.growDirection)
