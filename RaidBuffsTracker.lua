@@ -18,9 +18,10 @@ local PresenceBuffs = {
 }
 
 -- Provider-count buffs: number of buffs should match number of providers
--- {spellID(s), settingKey, displayName, classProvider}
+-- {spellID(s), settingKey, displayName, classProvider, beneficiaryRole (optional)}
+-- beneficiaryRole can be "HEALER", "TANK", "DAMAGER" to limit who can receive the buff
 local ProviderCountBuffs = {
-    {369459, "sourceOfMagic", "Source of Magic", "EVOKER"},
+    {369459, "sourceOfMagic", "Source of Magic", "EVOKER", "HEALER"},
 }
 
 -- Classes that benefit from each buff (BETA: class-level only, not spec-aware)
@@ -242,25 +243,46 @@ local function CountPresenceBuff(spellIDs)
     return found, minRemaining
 end
 
--- Count buffs vs providers (returns buffCount, providerCount, minRemaining)
-local function CountProviderBuff(spellIDs, providerClass)
+-- Count buffs vs providers (returns buffCount, targetCount, minRemaining)
+-- beneficiaryRole is optional: if provided, targetCount = min(providers, beneficiaries)
+-- Also handles self-cast restriction: if only 1 provider who is the only beneficiary, target = 0
+local function CountProviderBuff(spellIDs, providerClass, beneficiaryRole)
     local buffCount = 0
     local providerCount = 0
+    local beneficiaryCount = 0
+    local providerBeneficiaryCount = 0  -- providers who are also beneficiaries
     local minRemaining = nil
     local inRaid = IsInRaid()
     local groupSize = GetNumGroupMembers()
 
     if groupSize == 0 then
         local _, playerClass = UnitClass("player")
-        if playerClass == providerClass then
+        local isProvider = (playerClass == providerClass)
+        local isBeneficiary = false
+        if isProvider then
             providerCount = 1
+        end
+        if beneficiaryRole then
+            local role = UnitGroupRolesAssigned("player")
+            if role == beneficiaryRole then
+                beneficiaryCount = 1
+                isBeneficiary = true
+            end
+        end
+        if isProvider and isBeneficiary then
+            providerBeneficiaryCount = 1
         end
         local hasBuff, remaining = UnitHasBuff("player", spellIDs)
         if hasBuff then
             buffCount = 1
             minRemaining = remaining
         end
-        return buffCount, providerCount, minRemaining
+        local targetCount = beneficiaryRole and math.min(providerCount, beneficiaryCount) or providerCount
+        -- Self-cast restriction: if only 1 provider who is the only beneficiary, can't cast on self
+        if beneficiaryRole and providerCount == 1 and beneficiaryCount == 1 and providerBeneficiaryCount == 1 then
+            targetCount = 0
+        end
+        return buffCount, targetCount, minRemaining
     end
 
     for i = 1, groupSize do
@@ -277,8 +299,20 @@ local function CountProviderBuff(spellIDs, providerClass)
 
         if UnitExists(unit) and not UnitIsDeadOrGhost(unit) and UnitIsConnected(unit) then
             local _, unitClass = UnitClass(unit)
-            if unitClass == providerClass then
+            local isProvider = (unitClass == providerClass)
+            local isBeneficiary = false
+            if isProvider then
                 providerCount = providerCount + 1
+            end
+            if beneficiaryRole then
+                local role = UnitGroupRolesAssigned(unit)
+                if role == beneficiaryRole then
+                    beneficiaryCount = beneficiaryCount + 1
+                    isBeneficiary = true
+                end
+            end
+            if isProvider and isBeneficiary then
+                providerBeneficiaryCount = providerBeneficiaryCount + 1
             end
             local hasBuff, remaining = UnitHasBuff(unit, spellIDs)
             if hasBuff then
@@ -292,7 +326,12 @@ local function CountProviderBuff(spellIDs, providerClass)
         end
     end
 
-    return buffCount, providerCount, minRemaining
+    local targetCount = beneficiaryRole and math.min(providerCount, beneficiaryCount) or providerCount
+    -- Self-cast restriction: if only 1 provider who is the only beneficiary, can't cast on self
+    if beneficiaryRole and providerCount == 1 and beneficiaryCount == 1 and providerBeneficiaryCount == 1 then
+        targetCount = 0
+    end
+    return buffCount, targetCount, minRemaining
 end
 
 -- Forward declarations
@@ -528,7 +567,7 @@ UpdateDisplay = function()
 
     -- Process provider-count buffs (number of buffs should match number of providers)
     for _, buffData in ipairs(ProviderCountBuffs) do
-        local spellIDs, key, _, classProvider = unpack(buffData)
+        local spellIDs, key, _, classProvider, beneficiaryRole = unpack(buffData)
         local frame = buffFrames[key]
 
         local showBuff = true
@@ -542,22 +581,22 @@ UpdateDisplay = function()
         end
 
         if frame and db.enabledBuffs[key] and showBuff then
-            local buffCount, providerCount, minRemaining = CountProviderBuff(spellIDs, classProvider)
+            local buffCount, targetCount, minRemaining = CountProviderBuff(spellIDs, classProvider, beneficiaryRole)
             local expiringSoon = db.showExpirationGlow and minRemaining and minRemaining < (db.expirationThreshold * 60)
-            if buffCount < providerCount then
-                -- Not all providers have applied their buff
-                frame.count:SetText(buffCount .. "/" .. providerCount)
+            if targetCount > 0 and buffCount < targetCount then
+                -- Not all targets have the buff
+                frame.count:SetText(buffCount .. "/" .. targetCount)
                 frame:Show()
                 anyVisible = true
                 SetExpirationGlow(frame, expiringSoon)
-            elseif expiringSoon then
+            elseif targetCount > 0 and expiringSoon then
                 -- All applied but expiring soon - show with glow
-                frame.count:SetText(buffCount .. "/" .. providerCount)
+                frame.count:SetText(buffCount .. "/" .. targetCount)
                 frame:Show()
                 anyVisible = true
                 SetExpirationGlow(frame, true)
             else
-                -- All providers have applied their buff
+                -- All targets have the buff or no valid targets
                 frame:Hide()
                 SetExpirationGlow(frame, false)
             end
