@@ -3,18 +3,18 @@ local addonName, _ = ...
 -- Buff definitions: {spellID(s), settingKey, displayName, classProvider}
 local RaidBuffs = {
     { 1459, "intellect", "Arcane Intellect", "MAGE" },
-    { 21562, "stamina", "Power Word: Fortitude", "PRIEST" },
     { 6673, "attackPower", "Battle Shout", "WARRIOR" },
-    { 1126, "versatility", "Mark of the Wild", "DRUID" },
-    { 462854, "skyfury", "Skyfury", "SHAMAN" },
     { { 381748, 364342 }, "bronze", "Blessing of the Bronze", "EVOKER" },
+    { 1126, "versatility", "Mark of the Wild", "DRUID" },
+    { 21562, "stamina", "Power Word: Fortitude", "PRIEST" },
+    { 462854, "skyfury", "Skyfury", "SHAMAN" },
 }
 
 -- Presence-based buffs: only need at least 1 person to have it active
 -- {spellID(s), settingKey, displayName, classProvider}
 local PresenceBuffs = {
-    { 465, "devotionAura", "Devotion Aura", "PALADIN" },
     { 381637, "atrophicPoison", "Atrophic Poison", "ROGUE" },
+    { 465, "devotionAura", "Devotion Aura", "PALADIN" },
 }
 
 -- Provider-count buffs: number of buffs should match number of providers
