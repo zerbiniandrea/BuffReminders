@@ -17,10 +17,10 @@ local PresenceBuffs = {
     { 465, "devotionAura", "Devotion Aura", "PALADIN" },
 }
 
--- Provider-count buffs: number of buffs should match number of providers
--- {spellID(s), settingKey, displayName, classProvider, beneficiaryRole (optional)}
--- beneficiaryRole can be "HEALER", "TANK", "DAMAGER" to limit who can receive the buff
-local ProviderCountBuffs = {
+-- Personal buffs: only tracks if the player should cast their buff
+-- {spellID(s), settingKey, displayName, requiredClass, beneficiaryRole}
+-- Only shows if player is the required class, has the spell talented, and a beneficiary needs it
+local PersonalBuffs = {
     { 369459, "sourceOfMagic", "Source of Magic", "EVOKER", "HEALER" },
 }
 
@@ -95,6 +95,13 @@ local function IsValidGroupMember(unit)
     return UnitExists(unit) and not UnitIsDeadOrGhost(unit) and UnitIsConnected(unit) and UnitCanAssist("player", unit)
 end
 
+-- Calculate font size based on settings, with optional scale multiplier
+local function GetFontSize(scale)
+    local db = RaidBuffsTrackerDB
+    local baseSize = db.iconSize * (db.textScale or defaults.textScale)
+    return math.floor(baseSize * (scale or 1))
+end
+
 -- Get classes present in the group
 local function GetGroupClasses()
     local classes = {}
@@ -132,7 +139,7 @@ local function GetGroupClasses()
 end
 
 -- Check if unit has a specific buff (handles single spellID or table of spellIDs)
--- Returns: hasBuff, remainingTime (nil if no expiration or buff not found)
+-- Returns: hasBuff, remainingTime, sourceUnit
 local function UnitHasBuff(unit, spellIDs)
     if type(spellIDs) ~= "table" then
         spellIDs = { spellIDs }
@@ -148,11 +155,11 @@ local function UnitHasBuff(unit, spellIDs)
             if auraData.expirationTime and auraData.expirationTime > 0 then
                 remaining = auraData.expirationTime - GetTime()
             end
-            return true, remaining
+            return true, remaining, auraData.sourceUnit
         end
     end
 
-    return false, nil
+    return false, nil, nil
 end
 
 -- Get spell texture (handles table of spellIDs)
@@ -268,46 +275,26 @@ local function CountPresenceBuff(spellIDs)
     return found, minRemaining
 end
 
--- Count buffs vs providers (returns buffCount, targetCount, minRemaining)
--- beneficiaryRole is optional: if provided, targetCount = min(providers, beneficiaries)
--- Also handles self-cast restriction: if only 1 provider who is the only beneficiary, target = 0
-local function CountProviderBuff(spellIDs, providerClass, beneficiaryRole)
-    local buffCount = 0
-    local providerCount = 0
-    local beneficiaryCount = 0
-    local providerBeneficiaryCount = 0 -- providers who are also beneficiaries
-    local minRemaining = nil
+-- Check if player should cast their personal buff (returns true if a beneficiary needs it)
+-- Returns nil if player can't provide this buff
+local function ShouldShowPersonalBuff(spellIDs, requiredClass, beneficiaryRole)
+    -- Check if player is the required class and has the spell
+    local _, playerClass = UnitClass("player")
+    if playerClass ~= requiredClass then
+        return nil
+    end
+
+    local spellID = type(spellIDs) == "table" and spellIDs[1] or spellIDs
+    if not IsPlayerSpell(spellID) then
+        return nil
+    end
+
     local inRaid = IsInRaid()
     local groupSize = GetNumGroupMembers()
 
+    -- Solo: no beneficiaries (can't cast on self)
     if groupSize == 0 then
-        local _, playerClass = UnitClass("player")
-        local isProvider = (playerClass == providerClass)
-        local isBeneficiary = false
-        if isProvider then
-            providerCount = 1
-        end
-        if beneficiaryRole then
-            local role = UnitGroupRolesAssigned("player")
-            if role == beneficiaryRole then
-                beneficiaryCount = 1
-                isBeneficiary = true
-            end
-        end
-        if isProvider and isBeneficiary then
-            providerBeneficiaryCount = 1
-        end
-        local hasBuff, remaining = UnitHasBuff("player", spellIDs)
-        if hasBuff then
-            buffCount = 1
-            minRemaining = remaining
-        end
-        local targetCount = beneficiaryRole and math.min(providerCount, beneficiaryCount) or providerCount
-        -- Self-cast restriction: if only 1 provider who is the only beneficiary, can't cast on self
-        if beneficiaryRole and providerCount == 1 and beneficiaryCount == 1 and providerBeneficiaryCount == 1 then
-            targetCount = 0
-        end
-        return buffCount, targetCount, minRemaining
+        return false
     end
 
     for i = 1, groupSize do
@@ -323,40 +310,21 @@ local function CountProviderBuff(spellIDs, providerClass, beneficiaryRole)
         end
 
         if IsValidGroupMember(unit) then
-            local _, unitClass = UnitClass(unit)
-            local isProvider = (unitClass == providerClass)
-            local isBeneficiary = false
-            if isProvider then
-                providerCount = providerCount + 1
-            end
-            if beneficiaryRole then
+            -- Skip self (can't cast on self)
+            if not UnitIsUnit(unit, "player") then
                 local role = UnitGroupRolesAssigned(unit)
                 if role == beneficiaryRole then
-                    beneficiaryCount = beneficiaryCount + 1
-                    isBeneficiary = true
-                end
-            end
-            if isProvider and isBeneficiary then
-                providerBeneficiaryCount = providerBeneficiaryCount + 1
-            end
-            local hasBuff, remaining = UnitHasBuff(unit, spellIDs)
-            if hasBuff then
-                buffCount = buffCount + 1
-                if remaining then
-                    if not minRemaining or remaining < minRemaining then
-                        minRemaining = remaining
+                    local hasBuff, _, sourceUnit = UnitHasBuff(unit, spellIDs)
+                    -- Check if missing buff OR has buff but not from player
+                    if not hasBuff or (sourceUnit and not UnitIsUnit(sourceUnit, "player")) then
+                        return true
                     end
                 end
             end
         end
     end
 
-    local targetCount = beneficiaryRole and math.min(providerCount, beneficiaryCount) or providerCount
-    -- Self-cast restriction: if only 1 provider who is the only beneficiary, can't cast on self
-    if beneficiaryRole and providerCount == 1 and beneficiaryCount == 1 and providerBeneficiaryCount == 1 then
-        targetCount = 0
-    end
-    return buffCount, targetCount, minRemaining
+    return false
 end
 
 -- Forward declarations
@@ -407,11 +375,10 @@ local function CreateBuffFrame(buffData, _)
     frame.border:SetColorTexture(0, 0, 0, 1)
 
     -- Count text (font size scales with icon size)
-    local fontSize = math.floor(db.iconSize * (db.textScale or 0.32))
     frame.count = frame:CreateFontString(nil, "OVERLAY", "NumberFontNormalLarge")
     frame.count:SetPoint("CENTER", 0, 0)
     frame.count:SetTextColor(1, 1, 1, 1)
-    frame.count:SetFont(STANDARD_TEXT_FONT, fontSize, "OUTLINE")
+    frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(), "OUTLINE")
 
     -- "BUFF!" text for the class that provides this buff
     local _, playerClass = UnitClass("player")
@@ -419,7 +386,7 @@ local function CreateBuffFrame(buffData, _)
     if frame.isPlayerBuff then
         frame.buffText = frame:CreateFontString(nil, "OVERLAY")
         frame.buffText:SetPoint("TOP", frame, "BOTTOM", 0, -6)
-        frame.buffText:SetFont(STANDARD_TEXT_FONT, math.floor(fontSize * 0.8), "OUTLINE")
+        frame.buffText:SetFont(STANDARD_TEXT_FONT, GetFontSize(0.8), "OUTLINE")
         frame.buffText:SetTextColor(1, 1, 1, 1)
         frame.buffText:SetText("BUFF!")
         if not db.showBuffReminder then
@@ -594,38 +561,20 @@ UpdateDisplay = function()
         end
     end
 
-    -- Process provider-count buffs (number of buffs should match number of providers)
-    for _, buffData in ipairs(ProviderCountBuffs) do
-        local spellIDs, key, _, classProvider, beneficiaryRole = unpack(buffData)
+    -- Process personal buffs (player's own buff responsibility)
+    for _, buffData in ipairs(PersonalBuffs) do
+        local spellIDs, key, _, requiredClass, beneficiaryRole = unpack(buffData)
         local frame = buffFrames[key]
 
-        local showBuff = true
-        -- Filter: only show player's class buff
-        if db.showOnlyPlayerClassBuff and classProvider ~= playerClass then
-            showBuff = false
-        end
-        -- Filter: hide buffs without provider in group
-        if showBuff and presentClasses and not presentClasses[classProvider] then
-            showBuff = false
-        end
-
-        if frame and db.enabledBuffs[key] and showBuff then
-            local buffCount, targetCount, minRemaining = CountProviderBuff(spellIDs, classProvider, beneficiaryRole)
-            local expiringSoon = db.showExpirationGlow and minRemaining and minRemaining < (db.expirationThreshold * 60)
-            if targetCount > 0 and buffCount < targetCount then
-                -- Not all targets have the buff
-                frame.count:SetText(buffCount .. "/" .. targetCount)
+        if frame and db.enabledBuffs[key] then
+            local shouldShow = ShouldShowPersonalBuff(spellIDs, requiredClass, beneficiaryRole)
+            if shouldShow then
+                frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(0.6), "OUTLINE")
+                frame.count:SetText("NO\nSOURCE")
                 frame:Show()
                 anyVisible = true
-                SetExpirationGlow(frame, expiringSoon)
-            elseif targetCount > 0 and expiringSoon then
-                -- All applied but expiring soon - show with glow
-                frame.count:SetText(buffCount .. "/" .. targetCount)
-                frame:Show()
-                anyVisible = true
-                SetExpirationGlow(frame, true)
+                SetExpirationGlow(frame, false)
             else
-                -- All targets have the buff or no valid targets
                 frame:Hide()
                 SetExpirationGlow(frame, false)
             end
@@ -721,10 +670,10 @@ local function InitializeFrames()
         buffFrames[key].isPresenceBuff = true
     end
 
-    for i, buffData in ipairs(ProviderCountBuffs) do
+    for i, buffData in ipairs(PersonalBuffs) do
         local key = buffData[2]
         buffFrames[key] = CreateBuffFrame(buffData, #RaidBuffs + #PresenceBuffs + i)
-        buffFrames[key].isProviderCountBuff = true
+        buffFrames[key].isPersonalBuff = true
     end
 
     mainFrame:Hide()
@@ -758,12 +707,11 @@ end
 local function UpdateVisuals()
     local db = RaidBuffsTrackerDB
     local size = db.iconSize
-    local fontSize = math.floor(size * (db.textScale or 0.32))
     for _, frame in pairs(buffFrames) do
         frame:SetSize(size, size)
-        frame.count:SetFont(STANDARD_TEXT_FONT, fontSize, "OUTLINE")
+        frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(), "OUTLINE")
         if frame.buffText then
-            frame.buffText:SetFont(STANDARD_TEXT_FONT, math.floor(fontSize * 0.8), "OUTLINE")
+            frame.buffText:SetFont(STANDARD_TEXT_FONT, GetFontSize(0.8), "OUTLINE")
             if db.showBuffReminder then
                 frame.buffText:Show()
             else
@@ -1041,14 +989,14 @@ local function CreateOptionsPanel()
 
     leftY = leftY - SECTION_SPACING
 
-    -- Provider Buffs header
-    _, leftY = CreateSectionHeader(panel, "Provider Buffs", leftColX, leftY)
-    local providerNote = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    providerNote:SetPoint("TOPLEFT", leftColX, leftY)
-    providerNote:SetText("(1 per provider)")
+    -- Personal Buffs header
+    _, leftY = CreateSectionHeader(panel, "Personal Buffs", leftColX, leftY)
+    local personalNote = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    personalNote:SetPoint("TOPLEFT", leftColX, leftY)
+    personalNote:SetText("(your buff only)")
     leftY = leftY - 14
 
-    for _, buffData in ipairs(ProviderCountBuffs) do
+    for _, buffData in ipairs(PersonalBuffs) do
         local spellIDs, key, displayName = unpack(buffData)
         leftY = CreateBuffCheckbox(leftColX, leftY, spellIDs, key, displayName)
     end
@@ -1367,13 +1315,12 @@ local function CreateOptionsPanel()
                     frame:Show()
                 end
             end
-            for _, buffData in ipairs(ProviderCountBuffs) do
+            for _, buffData in ipairs(PersonalBuffs) do
                 local _, key = unpack(buffData)
                 local frame = buffFrames[key]
                 if frame and db.enabledBuffs[key] then
-                    local fakeProviders = math.random(1, 3)
-                    local fakeBuffed = math.random(0, fakeProviders - 1)
-                    frame.count:SetText(fakeBuffed .. "/" .. fakeProviders)
+                    frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(0.6), "OUTLINE")
+                    frame.count:SetText("NO\nSOURCE")
                     frame:Show()
                 end
             end
@@ -1413,7 +1360,7 @@ local function ToggleOptions()
                 optionsPanel.buffCheckboxes[key]:SetChecked(db.enabledBuffs[key])
             end
         end
-        for _, buffData in ipairs(ProviderCountBuffs) do
+        for _, buffData in ipairs(PersonalBuffs) do
             local key = buffData[2]
             if optionsPanel.buffCheckboxes[key] then
                 optionsPanel.buffCheckboxes[key]:SetChecked(db.enabledBuffs[key])
@@ -1486,13 +1433,12 @@ local function SlashHandler(msg)
                     frame:Show()
                 end
             end
-            for _, buffData in ipairs(ProviderCountBuffs) do
+            for _, buffData in ipairs(PersonalBuffs) do
                 local _, key = unpack(buffData)
                 local frame = buffFrames[key]
                 if frame and db.enabledBuffs[key] then
-                    local fakeProviders = math.random(1, 3)
-                    local fakeBuffed = math.random(0, fakeProviders - 1)
-                    frame.count:SetText(fakeBuffed .. "/" .. fakeProviders)
+                    frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(0.6), "OUTLINE")
+                    frame.count:SetText("NO\nSOURCE")
                     frame:Show()
                 end
             end
@@ -1542,7 +1488,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
                 RaidBuffsTrackerDB.enabledBuffs[key] = true
             end
         end
-        for _, buffData in ipairs(ProviderCountBuffs) do
+        for _, buffData in ipairs(PersonalBuffs) do
             local key = buffData[2]
             if RaidBuffsTrackerDB.enabledBuffs[key] == nil then
                 RaidBuffsTrackerDB.enabledBuffs[key] = true

@@ -30,12 +30,14 @@ read_globals = {
 	"Settings",
 	"SettingsPanel",
 	"UIParent",
+	"IsPlayerSpell",
 	"UnitCanAssist",
 	"UnitClass",
 	"UnitExists",
 	"UnitGroupRolesAssigned",
 	"UnitIsConnected",
 	"UnitIsDeadOrGhost",
+	"UnitIsUnit",
 
 	-- WoW UI globals
 	"ActionButton_HideOverlayGlow",
