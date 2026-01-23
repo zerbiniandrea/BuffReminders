@@ -1,6 +1,6 @@
 <h1 align="center">RaidBuffsTracker</h1>
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/1a8775c7-d9ff-41c6-8bab-6f26d75dceab" width="180" />
+  <img src="https://github.com/zerbiniandrea/RaidBuffsTracker/blob/main/images/logo.png?raw=true" width="180" />
 </p>
 <p align="center">
   <a href="https://discord.com/users/285458497020362762"><img src="https://shields.io/badge/discord-5865F2?logo=discord&style=for-the-badge&logoColor=white" /></a>
@@ -10,7 +10,7 @@
 <p align="center">From the author of <a href="https://wago.io/iWkZ4Eq-i">Raid Buffs Tracker</a>, one of the most popular raid buffs tracking WeakAuras.</p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/b8f38780-19bb-4435-badf-705cc585d024" />
+  <img src="https://github.com/zerbiniandrea/RaidBuffsTracker/blob/main/images/buffs.png?raw=true" />
 </p>
 
 ## Features
@@ -28,7 +28,7 @@
 To open the options panel, type `/rbt`
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/d06c09c3-a2d4-474e-a5fb-7d5857d60a07" />
+  <img src="https://github.com/zerbiniandrea/RaidBuffsTracker/blob/main/images/settings.png?raw=true" />
 </p>
 
 ## Notes
