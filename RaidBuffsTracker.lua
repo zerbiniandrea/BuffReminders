@@ -27,9 +27,9 @@ local PresenceBuffs = {
 -- Only shows if player is the required class, has the spell talented, and a beneficiary needs it
 -- groupId is optional - buffs with same groupId share a single setting and show one icon
 local PersonalBuffs = {
-    { 369459, "sourceOfMagic", "Source of Magic", "EVOKER", "HEALER", "NO\nSOURCE", nil },
     { 156910, "beaconOfFaith", "Beacon of Faith", "PALADIN", nil, "NO\nFAITH", "beacons" },
     { 53563, "beaconOfLight", "Beacon of Light", "PALADIN", nil, "NO\nLIGHT", "beacons" },
+    { 369459, "sourceOfMagic", "Source of Magic", "EVOKER", "HEALER", "NO\nSOURCE", nil },
 }
 
 -- Display names and text for grouped buffs
