@@ -4,7 +4,12 @@ local addonName, _ = ...
 local RaidBuffs = {
     { 1459, "intellect", "Arcane Intellect", "MAGE" },
     { 6673, "attackPower", "Battle Shout", "WARRIOR" },
-    { { 381748, 364342 }, "bronze", "Blessing of the Bronze", "EVOKER" },
+    {
+        { 381732, 381741, 381746, 381748, 381749, 381750, 381751, 381752, 381753, 381754, 381756, 381757, 381758 },
+        "bronze",
+        "Blessing of the Bronze",
+        "EVOKER",
+    },
     { 1126, "versatility", "Mark of the Wild", "DRUID" },
     { 21562, "stamina", "Power Word: Fortitude", "PRIEST" },
     { 462854, "skyfury", "Skyfury", "SHAMAN" },
@@ -373,9 +378,11 @@ end
 local UpdateDisplay, PositionBuffFrames, UpdateAnchor
 
 -- Show/hide expiration glow on a buff frame (temporarily disabled)
+-- Returns false since glow is disabled, used to skip "expiring soon" display logic
 local function SetExpirationGlow(frame, _)
     -- TODO: Implement glow using LibCustomGlow or similar
     frame.glowShowing = false
+    return false
 end
 
 -- Create icon frame for a buff
@@ -537,7 +544,11 @@ UpdateDisplay = function()
 
         if frame and db.enabledBuffs[key] and showBuff then
             local missing, total, minRemaining = CountMissingBuff(spellIDs, key)
-            local expiringSoon = db.showExpirationGlow and minRemaining and minRemaining < (db.expirationThreshold * 60)
+            -- TODO: Re-enable when glow is implemented
+            local expiringSoon = false
+                and db.showExpirationGlow
+                and minRemaining
+                and minRemaining < (db.expirationThreshold * 60)
             if missing > 0 then
                 local buffed = total - missing
                 frame.count:SetText(buffed .. "/" .. total)
@@ -577,7 +588,11 @@ UpdateDisplay = function()
 
         if frame and db.enabledBuffs[key] and showBuff then
             local count, minRemaining = CountPresenceBuff(spellIDs)
-            local expiringSoon = db.showExpirationGlow and minRemaining and minRemaining < (db.expirationThreshold * 60)
+            -- TODO: Re-enable when glow is implemented
+            local expiringSoon = false
+                and db.showExpirationGlow
+                and minRemaining
+                and minRemaining < (db.expirationThreshold * 60)
             if count == 0 then
                 -- Nobody has it - show as missing
                 frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(MISSING_TEXT_SCALE), "OUTLINE")
