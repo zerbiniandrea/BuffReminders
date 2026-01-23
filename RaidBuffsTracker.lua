@@ -1459,6 +1459,9 @@ local function CreateOptionsPanel()
         RaidBuffsTrackerDB.showExpirationGlow,
         function(self)
             RaidBuffsTrackerDB.showExpirationGlow = self:GetChecked()
+            if panel.SetGlowControlsEnabled then
+                panel.SetGlowControlsEnabled(self:GetChecked())
+            end
             UpdateDisplay()
         end
     )
@@ -1487,7 +1490,7 @@ local function CreateOptionsPanel()
         rightY,
         "Threshold",
         1,
-        120,
+        15,
         1,
         RaidBuffsTrackerDB.expirationThreshold or 5,
         " min",
@@ -1501,6 +1504,7 @@ local function CreateOptionsPanel()
 
     -- Glow style dropdown
     local styleLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    panel.styleLabel = styleLabel
     styleLabel:SetPoint("TOPLEFT", rightColX, rightY)
     styleLabel:SetText("Style:")
 
@@ -1537,6 +1541,23 @@ local function CreateOptionsPanel()
     previewBtn:SetScript("OnClick", function()
         ShowGlowDemo()
     end)
+    panel.previewBtn = previewBtn
+
+    -- Helper to enable/disable glow-related controls
+    local function SetGlowControlsEnabled(enabled)
+        thresholdSlider:SetEnabled(enabled)
+        thresholdValue:SetTextColor(enabled and 1 or 0.5, enabled and 1 or 0.5, enabled and 1 or 0.5)
+        styleLabel:SetTextColor(enabled and 1 or 0.5, enabled and 1 or 0.5, enabled and 1 or 0.5)
+        UIDropDownMenu_EnableDropDown(styleDropdown)
+        if not enabled then
+            UIDropDownMenu_DisableDropDown(styleDropdown)
+        end
+        previewBtn:SetEnabled(enabled)
+    end
+    panel.SetGlowControlsEnabled = SetGlowControlsEnabled
+
+    -- Set initial state
+    SetGlowControlsEnabled(RaidBuffsTrackerDB.showExpirationGlow)
 
     rightY = rightY - 28
 
@@ -1726,6 +1747,9 @@ local function ToggleOptions()
         if optionsPanel.styleDropdown then
             UIDropDownMenu_SetSelectedValue(optionsPanel.styleDropdown, db.glowStyle or 1)
             UIDropDownMenu_SetText(optionsPanel.styleDropdown, GlowStyles[db.glowStyle or 1].name)
+        end
+        if optionsPanel.SetGlowControlsEnabled then
+            optionsPanel.SetGlowControlsEnabled(db.showExpirationGlow)
         end
         for _, btn in ipairs(optionsPanel.growBtns) do
             btn:SetEnabled(btn.direction ~= db.growDirection)

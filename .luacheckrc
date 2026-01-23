@@ -45,6 +45,8 @@ read_globals = {
 	"STANDARD_TEXT_FONT",
 	"UIDropDownMenu_AddButton",
 	"UIDropDownMenu_CreateInfo",
+	"UIDropDownMenu_DisableDropDown",
+	"UIDropDownMenu_EnableDropDown",
 	"UIDropDownMenu_Initialize",
 	"UIDropDownMenu_SetSelectedValue",
 	"UIDropDownMenu_SetText",
