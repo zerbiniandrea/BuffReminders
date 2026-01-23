@@ -30,6 +30,7 @@ read_globals = {
 	"Settings",
 	"SettingsPanel",
 	"UIParent",
+	"UnitCanAssist",
 	"UnitClass",
 	"UnitExists",
 	"UnitGroupRolesAssigned",

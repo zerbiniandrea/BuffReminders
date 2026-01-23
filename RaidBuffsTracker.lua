@@ -89,6 +89,12 @@ local inCombat = false
 local testMode = false
 local optionsPanel
 
+-- Check if a unit is a valid group member for buff tracking
+-- Excludes: non-existent, dead/ghost, disconnected, hostile (cross-faction in open world)
+local function IsValidGroupMember(unit)
+    return UnitExists(unit) and not UnitIsDeadOrGhost(unit) and UnitIsConnected(unit) and UnitCanAssist("player", unit)
+end
+
 -- Get classes present in the group
 local function GetGroupClasses()
     local classes = {}
@@ -115,7 +121,7 @@ local function GetGroupClasses()
             end
         end
 
-        if UnitExists(unit) and UnitIsConnected(unit) then
+        if IsValidGroupMember(unit) then
             local _, class = UnitClass(unit)
             if class then
                 classes[class] = true
@@ -198,7 +204,7 @@ local function CountMissingBuff(spellIDs, buffKey)
             end
         end
 
-        if UnitExists(unit) and not UnitIsDeadOrGhost(unit) and UnitIsConnected(unit) then
+        if IsValidGroupMember(unit) then
             -- Check if unit's class benefits from this buff
             local _, unitClass = UnitClass(unit)
             if not beneficiaries or beneficiaries[unitClass] then
@@ -246,7 +252,7 @@ local function CountPresenceBuff(spellIDs)
             end
         end
 
-        if UnitExists(unit) and not UnitIsDeadOrGhost(unit) and UnitIsConnected(unit) then
+        if IsValidGroupMember(unit) then
             local hasBuff, remaining = UnitHasBuff(unit, spellIDs)
             if hasBuff then
                 found = found + 1
@@ -316,7 +322,7 @@ local function CountProviderBuff(spellIDs, providerClass, beneficiaryRole)
             end
         end
 
-        if UnitExists(unit) and not UnitIsDeadOrGhost(unit) and UnitIsConnected(unit) then
+        if IsValidGroupMember(unit) then
             local _, unitClass = UnitClass(unit)
             local isProvider = (unitClass == providerClass)
             local isBeneficiary = false
