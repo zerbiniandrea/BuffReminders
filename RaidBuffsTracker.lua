@@ -89,7 +89,7 @@ local defaults = {
     },
     iconSize = 64,
     spacing = 0.2, -- multiplier of iconSize (reset ratios default)
-    textScale = 0.32, -- multiplier of iconSize (reset ratios default)
+    textScale = 0.34, -- multiplier of iconSize (reset ratios default)
     showBuffReminder = true,
     showOnlyInGroup = false,
     showOnlyInInstance = false,
@@ -1276,7 +1276,7 @@ local function CreateOptionsPanel()
         20,
         60,
         1,
-        math.floor((RaidBuffsTrackerDB.textScale or 0.32) * 100),
+        math.floor((RaidBuffsTrackerDB.textScale or 0.34) * 100),
         "%",
         function(val)
             RaidBuffsTrackerDB.textScale = val / 100
@@ -1607,11 +1607,11 @@ local function CreateOptionsPanel()
     resetRatiosBtn:SetText("Reset Ratios")
     resetRatiosBtn:SetScript("OnClick", function()
         RaidBuffsTrackerDB.spacing = 0.2
-        RaidBuffsTrackerDB.textScale = 0.32
+        RaidBuffsTrackerDB.textScale = 0.34
         panel.spacingSlider:SetValue(20)
-        panel.textSlider:SetValue(32)
+        panel.textSlider:SetValue(34)
         panel.spacingValue:SetText("20%")
-        panel.textValue:SetText("32%")
+        panel.textValue:SetText("34%")
         UpdateVisuals()
     end)
     resetRatiosBtn:SetScript("OnEnter", function(self)
@@ -1726,7 +1726,7 @@ local function ToggleOptions()
         end
         optionsPanel.sizeSlider:SetValue(db.iconSize)
         optionsPanel.spacingSlider:SetValue((db.spacing or 0.2) * 100)
-        optionsPanel.textSlider:SetValue((db.textScale or 0.32) * 100)
+        optionsPanel.textSlider:SetValue((db.textScale or 0.34) * 100)
         optionsPanel.lockBtn:SetText(db.locked and "Unlock" or "Lock")
         optionsPanel.reminderCheckbox:SetChecked(db.showBuffReminder ~= false)
         optionsPanel.groupCheckbox:SetChecked(db.showOnlyInGroup ~= false)
