@@ -576,16 +576,33 @@ local function CreateBuffFrame(buffData, _)
     return frame
 end
 
--- Position all visible buff frames
+-- Position all visible buff frames (in definition order)
 PositionBuffFrames = function()
     local db = RaidBuffsTrackerDB
     local iconSize = db.iconSize or 32
     local spacing = math.floor(iconSize * (db.spacing or 0.2))
     local direction = db.growDirection or "CENTER"
 
+    -- Collect visible frames in definition order
     local visibleFrames = {}
-    for _, frame in pairs(buffFrames) do
-        if frame:IsShown() then
+    for _, buffData in ipairs(RaidBuffs) do
+        local key = buffData[2]
+        local frame = buffFrames[key]
+        if frame and frame:IsShown() then
+            table.insert(visibleFrames, frame)
+        end
+    end
+    for _, buffData in ipairs(PresenceBuffs) do
+        local key = buffData[2]
+        local frame = buffFrames[key]
+        if frame and frame:IsShown() then
+            table.insert(visibleFrames, frame)
+        end
+    end
+    for _, buffData in ipairs(PersonalBuffs) do
+        local key = buffData[2]
+        local frame = buffFrames[key]
+        if frame and frame:IsShown() then
             table.insert(visibleFrames, frame)
         end
     end
