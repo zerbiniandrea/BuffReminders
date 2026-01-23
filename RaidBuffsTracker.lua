@@ -53,17 +53,18 @@ local defaults = {
         atrophicPoison = true,
         sourceOfMagic = true,
     },
-    iconSize = 32,
-    spacing = 0.2,      -- multiplier of iconSize
-    textScale = 0.32,   -- multiplier of iconSize
+    iconSize = 64,
+    spacing = 0.2,      -- multiplier of iconSize (reset ratios default)
+    textScale = 0.32,   -- multiplier of iconSize (reset ratios default)
     showBuffReminder = true,
     showOnlyInGroup = true,
-    hideBuffsWithoutProvider = false,
+    hideBuffsWithoutProvider = true,
     showOnlyPlayerClassBuff = false,
     filterByClassBenefit = false,
     growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT"
-    showExpirationGlow = false,
-    expirationThreshold = 5, -- minutes
+    showExpirationGlow = true,
+    expirationThreshold = 15, -- minutes
+    optionsPanelScale = 1.2,  -- base scale (displayed as 100%)
 }
 
 -- Locals
@@ -738,12 +739,19 @@ local function UpdateVisuals()
 end
 
 -- ============================================================================
--- OPTIONS PANEL
+-- OPTIONS PANEL (Two-Column Layout)
 -- ============================================================================
 
 local function CreateOptionsPanel()
+    local PANEL_WIDTH = 540
+    local LEFT_COL_WIDTH = 220
+    local RIGHT_COL_WIDTH = 280
+    local COL_PADDING = 20
+    local SECTION_SPACING = 12
+    local ITEM_HEIGHT = 22
+
     local panel = CreateFrame("Frame", "RaidBuffsTrackerOptions", UIParent, "BackdropTemplate")
-    panel:SetWidth(320)
+    panel:SetWidth(PANEL_WIDTH)
     panel:SetPoint("CENTER")
     panel:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -760,32 +768,89 @@ local function CreateOptionsPanel()
     panel:SetFrameStrata("DIALOG")
     panel:Hide()
 
-    -- Title
+    -- Addon icon
+    local addonIcon = panel:CreateTexture(nil, "ARTWORK")
+    addonIcon:SetSize(28, 28)
+    addonIcon:SetPoint("TOPLEFT", 12, -8)
+    addonIcon:SetTexture("Interface\\AddOns\\RaidBuffsTracker\\icon.tga")
+    addonIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    -- Title (next to icon)
     local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -10)
-    title:SetText("|cff00ff00RaidBuffsTracker|r Options")
+    title:SetPoint("LEFT", addonIcon, "RIGHT", 8, 0)
+    title:SetText("|cff00ff00RaidBuffsTracker|r")
+
+    -- Scale controls (top right area) - using buttons to avoid slider scaling issues
+    -- Base scale is 1.2 (displayed as 100%), range is 80%-150%
+    local BASE_SCALE = 1.2
+    local MIN_PCT, MAX_PCT = 80, 150
+    local scaleDown, scaleUp
+
+    local scaleValue = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    scaleValue:SetPoint("TOPRIGHT", -70, -14)
+    local currentScale = RaidBuffsTrackerDB.optionsPanelScale or BASE_SCALE
+    local currentPct = math.floor(currentScale / BASE_SCALE * 100 + 0.5)
+    scaleValue:SetText(currentPct .. "%")
+
+    local function UpdateScale(delta)
+        -- Use integer math to avoid floating point issues
+        local oldPct = math.floor((RaidBuffsTrackerDB.optionsPanelScale or BASE_SCALE) / BASE_SCALE * 100 + 0.5)
+        local newPct = math.max(MIN_PCT, math.min(MAX_PCT, oldPct + delta))
+        local newScale = newPct / 100 * BASE_SCALE
+        RaidBuffsTrackerDB.optionsPanelScale = newScale
+        panel:SetScale(newScale)
+        scaleValue:SetText(newPct .. "%")
+        -- Disable buttons at limits
+        scaleDown:SetEnabled(newPct > MIN_PCT)
+        scaleUp:SetEnabled(newPct < MAX_PCT)
+    end
+
+    scaleDown = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    scaleDown:SetSize(18, 18)
+    scaleDown:SetPoint("RIGHT", scaleValue, "LEFT", -4, 0)
+    scaleDown:SetText("-")
+    scaleDown:SetScript("OnClick", function() UpdateScale(-10) end)
+    scaleDown:SetEnabled(currentPct > MIN_PCT)
+
+    scaleUp = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    scaleUp:SetSize(18, 18)
+    scaleUp:SetPoint("LEFT", scaleValue, "RIGHT", 4, 0)
+    scaleUp:SetText("+")
+    scaleUp:SetScript("OnClick", function() UpdateScale(10) end)
+    scaleUp:SetEnabled(currentPct < MAX_PCT)
+
+    -- Apply saved scale
+    if RaidBuffsTrackerDB.optionsPanelScale then
+        panel:SetScale(RaidBuffsTrackerDB.optionsPanelScale)
+    end
 
     -- Close button
     local closeBtn = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -2, -2)
     closeBtn:SetScript("OnClick", function() panel:Hide() end)
 
-    local yOffset = -40
-
-    -- Buff checkboxes section
-    local buffLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    buffLabel:SetPoint("TOP", 0, yOffset)
-    buffLabel:SetText("Tracked Buffs:")
-    yOffset = yOffset - 22
+    -- Column anchors
+    local leftColX = COL_PADDING
+    local rightColX = LEFT_COL_WIDTH + COL_PADDING * 2
+    local startY = -44
 
     panel.buffCheckboxes = {}
-    local buffStartX = 30  -- Fixed left margin for alignment
 
-    -- Helper to create buff checkbox row
-    local function CreateBuffCheckbox(spellIDs, key, displayName, classProvider, suffix)
+    -- ========== HELPER FUNCTIONS ==========
+
+    -- Create section header
+    local function CreateSectionHeader(parent, text, x, y)
+        local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        header:SetPoint("TOPLEFT", x, y)
+        header:SetText("|cffffcc00" .. text .. "|r")
+        return header, y - 18
+    end
+
+    -- Create buff checkbox (compact, for left column)
+    local function CreateBuffCheckbox(x, y, spellIDs, key, displayName)
         local cb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-        cb:SetSize(24, 24)
-        cb:SetPoint("TOPLEFT", buffStartX, yOffset)
+        cb:SetSize(20, 20)
+        cb:SetPoint("TOPLEFT", x, y)
         cb:SetChecked(RaidBuffsTrackerDB.enabledBuffs[key])
         cb:SetScript("OnClick", function(self)
             RaidBuffsTrackerDB.enabledBuffs[key] = self:GetChecked()
@@ -793,71 +858,48 @@ local function CreateOptionsPanel()
         end)
 
         local icon = panel:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(20, 20)
-        icon:SetPoint("LEFT", cb, "RIGHT", 4, 0)
+        icon:SetSize(18, 18)
+        icon:SetPoint("LEFT", cb, "RIGHT", 2, 0)
         icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         local texture = GetBuffTexture(spellIDs)
         if texture then
             icon:SetTexture(texture)
         end
 
-        local label = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        label:SetPoint("LEFT", icon, "RIGHT", 6, 0)
-        label:SetText(displayName .. " |cff888888(" .. classProvider .. ")|r" .. (suffix or ""))
+        local label = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        label:SetPoint("LEFT", icon, "RIGHT", 4, 0)
+        label:SetText(displayName)
 
         panel.buffCheckboxes[key] = cb
-        yOffset = yOffset - 24
+        return y - ITEM_HEIGHT
     end
 
-    -- Coverage buffs
-    for _, buffData in ipairs(RaidBuffs) do
-        local spellIDs, key, displayName, classProvider = unpack(buffData)
-        CreateBuffCheckbox(spellIDs, key, displayName, classProvider)
+    -- Create checkbox with label (for right column)
+    local function CreateCheckbox(x, y, labelText, checked, onClick)
+        local cb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+        cb:SetSize(20, 20)
+        cb:SetPoint("TOPLEFT", x, y)
+        cb:SetChecked(checked)
+        cb:SetScript("OnClick", onClick)
+
+        local label = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        label:SetPoint("LEFT", cb, "RIGHT", 4, 0)
+        label:SetText(labelText)
+
+        return cb, y - ITEM_HEIGHT
     end
 
-    yOffset = yOffset - 10
-
-    -- Presence buffs section
-    local presenceLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    presenceLabel:SetPoint("TOP", 0, yOffset)
-    presenceLabel:SetText("Presence Buffs |cff888888(need at least 1)|r:")
-    yOffset = yOffset - 22
-
-    for _, buffData in ipairs(PresenceBuffs) do
-        local spellIDs, key, displayName, classProvider = unpack(buffData)
-        CreateBuffCheckbox(spellIDs, key, displayName, classProvider)
-    end
-
-    yOffset = yOffset - 10
-
-    -- Provider-count buffs section
-    local providerCountLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    providerCountLabel:SetPoint("TOP", 0, yOffset)
-    providerCountLabel:SetText("Provider Buffs |cff888888(1 per provider)|r:")
-    yOffset = yOffset - 22
-
-    for _, buffData in ipairs(ProviderCountBuffs) do
-        local spellIDs, key, displayName, classProvider = unpack(buffData)
-        CreateBuffCheckbox(spellIDs, key, displayName, classProvider)
-    end
-
-    yOffset = yOffset - 20
-
-    -- Helper for inline sliders: Label [slider] value
-    local function CreateInlineSlider(yPos, labelText, minVal, maxVal, step, initVal, valueSuffix, onChange)
-        local labelWidth = 65
-        local sliderWidth = 140
-        local valueWidth = 40
-
-        local label = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        label:SetPoint("TOPLEFT", 25, yPos)
-        label:SetWidth(labelWidth)
-        label:SetJustifyH("RIGHT")
+    -- Create compact slider with clickable numeric input
+    local function CreateSlider(x, y, labelText, minVal, maxVal, step, initVal, suffix, onChange)
+        local label = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        label:SetPoint("TOPLEFT", x, y)
+        label:SetWidth(70)
+        label:SetJustifyH("LEFT")
         label:SetText(labelText)
 
         local slider = CreateFrame("Slider", nil, panel, "OptionsSliderTemplate")
-        slider:SetPoint("LEFT", label, "RIGHT", 10, 0)
-        slider:SetSize(sliderWidth, 17)
+        slider:SetPoint("LEFT", label, "RIGHT", 5, 0)
+        slider:SetSize(100, 14)
         slider:SetMinMaxValues(minVal, maxVal)
         slider:SetValueStep(step)
         slider:SetObeyStepOnDrag(true)
@@ -866,244 +908,291 @@ local function CreateOptionsPanel()
         slider.High:SetText("")
         slider.Text:SetText("")
 
-        local value = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        value:SetPoint("LEFT", slider, "RIGHT", 10, 0)
-        value:SetWidth(valueWidth)
+        -- Clickable value display
+        local valueBtn = CreateFrame("Button", nil, panel)
+        valueBtn:SetPoint("LEFT", slider, "RIGHT", 6, 0)
+        valueBtn:SetSize(40, 16)
+
+        local value = valueBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        value:SetAllPoints()
         value:SetJustifyH("LEFT")
-        value:SetText(initVal .. (valueSuffix or ""))
+        value:SetText(initVal .. (suffix or ""))
+
+        -- Edit box (hidden by default)
+        local editBox = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+        editBox:SetSize(35, 16)
+        editBox:SetPoint("LEFT", slider, "RIGHT", 6, 0)
+        editBox:SetAutoFocus(false)
+        editBox:SetNumeric(true)
+        editBox:Hide()
+
+        editBox:SetScript("OnEnterPressed", function(self)
+            local num = tonumber(self:GetText())
+            if num then
+                num = math.max(minVal, math.min(maxVal, num))
+                slider:SetValue(num)
+            end
+            self:Hide()
+            valueBtn:Show()
+        end)
+
+        editBox:SetScript("OnEscapePressed", function(self)
+            self:Hide()
+            valueBtn:Show()
+        end)
+
+        editBox:SetScript("OnEditFocusLost", function(self)
+            self:Hide()
+            valueBtn:Show()
+        end)
+
+        valueBtn:SetScript("OnClick", function()
+            valueBtn:Hide()
+            editBox:SetText(tostring(math.floor(slider:GetValue())))
+            editBox:Show()
+            editBox:SetFocus()
+            editBox:HighlightText()
+        end)
+        valueBtn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText("Click to type a value")
+            GameTooltip:Show()
+        end)
+        valueBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
         slider:SetScript("OnValueChanged", function(self, val)
             val = math.floor(val)
-            value:SetText(val .. (valueSuffix or ""))
+            value:SetText(val .. (suffix or ""))
             onChange(val)
         end)
 
-        return slider, value
+        return slider, value, y - 24
     end
 
-    -- Icon Size slider
-    local sizeSlider, sizeValue = CreateInlineSlider(yOffset, "Icon Size:", 16, 128, 2, RaidBuffsTrackerDB.iconSize, "", function(val)
+    -- ========== LEFT COLUMN: BUFF SELECTION ==========
+    local leftY = startY
+
+    -- Tracked Buffs header
+    _, leftY = CreateSectionHeader(panel, "Tracked Buffs", leftColX, leftY)
+
+    -- Coverage buffs
+    for _, buffData in ipairs(RaidBuffs) do
+        local spellIDs, key, displayName = unpack(buffData)
+        leftY = CreateBuffCheckbox(leftColX, leftY, spellIDs, key, displayName)
+    end
+
+    leftY = leftY - SECTION_SPACING
+
+    -- Presence Buffs header
+    _, leftY = CreateSectionHeader(panel, "Presence Buffs", leftColX, leftY)
+    local presenceNote = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    presenceNote:SetPoint("TOPLEFT", leftColX, leftY)
+    presenceNote:SetText("(need at least 1)")
+    leftY = leftY - 14
+
+    for _, buffData in ipairs(PresenceBuffs) do
+        local spellIDs, key, displayName = unpack(buffData)
+        leftY = CreateBuffCheckbox(leftColX, leftY, spellIDs, key, displayName)
+    end
+
+    leftY = leftY - SECTION_SPACING
+
+    -- Provider Buffs header
+    _, leftY = CreateSectionHeader(panel, "Provider Buffs", leftColX, leftY)
+    local providerNote = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    providerNote:SetPoint("TOPLEFT", leftColX, leftY)
+    providerNote:SetText("(1 per provider)")
+    leftY = leftY - 14
+
+    for _, buffData in ipairs(ProviderCountBuffs) do
+        local spellIDs, key, displayName = unpack(buffData)
+        leftY = CreateBuffCheckbox(leftColX, leftY, spellIDs, key, displayName)
+    end
+
+    -- ========== RIGHT COLUMN: SETTINGS ==========
+    local rightY = startY
+
+    -- Appearance header
+    _, rightY = CreateSectionHeader(panel, "Appearance", rightColX, rightY)
+
+    local sizeSlider, sizeValue
+    sizeSlider, sizeValue, rightY = CreateSlider(rightColX, rightY, "Icon Size", 16, 128, 1, RaidBuffsTrackerDB.iconSize, "", function(val)
         RaidBuffsTrackerDB.iconSize = val
         UpdateVisuals()
     end)
     panel.sizeSlider = sizeSlider
     panel.sizeValue = sizeValue
 
-    yOffset = yOffset - 28
-
-    -- Spacing slider
-    local spacingSlider, spacingValue = CreateInlineSlider(yOffset, "Spacing:", 0, 50, 5, math.floor((RaidBuffsTrackerDB.spacing or 0.2) * 100), "%", function(val)
+    local spacingSlider, spacingValue
+    spacingSlider, spacingValue, rightY = CreateSlider(rightColX, rightY, "Spacing", 0, 50, 1, math.floor((RaidBuffsTrackerDB.spacing or 0.2) * 100), "%", function(val)
         RaidBuffsTrackerDB.spacing = val / 100
-        UpdateDisplay()
+        if testMode then
+            PositionBuffFrames()
+        else
+            UpdateDisplay()
+        end
     end)
     panel.spacingSlider = spacingSlider
     panel.spacingValue = spacingValue
 
-    yOffset = yOffset - 28
-
-    -- Text Size slider
-    local textSlider, textValue = CreateInlineSlider(yOffset, "Text Size:", 20, 60, 2, math.floor((RaidBuffsTrackerDB.textScale or 0.32) * 100), "%", function(val)
+    local textSlider, textValue
+    textSlider, textValue, rightY = CreateSlider(rightColX, rightY, "Text Size", 20, 60, 1, math.floor((RaidBuffsTrackerDB.textScale or 0.32) * 100), "%", function(val)
         RaidBuffsTrackerDB.textScale = val / 100
         UpdateVisuals()
+        if testMode then
+            PositionBuffFrames()
+        end
     end)
     panel.textSlider = textSlider
     panel.textValue = textValue
 
-    yOffset = yOffset - 30
+    rightY = rightY - 4
 
-    -- Helper to create centered checkbox with label
-    local function CreateCenteredCheckbox(labelText, yPos, checked, onClick)
-        local row = CreateFrame("Frame", nil, panel)
-        row:SetSize(280, 24)
-        row:SetPoint("TOP", 0, yPos)
+    -- Grow direction
+    local growLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    growLabel:SetPoint("TOPLEFT", rightColX, rightY)
+    growLabel:SetText("Grow:")
 
-        local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
-        cb:SetSize(24, 24)
-        cb:SetChecked(checked)
-        cb:SetScript("OnClick", onClick)
+    local growBtns = {}
+    local directions = {"LEFT", "CENTER", "RIGHT"}
+    local dirLabels = {"Left", "Center", "Right"}
+    local growBtnWidth = 70
 
-        local label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        label:SetPoint("LEFT", cb, "RIGHT", 2, 0)
-        label:SetText(labelText)
-
-        -- Center the checkbox + label within the row
-        local totalWidth = 24 + 2 + label:GetStringWidth()
-        cb:SetPoint("LEFT", row, "CENTER", -totalWidth / 2, 0)
-
-        return cb
+    for i, dir in ipairs(directions) do
+        local btn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+        btn:SetSize(growBtnWidth, 18)
+        btn:SetPoint("LEFT", growLabel, "RIGHT", 5 + (i-1) * (growBtnWidth + 3), 0)
+        btn:SetText(dirLabels[i])
+        btn:SetNormalFontObject("GameFontHighlightSmall")
+        btn:SetHighlightFontObject("GameFontHighlightSmall")
+        btn:SetDisabledFontObject("GameFontDisableSmall")
+        btn.direction = dir
+        btn:SetScript("OnClick", function()
+            RaidBuffsTrackerDB.growDirection = dir
+            for _, b in ipairs(growBtns) do
+                b:SetEnabled(b.direction ~= dir)
+            end
+            UpdateDisplay()
+        end)
+        btn:SetEnabled(RaidBuffsTrackerDB.growDirection ~= dir)
+        growBtns[i] = btn
     end
+    panel.growBtns = growBtns
 
-    -- Lock checkbox
-    local lockCb = CreateCenteredCheckbox("Lock Position", yOffset, RaidBuffsTrackerDB.locked, function(self)
+    rightY = rightY - 26
+
+    -- Separator
+    local sep1 = panel:CreateTexture(nil, "ARTWORK")
+    sep1:SetSize(RIGHT_COL_WIDTH - 20, 1)
+    sep1:SetPoint("TOPLEFT", rightColX, rightY)
+    sep1:SetColorTexture(0.4, 0.4, 0.4, 1)
+    rightY = rightY - SECTION_SPACING
+
+    -- Behavior header
+    _, rightY = CreateSectionHeader(panel, "Behavior", rightColX, rightY)
+
+    local lockCb
+    lockCb, rightY = CreateCheckbox(rightColX, rightY, "Lock Position", RaidBuffsTrackerDB.locked, function(self)
         RaidBuffsTrackerDB.locked = self:GetChecked()
         UpdateAnchor()
     end)
     panel.lockCheckbox = lockCb
 
-    yOffset = yOffset - 30
-
-    -- Show Buff Reminder checkbox
-    local reminderCb = CreateCenteredCheckbox("Show \"BUFF!\" reminder", yOffset, RaidBuffsTrackerDB.showBuffReminder ~= false, function(self)
+    local reminderCb
+    reminderCb, rightY = CreateCheckbox(rightColX, rightY, "Show \"BUFF!\" reminder", RaidBuffsTrackerDB.showBuffReminder ~= false, function(self)
         RaidBuffsTrackerDB.showBuffReminder = self:GetChecked()
         UpdateVisuals()
     end)
     panel.reminderCheckbox = reminderCb
 
-    yOffset = yOffset - 30
-
-    -- Show only in group checkbox
-    local groupCb = CreateCenteredCheckbox("Show only in group/raid", yOffset, RaidBuffsTrackerDB.showOnlyInGroup ~= false, function(self)
+    local groupCb
+    groupCb, rightY = CreateCheckbox(rightColX, rightY, "Show only in group/raid", RaidBuffsTrackerDB.showOnlyInGroup ~= false, function(self)
         RaidBuffsTrackerDB.showOnlyInGroup = self:GetChecked()
         UpdateDisplay()
     end)
     panel.groupCheckbox = groupCb
 
-    yOffset = yOffset - 30
-
-    -- Hide if provider missing checkbox
-    local providerCb = CreateCenteredCheckbox("Hide buffs for missing classes", yOffset, RaidBuffsTrackerDB.hideBuffsWithoutProvider, function(self)
+    local providerCb
+    providerCb, rightY = CreateCheckbox(rightColX, rightY, "Hide buffs for missing classes", RaidBuffsTrackerDB.hideBuffsWithoutProvider, function(self)
         RaidBuffsTrackerDB.hideBuffsWithoutProvider = self:GetChecked()
         UpdateDisplay()
     end)
     panel.providerCheckbox = providerCb
 
-    yOffset = yOffset - 30
-
-    -- Show only player class buff checkbox
-    local playerClassCb = CreateCenteredCheckbox("Show only my class buff", yOffset, RaidBuffsTrackerDB.showOnlyPlayerClassBuff, function(self)
+    local playerClassCb
+    playerClassCb, rightY = CreateCheckbox(rightColX, rightY, "Show only my class buff", RaidBuffsTrackerDB.showOnlyPlayerClassBuff, function(self)
         RaidBuffsTrackerDB.showOnlyPlayerClassBuff = self:GetChecked()
         UpdateDisplay()
     end)
     panel.playerClassCheckbox = playerClassCb
 
-    yOffset = yOffset - 30
-
-    -- Filter by class benefit checkbox (BETA)
-    local classBenefitCb = CreateCenteredCheckbox("Only count benefiting classes |cffff8000(BETA)|r", yOffset, RaidBuffsTrackerDB.filterByClassBenefit, function(self)
+    local classBenefitCb
+    classBenefitCb, rightY = CreateCheckbox(rightColX, rightY, "Only count benefiting classes |cffff8000(BETA)|r", RaidBuffsTrackerDB.filterByClassBenefit, function(self)
         RaidBuffsTrackerDB.filterByClassBenefit = self:GetChecked()
         UpdateDisplay()
     end)
     panel.classBenefitCheckbox = classBenefitCb
 
-    yOffset = yOffset - 30
+    -- Separator
+    local sep2 = panel:CreateTexture(nil, "ARTWORK")
+    sep2:SetSize(RIGHT_COL_WIDTH - 20, 1)
+    sep2:SetPoint("TOPLEFT", rightColX, rightY - 4)
+    sep2:SetColorTexture(0.4, 0.4, 0.4, 1)
+    rightY = rightY - SECTION_SPACING - 4
 
-    -- Expiration glow checkbox
-    local glowCb = CreateCenteredCheckbox("Show glow when expiring soon", yOffset, RaidBuffsTrackerDB.showExpirationGlow, function(self)
+    -- Expiration Warning header
+    _, rightY = CreateSectionHeader(panel, "Expiration Warning", rightColX, rightY)
+
+    local glowCb
+    glowCb, rightY = CreateCheckbox(rightColX, rightY, "Show glow when expiring", RaidBuffsTrackerDB.showExpirationGlow, function(self)
         RaidBuffsTrackerDB.showExpirationGlow = self:GetChecked()
         UpdateDisplay()
     end)
     panel.glowCheckbox = glowCb
 
-    yOffset = yOffset - 28
-
-    -- Expiration threshold slider (reuse CreateInlineSlider pattern)
-    local thresholdLabelWidth = 100
-    local thresholdSliderWidth = 120
-    local thresholdValueWidth = 50
-
-    local thresholdLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    thresholdLabel:SetPoint("TOPLEFT", 20, yOffset)
-    thresholdLabel:SetWidth(thresholdLabelWidth)
-    thresholdLabel:SetJustifyH("RIGHT")
-    thresholdLabel:SetText("Threshold:")
-
-    local thresholdSlider = CreateFrame("Slider", nil, panel, "OptionsSliderTemplate")
-    thresholdSlider:SetPoint("LEFT", thresholdLabel, "RIGHT", 10, 0)
-    thresholdSlider:SetSize(thresholdSliderWidth, 17)
-    thresholdSlider:SetMinMaxValues(1, 15)
-    thresholdSlider:SetValueStep(1)
-    thresholdSlider:SetObeyStepOnDrag(true)
-    thresholdSlider:SetValue(RaidBuffsTrackerDB.expirationThreshold or 5)
-    thresholdSlider.Low:SetText("")
-    thresholdSlider.High:SetText("")
-    thresholdSlider.Text:SetText("")
-
-    local thresholdValue = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    thresholdValue:SetPoint("LEFT", thresholdSlider, "RIGHT", 10, 0)
-    thresholdValue:SetWidth(thresholdValueWidth)
-    thresholdValue:SetJustifyH("LEFT")
-    thresholdValue:SetText((RaidBuffsTrackerDB.expirationThreshold or 5) .. " min")
-
-    thresholdSlider:SetScript("OnValueChanged", function(self, val)
-        val = math.floor(val)
-        thresholdValue:SetText(val .. " min")
+    local thresholdSlider, thresholdValue
+    thresholdSlider, thresholdValue, rightY = CreateSlider(rightColX, rightY, "Threshold", 1, 15, 1, RaidBuffsTrackerDB.expirationThreshold or 5, " min", function(val)
         RaidBuffsTrackerDB.expirationThreshold = val
         UpdateDisplay()
     end)
-
     panel.thresholdSlider = thresholdSlider
     panel.thresholdValue = thresholdValue
 
-    yOffset = yOffset - 35
-
-    -- Grow direction label
-    local growLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    growLabel:SetPoint("TOP", 0, yOffset)
-    growLabel:SetText("Grow Direction:")
-
-    yOffset = yOffset - 25
-
-    -- Grow direction buttons
-    local growBtnWidth = 80
-    local growBtnSpacing = 10
-    local totalGrowWidth = (growBtnWidth * 3) + (growBtnSpacing * 2)
-
-    local growBtns = {}
-    local directions = {"LEFT", "CENTER", "RIGHT"}
-    local dirLabels = {"Left", "Center", "Right"}
-
-    for i, dir in ipairs(directions) do
-        local btn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-        btn:SetSize(growBtnWidth, 22)
-        btn:SetPoint("TOP", -totalGrowWidth/2 + growBtnWidth/2 + (i-1) * (growBtnWidth + growBtnSpacing), yOffset)
-        btn:SetText(dirLabels[i])
-        btn.direction = dir
-        btn:SetScript("OnClick", function()
-            RaidBuffsTrackerDB.growDirection = dir
-            for _, b in ipairs(growBtns) do
-                if b.direction == dir then
-                    b:SetEnabled(false)
-                else
-                    b:SetEnabled(true)
-                end
-            end
-            UpdateDisplay()
-        end)
-        if RaidBuffsTrackerDB.growDirection == dir then
-            btn:SetEnabled(false)
-        end
-        growBtns[i] = btn
-    end
-    panel.growBtns = growBtns
-
-    yOffset = yOffset - 35  -- 22px button height + 13px padding
+    -- ========== BOTTOM BUTTONS (spanning both columns) ==========
+    local bottomY = math.min(leftY, rightY) - 20
 
     -- Separator line
     local separator = panel:CreateTexture(nil, "ARTWORK")
-    separator:SetSize(260, 1)
-    separator:SetPoint("TOP", 0, yOffset)
+    separator:SetSize(PANEL_WIDTH - 40, 1)
+    separator:SetPoint("TOP", 0, bottomY)
     separator:SetColorTexture(0.5, 0.5, 0.5, 1)
+    bottomY = bottomY - 15
 
-    yOffset = yOffset - 15
+    -- Button row
+    local btnWidth = 100
+    local btnSpacing = 10
+    local totalBtnWidth = btnWidth * 3 + btnSpacing * 2
 
-    -- Buttons row 1 (centered)
-    local btnWidth = 135
-
-    -- Reset Position button
     local resetPosBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    resetPosBtn:SetSize(btnWidth, 24)
-    resetPosBtn:SetPoint("TOP", -72, yOffset)
-    resetPosBtn:SetText("Reset Position")
+    resetPosBtn:SetSize(btnWidth, 22)
+    resetPosBtn:SetPoint("TOP", -totalBtnWidth/2 + btnWidth/2, bottomY)
+    resetPosBtn:SetText("Reset Pos")
     resetPosBtn:SetScript("OnClick", function()
         RaidBuffsTrackerDB.position = {point = "CENTER", x = 0, y = 0}
         mainFrame:ClearAllPoints()
         mainFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     end)
+    resetPosBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText("Reset Position")
+        GameTooltip:AddLine("Moves the buff tracker back to the center of the screen.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    resetPosBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    -- Reset Ratios button
     local resetRatiosBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    resetRatiosBtn:SetSize(btnWidth, 24)
-    resetRatiosBtn:SetPoint("LEFT", resetPosBtn, "RIGHT", 10, 0)
+    resetRatiosBtn:SetSize(btnWidth, 22)
+    resetRatiosBtn:SetPoint("LEFT", resetPosBtn, "RIGHT", btnSpacing, 0)
     resetRatiosBtn:SetText("Reset Ratios")
     resetRatiosBtn:SetScript("OnClick", function()
         RaidBuffsTrackerDB.spacing = 0.2
@@ -1117,20 +1206,14 @@ local function CreateOptionsPanel()
     resetRatiosBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:SetText("Reset Ratios")
-        GameTooltip:AddLine("Resets spacing and text size to recommended ratios based on icon size for a consistent look.", 1, 1, 1, true)
+        GameTooltip:AddLine("Resets spacing and text size to recommended ratios.", 1, 1, 1, true)
         GameTooltip:Show()
     end)
-    resetRatiosBtn:SetScript("OnLeave", function()
-        GameTooltip:Hide()
-    end)
+    resetRatiosBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    yOffset = yOffset - 30
-
-    -- Buttons row 2 (centered)
-    -- Test Mode button
     local testBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    testBtn:SetSize(btnWidth, 24)
-    testBtn:SetPoint("TOP", 0, yOffset)
+    testBtn:SetSize(btnWidth, 22)
+    testBtn:SetPoint("LEFT", resetRatiosBtn, "RIGHT", btnSpacing, 0)
     testBtn:SetText("Test")
     panel.testBtn = testBtn
     testBtn:SetScript("OnClick", function()
@@ -1175,9 +1258,10 @@ local function CreateOptionsPanel()
         end
     end)
 
-    -- Set panel height dynamically based on content
-    local panelHeight = math.abs(yOffset) + 40  -- add bottom padding
-    panel:SetHeight(panelHeight)
+    bottomY = bottomY - 30
+
+    -- Set panel height
+    panel:SetHeight(math.abs(bottomY) + 15)
 
     return panel
 end
