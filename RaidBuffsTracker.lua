@@ -11,10 +11,10 @@ local RaidBuffs = {
 }
 
 -- Presence-based buffs: only need at least 1 person to have it active
--- {spellID(s), settingKey, displayName, classProvider}
+-- {spellID(s), settingKey, displayName, classProvider, missingText}
 local PresenceBuffs = {
-    { 381637, "atrophicPoison", "Atrophic Poison", "ROGUE" },
-    { 465, "devotionAura", "Devotion Aura", "PALADIN" },
+    { 381637, "atrophicPoison", "Atrophic Poison", "ROGUE", "NO\nPOISON" },
+    { 465, "devotionAura", "Devotion Aura", "PALADIN", "NO\nAURA" },
 }
 
 -- Personal buffs: only tracks if the player should cast their buff
@@ -88,6 +88,7 @@ local updateTicker
 local inCombat = false
 local testMode = false
 local optionsPanel
+local MISSING_TEXT_SCALE = 0.6 -- scale for "NO X" warning text
 
 -- Check if a unit is a valid group member for buff tracking
 -- Excludes: non-existent, dead/ghost, disconnected, hostile (cross-faction in open world)
@@ -522,7 +523,7 @@ UpdateDisplay = function()
 
     -- Process presence buffs (need at least 1 person to have them)
     for _, buffData in ipairs(PresenceBuffs) do
-        local spellIDs, key, _, classProvider = unpack(buffData)
+        local spellIDs, key, _, classProvider, missingText = unpack(buffData)
         local frame = buffFrames[key]
 
         local showBuff = true
@@ -540,12 +541,14 @@ UpdateDisplay = function()
             local expiringSoon = db.showExpirationGlow and minRemaining and minRemaining < (db.expirationThreshold * 60)
             if count == 0 then
                 -- Nobody has it - show as missing
-                frame.count:SetText("")
+                frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(MISSING_TEXT_SCALE), "OUTLINE")
+                frame.count:SetText(missingText or "")
                 frame:Show()
                 anyVisible = true
                 SetExpirationGlow(frame, false)
             elseif expiringSoon then
                 -- Has buff but expiring soon - show with glow
+                frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(), "OUTLINE")
                 frame.count:SetText("")
                 frame:Show()
                 anyVisible = true
@@ -569,7 +572,7 @@ UpdateDisplay = function()
         if frame and db.enabledBuffs[key] then
             local shouldShow = ShouldShowPersonalBuff(spellIDs, requiredClass, beneficiaryRole)
             if shouldShow then
-                frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(0.6), "OUTLINE")
+                frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(MISSING_TEXT_SCALE), "OUTLINE")
                 frame.count:SetText("NO\nSOURCE")
                 frame:Show()
                 anyVisible = true
@@ -1308,10 +1311,11 @@ local function CreateOptionsPanel()
                 end
             end
             for _, buffData in ipairs(PresenceBuffs) do
-                local _, key = unpack(buffData)
+                local _, key, _, _, missingText = unpack(buffData)
                 local frame = buffFrames[key]
                 if frame and db.enabledBuffs[key] then
-                    frame.count:SetText("")
+                    frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(MISSING_TEXT_SCALE), "OUTLINE")
+                    frame.count:SetText(missingText or "")
                     frame:Show()
                 end
             end
@@ -1319,7 +1323,7 @@ local function CreateOptionsPanel()
                 local _, key = unpack(buffData)
                 local frame = buffFrames[key]
                 if frame and db.enabledBuffs[key] then
-                    frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(0.6), "OUTLINE")
+                    frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(MISSING_TEXT_SCALE), "OUTLINE")
                     frame.count:SetText("NO\nSOURCE")
                     frame:Show()
                 end
@@ -1426,10 +1430,11 @@ local function SlashHandler(msg)
                 end
             end
             for _, buffData in ipairs(PresenceBuffs) do
-                local _, key = unpack(buffData)
+                local _, key, _, _, missingText = unpack(buffData)
                 local frame = buffFrames[key]
                 if frame and db.enabledBuffs[key] then
-                    frame.count:SetText("")
+                    frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(MISSING_TEXT_SCALE), "OUTLINE")
+                    frame.count:SetText(missingText or "")
                     frame:Show()
                 end
             end
@@ -1437,7 +1442,7 @@ local function SlashHandler(msg)
                 local _, key = unpack(buffData)
                 local frame = buffFrames[key]
                 if frame and db.enabledBuffs[key] then
-                    frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(0.6), "OUTLINE")
+                    frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(MISSING_TEXT_SCALE), "OUTLINE")
                     frame.count:SetText("NO\nSOURCE")
                     frame:Show()
                 end
