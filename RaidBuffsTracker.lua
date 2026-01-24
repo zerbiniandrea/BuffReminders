@@ -564,7 +564,7 @@ local function CreateBuffFrame(buffData, _)
     frame.testText:Hide()
 
     -- Dragging
-    frame:EnableMouse(true)
+    frame:EnableMouse(not RaidBuffsTrackerDB.locked)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", function()
         if not RaidBuffsTrackerDB.locked then
@@ -962,7 +962,7 @@ end
 -- Make frame draggable
 local function SetupDragging()
     mainFrame:SetMovable(true)
-    mainFrame:EnableMouse(true)
+    mainFrame:EnableMouse(not RaidBuffsTrackerDB.locked)
     mainFrame:RegisterForDrag("LeftButton")
 
     mainFrame:SetScript("OnDragStart", function(self)
@@ -1049,6 +1049,12 @@ UpdateAnchor = function()
         mainFrame.anchorFrame:Show()
     else
         mainFrame.anchorFrame:Hide()
+    end
+
+    -- Update mouse enabled state (click-through when locked)
+    mainFrame:EnableMouse(not db.locked)
+    for _, frame in pairs(buffFrames) do
+        frame:EnableMouse(not db.locked)
     end
 end
 
