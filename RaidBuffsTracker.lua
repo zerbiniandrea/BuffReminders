@@ -96,6 +96,8 @@ local defaults = {
     hideBuffsWithoutProvider = false,
     showOnlyPlayerClassBuff = false,
     filterByClassBenefit = false,
+    showOnlyOnReadyCheck = false,
+    readyCheckDuration = 15, -- seconds
     growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT"
     showExpirationGlow = true,
     expirationThreshold = 15, -- minutes
@@ -107,6 +109,8 @@ local defaults = {
 local mainFrame
 local buffFrames = {}
 local updateTicker
+local inReadyCheck = false
+local readyCheckTimer = nil
 local inCombat = false
 local testMode = false
 local testModeData = nil -- Stores seeded fake values for consistent test display
@@ -770,6 +774,11 @@ UpdateDisplay = function()
     local db = RaidBuffsTrackerDB
 
     -- Hide based on visibility settings
+    if db.showOnlyOnReadyCheck and not inReadyCheck then
+        mainFrame:Hide()
+        return
+    end
+
     if db.showOnlyInGroup then
         if db.showOnlyInInstance then
             if not IsInInstance() then
@@ -1298,6 +1307,7 @@ local function CreateOptionsPanel()
             onChange(val)
         end)
 
+        slider.label = label
         return slider, value, y - 24
     end
 
@@ -1533,6 +1543,49 @@ local function CreateOptionsPanel()
     panel.instanceCheckbox = instanceCb
     panel.SetCheckboxEnabled = SetCheckboxEnabled
 
+    local readyCheckCb, readyCheckSlider, readyCheckSliderValue
+    readyCheckCb, rightY = CreateCheckbox(
+        rightColX,
+        rightY,
+        "Show only on ready check",
+        RaidBuffsTrackerDB.showOnlyOnReadyCheck,
+        function(self)
+            RaidBuffsTrackerDB.showOnlyOnReadyCheck = self:GetChecked()
+            -- Enable/disable the duration slider
+            if readyCheckSlider then
+                local enabled = self:GetChecked()
+                local color = enabled and 1 or 0.5
+                readyCheckSlider:SetEnabled(enabled)
+                readyCheckSlider.label:SetTextColor(color, color, color)
+                readyCheckSliderValue:SetTextColor(color, color, color)
+            end
+            UpdateDisplay()
+        end
+    )
+    panel.readyCheckCheckbox = readyCheckCb
+
+    -- Duration slider
+    readyCheckSlider, readyCheckSliderValue, rightY = CreateSlider(
+        rightColX,
+        rightY,
+        "Duration",
+        10,
+        30,
+        1,
+        RaidBuffsTrackerDB.readyCheckDuration or 15,
+        "s",
+        function(val)
+            RaidBuffsTrackerDB.readyCheckDuration = val
+        end
+    )
+    local enabled = RaidBuffsTrackerDB.showOnlyOnReadyCheck
+    local color = enabled and 1 or 0.5
+    readyCheckSlider:SetEnabled(enabled)
+    readyCheckSlider.label:SetTextColor(color, color, color)
+    readyCheckSliderValue:SetTextColor(color, color, color)
+    panel.readyCheckSlider = readyCheckSlider
+    panel.readyCheckSliderValue = readyCheckSliderValue
+
     local providerCb
     providerCb, rightY = CreateCheckbox(
         rightColX,
@@ -1688,9 +1741,11 @@ local function CreateOptionsPanel()
 
     -- Helper to enable/disable glow-related controls
     local function SetGlowControlsEnabled(enabled)
+        local color = enabled and 1 or 0.5
         thresholdSlider:SetEnabled(enabled)
-        thresholdValue:SetTextColor(enabled and 1 or 0.5, enabled and 1 or 0.5, enabled and 1 or 0.5)
-        styleLabel:SetTextColor(enabled and 1 or 0.5, enabled and 1 or 0.5, enabled and 1 or 0.5)
+        thresholdSlider.label:SetTextColor(color, color, color)
+        thresholdValue:SetTextColor(color, color, color)
+        styleLabel:SetTextColor(color, color, color)
         UIDropDownMenu_EnableDropDown(styleDropdown)
         if not enabled then
             UIDropDownMenu_DisableDropDown(styleDropdown)
@@ -1953,6 +2008,7 @@ eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 eventFrame:RegisterEvent("UNIT_AURA")
+eventFrame:RegisterEvent("READY_CHECK")
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == addonName then
@@ -2050,6 +2106,23 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "UNIT_AURA" then
         if not inCombat and mainFrame and mainFrame:IsShown() then
             UpdateDisplay()
+        end
+    elseif event == "READY_CHECK" then
+        if RaidBuffsTrackerDB.showOnlyOnReadyCheck then
+            -- Cancel any existing timer
+            if readyCheckTimer then
+                readyCheckTimer:Cancel()
+            end
+            inReadyCheck = true
+            if not inCombat then
+                UpdateDisplay()
+            end
+            -- Start timer to hide after configured duration
+            readyCheckTimer = C_Timer.NewTimer(RaidBuffsTrackerDB.readyCheckDuration, function()
+                inReadyCheck = false
+                readyCheckTimer = nil
+                UpdateDisplay()
+            end)
         end
     end
 end)
