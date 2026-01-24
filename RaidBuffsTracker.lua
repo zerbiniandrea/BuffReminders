@@ -16,10 +16,11 @@ local RaidBuffs = {
 }
 
 -- Presence-based buffs: only need at least 1 person to have it active
--- {spellID(s), settingKey, displayName, classProvider, missingText}
+-- {spellID(s), settingKey, displayName, classProvider, missingText, readyCheckOnly}
 local PresenceBuffs = {
-    { 381637, "atrophicPoison", "Atrophic Poison", "ROGUE", "NO\nPOISON" },
-    { 465, "devotionAura", "Devotion Aura", "PALADIN", "NO\nAURA" },
+    { 381637, "atrophicPoison", "Atrophic Poison", "ROGUE", "NO\nPOISON", false },
+    { 465, "devotionAura", "Devotion Aura", "PALADIN", "NO\nAURA", false },
+    { 20707, "soulstone", "Soulstone", "WARLOCK", "NO\nSTONE", true },
 }
 
 -- Personal buffs: only tracks if the player should cast their buff
@@ -842,12 +843,16 @@ UpdateDisplay = function()
 
     -- Process presence buffs (need at least 1 person to have them)
     for _, buffData in ipairs(PresenceBuffs) do
-        local spellIDs, key, _, classProvider, missingText = unpack(buffData)
+        local spellIDs, key, _, classProvider, missingText, readyCheckOnly = unpack(buffData)
         local frame = buffFrames[key]
 
         local showBuff = true
+        -- Filter: ready check only buffs
+        if readyCheckOnly and not inReadyCheck then
+            showBuff = false
+        end
         -- Filter: only show player's class buff
-        if db.showOnlyPlayerClassBuff and classProvider ~= playerClass then
+        if showBuff and db.showOnlyPlayerClassBuff and classProvider ~= playerClass then
             showBuff = false
         end
         -- Filter: hide buffs without provider in group
@@ -1333,8 +1338,28 @@ local function CreateOptionsPanel()
     leftY = leftY - 14
 
     for _, buffData in ipairs(PresenceBuffs) do
-        local spellIDs, key, displayName = unpack(buffData)
+        local spellIDs, key, displayName, _, _, readyCheckOnly = unpack(buffData)
         leftY = CreateBuffCheckbox(leftColX, leftY, spellIDs, key, displayName)
+        -- Add info indicator for ready-check-only buffs
+        if readyCheckOnly then
+            local infoIcon = panel:CreateTexture(nil, "ARTWORK")
+            infoIcon:SetSize(14, 14)
+            infoIcon:SetPoint("TOPLEFT", leftColX + 105, leftY + ITEM_HEIGHT - 3)
+            infoIcon:SetAtlas("QuestNormal")
+            -- Create invisible button for tooltip
+            local infoBtn = CreateFrame("Button", nil, panel)
+            infoBtn:SetSize(14, 14)
+            infoBtn:SetPoint("CENTER", infoIcon, "CENTER", 0, 0)
+            infoBtn:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText("Ready Check Only", 1, 0.82, 0)
+                GameTooltip:AddLine("This buff is only shown during ready checks.", 1, 1, 1, true)
+                GameTooltip:Show()
+            end)
+            infoBtn:SetScript("OnLeave", function()
+                GameTooltip:Hide()
+            end)
+        end
     end
 
     leftY = leftY - SECTION_SPACING
@@ -1578,11 +1603,11 @@ local function CreateOptionsPanel()
             RaidBuffsTrackerDB.readyCheckDuration = val
         end
     )
-    local enabled = RaidBuffsTrackerDB.showOnlyOnReadyCheck
-    local color = enabled and 1 or 0.5
-    readyCheckSlider:SetEnabled(enabled)
-    readyCheckSlider.label:SetTextColor(color, color, color)
-    readyCheckSliderValue:SetTextColor(color, color, color)
+    local rcEnabled = RaidBuffsTrackerDB.showOnlyOnReadyCheck
+    local rcColor = rcEnabled and 1 or 0.5
+    readyCheckSlider:SetEnabled(rcEnabled)
+    readyCheckSlider.label:SetTextColor(rcColor, rcColor, rcColor)
+    readyCheckSliderValue:SetTextColor(rcColor, rcColor, rcColor)
     panel.readyCheckSlider = readyCheckSlider
     panel.readyCheckSliderValue = readyCheckSliderValue
 
@@ -2108,21 +2133,20 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             UpdateDisplay()
         end
     elseif event == "READY_CHECK" then
-        if RaidBuffsTrackerDB.showOnlyOnReadyCheck then
-            -- Cancel any existing timer
-            if readyCheckTimer then
-                readyCheckTimer:Cancel()
-            end
-            inReadyCheck = true
-            if not inCombat then
-                UpdateDisplay()
-            end
-            -- Start timer to hide after configured duration
-            readyCheckTimer = C_Timer.NewTimer(RaidBuffsTrackerDB.readyCheckDuration, function()
-                inReadyCheck = false
-                readyCheckTimer = nil
-                UpdateDisplay()
-            end)
+        -- Cancel any existing timer
+        if readyCheckTimer then
+            readyCheckTimer:Cancel()
         end
+        inReadyCheck = true
+        if not inCombat then
+            UpdateDisplay()
+        end
+        -- Start timer to reset ready check state
+        local duration = RaidBuffsTrackerDB.readyCheckDuration or 15
+        readyCheckTimer = C_Timer.NewTimer(duration, function()
+            inReadyCheck = false
+            readyCheckTimer = nil
+            UpdateDisplay()
+        end)
     end
 end)
