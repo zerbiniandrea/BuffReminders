@@ -60,6 +60,7 @@ local PresenceBuffs = {
 --   missingText: text shown when buff is missing
 --   groupId: optional - buffs with same groupId share a single setting and show one icon
 local PersonalBuffs = {
+    -- Beacons (alphabetical: Faith, Light)
     {
         spellID = 156910,
         key = "beaconOfFaith",
@@ -77,6 +78,14 @@ local PersonalBuffs = {
         groupId = "beacons",
     },
     {
+        spellID = 974,
+        key = "earthShieldOthers",
+        name = "Earth Shield",
+        class = "SHAMAN",
+        missingText = "NO\nES",
+        infoTooltip = "May Show Extra Icon|Until you cast this, you might see both this and the Water/Lightning Shield reminder. I can't tell if you want Earth Shield on yourself, or Earth Shield on an ally + Water/Lightning Shield on yourself.",
+    },
+    {
         spellID = 369459,
         key = "sourceOfMagic",
         name = "Source of Magic",
@@ -91,14 +100,6 @@ local PersonalBuffs = {
         class = "DRUID",
         missingText = "NO\nLINK",
     },
-    {
-        spellID = 974,
-        key = "earthShieldOthers",
-        name = "Earth Shield",
-        class = "SHAMAN",
-        missingText = "NO\nES",
-        infoTooltip = "May Show Extra Icon|Until you cast this, you might see both this and the Water/Lightning Shield reminder. I can't tell if you want Earth Shield on yourself, or Earth Shield on an ally + Water/Lightning Shield on yourself.",
-    },
 }
 
 -- Self buffs: buffs/imbues the player casts on themselves
@@ -111,16 +112,35 @@ local PersonalBuffs = {
 --   excludeTalentSpellID: optional - hide if player has this talent
 --   iconByRole: optional - table mapping role (HEALER/DAMAGER/TANK) to spellID for icon
 local SelfBuffs = {
+    -- Paladin weapon rites (alphabetical: Adjuration, Sanctification)
+    {
+        spellID = 433583,
+        key = "riteOfAdjuration",
+        name = "Rite of Adjuration",
+        class = "PALADIN",
+        missingText = "NO\nRITE",
+        enchantID = 7144,
+        groupId = "paladinRites",
+    },
+    {
+        spellID = 433568,
+        key = "riteOfSanctification",
+        name = "Rite of Sanctification",
+        class = "PALADIN",
+        missingText = "NO\nRITE",
+        enchantID = 7143,
+        groupId = "paladinRites",
+    },
     -- Shadowform will drop during Void Form, but that only happens in combat. We're happy enough just checking Shadowform before going into combat.
     { spellID = 232698, key = "shadowform", name = "Shadowform", class = "PRIEST", missingText = "NO\nFORM" },
-    -- Enhancement Shaman weapon imbues
+    -- Shaman weapon imbues (alphabetical: Earthliving, Flametongue, Windfury)
     {
-        spellID = 33757,
-        key = "windfuryWeapon",
-        name = "Windfury Weapon",
+        spellID = 382021,
+        key = "earthlivingWeapon",
+        name = "Earthliving Weapon",
         class = "SHAMAN",
-        missingText = "NO\nWF",
-        enchantID = 5401,
+        missingText = "NO\nEL",
+        enchantID = 6498,
         groupId = "shamanImbues",
     },
     {
@@ -133,56 +153,15 @@ local SelfBuffs = {
         groupId = "shamanImbues",
     },
     {
-        spellID = 382021,
-        key = "earthlivingWeapon",
-        name = "Earthliving Weapon",
+        spellID = 33757,
+        key = "windfuryWeapon",
+        name = "Windfury Weapon",
         class = "SHAMAN",
-        missingText = "NO\nEL",
-        enchantID = 6498,
+        missingText = "NO\nWF",
+        enchantID = 5401,
         groupId = "shamanImbues",
     },
-    -- Paladin weapon rites
-    {
-        spellID = 433568,
-        key = "riteOfSanctification",
-        name = "Rite of Sanctification",
-        class = "PALADIN",
-        missingText = "NO\nRITE",
-        enchantID = 7143,
-        groupId = "paladinRites",
-    },
-    {
-        spellID = 433583,
-        key = "riteOfAdjuration",
-        name = "Rite of Adjuration",
-        class = "PALADIN",
-        missingText = "NO\nRITE",
-        enchantID = 7144,
-        groupId = "paladinRites",
-    },
-    -- Shaman shields
-    -- Without Elemental Orbit: need either Water Shield, Earth Shield, or Lightning Shield on self
-    {
-        spellID = { 52127, 974, 192106 },
-        key = "shamanShieldBasic",
-        name = "Shield (No Talent)",
-        class = "SHAMAN",
-        missingText = "NO\nSHIELD",
-        excludeTalentSpellID = 383010,
-        groupId = "shamanShields",
-        iconByRole = { HEALER = 52127, DAMAGER = 192106, TANK = 192106 },
-    },
-    -- With Elemental Orbit: need Water Shield or Lightning Shield
-    {
-        spellID = { 52127, 192106 },
-        key = "waterLightningShieldEO",
-        name = "Water/Lightning Shield",
-        class = "SHAMAN",
-        missingText = "NO\nSHIELD",
-        requiresTalentSpellID = 383010,
-        groupId = "shamanShields",
-        iconByRole = { HEALER = 52127, DAMAGER = 192106, TANK = 192106 },
-    },
+    -- Shaman shields (alphabetical: Earth, Lightning, Water)
     -- With Elemental Orbit: need Earth Shield (passive self-buff)
     {
         spellID = 974, -- Earth Shield spell (for icon and spell check)
@@ -193,6 +172,28 @@ local SelfBuffs = {
         missingText = "NO\nSELF ES",
         requiresTalentSpellID = 383010,
         groupId = "shamanShields",
+    },
+    -- With Elemental Orbit: need Lightning Shield or Water Shield
+    {
+        spellID = { 192106, 52127 },
+        key = "waterLightningShieldEO",
+        name = "Water/Lightning Shield",
+        class = "SHAMAN",
+        missingText = "NO\nSHIELD",
+        requiresTalentSpellID = 383010,
+        groupId = "shamanShields",
+        iconByRole = { HEALER = 52127, DAMAGER = 192106, TANK = 192106 },
+    },
+    -- Without Elemental Orbit: need either Earth Shield, Lightning Shield, or Water Shield on self
+    {
+        spellID = { 974, 192106, 52127 },
+        key = "shamanShieldBasic",
+        name = "Shield (No Talent)",
+        class = "SHAMAN",
+        missingText = "NO\nSHIELD",
+        excludeTalentSpellID = 383010,
+        groupId = "shamanShields",
+        iconByRole = { HEALER = 52127, DAMAGER = 192106, TANK = 192106 },
     },
 }
 
@@ -1177,6 +1178,13 @@ UpdateDisplay = function()
             if shouldShow then
                 frame.icon:SetAllPoints()
                 frame.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                -- Update icon based on current role (for role-dependent buffs like shields)
+                if buff.iconByRole then
+                    local texture = GetBuffTexture(buff.spellID, buff.iconByRole)
+                    if texture then
+                        frame.icon:SetTexture(texture)
+                    end
+                end
                 frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(MISSING_TEXT_SCALE), "OUTLINE")
                 frame.count:SetText(buff.missingText or "")
                 frame:Show()
@@ -1625,12 +1633,16 @@ local function CreateOptionsPanel()
     -- Render checkboxes for any buff array
     -- Handles grouping automatically if groupId field is present
     local function RenderBuffCheckboxes(x, y, buffArray)
-        -- Pass 1: Collect grouped spell IDs
+        -- Pass 1: Collect grouped spell IDs (flatten tables)
         local groupSpells = {}
         for _, buff in ipairs(buffArray) do
             if buff.groupId then
                 groupSpells[buff.groupId] = groupSpells[buff.groupId] or {}
-                table.insert(groupSpells[buff.groupId], buff.spellID)
+                -- Flatten: buff.spellID can be a number or table of numbers
+                local spellList = type(buff.spellID) == "table" and buff.spellID or { buff.spellID }
+                for _, id in ipairs(spellList) do
+                    table.insert(groupSpells[buff.groupId], id)
+                end
             end
         end
 
