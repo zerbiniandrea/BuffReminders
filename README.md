@@ -6,7 +6,7 @@
   <a href="https://discord.com/users/285458497020362762"><img src="https://shields.io/badge/discord-5865F2?logo=discord&style=for-the-badge&logoColor=white" /></a>
   <a href="https://github.com/zerbiniandrea/BuffReminders"><img src="https://shields.io/badge/github-gray?logo=github&style=for-the-badge&logoColor=white" /></a>
 </p>
-<p align="center">A lightweight World of Warcraft addon that tracks missing raid buffs with a clean icon display.</p>
+<p align="center">A lightweight World of Warcraft addon that tracks missing buffs with a clean icon display.</p>
 <p align="center">From the author of <a href="https://wago.io/iWkZ4Eq-i">Raid Buffs Tracker</a>, one of the most popular raid buffs tracking WeakAuras.</p>
 
 <p align="center">

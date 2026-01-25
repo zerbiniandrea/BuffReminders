@@ -2,7 +2,7 @@
 
 [![](https://shields.io/badge/discord-5865F2?logo=discord&style=for-the-badge&logoColor=white)](https://discord.com/users/285458497020362762) [![](https://shields.io/badge/github-gray?logo=github&style=for-the-badge&logoColor=white)](https://github.com/zerbiniandrea/BuffReminders)
 
-A lightweight World of Warcraft addon that tracks missing raid buffs with a clean icon display.
+A lightweight World of Warcraft addon that tracks missing buffs with a clean icon display.
 
 From the author of [Raid Buffs Tracker](https://wago.io/iWkZ4Eq-i), one of the most popular raid buffs tracking WeakAuras.
 
