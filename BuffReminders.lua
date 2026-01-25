@@ -258,6 +258,8 @@ local function CreateButton(parent, width, height, text, onClick, smallFont)
     btn:SetText(text)
     if smallFont ~= false then
         btn:SetNormalFontObject("GameFontHighlightSmall")
+        btn:SetHighlightFontObject("GameFontHighlightSmall")
+        btn:SetDisabledFontObject("GameFontDisableSmall")
     end
     btn:SetScript("OnClick", onClick)
     return btn
@@ -2353,7 +2355,9 @@ local function CreateOptionsPanel()
 
     local customDesc = customContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     customDesc:SetPoint("TOPLEFT", COL_PADDING, -18)
-    customDesc:SetText("(user-defined buff reminders)")
+    customDesc:SetWidth(PANEL_WIDTH - COL_PADDING * 2)
+    customDesc:SetJustifyH("LEFT")
+    customDesc:SetText("Track any buff by spell ID. Only checks if YOU have the buff (like Self Buffs).")
 
     -- Container for custom buff rows
     local customBuffsContainer = CreateFrame("Frame", nil, customContent)
