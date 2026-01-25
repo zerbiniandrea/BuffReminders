@@ -2312,7 +2312,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
 
         local desc = settingsPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
         desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-        desc:SetText("Track missing raid buffs at a glance.")
+        desc:SetText("Track missing buffs at a glance.")
 
         local openBtn = CreateFrame("Button", nil, settingsPanel, "UIPanelButtonTemplate")
         openBtn:SetSize(150, 24)
