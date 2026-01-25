@@ -1539,9 +1539,8 @@ end
 
 local function CreateOptionsPanel()
     local PANEL_WIDTH = 540
-    local LEFT_COL_WIDTH = 220
-    local RIGHT_COL_WIDTH = 280
     local COL_PADDING = 20
+    local COL_WIDTH = (PANEL_WIDTH - COL_PADDING * 3) / 2 -- Two columns with padding
     local SECTION_SPACING = 12
     local ITEM_HEIGHT = 22
 
@@ -1605,9 +1604,11 @@ local function CreateOptionsPanel()
         panel:SetScale(BuffRemindersDB.optionsPanelScale)
     end
 
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -2, -2)
+    -- Close button (same style as scale buttons)
+    local closeBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    closeBtn:SetSize(18, 18)
+    closeBtn:SetPoint("LEFT", scaleUp, "RIGHT", 8, 0)
+    closeBtn:SetText("x")
     closeBtn:SetScript("OnClick", function()
         panel:Hide()
     end)
@@ -1681,15 +1682,20 @@ local function CreateOptionsPanel()
         end
     end
 
-    tabButtons.general = CreateTab("general", "General")
+    tabButtons.buffs = CreateTab("buffs", "Buffs")
+    tabButtons.appearance = CreateTab("appearance", "Options")
     tabButtons.custom = CreateTab("custom", "Custom Buffs")
 
     -- Position tabs below title bar
-    tabButtons.general:SetPoint("TOPLEFT", panel, "TOPLEFT", COL_PADDING, -40)
-    tabButtons.custom:SetPoint("LEFT", tabButtons.general, "RIGHT", 4, 0)
+    tabButtons.buffs:SetPoint("TOPLEFT", panel, "TOPLEFT", COL_PADDING, -40)
+    tabButtons.appearance:SetPoint("LEFT", tabButtons.buffs, "RIGHT", 4, 0)
+    tabButtons.custom:SetPoint("LEFT", tabButtons.appearance, "RIGHT", 4, 0)
 
-    tabButtons.general:SetScript("OnClick", function()
-        SetActiveTab("general")
+    tabButtons.buffs:SetScript("OnClick", function()
+        SetActiveTab("buffs")
+    end)
+    tabButtons.appearance:SetScript("OnClick", function()
+        SetActiveTab("appearance")
     end)
     tabButtons.custom:SetScript("OnClick", function()
         SetActiveTab("custom")
@@ -1705,10 +1711,16 @@ local function CreateOptionsPanel()
     -- ========== CONTENT CONTAINERS ==========
     local CONTENT_TOP = -40 - TAB_HEIGHT - 16 -- Below tabs and separator with padding
 
-    local generalContent = CreateFrame("Frame", nil, panel)
-    generalContent:SetPoint("TOPLEFT", 0, CONTENT_TOP)
-    generalContent:SetSize(PANEL_WIDTH, 400) -- Height adjusted later
-    contentContainers.general = generalContent
+    local buffsContent = CreateFrame("Frame", nil, panel)
+    buffsContent:SetPoint("TOPLEFT", 0, CONTENT_TOP)
+    buffsContent:SetSize(PANEL_WIDTH, 400) -- Height adjusted later
+    contentContainers.buffs = buffsContent
+
+    local appearanceContent = CreateFrame("Frame", nil, panel)
+    appearanceContent:SetPoint("TOPLEFT", 0, CONTENT_TOP)
+    appearanceContent:SetSize(PANEL_WIDTH, 400)
+    appearanceContent:Hide()
+    contentContainers.appearance = appearanceContent
 
     local customContent = CreateFrame("Frame", nil, panel)
     customContent:SetPoint("TOPLEFT", 0, CONTENT_TOP)
@@ -1718,10 +1730,9 @@ local function CreateOptionsPanel()
 
     panel.contentContainers = contentContainers
 
-    -- Column anchors (now relative to generalContent)
+    -- Column anchors
     local leftColX = COL_PADDING
-    local rightColX = LEFT_COL_WIDTH + COL_PADDING * 2
-    local startY = 0 -- Now relative to content container top
+    local startY = 0 -- Relative to content container top
 
     panel.buffCheckboxes = {}
 
@@ -1731,7 +1742,7 @@ local function CreateOptionsPanel()
     -- spellIDs can be a single ID, a table of IDs (for multi-rank spells), or a table of tables (for grouped buffs with multiple icons)
     -- infoTooltip is optional: "Title|Description" format shows a "?" icon with tooltip
     local function CreateBuffCheckbox(x, y, spellIDs, key, displayName, infoTooltip)
-        local cb = CreateFrame("CheckButton", nil, generalContent, "UICheckButtonTemplate")
+        local cb = CreateFrame("CheckButton", nil, buffsContent, "UICheckButtonTemplate")
         cb:SetSize(20, 20)
         cb:SetPoint("TOPLEFT", x, y)
         cb:SetChecked(BuffRemindersDB.enabledBuffs[key])
@@ -1748,24 +1759,24 @@ local function CreateOptionsPanel()
             local texture = GetBuffTexture(spellID)
             if texture and not seenTextures[texture] then
                 seenTextures[texture] = true
-                local icon = CreateBuffIcon(generalContent, 18, texture)
+                local icon = CreateBuffIcon(buffsContent, 18, texture)
                 icon:SetPoint("LEFT", lastAnchor, lastAnchor == cb and "RIGHT" or "RIGHT", 2, 0)
                 lastAnchor = icon
             end
         end
 
-        local label = generalContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        local label = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         label:SetPoint("LEFT", lastAnchor, "RIGHT", 4, 0)
         label:SetText(displayName)
 
         -- Add info tooltip icon if specified
         if infoTooltip then
-            local infoIcon = generalContent:CreateTexture(nil, "ARTWORK")
+            local infoIcon = buffsContent:CreateTexture(nil, "ARTWORK")
             infoIcon:SetSize(14, 14)
             infoIcon:SetPoint("LEFT", label, "RIGHT", 4, 0)
             infoIcon:SetAtlas("QuestNormal")
             -- Create invisible button for tooltip
-            local infoBtn = CreateFrame("Button", nil, generalContent)
+            local infoBtn = CreateFrame("Button", nil, buffsContent)
             infoBtn:SetSize(14, 14)
             infoBtn:SetPoint("CENTER", infoIcon, "CENTER", 0, 0)
             -- Parse "Title|Description" format
@@ -1790,15 +1801,15 @@ local function CreateOptionsPanel()
         return y - ITEM_HEIGHT
     end
 
-    -- Create checkbox with label (for right column)
-    local function CreateCheckbox(x, y, labelText, checked, onClick, tooltip)
-        local cb = CreateFrame("CheckButton", nil, generalContent, "UICheckButtonTemplate")
+    -- Create checkbox with label
+    local function CreateCheckbox(parent, x, y, labelText, checked, onClick, tooltip)
+        local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
         cb:SetSize(20, 20)
         cb:SetPoint("TOPLEFT", x, y)
         cb:SetChecked(checked)
         cb:SetScript("OnClick", onClick)
 
-        local label = generalContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        local label = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         label:SetPoint("LEFT", cb, "RIGHT", 4, 0)
         label:SetText(labelText)
         cb.label = label
@@ -1811,14 +1822,14 @@ local function CreateOptionsPanel()
     end
 
     -- Create compact slider with clickable numeric input
-    local function CreateSlider(x, y, labelText, minVal, maxVal, step, initVal, suffix, onChange)
-        local label = generalContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local function CreateSlider(parent, x, y, labelText, minVal, maxVal, step, initVal, suffix, onChange)
+        local label = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         label:SetPoint("TOPLEFT", x, y)
         label:SetWidth(70)
         label:SetJustifyH("LEFT")
         label:SetText(labelText)
 
-        local slider = CreateFrame("Slider", nil, generalContent, "OptionsSliderTemplate")
+        local slider = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
         slider:SetPoint("LEFT", label, "RIGHT", 5, 0)
         slider:SetSize(100, 14)
         slider:SetMinMaxValues(minVal, maxVal)
@@ -1830,7 +1841,7 @@ local function CreateOptionsPanel()
         slider.Text:SetText("")
 
         -- Clickable value display
-        local valueBtn = CreateFrame("Button", nil, generalContent)
+        local valueBtn = CreateFrame("Button", nil, parent)
         valueBtn:SetPoint("LEFT", slider, "RIGHT", 6, 0)
         valueBtn:SetSize(40, 16)
 
@@ -1840,7 +1851,7 @@ local function CreateOptionsPanel()
         value:SetText(initVal .. (suffix or ""))
 
         -- Edit box (hidden by default)
-        local editBox = CreateFrame("EditBox", nil, generalContent, "InputBoxTemplate")
+        local editBox = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
         editBox:SetSize(35, 16)
         editBox:SetPoint("LEFT", slider, "RIGHT", 6, 0)
         editBox:SetAutoFocus(false)
@@ -1926,181 +1937,58 @@ local function CreateOptionsPanel()
         return y
     end
 
-    -- ========== LEFT COLUMN: BUFF SELECTION ==========
-    local leftY = startY
+    -- ========== BUFFS TAB: BUFF SELECTION (Two Columns) ==========
+    local buffsLeftX = leftColX
+    local buffsRightX = leftColX + COL_WIDTH + COL_PADDING
+    local buffsLeftY = startY
+    local buffsRightY = startY
 
+    -- LEFT COLUMN: Group-wide buffs
     -- Raid Buffs header
-    _, leftY = CreateSectionHeader(generalContent, "Raid Buffs", leftColX, leftY)
-    local raidNote = generalContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    raidNote:SetPoint("TOPLEFT", leftColX, leftY)
+    _, buffsLeftY = CreateSectionHeader(buffsContent, "Raid Buffs", buffsLeftX, buffsLeftY)
+    local raidNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    raidNote:SetPoint("TOPLEFT", buffsLeftX, buffsLeftY)
     raidNote:SetText("(for the whole group)")
-    leftY = leftY - 14
-    leftY = RenderBuffCheckboxes(leftColX, leftY, RaidBuffs)
+    buffsLeftY = buffsLeftY - 14
+    buffsLeftY = RenderBuffCheckboxes(buffsLeftX, buffsLeftY, RaidBuffs)
 
-    leftY = leftY - SECTION_SPACING
+    buffsLeftY = buffsLeftY - SECTION_SPACING
 
     -- Presence Buffs header
-    _, leftY = CreateSectionHeader(generalContent, "Presence Buffs", leftColX, leftY)
-    local presenceNote = generalContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    presenceNote:SetPoint("TOPLEFT", leftColX, leftY)
+    _, buffsLeftY = CreateSectionHeader(buffsContent, "Presence Buffs", buffsLeftX, buffsLeftY)
+    local presenceNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    presenceNote:SetPoint("TOPLEFT", buffsLeftX, buffsLeftY)
     presenceNote:SetText("(at least 1 person needs)")
-    leftY = leftY - 14
-    leftY = RenderBuffCheckboxes(leftColX, leftY, PresenceBuffs)
+    buffsLeftY = buffsLeftY - 14
+    buffsLeftY = RenderBuffCheckboxes(buffsLeftX, buffsLeftY, PresenceBuffs)
 
-    leftY = leftY - SECTION_SPACING
-
+    -- RIGHT COLUMN: Individual buffs
     -- Personal Buffs header
-    _, leftY = CreateSectionHeader(generalContent, "Personal Buffs", leftColX, leftY)
-    local personalNote = generalContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    personalNote:SetPoint("TOPLEFT", leftColX, leftY)
+    _, buffsRightY = CreateSectionHeader(buffsContent, "Personal Buffs", buffsRightX, buffsRightY)
+    local personalNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    personalNote:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
     personalNote:SetText("(buffs you cast on others)")
-    leftY = leftY - 14
-    leftY = RenderBuffCheckboxes(leftColX, leftY, PersonalBuffs)
+    buffsRightY = buffsRightY - 14
+    buffsRightY = RenderBuffCheckboxes(buffsRightX, buffsRightY, PersonalBuffs)
 
-    leftY = leftY - SECTION_SPACING
+    buffsRightY = buffsRightY - SECTION_SPACING
 
     -- Self Buffs header
-    _, leftY = CreateSectionHeader(generalContent, "Self Buffs", leftColX, leftY)
-    local selfNote = generalContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    selfNote:SetPoint("TOPLEFT", leftColX, leftY)
+    _, buffsRightY = CreateSectionHeader(buffsContent, "Self Buffs", buffsRightX, buffsRightY)
+    local selfNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    selfNote:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
     selfNote:SetText("(buffs on yourself)")
-    leftY = leftY - 14
-    leftY = RenderBuffCheckboxes(leftColX, leftY, SelfBuffs)
+    buffsRightY = buffsRightY - 14
+    buffsRightY = RenderBuffCheckboxes(buffsRightX, buffsRightY, SelfBuffs)
 
-    -- ========== RIGHT COLUMN: SETTINGS ==========
-    local rightY = startY
+    -- Set buffs content height (use the taller column)
+    buffsContent:SetHeight(math.max(math.abs(buffsLeftY), math.abs(buffsRightY)) + 20)
 
-    -- Appearance header
-    _, rightY = CreateSectionHeader(generalContent, "Appearance", rightColX, rightY)
-
-    local sizeSlider, sizeValue
-    sizeSlider, sizeValue, rightY = CreateSlider(
-        rightColX,
-        rightY,
-        "Icon Size",
-        16,
-        128,
-        1,
-        BuffRemindersDB.iconSize,
-        "",
-        function(val)
-            BuffRemindersDB.iconSize = val
-            UpdateVisuals()
-        end
-    )
-    panel.sizeSlider = sizeSlider
-    panel.sizeValue = sizeValue
-
-    local spacingSlider, spacingValue
-    spacingSlider, spacingValue, rightY = CreateSlider(
-        rightColX,
-        rightY,
-        "Spacing",
-        0,
-        50,
-        1,
-        math.floor((BuffRemindersDB.spacing or 0.2) * 100),
-        "%",
-        function(val)
-            BuffRemindersDB.spacing = val / 100
-            if testMode then
-                PositionBuffFrames()
-            else
-                UpdateDisplay()
-            end
-        end
-    )
-    panel.spacingSlider = spacingSlider
-    panel.spacingValue = spacingValue
-
-    local textSlider, textValue
-    textSlider, textValue, rightY = CreateSlider(
-        rightColX,
-        rightY,
-        "Text Size",
-        20,
-        60,
-        1,
-        math.floor((BuffRemindersDB.textScale or 0.34) * 100),
-        "%",
-        function(val)
-            BuffRemindersDB.textScale = val / 100
-            UpdateVisuals()
-        end
-    )
-    panel.textSlider = textSlider
-    panel.textValue = textValue
-
-    rightY = rightY - 4
-
-    -- Lock button and grow direction
-    local lockBtn = CreateFrame("Button", nil, generalContent, "UIPanelButtonTemplate")
-    lockBtn:SetSize(52, 18)
-    lockBtn:SetPoint("TOPLEFT", rightColX, rightY)
-    lockBtn:SetNormalFontObject("GameFontHighlightSmall")
-    lockBtn:SetHighlightFontObject("GameFontHighlightSmall")
-    lockBtn:SetText(BuffRemindersDB.locked and "Unlock" or "Lock")
-    lockBtn:SetScript("OnClick", function(self)
-        BuffRemindersDB.locked = not BuffRemindersDB.locked
-        self:SetText(BuffRemindersDB.locked and "Unlock" or "Lock")
-        UpdateAnchor()
-    end)
-    panel.lockBtn = lockBtn
-
-    local growLabel = generalContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    growLabel:SetPoint("LEFT", lockBtn, "RIGHT", 10, 0)
-    growLabel:SetText("Grow:")
-
-    local growBtns = {}
-    local directions = { "LEFT", "CENTER", "RIGHT" }
-    local dirLabels = { "Left", "Center", "Right" }
-    local growBtnWidth = 52
-
-    for i, dir in ipairs(directions) do
-        local btn = CreateFrame("Button", nil, generalContent, "UIPanelButtonTemplate")
-        btn:SetSize(growBtnWidth, 18)
-        btn:SetPoint("LEFT", growLabel, "RIGHT", 5 + (i - 1) * (growBtnWidth + 3), 0)
-        btn:SetText(dirLabels[i])
-        btn:SetNormalFontObject("GameFontHighlightSmall")
-        btn:SetHighlightFontObject("GameFontHighlightSmall")
-        btn:SetDisabledFontObject("GameFontDisableSmall")
-        btn.direction = dir
-        btn:SetScript("OnClick", function()
-            BuffRemindersDB.growDirection = dir
-            for _, b in ipairs(growBtns) do
-                b:SetEnabled(b.direction ~= dir)
-            end
-            UpdateDisplay()
-        end)
-        btn:SetEnabled(BuffRemindersDB.growDirection ~= dir)
-        growBtns[i] = btn
-    end
-    panel.growBtns = growBtns
-
-    rightY = rightY - 26
-
-    -- Separator
-    local sep1 = generalContent:CreateTexture(nil, "ARTWORK")
-    sep1:SetSize(RIGHT_COL_WIDTH - 20, 1)
-    sep1:SetPoint("TOPLEFT", rightColX, rightY)
-    sep1:SetColorTexture(0.4, 0.4, 0.4, 1)
-    rightY = rightY - SECTION_SPACING
-
-    -- Behavior header
-    _, rightY = CreateSectionHeader(generalContent, "Behavior", rightColX, rightY)
-
-    local reminderCb
-    reminderCb, rightY = CreateCheckbox(
-        rightColX,
-        rightY,
-        'Show "BUFF!" reminder',
-        BuffRemindersDB.showBuffReminder ~= false,
-        function(self)
-            BuffRemindersDB.showBuffReminder = self:GetChecked()
-            UpdateVisuals()
-        end
-    )
-    panel.reminderCheckbox = reminderCb
+    -- ========== APPEARANCE TAB: SETTINGS (Two Columns) ==========
+    local appLeftX = leftColX
+    local appRightX = leftColX + COL_WIDTH + COL_PADDING
+    local appLeftY = startY
+    local appRightY = startY
 
     -- Helper to enable/disable checkbox with label greying
     local function SetCheckboxEnabled(cb, enabled)
@@ -2113,11 +2001,30 @@ local function CreateOptionsPanel()
             end
         end
     end
+    panel.SetCheckboxEnabled = SetCheckboxEnabled
+
+    -- LEFT COLUMN: Behavior Settings
+    _, appLeftY = CreateSectionHeader(appearanceContent, "Behavior", appLeftX, appLeftY)
+
+    local reminderCb
+    reminderCb, appLeftY = CreateCheckbox(
+        appearanceContent,
+        appLeftX,
+        appLeftY,
+        'Show "BUFF!" reminder',
+        BuffRemindersDB.showBuffReminder ~= false,
+        function(self)
+            BuffRemindersDB.showBuffReminder = self:GetChecked()
+            UpdateVisuals()
+        end
+    )
+    panel.reminderCheckbox = reminderCb
 
     local groupCb, instanceCb
-    groupCb, rightY = CreateCheckbox(
-        rightColX,
-        rightY,
+    groupCb, appLeftY = CreateCheckbox(
+        appearanceContent,
+        appLeftX,
+        appLeftY,
         "Show only in group/raid",
         BuffRemindersDB.showOnlyInGroup ~= false,
         function(self)
@@ -2136,9 +2043,10 @@ local function CreateOptionsPanel()
     panel.groupCheckbox = groupCb
 
     -- Sub-checkbox: Only in instance (indented under group checkbox)
-    instanceCb, rightY = CreateCheckbox(
-        rightColX + 20,
-        rightY,
+    instanceCb, appLeftY = CreateCheckbox(
+        appearanceContent,
+        appLeftX + 20,
+        appLeftY,
         "Only in instance",
         BuffRemindersDB.showOnlyInInstance,
         function(self)
@@ -2148,12 +2056,12 @@ local function CreateOptionsPanel()
     )
     SetCheckboxEnabled(instanceCb, BuffRemindersDB.showOnlyInGroup)
     panel.instanceCheckbox = instanceCb
-    panel.SetCheckboxEnabled = SetCheckboxEnabled
 
     local readyCheckCb, readyCheckSlider, readyCheckSliderValue
-    readyCheckCb, rightY = CreateCheckbox(
-        rightColX,
-        rightY,
+    readyCheckCb, appLeftY = CreateCheckbox(
+        appearanceContent,
+        appLeftX,
+        appLeftY,
         "Show only on ready check",
         BuffRemindersDB.showOnlyOnReadyCheck,
         function(self)
@@ -2172,9 +2080,10 @@ local function CreateOptionsPanel()
     panel.readyCheckCheckbox = readyCheckCb
 
     -- Duration slider
-    readyCheckSlider, readyCheckSliderValue, rightY = CreateSlider(
-        rightColX,
-        rightY,
+    readyCheckSlider, readyCheckSliderValue, appLeftY = CreateSlider(
+        appearanceContent,
+        appLeftX,
+        appLeftY,
         "Duration",
         10,
         30,
@@ -2194,9 +2103,10 @@ local function CreateOptionsPanel()
     panel.readyCheckSliderValue = readyCheckSliderValue
 
     local playerClassCb
-    playerClassCb, rightY = CreateCheckbox(
-        rightColX,
-        rightY,
+    playerClassCb, appLeftY = CreateCheckbox(
+        appearanceContent,
+        appLeftX,
+        appLeftY,
         "Show only my class buffs",
         BuffRemindersDB.showOnlyPlayerClassBuff,
         function(self)
@@ -2207,20 +2117,136 @@ local function CreateOptionsPanel()
     )
     panel.playerClassCheckbox = playerClassCb
 
+    -- RIGHT COLUMN: Visual Settings
+    _, appRightY = CreateSectionHeader(appearanceContent, "Appearance", appRightX, appRightY)
+
+    local sizeSlider, sizeValue
+    sizeSlider, sizeValue, appRightY = CreateSlider(
+        appearanceContent,
+        appRightX,
+        appRightY,
+        "Icon Size",
+        16,
+        128,
+        1,
+        BuffRemindersDB.iconSize,
+        "",
+        function(val)
+            BuffRemindersDB.iconSize = val
+            UpdateVisuals()
+        end
+    )
+    panel.sizeSlider = sizeSlider
+    panel.sizeValue = sizeValue
+
+    local spacingSlider, spacingValue
+    spacingSlider, spacingValue, appRightY = CreateSlider(
+        appearanceContent,
+        appRightX,
+        appRightY,
+        "Spacing",
+        0,
+        50,
+        1,
+        math.floor((BuffRemindersDB.spacing or 0.2) * 100),
+        "%",
+        function(val)
+            BuffRemindersDB.spacing = val / 100
+            if testMode then
+                PositionBuffFrames()
+            else
+                UpdateDisplay()
+            end
+        end
+    )
+    panel.spacingSlider = spacingSlider
+    panel.spacingValue = spacingValue
+
+    local textSlider, textValue
+    textSlider, textValue, appRightY = CreateSlider(
+        appearanceContent,
+        appRightX,
+        appRightY,
+        "Text Size",
+        20,
+        60,
+        1,
+        math.floor((BuffRemindersDB.textScale or 0.34) * 100),
+        "%",
+        function(val)
+            BuffRemindersDB.textScale = val / 100
+            UpdateVisuals()
+        end
+    )
+    panel.textSlider = textSlider
+    panel.textValue = textValue
+
+    appRightY = appRightY - 4
+
+    -- Lock button and grow direction
+    local lockBtn = CreateFrame("Button", nil, appearanceContent, "UIPanelButtonTemplate")
+    lockBtn:SetSize(52, 18)
+    lockBtn:SetPoint("TOPLEFT", appRightX, appRightY)
+    lockBtn:SetNormalFontObject("GameFontHighlightSmall")
+    lockBtn:SetHighlightFontObject("GameFontHighlightSmall")
+    lockBtn:SetText(BuffRemindersDB.locked and "Unlock" or "Lock")
+    lockBtn:SetScript("OnClick", function(self)
+        BuffRemindersDB.locked = not BuffRemindersDB.locked
+        self:SetText(BuffRemindersDB.locked and "Unlock" or "Lock")
+        UpdateAnchor()
+    end)
+    panel.lockBtn = lockBtn
+
+    local growLabel = appearanceContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    growLabel:SetPoint("LEFT", lockBtn, "RIGHT", 10, 0)
+    growLabel:SetText("Grow:")
+
+    local growBtns = {}
+    local directions = { "LEFT", "CENTER", "RIGHT" }
+    local dirLabels = { "Left", "Center", "Right" }
+    local growBtnWidth = 48
+
+    for i, dir in ipairs(directions) do
+        local btn = CreateFrame("Button", nil, appearanceContent, "UIPanelButtonTemplate")
+        btn:SetSize(growBtnWidth, 18)
+        btn:SetPoint("LEFT", growLabel, "RIGHT", 5 + (i - 1) * (growBtnWidth + 2), 0)
+        btn:SetText(dirLabels[i])
+        btn:SetNormalFontObject("GameFontHighlightSmall")
+        btn:SetHighlightFontObject("GameFontHighlightSmall")
+        btn:SetDisabledFontObject("GameFontDisableSmall")
+        btn.direction = dir
+        btn:SetScript("OnClick", function()
+            BuffRemindersDB.growDirection = dir
+            for _, b in ipairs(growBtns) do
+                b:SetEnabled(b.direction ~= dir)
+            end
+            UpdateDisplay()
+        end)
+        btn:SetEnabled(BuffRemindersDB.growDirection ~= dir)
+        growBtns[i] = btn
+    end
+    panel.growBtns = growBtns
+
+    appRightY = appRightY - 26
+
+    -- BOTTOM: Expiration Warning (full width, below both columns)
+    local appearanceY = math.min(appLeftY, appRightY) - SECTION_SPACING
+
     -- Separator
-    local sep2 = generalContent:CreateTexture(nil, "ARTWORK")
-    sep2:SetSize(RIGHT_COL_WIDTH - 20, 1)
-    sep2:SetPoint("TOPLEFT", rightColX, rightY - 4)
-    sep2:SetColorTexture(0.4, 0.4, 0.4, 1)
-    rightY = rightY - SECTION_SPACING - 4
+    local sep1 = appearanceContent:CreateTexture(nil, "ARTWORK")
+    sep1:SetSize(PANEL_WIDTH - COL_PADDING * 2, 1)
+    sep1:SetPoint("TOPLEFT", appLeftX, appearanceY)
+    sep1:SetColorTexture(0.4, 0.4, 0.4, 1)
+    appearanceY = appearanceY - SECTION_SPACING
 
     -- Expiration Warning header
-    _, rightY = CreateSectionHeader(generalContent, "Expiration Warning", rightColX, rightY)
+    _, appearanceY = CreateSectionHeader(appearanceContent, "Expiration Warning", appLeftX, appearanceY)
 
     local glowCb
-    glowCb, rightY = CreateCheckbox(
-        rightColX,
-        rightY,
+    glowCb, appearanceY = CreateCheckbox(
+        appearanceContent,
+        appLeftX,
+        appearanceY,
         "Show glow when expiring in:",
         BuffRemindersDB.showExpirationGlow,
         function(self)
@@ -2255,9 +2281,10 @@ local function CreateOptionsPanel()
     panel.glowCheckbox = glowCb
 
     local thresholdSlider, thresholdValue
-    thresholdSlider, thresholdValue, rightY = CreateSlider(
-        rightColX,
-        rightY,
+    thresholdSlider, thresholdValue, appearanceY = CreateSlider(
+        appearanceContent,
+        appLeftX,
+        appearanceY,
         "Threshold",
         1,
         15,
@@ -2277,12 +2304,13 @@ local function CreateOptionsPanel()
     panel.thresholdValue = thresholdValue
 
     -- Glow style dropdown
-    local styleLabel = generalContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local styleLabel = appearanceContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     panel.styleLabel = styleLabel
-    styleLabel:SetPoint("TOPLEFT", rightColX, rightY)
+    styleLabel:SetPoint("TOPLEFT", appLeftX, appearanceY)
     styleLabel:SetText("Style:")
 
-    local styleDropdown = CreateFrame("Frame", "BuffRemindersStyleDropdown", generalContent, "UIDropDownMenuTemplate")
+    local styleDropdown =
+        CreateFrame("Frame", "BuffRemindersStyleDropdown", appearanceContent, "UIDropDownMenuTemplate")
     styleDropdown:SetPoint("LEFT", styleLabel, "RIGHT", -10, -2)
     UIDropDownMenu_SetWidth(styleDropdown, 100)
 
@@ -2312,7 +2340,7 @@ local function CreateOptionsPanel()
     panel.styleDropdown = styleDropdown
 
     -- Preview button
-    local previewBtn = CreateFrame("Button", nil, generalContent, "UIPanelButtonTemplate")
+    local previewBtn = CreateFrame("Button", nil, appearanceContent, "UIPanelButtonTemplate")
     previewBtn:SetSize(80, 18)
     previewBtn:SetPoint("LEFT", styleDropdown, "RIGHT", 0, 2)
     previewBtn:SetText("Preview")
@@ -2339,11 +2367,13 @@ local function CreateOptionsPanel()
     -- Set initial state
     SetGlowControlsEnabled(BuffRemindersDB.showExpirationGlow)
 
-    rightY = rightY - 28
+    appearanceY = appearanceY - 28
 
-    -- Set general content height
-    local generalContentHeight = math.max(math.abs(leftY), math.abs(rightY))
-    generalContent:SetHeight(generalContentHeight)
+    -- Set appearance content height
+    appearanceContent:SetHeight(math.abs(appearanceY) + 20)
+
+    -- Content height for bottom buttons positioning (use tallest tab)
+    local contentHeight = math.max(buffsContent:GetHeight(), appearanceContent:GetHeight())
 
     -- ========== CUSTOM BUFFS CONTENT ==========
     panel.customBuffRows = {}
@@ -2465,10 +2495,10 @@ local function CreateOptionsPanel()
     RenderCustomBuffRows()
 
     -- Set custom content height
-    customContent:SetHeight(generalContentHeight)
+    customContent:SetHeight(contentHeight)
 
     -- ========== BOTTOM BUTTONS (on main panel) ==========
-    local contentBottomY = CONTENT_TOP - generalContentHeight - 20
+    local contentBottomY = CONTENT_TOP - contentHeight - 20
 
     -- Separator line
     local separator = panel:CreateTexture(nil, "ARTWORK")
@@ -2530,7 +2560,7 @@ local function CreateOptionsPanel()
     panel:SetHeight(panelHeight)
 
     -- Set initial active tab
-    SetActiveTab("general")
+    SetActiveTab("buffs")
 
     return panel
 end
@@ -2637,7 +2667,7 @@ ShowGlowDemo = function()
     title:SetText("Glow Styles Preview")
 
     local closeBtn = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -2, -2)
+    closeBtn:SetPoint("TOPRIGHT", -5, -5)
 
     -- Create demo icons using GlowStyles
     for i, style in ipairs(GlowStyles) do
@@ -2715,7 +2745,7 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     title:SetText(editingBuff and "Edit Custom Buff" or "Add Custom Buff")
 
     local closeBtn = CreateFrame("Button", nil, modal, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -2, -2)
+    closeBtn:SetPoint("TOPRIGHT", -5, -5)
 
     local y = -40
 
