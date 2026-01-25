@@ -238,24 +238,11 @@ local BuffBeneficiaries = {
 }
 
 -- Default settings
+-- Note: enabledBuffs defaults to all enabled - only set false to disable by default
 local defaults = {
     position = { point = "CENTER", x = 0, y = 0 },
     locked = true,
-    enabledBuffs = {
-        intellect = true,
-        stamina = true,
-        attackPower = true,
-        versatility = true,
-        skyfury = true,
-        bronze = true,
-        devotionAura = true,
-        atrophicPoison = true,
-        sourceOfMagic = true,
-        beacons = true,
-        shadowform = true,
-        shamanShields = true,
-        earthShieldOthers = true,
-    },
+    enabledBuffs = {},
     iconSize = 64,
     spacing = 0.2, -- multiplier of iconSize (reset ratios default)
     textScale = 0.34, -- multiplier of iconSize (reset ratios default)
@@ -285,6 +272,12 @@ local testModeData = nil -- Stores seeded fake values for consistent test displa
 local playerClass = nil -- Cached player class, set once on init
 local optionsPanel
 local MISSING_TEXT_SCALE = 0.6 -- scale for "NO X" warning text
+
+-- Check if a buff is enabled (defaults to true if not explicitly set to false)
+local function IsBuffEnabled(key)
+    local db = BuffRemindersDB
+    return db.enabledBuffs[key] ~= false
+end
 
 -- Check if a unit is a valid group member for buff tracking
 -- Excludes: non-existent, dead/ghost, disconnected, hostile (cross-faction in open world)
@@ -1050,7 +1043,7 @@ UpdateDisplay = function()
             showBuff = false
         end
 
-        if frame and db.enabledBuffs[buff.key] and showBuff then
+        if frame and IsBuffEnabled(buff.key) and showBuff then
             local missing, total, minRemaining = CountMissingBuff(buff.spellID, buff.key)
             local expiringSoon = db.showExpirationGlow and minRemaining and minRemaining < (db.expirationThreshold * 60)
             if missing > 0 then
@@ -1095,7 +1088,7 @@ UpdateDisplay = function()
             showBuff = false
         end
 
-        if frame and db.enabledBuffs[buff.key] and showBuff then
+        if frame and IsBuffEnabled(buff.key) and showBuff then
             local count, minRemaining = CountPresenceBuff(buff.spellID)
             local expiringSoon = db.showExpirationGlow and minRemaining and minRemaining < (db.expirationThreshold * 60)
             if count == 0 then
@@ -1129,7 +1122,7 @@ UpdateDisplay = function()
         local frame = buffFrames[buff.key]
         local settingKey = GetBuffSettingKey(buff)
 
-        if frame and db.enabledBuffs[settingKey] then
+        if frame and IsBuffEnabled(settingKey) then
             local shouldShow = ShouldShowPersonalBuff(buff.spellID, buff.class, buff.beneficiaryRole)
             if shouldShow then
                 frame.icon:SetAllPoints()
@@ -1172,7 +1165,7 @@ UpdateDisplay = function()
         local frame = buffFrames[buff.key]
         local settingKey = buff.groupId or buff.key
 
-        if frame and db.enabledBuffs[settingKey] then
+        if frame and IsBuffEnabled(settingKey) then
             local shouldShow = ShouldShowSelfBuff(
                 buff.spellID,
                 buff.class,
@@ -2187,12 +2180,12 @@ local function ToggleOptions()
                     if not seenGroups[buff.groupId] then
                         seenGroups[buff.groupId] = true
                         if optionsPanel.buffCheckboxes[settingKey] then
-                            optionsPanel.buffCheckboxes[settingKey]:SetChecked(db.enabledBuffs[settingKey])
+                            optionsPanel.buffCheckboxes[settingKey]:SetChecked(IsBuffEnabled(settingKey))
                         end
                     end
                 else
                     if optionsPanel.buffCheckboxes[settingKey] then
-                        optionsPanel.buffCheckboxes[settingKey]:SetChecked(db.enabledBuffs[settingKey])
+                        optionsPanel.buffCheckboxes[settingKey]:SetChecked(IsBuffEnabled(settingKey))
                     end
                 end
             end
@@ -2363,37 +2356,6 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
                 end
             end
         end
-        for _, buff in ipairs(RaidBuffs) do
-            if BuffRemindersDB.enabledBuffs[buff.key] == nil then
-                BuffRemindersDB.enabledBuffs[buff.key] = true
-            end
-        end
-        for _, buff in ipairs(PresenceBuffs) do
-            if BuffRemindersDB.enabledBuffs[buff.key] == nil then
-                BuffRemindersDB.enabledBuffs[buff.key] = true
-            end
-        end
-        local seenInitGroups = {}
-        for _, buff in ipairs(PersonalBuffs) do
-            local settingKey = GetBuffSettingKey(buff)
-            if not seenInitGroups[settingKey] then
-                seenInitGroups[settingKey] = true
-                if BuffRemindersDB.enabledBuffs[settingKey] == nil then
-                    BuffRemindersDB.enabledBuffs[settingKey] = true
-                end
-            end
-        end
-        local seenSelfInitGroups = {}
-        for _, buff in ipairs(SelfBuffs) do
-            local settingKey = GetBuffSettingKey(buff)
-            if not seenSelfInitGroups[settingKey] then
-                seenSelfInitGroups[settingKey] = true
-                if BuffRemindersDB.enabledBuffs[settingKey] == nil then
-                    BuffRemindersDB.enabledBuffs[settingKey] = true
-                end
-            end
-        end
-
         SLASH_BUFFREMINDERS1 = "/br"
         SLASH_BUFFREMINDERS2 = "/buffreminders"
         SlashCmdList["BUFFREMINDERS"] = SlashHandler
