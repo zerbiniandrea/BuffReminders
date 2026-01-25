@@ -120,12 +120,32 @@ local SelfBuffs = {
         enchantID = 5400,
         groupId = "shamanImbues",
     },
+    -- Paladin weapon rites
+    {
+        spellID = 433568,
+        key = "riteOfSanctification",
+        name = "Rite of Sanctification",
+        class = "PALADIN",
+        missingText = "NO\nRITE",
+        enchantID = 7143,
+        groupId = "paladinRites",
+    },
+    {
+        spellID = 433583,
+        key = "riteOfAdjuration",
+        name = "Rite of Adjuration",
+        class = "PALADIN",
+        missingText = "NO\nRITE",
+        enchantID = 7144,
+        groupId = "paladinRites",
+    },
 }
 
 -- Display names and text for grouped buffs
 local BuffGroups = {
     beacons = { displayName = "Beacons", missingText = "NO\nBEACONS" },
     shamanImbues = { displayName = "Shaman Imbues" },
+    paladinRites = { displayName = "Paladin Rites" },
 }
 
 -- Get the effective setting key for a buff (groupId if present, otherwise individual key)
