@@ -1,8 +1,12 @@
 ignore:
   - images
+  - ignored
   - .github
+  - .gitignore
+  - .claude
   - .luacheckrc
   - .luarc.json
   - stylua.toml
   - Makefile
   - CURSEFORGE.md
+  - CLAUDE.md
