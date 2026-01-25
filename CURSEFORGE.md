@@ -24,7 +24,23 @@ From the author of [Raid Buffs Tracker](https://wago.io/iWkZ4Eq-i), one of the m
 
 To open the options panel, type `/br`
 
-![BuffReminders Settings](https://github.com/zerbiniandrea/BuffReminders/blob/main/images/settings.png?raw=true)
+### Buff Selection
+
+Choose which buffs to track. Buffs are organized by type: raid-wide buffs, presence buffs (at least one person needs it), personal buffs (buffs you cast on others), and self buffs.
+
+![BuffReminders Settings - Buffs](https://github.com/zerbiniandrea/BuffReminders/blob/main/images/settings-buffs.png?raw=true)
+
+### Options
+
+Configure when and how the addon displays. Control visibility (group only, instance only, ready check only), adjust icon size and spacing, set expiration warning thresholds, and choose from 5 glow styles.
+
+![BuffReminders Settings - Options](https://github.com/zerbiniandrea/BuffReminders/blob/main/images/settings-options.png?raw=true)
+
+### Custom Buffs
+
+Track any buff by spell ID. Useful for consumables, world buffs, or any buff not included by default. Custom buffs check if you have the buff on yourself.
+
+![BuffReminders Settings - Custom Buffs](https://github.com/zerbiniandrea/BuffReminders/blob/main/images/settings-custombuffs.png?raw=true)
 
 ## Limitations
 
