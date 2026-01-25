@@ -2120,6 +2120,14 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         if not BuffRemindersDB then
             BuffRemindersDB = {}
         end
+
+        -- Notify users about the rename (shows once)
+        if not BuffRemindersDB.renameNotificationShown then
+            BuffRemindersDB.renameNotificationShown = true
+            print("|cff00ccffBuffReminders:|r This addon was renamed from |cffffcc00RaidBuffsTracker|r.")
+            print("|cff00ccffBuffReminders:|r Your previous settings could not be migrated. Use |cffffcc00/br|r to reconfigure.")
+        end
+
         for k, v in pairs(defaults) do
             if BuffRemindersDB[k] == nil then
                 if type(v) == "table" then
