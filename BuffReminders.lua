@@ -251,7 +251,6 @@ local defaults = {
     showOnlyInGroup = false,
     showOnlyInInstance = false,
     showOnlyPlayerClassBuff = false,
-    filterByClassBenefit = false,
     showOnlyOnReadyCheck = false,
     readyCheckDuration = 15, -- seconds
     growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT"
@@ -400,8 +399,7 @@ local function CountMissingBuff(spellIDs, buffKey)
     local minRemaining = nil
     local inRaid = IsInRaid()
     local groupSize = GetNumGroupMembers()
-    local db = BuffRemindersDB
-    local beneficiaries = db.filterByClassBenefit and buffKey and BuffBeneficiaries[buffKey] or nil
+    local beneficiaries = BuffBeneficiaries[buffKey]
 
     if groupSize == 0 then
         -- Solo: check if player benefits
@@ -1963,19 +1961,6 @@ local function CreateOptionsPanel()
     )
     panel.playerClassCheckbox = playerClassCb
 
-    local classBenefitCb
-    classBenefitCb, rightY = CreateCheckbox(
-        rightColX,
-        rightY,
-        "Only count benefiting classes |cffff8000(BETA)|r",
-        BuffRemindersDB.filterByClassBenefit,
-        function(self)
-            BuffRemindersDB.filterByClassBenefit = self:GetChecked()
-            UpdateDisplay()
-        end
-    )
-    panel.classBenefitCheckbox = classBenefitCb
-
     -- Separator
     local sep2 = panel:CreateTexture(nil, "ARTWORK")
     sep2:SetSize(RIGHT_COL_WIDTH - 20, 1)
@@ -2233,9 +2218,6 @@ local function ToggleOptions()
         end
         if optionsPanel.playerClassCheckbox then
             optionsPanel.playerClassCheckbox:SetChecked(db.showOnlyPlayerClassBuff)
-        end
-        if optionsPanel.classBenefitCheckbox then
-            optionsPanel.classBenefitCheckbox:SetChecked(db.filterByClassBenefit)
         end
         if optionsPanel.glowCheckbox then
             optionsPanel.glowCheckbox:SetChecked(db.showExpirationGlow)
