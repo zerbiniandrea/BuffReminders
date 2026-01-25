@@ -2268,9 +2268,7 @@ local function SlashHandler(msg)
     local cmd = msg:match("^(%S*)") or ""
     cmd = cmd:lower()
 
-    if cmd == "glowdemo" then
-        ShowGlowDemo()
-    elseif cmd == "test" then
+    if cmd == "test" then
         ToggleTestMode(false) -- no labels, for previews
     else
         ToggleOptions()
