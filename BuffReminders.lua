@@ -182,6 +182,120 @@ local BuffGroups = {
     shamanShields = { displayName = "Shaman Shields" },
 }
 
+-- UI Constants (needed by helper functions below)
+local TEXCOORD_INSET = 0.08
+
+-- ============================================================================
+-- UI HELPER FUNCTIONS
+-- ============================================================================
+
+---Setup tooltip on hover for a widget
+---@param widget table
+---@param tooltipTitle string
+---@param tooltipDesc? string
+---@param anchor? string
+local function SetupTooltip(widget, tooltipTitle, tooltipDesc, anchor)
+    widget:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, anchor or "ANCHOR_RIGHT")
+        GameTooltip:SetText(tooltipTitle)
+        if tooltipDesc then
+            GameTooltip:AddLine(tooltipDesc, 1, 1, 1, true)
+        end
+        GameTooltip:Show()
+    end)
+    widget:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+end
+
+---Create a draggable panel with standard backdrop
+---@param name string? Frame name (nil for anonymous)
+---@param width number
+---@param height number
+---@param options? {bgColor?: table, borderColor?: table, strata?: string, level?: number, escClose?: boolean}
+---@return table
+local function CreatePanel(name, width, height, options)
+    options = options or {}
+    local bgColor = options.bgColor or { 0.1, 0.1, 0.1, 0.95 }
+    local borderColor = options.borderColor or { 0.3, 0.3, 0.3, 1 }
+
+    local panel = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
+    panel:SetSize(width, height)
+    panel:SetPoint("CENTER")
+    panel:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 2,
+    })
+    panel:SetBackdropColor(unpack(bgColor))
+    panel:SetBackdropBorderColor(unpack(borderColor))
+    panel:SetMovable(true)
+    panel:EnableMouse(true)
+    panel:RegisterForDrag("LeftButton")
+    panel:SetScript("OnDragStart", panel.StartMoving)
+    panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
+    panel:SetFrameStrata(options.strata or "DIALOG")
+    if options.level then
+        panel:SetFrameLevel(options.level)
+    end
+    if options.escClose and name then
+        tinsert(UISpecialFrames, name)
+    end
+    return panel
+end
+
+---Create a styled button with consistent font
+---@param parent Frame
+---@param width number
+---@param height number
+---@param text string
+---@param onClick function
+---@param smallFont? boolean Use small font (default true)
+---@return table
+local function CreateButton(parent, width, height, text, onClick, smallFont)
+    local btn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    btn:SetSize(width, height)
+    btn:SetText(text)
+    if smallFont ~= false then
+        btn:SetNormalFontObject("GameFontHighlightSmall")
+    end
+    btn:SetScript("OnClick", onClick)
+    return btn
+end
+
+---Create a section header with yellow text
+---@param parent table
+---@param text string
+---@param x number
+---@param y number
+---@return table header
+---@return number newY
+local function CreateSectionHeader(parent, text, x, y)
+    local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    header:SetPoint("TOPLEFT", x, y)
+    header:SetText("|cffffcc00" .. text .. "|r")
+    return header, y - 18
+end
+
+---Create a buff icon texture with standard formatting
+---@param parent table
+---@param size number
+---@param textureID? number|string
+---@return table
+local function CreateBuffIcon(parent, size, textureID)
+    local icon = parent:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(size, size)
+    icon:SetTexCoord(TEXCOORD_INSET, 1 - TEXCOORD_INSET, TEXCOORD_INSET, 1 - TEXCOORD_INSET)
+    if textureID then
+        icon:SetTexture(textureID)
+    end
+    return icon
+end
+
+-- ============================================================================
+-- BUFF HELPER FUNCTIONS
+-- ============================================================================
+
 ---Get the effective setting key for a buff (groupId if present, otherwise individual key)
 ---@param buff RaidBuff|PresenceBuff|PersonalBuff|SelfBuff
 ---@return string
@@ -264,7 +378,6 @@ local defaults = {
 }
 
 -- Constants
-local TEXCOORD_INSET = 0.08
 local BORDER_PADDING = 2
 local MISSING_TEXT_SCALE = 0.6 -- scale for "NO X" warning text
 local OPTIONS_BASE_SCALE = 1.2
@@ -1430,31 +1543,12 @@ local function CreateOptionsPanel()
     local SECTION_SPACING = 12
     local ITEM_HEIGHT = 22
 
-    local panel = CreateFrame("Frame", "BuffRemindersOptions", UIParent, "BackdropTemplate")
-    panel:SetWidth(PANEL_WIDTH)
-    panel:SetPoint("CENTER")
-    panel:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 2,
-    })
-    panel:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
-    panel:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-    panel:SetMovable(true)
-    panel:EnableMouse(true)
-    panel:RegisterForDrag("LeftButton")
-    panel:SetScript("OnDragStart", panel.StartMoving)
-    panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
-    panel:SetFrameStrata("DIALOG")
+    local panel = CreatePanel("BuffRemindersOptions", PANEL_WIDTH, 400, { escClose = true })
     panel:Hide()
-    tinsert(UISpecialFrames, "BuffRemindersOptions")
 
     -- Addon icon
-    local addonIcon = panel:CreateTexture(nil, "ARTWORK")
-    addonIcon:SetSize(28, 28)
+    local addonIcon = CreateBuffIcon(panel, 28, "Interface\\AddOns\\BuffReminders\\icon.tga")
     addonIcon:SetPoint("TOPLEFT", 12, -8)
-    addonIcon:SetTexture("Interface\\AddOns\\BuffReminders\\icon.tga")
-    addonIcon:SetTexCoord(TEXCOORD_INSET, 1 - TEXCOORD_INSET, TEXCOORD_INSET, 1 - TEXCOORD_INSET)
 
     -- Title (next to icon)
     local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
@@ -1631,30 +1725,6 @@ local function CreateOptionsPanel()
 
     -- ========== HELPER FUNCTIONS ==========
 
-    -- Create section header (defaults to generalContent)
-    local function CreateSectionHeader(parent, text, x, y)
-        parent = parent or generalContent
-        local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        header:SetPoint("TOPLEFT", x, y)
-        header:SetText("|cffffcc00" .. text .. "|r")
-        return header, y - 18
-    end
-
-    -- Setup tooltip for a widget
-    local function SetupTooltip(widget, tooltipTitle, tooltipDesc, anchor)
-        widget:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, anchor or "ANCHOR_RIGHT")
-            GameTooltip:SetText(tooltipTitle)
-            if tooltipDesc then
-                GameTooltip:AddLine(tooltipDesc, 1, 1, 1, true)
-            end
-            GameTooltip:Show()
-        end)
-        widget:SetScript("OnLeave", function()
-            GameTooltip:Hide()
-        end)
-    end
-
     -- Create buff checkbox (compact, for left column)
     -- spellIDs can be a single ID, a table of IDs (for multi-rank spells), or a table of tables (for grouped buffs with multiple icons)
     -- infoTooltip is optional: "Title|Description" format shows a "?" icon with tooltip
@@ -1676,11 +1746,8 @@ local function CreateOptionsPanel()
             local texture = GetBuffTexture(spellID)
             if texture and not seenTextures[texture] then
                 seenTextures[texture] = true
-                local icon = generalContent:CreateTexture(nil, "ARTWORK")
-                icon:SetSize(18, 18)
+                local icon = CreateBuffIcon(generalContent, 18, texture)
                 icon:SetPoint("LEFT", lastAnchor, lastAnchor == cb and "RIGHT" or "RIGHT", 2, 0)
-                icon:SetTexCoord(TEXCOORD_INSET, 1 - TEXCOORD_INSET, TEXCOORD_INSET, 1 - TEXCOORD_INSET)
-                icon:SetTexture(texture)
                 lastAnchor = icon
             end
         end
@@ -2345,14 +2412,8 @@ local function CreateOptionsPanel()
             panel.buffCheckboxes[key] = cb
 
             -- Icon
-            local icon = row:CreateTexture(nil, "ARTWORK")
-            icon:SetSize(18, 18)
+            local icon = CreateBuffIcon(row, 18, GetBuffTexture(customBuff.spellID))
             icon:SetPoint("LEFT", cb, "RIGHT", 2, 0)
-            icon:SetTexCoord(TEXCOORD_INSET, 1 - TEXCOORD_INSET, TEXCOORD_INSET, 1 - TEXCOORD_INSET)
-            local texture = GetBuffTexture(customBuff.spellID)
-            if texture then
-                icon:SetTexture(texture)
-            end
 
             -- Name label
             local label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -2367,41 +2428,29 @@ local function CreateOptionsPanel()
             end
 
             -- Edit button (smaller, matching style)
-            local editBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-            editBtn:SetSize(36, 18)
-            editBtn:SetPoint("RIGHT", row, "RIGHT", -44, 0)
-            editBtn:SetText("Edit")
-            editBtn:SetNormalFontObject("GameFontHighlightSmall")
-            editBtn:SetScript("OnClick", function()
+            local editBtn = CreateButton(row, 36, 18, "Edit", function()
                 ShowCustomBuffModal(key, RenderCustomBuffRows)
             end)
+            editBtn:SetPoint("RIGHT", row, "RIGHT", -44, 0)
 
             -- Delete button (smaller, matching style)
-            local deleteBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-            deleteBtn:SetSize(36, 18)
-            deleteBtn:SetPoint("LEFT", editBtn, "RIGHT", 4, 0)
-            deleteBtn:SetText("Del")
-            deleteBtn:SetNormalFontObject("GameFontHighlightSmall")
-            deleteBtn:SetScript("OnClick", function()
+            local deleteBtn = CreateButton(row, 36, 18, "Del", function()
                 StaticPopup_Show("BUFFREMINDERS_DELETE_CUSTOM", customBuff.name or key, nil, {
                     key = key,
                     refreshPanel = RenderCustomBuffRows,
                 })
             end)
+            deleteBtn:SetPoint("LEFT", editBtn, "RIGHT", 4, 0)
 
             table.insert(panel.customBuffRows, row)
             customY = customY - ITEM_HEIGHT
         end
 
         -- Add button
-        local addBtn = CreateFrame("Button", nil, customBuffsContainer, "UIPanelButtonTemplate")
-        addBtn:SetSize(110, 18)
-        addBtn:SetPoint("TOPLEFT", 0, customY - 4)
-        addBtn:SetText("+ Add Custom Buff")
-        addBtn:SetNormalFontObject("GameFontHighlightSmall")
-        addBtn:SetScript("OnClick", function()
+        local addBtn = CreateButton(customBuffsContainer, 110, 18, "+ Add Custom Buff", function()
             ShowCustomBuffModal(nil, RenderCustomBuffRows)
         end)
+        addBtn:SetPoint("TOPLEFT", 0, customY - 4)
         table.insert(panel.customBuffRows, addBtn)
 
         -- Update container height
@@ -2571,24 +2620,13 @@ ShowGlowDemo = function()
 
     local ICON_SIZE = 64
     local SPACING = 20
-
-    local panel = CreateFrame("Frame", "BuffRemindersGlowDemo", UIParent, "BackdropTemplate")
     local numStyles = #GlowStyles
-    panel:SetSize(numStyles * (ICON_SIZE + SPACING) + SPACING, ICON_SIZE + 70)
-    panel:SetPoint("CENTER")
-    panel:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 2,
+
+    local panel = CreatePanel("BuffRemindersGlowDemo", numStyles * (ICON_SIZE + SPACING) + SPACING, ICON_SIZE + 70, {
+        bgColor = { 0.12, 0.08, 0.18, 0.98 },
+        borderColor = { 0.6, 0.4, 0.8, 1 },
+        strata = "TOOLTIP",
     })
-    panel:SetBackdropColor(0.12, 0.08, 0.18, 0.98)
-    panel:SetBackdropBorderColor(0.6, 0.4, 0.8, 1)
-    panel:SetMovable(true)
-    panel:EnableMouse(true)
-    panel:RegisterForDrag("LeftButton")
-    panel:SetScript("OnDragStart", panel.StartMoving)
-    panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
-    panel:SetFrameStrata("TOOLTIP")
 
     local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", 0, -8)
@@ -2661,24 +2699,12 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     local MODAL_HEIGHT = 270
     local editingBuff = existingKey and BuffRemindersDB.customBuffs[existingKey] or nil
 
-    local modal = CreateFrame("Frame", "BuffRemindersCustomBuffModal", UIParent, "BackdropTemplate")
-    modal:SetSize(MODAL_WIDTH, MODAL_HEIGHT)
-    modal:SetPoint("CENTER")
-    modal:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 2,
+    local modal = CreatePanel("BuffRemindersCustomBuffModal", MODAL_WIDTH, MODAL_HEIGHT, {
+        bgColor = { 0.1, 0.1, 0.1, 0.98 },
+        borderColor = { 0.4, 0.4, 0.4, 1 },
+        level = 200,
+        escClose = true,
     })
-    modal:SetBackdropColor(0.1, 0.1, 0.1, 0.98)
-    modal:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
-    modal:SetMovable(true)
-    modal:EnableMouse(true)
-    modal:RegisterForDrag("LeftButton")
-    modal:SetScript("OnDragStart", modal.StartMoving)
-    modal:SetScript("OnDragStop", modal.StopMovingOrSizing)
-    modal:SetFrameStrata("DIALOG")
-    modal:SetFrameLevel(200)
-    tinsert(UISpecialFrames, "BuffRemindersCustomBuffModal")
 
     local title = modal:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -12)
@@ -2716,10 +2742,8 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     previewBg:SetPoint("TOPLEFT", 20, y)
     previewBg:SetColorTexture(0.05, 0.05, 0.05, 1)
 
-    local previewIcon = modal:CreateTexture(nil, "ARTWORK")
-    previewIcon:SetSize(40, 40)
+    local previewIcon = CreateBuffIcon(modal, 40)
     previewIcon:SetPoint("TOPLEFT", 25, y - 5)
-    previewIcon:SetTexCoord(TEXCOORD_INSET, 1 - TEXCOORD_INSET, TEXCOORD_INSET, 1 - TEXCOORD_INSET)
     previewIcon:Hide()
 
     local previewName = modal:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
