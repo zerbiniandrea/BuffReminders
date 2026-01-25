@@ -1532,7 +1532,7 @@ local function CreateOptionsPanel()
     end
 
     -- Create checkbox with label (for right column)
-    local function CreateCheckbox(x, y, labelText, checked, onClick)
+    local function CreateCheckbox(x, y, labelText, checked, onClick, tooltip)
         local cb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
         cb:SetSize(20, 20)
         cb:SetPoint("TOPLEFT", x, y)
@@ -1543,6 +1543,18 @@ local function CreateOptionsPanel()
         label:SetPoint("LEFT", cb, "RIGHT", 4, 0)
         label:SetText(labelText)
         cb.label = label
+
+        if tooltip then
+            cb:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText(labelText)
+                GameTooltip:AddLine(tooltip, 1, 1, 1, true)
+                GameTooltip:Show()
+            end)
+            cb:SetScript("OnLeave", function()
+                GameTooltip:Hide()
+            end)
+        end
 
         return cb, y - ITEM_HEIGHT
     end
@@ -1946,7 +1958,8 @@ local function CreateOptionsPanel()
         function(self)
             BuffRemindersDB.showOnlyPlayerClassBuff = self:GetChecked()
             UpdateDisplay()
-        end
+        end,
+        "Only show buffs that your class can provide (e.g., warriors will only see Battle Shout)"
     )
     panel.playerClassCheckbox = playerClassCb
 
