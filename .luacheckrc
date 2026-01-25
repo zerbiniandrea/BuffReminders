@@ -24,6 +24,8 @@ read_globals = {
 	"C_UnitAuras",
 	"CreateFrame",
 	"GetNumGroupMembers",
+	"GetSpecialization",
+	"GetSpecializationRole",
 	"GetTime",
 	"GetWeaponEnchantInfo",
 	"InCombatLockdown",

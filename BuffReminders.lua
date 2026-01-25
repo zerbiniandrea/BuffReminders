@@ -91,6 +91,14 @@ local PersonalBuffs = {
         class = "DRUID",
         missingText = "NO\nLINK",
     },
+    {
+        spellID = 974,
+        key = "earthShieldOthers",
+        name = "Earth Shield",
+        class = "SHAMAN",
+        missingText = "NO\nES",
+        infoTooltip = "May Show Extra Icon|Until you cast this, you might see both this and the Water/Lightning Shield reminder. I can't tell if you want Earth Shield on yourself, or Earth Shield on an ally + Water/Lightning Shield on yourself.",
+    },
 }
 
 -- Self buffs: buffs/imbues the player casts on themselves
@@ -98,6 +106,10 @@ local PersonalBuffs = {
 --   missingText: text shown when buff is missing
 --   enchantID: optional - for weapon imbues, checks if this enchant is on either weapon
 --   groupId: optional - buffs with same groupId share a single setting and show one icon
+--   buffIdOverride: optional - separate buff ID to check (if different from spellID, e.g., passive effects)
+--   requiresTalentSpellID: optional - only show if player has this talent
+--   excludeTalentSpellID: optional - hide if player has this talent
+--   iconByRole: optional - table mapping role (HEALER/DAMAGER/TANK) to spellID for icon
 local SelfBuffs = {
     -- Shadowform will drop during Void Form, but that only happens in combat. We're happy enough just checking Shadowform before going into combat.
     { spellID = 232698, key = "shadowform", name = "Shadowform", class = "PRIEST", missingText = "NO\nFORM" },
@@ -148,6 +160,40 @@ local SelfBuffs = {
         enchantID = 7144,
         groupId = "paladinRites",
     },
+    -- Shaman shields
+    -- Without Elemental Orbit: need either Water Shield, Earth Shield, or Lightning Shield on self
+    {
+        spellID = { 52127, 974, 192106 },
+        key = "shamanShieldBasic",
+        name = "Shield (No Talent)",
+        class = "SHAMAN",
+        missingText = "NO\nSHIELD",
+        excludeTalentSpellID = 383010,
+        groupId = "shamanShields",
+        iconByRole = { HEALER = 52127, DAMAGER = 192106, TANK = 192106 },
+    },
+    -- With Elemental Orbit: need Water Shield or Lightning Shield
+    {
+        spellID = { 52127, 192106 },
+        key = "waterLightningShieldEO",
+        name = "Water/Lightning Shield",
+        class = "SHAMAN",
+        missingText = "NO\nSHIELD",
+        requiresTalentSpellID = 383010,
+        groupId = "shamanShields",
+        iconByRole = { HEALER = 52127, DAMAGER = 192106, TANK = 192106 },
+    },
+    -- With Elemental Orbit: need Earth Shield (passive self-buff)
+    {
+        spellID = 974, -- Earth Shield spell (for icon and spell check)
+        buffIdOverride = 383648, -- The passive buff to check for
+        key = "earthShieldSelfEO",
+        name = "Earth Shield (Self)",
+        class = "SHAMAN",
+        missingText = "NO\nSELF ES",
+        requiresTalentSpellID = 383010,
+        groupId = "shamanShields",
+    },
 }
 
 -- Display names and text for grouped buffs
@@ -155,6 +201,7 @@ local BuffGroups = {
     beacons = { displayName = "Beacons", missingText = "NO\nBEACONS" },
     shamanImbues = { displayName = "Shaman Imbues" },
     paladinRites = { displayName = "Paladin Rites" },
+    shamanShields = { displayName = "Shaman Shields" },
 }
 
 -- Get the effective setting key for a buff (groupId if present, otherwise individual key)
@@ -206,6 +253,8 @@ local defaults = {
         sourceOfMagic = true,
         beacons = true,
         shadowform = true,
+        shamanShields = true,
+        earthShieldOthers = true,
     },
     iconSize = 64,
     spacing = 0.2, -- multiplier of iconSize (reset ratios default)
@@ -319,9 +368,29 @@ local function UnitHasBuff(unit, spellIDs)
     return false, nil, nil
 end
 
--- Get spell texture (handles table of spellIDs)
-local function GetBuffTexture(spellIDs)
-    local id = type(spellIDs) == "table" and spellIDs[1] or spellIDs
+-- Get player's current role (HEALER, DAMAGER, TANK, or nil)
+local function GetPlayerRole()
+    local spec = GetSpecialization()
+    if spec then
+        return GetSpecializationRole(spec)
+    end
+    return nil
+end
+
+-- Get spell texture (handles table of spellIDs and role-based icons)
+local function GetBuffTexture(spellIDs, iconByRole)
+    local id
+    -- Check for role-based icon override
+    if iconByRole then
+        local role = GetPlayerRole()
+        if role and iconByRole[role] then
+            id = iconByRole[role]
+        end
+    end
+    -- Fall back to spellIDs
+    if not id then
+        id = type(spellIDs) == "table" and spellIDs[1] or spellIDs
+    end
     local texture
     pcall(function()
         texture = C_Spell.GetSpellTexture(id)
@@ -486,12 +555,32 @@ end
 -- Check if player should cast their self buff or weapon imbue (returns true if missing)
 -- Returns nil if player can't/shouldn't use this buff
 -- enchantID: for weapon imbues, checks if this enchant is on either weapon
-local function ShouldShowSelfBuff(spellID, requiredClass, enchantID)
+-- requiresTalent: only show if player HAS this talent (by spellID)
+-- excludeTalent: hide if player HAS this talent (by spellID)
+-- buffIdOverride: optional separate buff ID to check (if different from spellID)
+local function ShouldShowSelfBuff(spellID, requiredClass, enchantID, requiresTalent, excludeTalent, buffIdOverride)
     if playerClass ~= requiredClass then
         return nil
     end
 
-    if not IsPlayerSpell(spellID) then
+    -- Talent checks (before spell availability check for talent-gated buffs)
+    if requiresTalent and not IsPlayerSpell(requiresTalent) then
+        return nil
+    end
+    if excludeTalent and IsPlayerSpell(excludeTalent) then
+        return nil
+    end
+
+    -- For buffs with multiple spellIDs (like shields), check if player knows ANY of them
+    local spellIDs = type(spellID) == "table" and spellID or { spellID }
+    local knowsAnySpell = false
+    for _, id in ipairs(spellIDs) do
+        if IsPlayerSpell(id) then
+            knowsAnySpell = true
+            break
+        end
+    end
+    if not knowsAnySpell then
         return nil
     end
 
@@ -501,8 +590,8 @@ local function ShouldShowSelfBuff(spellID, requiredClass, enchantID)
         return mainHandEnchantID ~= enchantID and offHandEnchantID ~= enchantID
     end
 
-    -- Regular buff check
-    local hasBuff, _ = UnitHasBuff("player", spellID)
+    -- Regular buff check - use buffIdOverride if provided, otherwise use spellID
+    local hasBuff, _ = UnitHasBuff("player", buffIdOverride or spellID)
     return not hasBuff
 end
 
@@ -662,7 +751,7 @@ local function CreateBuffFrame(buff, _)
     frame.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     frame.icon:SetDesaturated(false)
     frame.icon:SetVertexColor(1, 1, 1, 1)
-    local texture = GetBuffTexture(buff.spellID)
+    local texture = GetBuffTexture(buff.spellID, buff.iconByRole)
     if texture then
         frame.icon:SetTexture(texture)
     end
@@ -1084,7 +1173,14 @@ UpdateDisplay = function()
         local settingKey = buff.groupId or buff.key
 
         if frame and db.enabledBuffs[settingKey] then
-            local shouldShow = ShouldShowSelfBuff(buff.spellID, buff.class, buff.enchantID)
+            local shouldShow = ShouldShowSelfBuff(
+                buff.spellID,
+                buff.class,
+                buff.enchantID,
+                buff.requiresTalentSpellID,
+                buff.excludeTalentSpellID,
+                buff.buffIdOverride
+            )
             if shouldShow then
                 frame.icon:SetAllPoints()
                 frame.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
