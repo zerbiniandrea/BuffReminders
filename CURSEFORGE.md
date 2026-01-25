@@ -15,8 +15,7 @@ From the author of [Raid Buffs Tracker](https://wago.io/iWkZ4Eq-i), one of the m
 *   Draggable frame - Position anywhere on screen, with configurable grow direction
 *   Class reminder - Shows "BUFF!" under your class's buff icon when party members are missing it
 *   Expiration warning - Glow effect when buffs are about to expire, with 5 styles to choose from
-*   Smart filtering - Show only in group, hide buffs without provider, show only your class buff
-*   Class benefit filtering - Only show buffs that benefit your class (BETA)
+*   Smart filtering - Show only in group, hide buffs without provider, show only your class buff, count only benefiting classes
 *   Customizable - Adjust icon size, spacing, and text size
 
 ![Glow Styles](https://github.com/zerbiniandrea/BuffReminders/blob/main/images/glows.png?raw=true)
