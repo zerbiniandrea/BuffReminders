@@ -23,17 +23,22 @@ local PresenceBuffs = {
     { 20707, "soulstone", "Soulstone", "WARLOCK", "NO\nSTONE", true },
 }
 
--- Personal buffs: only tracks if the player should cast their buff
--- {spellID, settingKey, displayName, requiredClass, beneficiaryRole, missingText, groupId, selfCast}
+-- Personal buffs: only tracks if the player should cast their buff on others
+-- {spellID, settingKey, displayName, requiredClass, beneficiaryRole, missingText, groupId}
 -- Only shows if player is the required class, has the spell talented, and a beneficiary needs it
 -- groupId is optional - buffs with same groupId share a single setting and show one icon
--- selfCast means the buff can only be cast on the player (e.g. Shadowform, Water Shield)
 local PersonalBuffs = {
-    { 156910, "beaconOfFaith", "Beacon of Faith", "PALADIN", nil, "NO\nFAITH", "beacons", false },
-    { 53563, "beaconOfLight", "Beacon of Light", "PALADIN", nil, "NO\nLIGHT", "beacons", false },
-    { 369459, "sourceOfMagic", "Source of Magic", "EVOKER", "HEALER", "NO\nSOURCE", nil, false },
+    { 156910, "beaconOfFaith", "Beacon of Faith", "PALADIN", nil, "NO\nFAITH", "beacons" },
+    { 53563, "beaconOfLight", "Beacon of Light", "PALADIN", nil, "NO\nLIGHT", "beacons" },
+    { 369459, "sourceOfMagic", "Source of Magic", "EVOKER", "HEALER", "NO\nSOURCE", nil },
+}
+
+-- Self buffs: buffs the player casts on themselves
+-- {spellID, settingKey, displayName, requiredClass, missingText}
+-- Only shows if player is the required class and has the spell (spec is inferred from spell knowledge)
+local SelfBuffs = {
     -- Shadowform will drop during Void Form, but that only happens in combat. We're happy enough just checking Shadowform before going into combat.
-    { 232698, "shadowform", "Shadowform", "PRIEST", "DAMAGER", "NO\nFORM", nil, true },
+    { 232698, "shadowform", "Shadowform", "PRIEST", "NO\nFORM" },
 }
 
 -- Display names and text for grouped buffs
@@ -320,19 +325,8 @@ end
 -- Check if player's buff is active on anyone in the group
 -- Returns true if the buff (from player) exists on someone, false otherwise
 -- If role is specified, only checks units with that role
--- If selfCast is true, only checks against the player
-local function IsPlayerBuffActive(spellID, role, selfCast, groupSize)
+local function IsPlayerBuffActive(spellID, role, groupSize)
     local inRaid = IsInRaid()
-
-    -- Solo: check self-cast buffs against the player, regardless of group size
-    if selfCast then
-        if not role or UnitGroupRolesAssigned(unit) == role then
-            local hasBuff, _ = UnitHasBuff("player", spellID)
-            return hasBuff
-        else
-            return false
-        end
-    end
 
     for i = 1, groupSize do
         local unit
@@ -361,7 +355,7 @@ end
 
 -- Check if player should cast their personal buff (returns true if a beneficiary needs it)
 -- Returns nil if player can't provide this buff
-local function ShouldShowPersonalBuff(spellIDs, requiredClass, beneficiaryRole, selfCast)
+local function ShouldShowPersonalBuff(spellIDs, requiredClass, beneficiaryRole)
     local _, playerClass = UnitClass("player")
     if playerClass ~= requiredClass then
         return nil
@@ -372,13 +366,29 @@ local function ShouldShowPersonalBuff(spellIDs, requiredClass, beneficiaryRole, 
         return nil
     end
 
-    -- when solo, do not show personal buffs unless they're self-cast.
+    -- Personal buffs require a group (you cast them on others)
     local groupSize = GetNumGroupMembers()
-    if not selfCast and groupSize == 0 then
+    if groupSize == 0 then
         return nil
     end
 
-    return not IsPlayerBuffActive(spellID, beneficiaryRole, selfCast, groupSize)
+    return not IsPlayerBuffActive(spellID, beneficiaryRole, groupSize)
+end
+
+-- Check if player should cast their self buff (returns true if missing)
+-- Returns nil if player can't/shouldn't use this buff
+local function ShouldShowSelfBuff(spellID, requiredClass)
+    local _, playerClass = UnitClass("player")
+    if playerClass ~= requiredClass then
+        return nil
+    end
+
+    if not IsPlayerSpell(spellID) then
+        return nil
+    end
+
+    local hasBuff, _ = UnitHasBuff("player", spellID)
+    return not hasBuff
 end
 
 -- Forward declarations
@@ -626,6 +636,13 @@ PositionBuffFrames = function()
             table.insert(visibleFrames, frame)
         end
     end
+    for _, buffData in ipairs(SelfBuffs) do
+        local key = buffData[2]
+        local frame = buffFrames[key]
+        if frame and frame:IsShown() then
+            table.insert(visibleFrames, frame)
+        end
+    end
 
     local count = #visibleFrames
     if count == 0 then
@@ -728,6 +745,21 @@ RefreshTestDisplay = function()
                 end
                 frame:Show()
             end
+        end
+    end
+
+    -- Show ALL self buffs
+    for _, buffData in ipairs(SelfBuffs) do
+        local _, key, _, _, missingText = unpack(buffData)
+        local frame = buffFrames[key]
+        if frame then
+            frame.count:SetText(missingText or "")
+            frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(MISSING_TEXT_SCALE), "OUTLINE")
+            if frame.testText and testModeData.showLabels then
+                frame.testText:SetFont(STANDARD_TEXT_FONT, GetFontSize(0.6), "OUTLINE")
+                frame.testText:Show()
+            end
+            frame:Show()
         end
     end
 
@@ -903,12 +935,12 @@ UpdateDisplay = function()
     -- Process personal buffs (player's own buff responsibility)
     local visibleGroups = {} -- Track visible buffs by groupId for merging
     for _, buffData in ipairs(PersonalBuffs) do
-        local spellIDs, key, _, requiredClass, beneficiaryRole, missingText, groupId, selfCast = unpack(buffData)
+        local spellIDs, key, _, requiredClass, beneficiaryRole, missingText, groupId = unpack(buffData)
         local frame = buffFrames[key]
         local settingKey = GetBuffSettingKey(buffData)
 
         if frame and db.enabledBuffs[settingKey] then
-            local shouldShow = ShouldShowPersonalBuff(spellIDs, requiredClass, beneficiaryRole, selfCast)
+            local shouldShow = ShouldShowPersonalBuff(spellIDs, requiredClass, beneficiaryRole)
             if shouldShow then
                 frame.icon:SetAllPoints()
                 frame.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -942,6 +974,31 @@ UpdateDisplay = function()
             for i = 2, #group do
                 group[i].frame:Hide()
             end
+        end
+    end
+
+    -- Process self buffs (player's own buff on themselves)
+    for _, buffData in ipairs(SelfBuffs) do
+        local spellID, key, _, requiredClass, missingText = unpack(buffData)
+        local frame = buffFrames[key]
+
+        if frame and db.enabledBuffs[key] then
+            local shouldShow = ShouldShowSelfBuff(spellID, requiredClass)
+            if shouldShow then
+                frame.icon:SetAllPoints()
+                frame.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(MISSING_TEXT_SCALE), "OUTLINE")
+                frame.count:SetText(missingText or "")
+                frame:Show()
+                anyVisible = true
+                SetExpirationGlow(frame, false)
+            else
+                frame:Hide()
+                SetExpirationGlow(frame, false)
+            end
+        elseif frame then
+            frame:Hide()
+            SetExpirationGlow(frame, false)
         end
     end
 
@@ -1035,6 +1092,12 @@ local function InitializeFrames()
         local key = buffData[2]
         buffFrames[key] = CreateBuffFrame(buffData, #RaidBuffs + #PresenceBuffs + i)
         buffFrames[key].isPersonalBuff = true
+    end
+
+    for i, buffData in ipairs(SelfBuffs) do
+        local key = buffData[2]
+        buffFrames[key] = CreateBuffFrame(buffData, #RaidBuffs + #PresenceBuffs + #PersonalBuffs + i)
+        buffFrames[key].isSelfBuff = true
     end
 
     mainFrame:Hide()
@@ -1401,6 +1464,20 @@ local function CreateOptionsPanel()
         else
             leftY = CreateBuffCheckbox(leftColX, leftY, spellIDs, key, displayName)
         end
+    end
+
+    leftY = leftY - SECTION_SPACING
+
+    -- Self Buffs header
+    _, leftY = CreateSectionHeader(panel, "Self Buffs", leftColX, leftY)
+    local selfNote = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    selfNote:SetPoint("TOPLEFT", leftColX, leftY)
+    selfNote:SetText("(buffs on yourself)")
+    leftY = leftY - 14
+
+    for _, buffData in ipairs(SelfBuffs) do
+        local spellID, key, displayName = unpack(buffData)
+        leftY = CreateBuffCheckbox(leftColX, leftY, spellID, key, displayName)
     end
 
     -- ========== RIGHT COLUMN: SETTINGS ==========
@@ -1904,6 +1981,12 @@ local function ToggleOptions()
                 end
             end
         end
+        for _, buffData in ipairs(SelfBuffs) do
+            local key = buffData[2]
+            if optionsPanel.buffCheckboxes[key] then
+                optionsPanel.buffCheckboxes[key]:SetChecked(db.enabledBuffs[key])
+            end
+        end
         optionsPanel.sizeSlider:SetValue(db.iconSize)
         optionsPanel.spacingSlider:SetValue((db.spacing or 0.2) * 100)
         optionsPanel.textSlider:SetValue((db.textScale or 0.34) * 100)
@@ -2074,6 +2157,12 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
                 if RaidBuffsTrackerDB.enabledBuffs[settingKey] == nil then
                     RaidBuffsTrackerDB.enabledBuffs[settingKey] = true
                 end
+            end
+        end
+        for _, buffData in ipairs(SelfBuffs) do
+            local key = buffData[2]
+            if RaidBuffsTrackerDB.enabledBuffs[key] == nil then
+                RaidBuffsTrackerDB.enabledBuffs[key] = true
             end
         end
 
