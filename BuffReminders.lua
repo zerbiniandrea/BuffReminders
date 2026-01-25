@@ -120,6 +120,15 @@ local SelfBuffs = {
         enchantID = 5400,
         groupId = "shamanImbues",
     },
+    {
+        spellID = 382021,
+        key = "earthlivingWeapon",
+        name = "Earthliving Weapon",
+        class = "SHAMAN",
+        missingText = "NO\nEL",
+        enchantID = 6498,
+        groupId = "shamanImbues",
+    },
     -- Paladin weapon rites
     {
         spellID = 433568,
