@@ -24,6 +24,8 @@
 ---@field name string
 ---@field class ClassName
 ---@field missingText string
+---@field groupId? string
+---@field excludeTalentSpellID? number
 ---@field infoTooltip? string
 
 ---@class PersonalBuff
@@ -34,6 +36,8 @@
 ---@field missingText string
 ---@field groupId? string
 ---@field beneficiaryRole? RoleType
+---@field excludeTalentSpellID? number
+---@field iconOverride? number
 ---@field infoTooltip? string
 
 ---@class SelfBuff

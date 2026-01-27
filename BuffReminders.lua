@@ -61,6 +61,8 @@ local PersonalBuffs = {
         class = "PALADIN",
         missingText = "NO\nLIGHT",
         groupId = "beacons",
+        excludeTalentSpellID = 200025, -- Hide when Beacon of Virtue is known
+        iconOverride = 236247, -- Force original icon (talents replace the texture)
     },
     {
         spellID = 974,
@@ -521,7 +523,11 @@ end
 ---@param spellIDs SpellID
 ---@param iconByRole? table<RoleType, number>
 ---@return number? textureID
-local function GetBuffTexture(spellIDs, iconByRole)
+local function GetBuffTexture(spellIDs, iconByRole, iconOverride)
+    -- Direct texture override (for spells replaced by talents)
+    if iconOverride then
+        return iconOverride
+    end
     local id
     -- Check for role-based icon override
     if iconByRole then
@@ -1222,6 +1228,8 @@ UpdateDisplay = function()
         local showBuff = (not readyCheckOnly or inReadyCheck)
             and (not db.showOnlyPlayerClassBuff or buff.class == playerClass)
             and (not presentClasses or presentClasses[buff.class])
+            and IsPlayerSpell(buff.spellID)
+            and (not buff.excludeTalentSpellID or not IsPlayerSpell(buff.excludeTalentSpellID))
 
         if frame and IsBuffEnabled(buff.key) and showBuff then
             local count, minRemaining = CountPresenceBuff(buff.spellID)
@@ -1256,7 +1264,12 @@ UpdateDisplay = function()
         local frame = buffFrames[buff.key]
         local settingKey = GetBuffSettingKey(buff)
 
-        if frame and IsBuffEnabled(settingKey) then
+        -- Skip if player has a talent that replaces this buff
+        if buff.excludeTalentSpellID and IsPlayerSpell(buff.excludeTalentSpellID) then
+            if frame then
+                HideFrame(frame)
+            end
+        elseif frame and IsBuffEnabled(settingKey) then
             local shouldShow = ShouldShowPersonalBuff(buff.spellID, buff.class, buff.beneficiaryRole)
             if shouldShow then
                 frame.icon:SetAllPoints()
@@ -1747,7 +1760,8 @@ local function CreateOptionsPanel()
     -- Create buff checkbox (compact, for left column)
     -- spellIDs can be a single ID, a table of IDs (for multi-rank spells), or a table of tables (for grouped buffs with multiple icons)
     -- infoTooltip is optional: "Title|Description" format shows a "?" icon with tooltip
-    local function CreateBuffCheckbox(x, y, spellIDs, key, displayName, infoTooltip)
+    -- iconOverrides is optional: table mapping spellID -> texture for spells replaced by talents
+    local function CreateBuffCheckbox(x, y, spellIDs, key, displayName, infoTooltip, iconOverrides)
         local cb = CreateFrame("CheckButton", nil, buffsContent, "UICheckButtonTemplate")
         cb:SetSize(20, 20)
         cb:SetPoint("TOPLEFT", x, y)
@@ -1762,7 +1776,8 @@ local function CreateOptionsPanel()
         local spellList = type(spellIDs) == "table" and spellIDs or { spellIDs }
         local seenTextures = {}
         for _, spellID in ipairs(spellList) do
-            local texture = GetBuffTexture(spellID)
+            local override = iconOverrides and iconOverrides[spellID]
+            local texture = GetBuffTexture(spellID, nil, override)
             if texture and not seenTextures[texture] then
                 seenTextures[texture] = true
                 local icon = CreateBuffIcon(buffsContent, 18, texture)
@@ -1906,8 +1921,9 @@ local function CreateOptionsPanel()
     -- Render checkboxes for any buff array
     -- Handles grouping automatically if groupId field is present
     local function RenderBuffCheckboxes(x, y, buffArray)
-        -- Pass 1: Collect grouped spell IDs (flatten tables)
+        -- Pass 1: Collect grouped spell IDs and icon overrides (flatten tables)
         local groupSpells = {}
+        local iconOverrides = {} -- spellID -> texture override
         for _, buff in ipairs(buffArray) do
             if buff.groupId then
                 groupSpells[buff.groupId] = groupSpells[buff.groupId] or {}
@@ -1915,6 +1931,9 @@ local function CreateOptionsPanel()
                 local spellList = type(buff.spellID) == "table" and buff.spellID or { buff.spellID }
                 for _, id in ipairs(spellList) do
                     table.insert(groupSpells[buff.groupId], id)
+                    if buff.iconOverride then
+                        iconOverrides[id] = buff.iconOverride
+                    end
                 end
             end
         end
@@ -1932,11 +1951,20 @@ local function CreateOptionsPanel()
                         groupSpells[buff.groupId],
                         buff.groupId,
                         groupInfo.displayName,
-                        buff.infoTooltip
+                        buff.infoTooltip,
+                        iconOverrides
                     )
                 end
             else
-                y = CreateBuffCheckbox(x, y, buff.spellID, buff.key, buff.name, buff.infoTooltip)
+                y = CreateBuffCheckbox(
+                    x,
+                    y,
+                    buff.spellID,
+                    buff.key,
+                    buff.name,
+                    buff.infoTooltip,
+                    buff.iconOverride and { [buff.spellID] = buff.iconOverride }
+                )
             end
         end
 
