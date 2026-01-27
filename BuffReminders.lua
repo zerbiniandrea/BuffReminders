@@ -385,6 +385,7 @@ local defaults = {
     showOnlyInGroup = false,
     showOnlyInInstance = false,
     showOnlyPlayerClassBuff = false,
+    showOnlyPlayerMissing = false,
     showOnlyOnReadyCheck = false,
     readyCheckDuration = 15, -- seconds
     growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT"
@@ -563,17 +564,18 @@ end
 ---Count group members missing a buff
 ---@param spellIDs SpellID
 ---@param buffKey? string Used for class benefit filtering
+---@param playerOnly? boolean Only check the player, not the group
 ---@return number missing
 ---@return number total
 ---@return number? minRemaining
-local function CountMissingBuff(spellIDs, buffKey)
+local function CountMissingBuff(spellIDs, buffKey, playerOnly)
     local missing = 0
     local total = 0
     local minRemaining = nil
     local beneficiaries = BuffBeneficiaries[buffKey]
 
-    if GetNumGroupMembers() == 0 then
-        -- Solo: check if player benefits
+    if playerOnly or GetNumGroupMembers() == 0 then
+        -- Solo/player-only: check if player benefits
         if beneficiaries and not beneficiaries[playerClass] then
             return 0, 0, nil -- player doesn't benefit, skip
         end
@@ -608,13 +610,14 @@ end
 
 ---Count group members with a presence buff
 ---@param spellIDs SpellID
+---@param playerOnly? boolean Only check the player, not the group
 ---@return number count
 ---@return number? minRemaining
-local function CountPresenceBuff(spellIDs)
+local function CountPresenceBuff(spellIDs, playerOnly)
     local found = 0
     local minRemaining = nil
 
-    if GetNumGroupMembers() == 0 then
+    if playerOnly or GetNumGroupMembers() == 0 then
         local hasBuff, remaining = UnitHasBuff("player", spellIDs)
         if hasBuff then
             found = 1
@@ -1205,22 +1208,23 @@ UpdateDisplay = function()
     local anyVisible = false
 
     -- Process coverage buffs (need everyone to have them)
+    local playerOnly = db.showOnlyPlayerMissing
     for _, buff in ipairs(RaidBuffs) do
         local frame = buffFrames[buff.key]
         local showBuff = (not db.showOnlyPlayerClassBuff or buff.class == playerClass)
             and (not presentClasses or presentClasses[buff.class])
 
         if frame and IsBuffEnabled(buff.key) and showBuff then
-            local missing, total, minRemaining = CountMissingBuff(buff.spellID, buff.key)
+            local missing, total, minRemaining = CountMissingBuff(buff.spellID, buff.key, playerOnly)
             local expiringSoon = db.showExpirationGlow and minRemaining and minRemaining < (db.expirationThreshold * 60)
             if missing > 0 then
                 local buffed = total - missing
-                frame.count:SetText(buffed .. "/" .. total)
+                -- In player-only mode, just show the icon; in group mode, show "X/Y"
+                frame.count:SetText(playerOnly and "" or (buffed .. "/" .. total))
                 frame:Show()
                 anyVisible = true
                 SetExpirationGlow(frame, expiringSoon)
             elseif expiringSoon then
-                -- Everyone has buff but expiring soon - show remaining time with glow
                 ---@cast minRemaining number
                 frame.count:SetText(FormatRemainingTime(minRemaining))
                 frame:Show()
@@ -1245,17 +1249,15 @@ UpdateDisplay = function()
             and (not buff.excludeTalentSpellID or not IsPlayerSpell(buff.excludeTalentSpellID))
 
         if frame and IsBuffEnabled(buff.key) and showBuff then
-            local count, minRemaining = CountPresenceBuff(buff.spellID)
+            local count, minRemaining = CountPresenceBuff(buff.spellID, playerOnly)
             local expiringSoon = db.showExpirationGlow and minRemaining and minRemaining < (db.expirationThreshold * 60)
             if count == 0 then
-                -- Nobody has it - show as missing
                 frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(MISSING_TEXT_SCALE), "OUTLINE")
                 frame.count:SetText(buff.missingText or "")
                 frame:Show()
                 anyVisible = true
                 SetExpirationGlow(frame, false)
             elseif expiringSoon then
-                -- Has buff but expiring soon - show remaining time with glow
                 ---@cast minRemaining number
                 frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(), "OUTLINE")
                 frame.count:SetText(FormatRemainingTime(minRemaining))
@@ -1263,7 +1265,6 @@ UpdateDisplay = function()
                 anyVisible = true
                 SetExpirationGlow(frame, true)
             else
-                -- At least 1 person has it and not expiring - all good
                 HideFrame(frame)
             end
         elseif frame then
@@ -2148,6 +2149,21 @@ local function CreateOptionsPanel()
         "Only show buffs that your class can provide (e.g., warriors will only see Battle Shout)"
     )
     panel.playerClassCheckbox = playerClassCb
+
+    local playerMissingCb
+    playerMissingCb, appLeftY = CreateCheckbox(
+        appearanceContent,
+        appLeftX,
+        appLeftY,
+        "Show only buffs I'm missing",
+        BuffRemindersDB.showOnlyPlayerMissing,
+        function(self)
+            BuffRemindersDB.showOnlyPlayerMissing = self:GetChecked()
+            UpdateDisplay()
+        end,
+        "Only show buffs that you personally are missing, instead of showing group buff coverage (e.g., 17/20)"
+    )
+    panel.playerMissingCheckbox = playerMissingCb
 
     -- RIGHT COLUMN: Visual Settings
     _, appRightY = CreateSectionHeader(appearanceContent, "Appearance", appRightX, appRightY)
