@@ -406,42 +406,55 @@ local defaults = {
             iconSize = 64,
             spacing = 0.2,
             growDirection = "CENTER",
+            iconZoom = 8,
+            borderSize = 2,
         },
         raid = {
             position = { point = "CENTER", x = 0, y = 60 },
             iconSize = 64,
             spacing = 0.2,
             growDirection = "CENTER",
+            iconZoom = 8,
+            borderSize = 2,
         },
         presence = {
             position = { point = "CENTER", x = 0, y = 20 },
             iconSize = 64,
             spacing = 0.2,
             growDirection = "CENTER",
+            iconZoom = 8,
+            borderSize = 2,
         },
         personal = {
             position = { point = "CENTER", x = 0, y = -20 },
             iconSize = 64,
             spacing = 0.2,
             growDirection = "CENTER",
+            iconZoom = 8,
+            borderSize = 2,
         },
         self = {
             position = { point = "CENTER", x = 0, y = -60 },
             iconSize = 64,
             spacing = 0.2,
             growDirection = "CENTER",
+            iconZoom = 8,
+            borderSize = 2,
         },
         custom = {
             position = { point = "CENTER", x = 0, y = -100 },
             iconSize = 64,
             spacing = 0.2,
             growDirection = "CENTER",
+            iconZoom = 8,
+            borderSize = 2,
         },
     },
 }
 
 -- Constants
-local BORDER_PADDING = 2
+local DEFAULT_BORDER_SIZE = 2
+local DEFAULT_ICON_ZOOM = 8 -- percentage (0.08 as inset)
 local MISSING_TEXT_SCALE = 0.6 -- scale for "NO X" warning text
 local OPTIONS_BASE_SCALE = 1.2
 
@@ -1080,8 +1093,8 @@ local function CreateBuffFrame(buff, _)
 
     -- Border (background behind icon)
     frame.border = frame:CreateTexture(nil, "BACKGROUND")
-    frame.border:SetPoint("TOPLEFT", -BORDER_PADDING, BORDER_PADDING)
-    frame.border:SetPoint("BOTTOMRIGHT", BORDER_PADDING, -BORDER_PADDING)
+    frame.border:SetPoint("TOPLEFT", -DEFAULT_BORDER_SIZE, DEFAULT_BORDER_SIZE)
+    frame.border:SetPoint("BOTTOMRIGHT", DEFAULT_BORDER_SIZE, -DEFAULT_BORDER_SIZE)
     frame.border:SetColorTexture(0, 0, 0, 1)
 
     -- Count text (font size scales with icon size, updated in UpdateVisuals)
@@ -1981,6 +1994,14 @@ local function UpdateVisuals()
                 frame.buffText:Hide()
             end
         end
+        -- Update icon zoom (texcoord)
+        local zoom = (catSettings.iconZoom or DEFAULT_ICON_ZOOM) / 100
+        frame.icon:SetTexCoord(zoom, 1 - zoom, zoom, 1 - zoom)
+        -- Update border size
+        local borderSize = catSettings.borderSize or DEFAULT_BORDER_SIZE
+        frame.border:ClearAllPoints()
+        frame.border:SetPoint("TOPLEFT", -borderSize, borderSize)
+        frame.border:SetPoint("BOTTOMRIGHT", borderSize, -borderSize)
     end
     if testMode then
         RefreshTestDisplay()
@@ -2649,6 +2670,60 @@ local function CreateOptionsPanel()
     panel.spacingSlider = spacingSlider
     panel.spacingValue = spacingValue
 
+    -- Icon Zoom slider
+    local zoomSlider, zoomValue
+    zoomSlider, zoomValue, appRightY = CreateSlider(
+        appearanceContent,
+        appRightX,
+        appRightY,
+        "Icon Zoom",
+        0,
+        15,
+        1,
+        GetCategorySettings("main").iconZoom or DEFAULT_ICON_ZOOM,
+        "%",
+        function(val)
+            local db = BuffRemindersDB
+            if not db.categorySettings then
+                db.categorySettings = {}
+            end
+            if not db.categorySettings.main then
+                db.categorySettings.main = {}
+            end
+            db.categorySettings.main.iconZoom = val
+            UpdateVisuals()
+        end
+    )
+    panel.zoomSlider = zoomSlider
+    panel.zoomValue = zoomValue
+
+    -- Border Size slider
+    local borderSlider, borderValue
+    borderSlider, borderValue, appRightY = CreateSlider(
+        appearanceContent,
+        appRightX,
+        appRightY,
+        "Border Size",
+        0,
+        8,
+        1,
+        GetCategorySettings("main").borderSize or DEFAULT_BORDER_SIZE,
+        "px",
+        function(val)
+            local db = BuffRemindersDB
+            if not db.categorySettings then
+                db.categorySettings = {}
+            end
+            if not db.categorySettings.main then
+                db.categorySettings.main = {}
+            end
+            db.categorySettings.main.borderSize = val
+            UpdateVisuals()
+        end
+    )
+    panel.borderSlider = borderSlider
+    panel.borderValue = borderValue
+
     appRightY = appRightY - 4
 
     -- Grow direction
@@ -2903,6 +2978,8 @@ local function CreateOptionsPanel()
     local splitCheckbox
     local catSizeSlider, catSizeValue
     local catSpacingSlider, catSpacingValue
+    local catZoomSlider, catZoomValue
+    local catBorderSlider, catBorderValue
     local catGrowLabel
     local catGrowBtns = {}
     local resetCatPosBtn
@@ -2919,6 +2996,16 @@ local function CreateOptionsPanel()
             catSpacingSlider:SetEnabled(enabled)
             catSpacingSlider.label:SetTextColor(color, color, color)
             catSpacingValue:SetTextColor(color, color, color)
+        end
+        if catZoomSlider then
+            catZoomSlider:SetEnabled(enabled)
+            catZoomSlider.label:SetTextColor(color, color, color)
+            catZoomValue:SetTextColor(color, color, color)
+        end
+        if catBorderSlider then
+            catBorderSlider:SetEnabled(enabled)
+            catBorderSlider.label:SetTextColor(color, color, color)
+            catBorderValue:SetTextColor(color, color, color)
         end
         if catGrowLabel then
             catGrowLabel:SetTextColor(color, color, color)
@@ -2953,6 +3040,12 @@ local function CreateOptionsPanel()
         end
         if catSpacingSlider then
             catSpacingSlider:SetValue((catSettings.spacing or 0.2) * 100)
+        end
+        if catZoomSlider then
+            catZoomSlider:SetValue(catSettings.iconZoom or DEFAULT_ICON_ZOOM)
+        end
+        if catBorderSlider then
+            catBorderSlider:SetValue(catSettings.borderSize or DEFAULT_BORDER_SIZE)
         end
 
         -- Update direction buttons
@@ -3003,11 +3096,7 @@ local function CreateOptionsPanel()
             db.splitCategories[selectedCategory] = self:GetChecked()
             SetSplitSettingsEnabled(self:GetChecked())
             ReparentBuffFrames()
-            if testMode then
-                RefreshTestDisplay()
-            else
-                UpdateDisplay()
-            end
+            UpdateVisuals()
         end,
         "Move this category to its own frame with independent position and settings"
     )
@@ -3075,6 +3164,58 @@ local function CreateOptionsPanel()
     )
     panel.catSpacingSlider = catSpacingSlider
     panel.catSpacingValue = catSpacingValue
+
+    -- Icon Zoom slider for selected category
+    catZoomSlider, catZoomValue, appearanceY = CreateSlider(
+        appearanceContent,
+        appLeftX,
+        appearanceY,
+        "Icon Zoom",
+        0,
+        15,
+        1,
+        catSettings.iconZoom or DEFAULT_ICON_ZOOM,
+        "%",
+        function(val)
+            local db = BuffRemindersDB
+            if not db.categorySettings then
+                db.categorySettings = {}
+            end
+            if not db.categorySettings[selectedCategory] then
+                db.categorySettings[selectedCategory] = {}
+            end
+            db.categorySettings[selectedCategory].iconZoom = val
+            UpdateVisuals()
+        end
+    )
+    panel.catZoomSlider = catZoomSlider
+    panel.catZoomValue = catZoomValue
+
+    -- Border Size slider for selected category
+    catBorderSlider, catBorderValue, appearanceY = CreateSlider(
+        appearanceContent,
+        appLeftX,
+        appearanceY,
+        "Border Size",
+        0,
+        8,
+        1,
+        catSettings.borderSize or DEFAULT_BORDER_SIZE,
+        "px",
+        function(val)
+            local db = BuffRemindersDB
+            if not db.categorySettings then
+                db.categorySettings = {}
+            end
+            if not db.categorySettings[selectedCategory] then
+                db.categorySettings[selectedCategory] = {}
+            end
+            db.categorySettings[selectedCategory].borderSize = val
+            UpdateVisuals()
+        end
+    )
+    panel.catBorderSlider = catBorderSlider
+    panel.catBorderValue = catBorderValue
 
     -- Growth direction buttons for selected category
     catGrowLabel = appearanceContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -3340,11 +3481,22 @@ local function CreateOptionsPanel()
             db.categorySettings.main = {}
         end
         db.categorySettings.main.spacing = 0.2
+        db.categorySettings.main.iconZoom = DEFAULT_ICON_ZOOM
+        db.categorySettings.main.borderSize = DEFAULT_BORDER_SIZE
         panel.spacingSlider:SetValue(20)
         panel.spacingValue:SetText("20%")
+        panel.zoomSlider:SetValue(DEFAULT_ICON_ZOOM)
+        panel.zoomValue:SetText(DEFAULT_ICON_ZOOM .. "%")
+        panel.borderSlider:SetValue(DEFAULT_BORDER_SIZE)
+        panel.borderValue:SetText(DEFAULT_BORDER_SIZE .. "px")
         UpdateVisuals()
     end)
-    SetupTooltip(resetRatiosBtn, "Reset Ratios", "Resets spacing to recommended ratio.", "ANCHOR_TOP")
+    SetupTooltip(
+        resetRatiosBtn,
+        "Reset Ratios",
+        "Resets spacing, icon zoom, and border size to defaults.",
+        "ANCHOR_TOP"
+    )
 
     local testBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     testBtn:SetSize(btnWidth, 22)
@@ -3411,6 +3563,8 @@ local function ToggleOptions()
         local mainSettings = GetCategorySettings("main")
         optionsPanel.sizeSlider:SetValue(mainSettings.iconSize or 64)
         optionsPanel.spacingSlider:SetValue((mainSettings.spacing or 0.2) * 100)
+        optionsPanel.zoomSlider:SetValue(mainSettings.iconZoom or DEFAULT_ICON_ZOOM)
+        optionsPanel.borderSlider:SetValue(mainSettings.borderSize or DEFAULT_BORDER_SIZE)
         optionsPanel.lockBtn:SetText(db.locked and "Unlock" or "Lock")
         optionsPanel.reminderCheckbox:SetChecked(db.showBuffReminder ~= false)
         optionsPanel.groupCheckbox:SetChecked(db.showOnlyInGroup ~= false)
@@ -3488,8 +3642,8 @@ ShowGlowDemo = function()
         icon:SetTexture(GetBuffTexture(1459)) -- Arcane Intellect icon
 
         local border = iconFrame:CreateTexture(nil, "BACKGROUND")
-        border:SetPoint("TOPLEFT", -BORDER_PADDING, BORDER_PADDING)
-        border:SetPoint("BOTTOMRIGHT", BORDER_PADDING, -BORDER_PADDING)
+        border:SetPoint("TOPLEFT", -DEFAULT_BORDER_SIZE, DEFAULT_BORDER_SIZE)
+        border:SetPoint("BOTTOMRIGHT", DEFAULT_BORDER_SIZE, -DEFAULT_BORDER_SIZE)
         border:SetColorTexture(0, 0, 0, 1)
 
         -- Setup and play glow animation

@@ -99,6 +99,8 @@
 ---@field iconSize number
 ---@field spacing number
 ---@field growDirection string
+---@field iconZoom number
+---@field borderSize number
 
 ---@class CategoryFrame: Frame
 ---@field category CategoryName
