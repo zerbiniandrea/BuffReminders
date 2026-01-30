@@ -2424,6 +2424,16 @@ local function CreateOptionsPanel()
     buffsLeftY = buffsLeftY - 14
     buffsLeftY = RenderBuffCheckboxes(buffsLeftX, buffsLeftY, PresenceBuffs)
 
+    buffsLeftY = buffsLeftY - SECTION_SPACING
+
+    -- Consumables header (coming soon)
+    _, buffsLeftY = CreateSectionHeader(buffsContent, "Consumables", buffsLeftX, buffsLeftY)
+    local consumablesNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    consumablesNote:SetPoint("TOPLEFT", buffsLeftX + 5, buffsLeftY)
+    consumablesNote:SetText("Coming soon!")
+    consumablesNote:SetTextColor(0.5, 0.5, 0.5)
+    buffsLeftY = buffsLeftY - 14
+
     -- RIGHT COLUMN: Individual buffs
     -- Personal Buffs header
     _, buffsRightY = CreateSectionHeader(buffsContent, "Personal Buffs", buffsRightX, buffsRightY)
