@@ -2166,19 +2166,24 @@ local function CreateOptionsPanel()
     end
 
     tabButtons.buffs = CreateTab("buffs", "Buffs")
-    tabButtons.appearance = CreateTab("appearance", "Options")
     tabButtons.custom = CreateTab("custom", "Custom Buffs")
+    tabButtons.appearance = CreateTab("appearance", "Appearance")
+    tabButtons.settings = CreateTab("settings", "Settings")
 
     -- Position tabs below title bar
     tabButtons.buffs:SetPoint("TOPLEFT", panel, "TOPLEFT", COL_PADDING, -40)
-    tabButtons.appearance:SetPoint("LEFT", tabButtons.buffs, "RIGHT", 4, 0)
-    tabButtons.custom:SetPoint("LEFT", tabButtons.appearance, "RIGHT", 4, 0)
+    tabButtons.custom:SetPoint("LEFT", tabButtons.buffs, "RIGHT", 4, 0)
+    tabButtons.appearance:SetPoint("LEFT", tabButtons.custom, "RIGHT", 4, 0)
+    tabButtons.settings:SetPoint("LEFT", tabButtons.appearance, "RIGHT", 4, 0)
 
     tabButtons.buffs:SetScript("OnClick", function()
         SetActiveTab("buffs")
     end)
     tabButtons.appearance:SetScript("OnClick", function()
         SetActiveTab("appearance")
+    end)
+    tabButtons.settings:SetScript("OnClick", function()
+        SetActiveTab("settings")
     end)
     tabButtons.custom:SetScript("OnClick", function()
         SetActiveTab("custom")
@@ -2199,11 +2204,33 @@ local function CreateOptionsPanel()
     buffsContent:SetSize(PANEL_WIDTH, 400) -- Height adjusted later
     contentContainers.buffs = buffsContent
 
-    local appearanceContent = CreateFrame("Frame", nil, panel)
-    appearanceContent:SetPoint("TOPLEFT", 0, CONTENT_TOP)
-    appearanceContent:SetSize(PANEL_WIDTH, 400)
-    appearanceContent:Hide()
-    contentContainers.appearance = appearanceContent
+    -- Appearance tab uses a scroll frame for expandable content
+    local appearanceScrollFrame = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    appearanceScrollFrame:SetPoint("TOPLEFT", 0, CONTENT_TOP)
+    appearanceScrollFrame:SetPoint("BOTTOMRIGHT", -24, 50) -- Leave room for scrollbar and bottom buttons
+    appearanceScrollFrame:SetClipsChildren(true) -- Clip content that overflows
+    appearanceScrollFrame:Hide()
+    contentContainers.appearance = appearanceScrollFrame
+
+    -- Position the scrollbar properly
+    local scrollBar = appearanceScrollFrame.ScrollBar
+    if scrollBar then
+        scrollBar:ClearAllPoints()
+        scrollBar:SetPoint("TOPLEFT", appearanceScrollFrame, "TOPRIGHT", -16, -16)
+        scrollBar:SetPoint("BOTTOMLEFT", appearanceScrollFrame, "BOTTOMRIGHT", -16, 16)
+    end
+
+    local appearanceContent = CreateFrame("Frame", nil, appearanceScrollFrame)
+    appearanceContent:SetSize(PANEL_WIDTH - 24, 400) -- Width minus scrollbar
+    appearanceScrollFrame:SetScrollChild(appearanceContent)
+    panel.appearanceScrollFrame = appearanceScrollFrame
+
+    -- Settings tab content
+    local settingsContent = CreateFrame("Frame", nil, panel)
+    settingsContent:SetPoint("TOPLEFT", 0, CONTENT_TOP)
+    settingsContent:SetSize(PANEL_WIDTH, 400)
+    settingsContent:Hide()
+    contentContainers.settings = settingsContent
 
     local customContent = CreateFrame("Frame", nil, panel)
     customContent:SetPoint("TOPLEFT", 0, CONTENT_TOP)
@@ -2477,11 +2504,9 @@ local function CreateOptionsPanel()
     -- Set buffs content height (use the taller column)
     buffsContent:SetHeight(math.max(math.abs(buffsLeftY), math.abs(buffsRightY)) + 20)
 
-    -- ========== APPEARANCE TAB: SETTINGS (Two Columns) ==========
-    local appLeftX = leftColX
-    local appRightX = leftColX + COL_WIDTH + COL_PADDING
-    local appLeftY = startY
-    local appRightY = startY
+    -- ========== FRAMES TAB: SINGLE COLUMN LAYOUT ==========
+    local framesX = leftColX
+    local framesY = startY
 
     -- Helper to enable/disable checkbox with label greying
     local function SetCheckboxEnabled(cb, enabled)
@@ -2496,129 +2521,32 @@ local function CreateOptionsPanel()
     end
     panel.SetCheckboxEnabled = SetCheckboxEnabled
 
-    -- LEFT COLUMN: Visibility Settings
-    _, appLeftY = CreateSectionHeader(appearanceContent, "Visibility", appLeftX, appLeftY)
-
-    local groupCb, instanceCb
-    groupCb, appLeftY = CreateCheckbox(
-        appearanceContent,
-        appLeftX,
-        appLeftY,
-        "Show only in group/raid",
-        BuffRemindersDB.showOnlyInGroup ~= false,
-        function(self)
-            BuffRemindersDB.showOnlyInGroup = self:GetChecked()
-            -- Update sub-checkbox enabled state
-            if instanceCb then
-                SetCheckboxEnabled(instanceCb, self:GetChecked())
-                if not self:GetChecked() then
-                    instanceCb:SetChecked(false)
-                    BuffRemindersDB.showOnlyInInstance = false
-                end
-            end
-            UpdateDisplay()
+    -- Helper to enable/disable slider with label greying
+    local function SetSliderEnabled(slider, valueText, enabled)
+        local color = enabled and 1 or 0.5
+        slider:SetEnabled(enabled)
+        if slider.label then
+            slider.label:SetTextColor(color, color, color)
         end
-    )
-    panel.groupCheckbox = groupCb
-
-    -- Sub-checkbox: Only in instance (indented under group checkbox)
-    instanceCb, appLeftY = CreateCheckbox(
-        appearanceContent,
-        appLeftX + 20,
-        appLeftY,
-        "Only in instance",
-        BuffRemindersDB.showOnlyInInstance,
-        function(self)
-            BuffRemindersDB.showOnlyInInstance = self:GetChecked()
-            UpdateDisplay()
+        if valueText then
+            valueText:SetTextColor(color, color, color)
         end
-    )
-    SetCheckboxEnabled(instanceCb, BuffRemindersDB.showOnlyInGroup)
-    panel.instanceCheckbox = instanceCb
+    end
 
-    local readyCheckCb, readyCheckSlider, readyCheckSliderValue
-    readyCheckCb, appLeftY = CreateCheckbox(
-        appearanceContent,
-        appLeftX,
-        appLeftY,
-        "Show only on ready check",
-        BuffRemindersDB.showOnlyOnReadyCheck,
-        function(self)
-            BuffRemindersDB.showOnlyOnReadyCheck = self:GetChecked()
-            -- Enable/disable the duration slider
-            if readyCheckSlider then
-                local enabled = self:GetChecked()
-                local color = enabled and 1 or 0.5
-                readyCheckSlider:SetEnabled(enabled)
-                readyCheckSlider.label:SetTextColor(color, color, color)
-                readyCheckSliderValue:SetTextColor(color, color, color)
-            end
-            UpdateDisplay()
-        end
-    )
-    panel.readyCheckCheckbox = readyCheckCb
+    -- Direction button constants
+    local directions = { "LEFT", "CENTER", "RIGHT" }
+    local dirLabels = { "Left", "Ctr", "Right" }
+    local dirBtnWidth = 40
 
-    -- Duration slider
-    readyCheckSlider, readyCheckSliderValue, appLeftY = CreateSlider(
-        appearanceContent,
-        appLeftX,
-        appLeftY,
-        "Duration",
-        10,
-        30,
-        1,
-        BuffRemindersDB.readyCheckDuration or 15,
-        "s",
-        function(val)
-            BuffRemindersDB.readyCheckDuration = val
-        end
-    )
-    local rcEnabled = BuffRemindersDB.showOnlyOnReadyCheck
-    local rcColor = rcEnabled and 1 or 0.5
-    readyCheckSlider:SetEnabled(rcEnabled)
-    readyCheckSlider.label:SetTextColor(rcColor, rcColor, rcColor)
-    readyCheckSliderValue:SetTextColor(rcColor, rcColor, rcColor)
-    panel.readyCheckSlider = readyCheckSlider
-    panel.readyCheckSliderValue = readyCheckSliderValue
+    -- ========== SECTION: MAIN FRAME ==========
+    _, framesY = CreateSectionHeader(appearanceContent, "Main Frame", framesX, framesY)
 
-    local playerClassCb
-    playerClassCb, appLeftY = CreateCheckbox(
-        appearanceContent,
-        appLeftX,
-        appLeftY,
-        "Show only my class buffs",
-        BuffRemindersDB.showOnlyPlayerClassBuff,
-        function(self)
-            BuffRemindersDB.showOnlyPlayerClassBuff = self:GetChecked()
-            UpdateDisplay()
-        end,
-        "Only show buffs that your class can provide (e.g., warriors will only see Battle Shout)"
-    )
-    panel.playerClassCheckbox = playerClassCb
-
-    local playerMissingCb
-    playerMissingCb, appLeftY = CreateCheckbox(
-        appearanceContent,
-        appLeftX,
-        appLeftY,
-        "Show only buffs I'm missing",
-        BuffRemindersDB.showOnlyPlayerMissing,
-        function(self)
-            BuffRemindersDB.showOnlyPlayerMissing = self:GetChecked()
-            UpdateDisplay()
-        end,
-        "Only show buffs that you personally are missing, instead of showing group buff coverage (e.g., 17/20)"
-    )
-    panel.playerMissingCheckbox = playerMissingCb
-
-    -- RIGHT COLUMN: Visual Settings
-    _, appRightY = CreateSectionHeader(appearanceContent, "Appearance", appRightX, appRightY)
-
+    -- Row 1: Icon Size + Direction buttons
     local sizeSlider, sizeValue
-    sizeSlider, sizeValue, appRightY = CreateSlider(
+    sizeSlider, sizeValue, _ = CreateSlider(
         appearanceContent,
-        appRightX,
-        appRightY,
+        framesX,
+        framesY,
         "Icon Size",
         16,
         128,
@@ -2640,11 +2568,14 @@ local function CreateOptionsPanel()
     panel.sizeSlider = sizeSlider
     panel.sizeValue = sizeValue
 
+    framesY = framesY - 24
+
+    -- Row 2: Spacing
     local spacingSlider, spacingValue
-    spacingSlider, spacingValue, appRightY = CreateSlider(
+    spacingSlider, spacingValue, framesY = CreateSlider(
         appearanceContent,
-        appRightX,
-        appRightY,
+        framesX,
+        framesY,
         "Spacing",
         0,
         50,
@@ -2670,12 +2601,12 @@ local function CreateOptionsPanel()
     panel.spacingSlider = spacingSlider
     panel.spacingValue = spacingValue
 
-    -- Icon Zoom slider
+    -- Row 3: Icon Zoom
     local zoomSlider, zoomValue
-    zoomSlider, zoomValue, appRightY = CreateSlider(
+    zoomSlider, zoomValue, framesY = CreateSlider(
         appearanceContent,
-        appRightX,
-        appRightY,
+        framesX,
+        framesY,
         "Icon Zoom",
         0,
         15,
@@ -2697,12 +2628,12 @@ local function CreateOptionsPanel()
     panel.zoomSlider = zoomSlider
     panel.zoomValue = zoomValue
 
-    -- Border Size slider
+    -- Row 4: Border Size
     local borderSlider, borderValue
-    borderSlider, borderValue, appRightY = CreateSlider(
+    borderSlider, borderValue, framesY = CreateSlider(
         appearanceContent,
-        appRightX,
-        appRightY,
+        framesX,
+        framesY,
         "Border Size",
         0,
         8,
@@ -2724,23 +2655,17 @@ local function CreateOptionsPanel()
     panel.borderSlider = borderSlider
     panel.borderValue = borderValue
 
-    appRightY = appRightY - 4
-
-    -- Grow direction
-    local growLabel = appearanceContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    growLabel:SetPoint("TOPLEFT", appRightX, appRightY)
-    growLabel:SetText("Direction:")
+    -- Row 5: Direction buttons with label
+    local mainDirLabel = appearanceContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    mainDirLabel:SetPoint("TOPLEFT", framesX, framesY)
+    mainDirLabel:SetText("Direction:")
 
     local growBtns = {}
-    local directions = { "LEFT", "CENTER", "RIGHT" }
-    local dirLabels = { "Left", "Center", "Right" }
-    local growBtnWidth = 48
-
     local mainGrowDir = GetCategorySettings("main").growDirection or "CENTER"
     for i, dir in ipairs(directions) do
         local btn = CreateFrame("Button", nil, appearanceContent, "UIPanelButtonTemplate")
-        btn:SetSize(growBtnWidth, 18)
-        btn:SetPoint("LEFT", growLabel, "RIGHT", 5 + (i - 1) * (growBtnWidth + 2), 0)
+        btn:SetSize(dirBtnWidth, 18)
+        btn:SetPoint("LEFT", mainDirLabel, "RIGHT", 5 + (i - 1) * (dirBtnWidth + 2), 0)
         btn:SetText(dirLabels[i])
         btn:SetNormalFontObject("GameFontHighlightSmall")
         btn:SetHighlightFontObject("GameFontHighlightSmall")
@@ -2765,15 +2690,428 @@ local function CreateOptionsPanel()
     end
     panel.growBtns = growBtns
 
-    appRightY = appRightY - 24
+    -- Reset button for main frame (on same row as direction)
+    local mainResetBtn = CreateButton(appearanceContent, 50, 18, "Reset", function()
+        local db = BuffRemindersDB
+        if not db.categorySettings then
+            db.categorySettings = {}
+        end
+        db.categorySettings.main = {
+            position = defaults.categorySettings.main.position,
+            iconSize = defaults.categorySettings.main.iconSize,
+            spacing = defaults.categorySettings.main.spacing,
+            growDirection = defaults.categorySettings.main.growDirection,
+            iconZoom = defaults.categorySettings.main.iconZoom,
+            borderSize = defaults.categorySettings.main.borderSize,
+        }
+        -- Update sliders
+        panel.sizeSlider:SetValue(defaults.categorySettings.main.iconSize)
+        panel.spacingSlider:SetValue(defaults.categorySettings.main.spacing * 100)
+        panel.zoomSlider:SetValue(defaults.categorySettings.main.iconZoom)
+        panel.borderSlider:SetValue(defaults.categorySettings.main.borderSize)
+        for _, btn in ipairs(growBtns) do
+            btn:SetEnabled(btn.direction ~= defaults.categorySettings.main.growDirection)
+        end
+        -- Reset position
+        mainFrame:ClearAllPoints()
+        mainFrame:SetPoint(
+            defaults.categorySettings.main.position.point,
+            UIParent,
+            defaults.categorySettings.main.position.point,
+            defaults.categorySettings.main.position.x,
+            defaults.categorySettings.main.position.y
+        )
+        UpdateVisuals()
+    end)
+    mainResetBtn:SetPoint("LEFT", mainDirLabel, "RIGHT", 5 + 3 * (dirBtnWidth + 2) + 10, 0)
+    SetupTooltip(mainResetBtn, "Reset Main Frame", "Reset all main frame settings to defaults", "ANCHOR_TOP")
 
-    -- Show "BUFF!" reminder checkbox
+    framesY = framesY - 24 - SECTION_SPACING
+
+    -- ========== SECTION: CATEGORIES ==========
+    _, framesY = CreateSectionHeader(appearanceContent, "Categories", framesX, framesY)
+
+    -- Capture this Y position for the UpdateCategoryLayout closure
+    local categoriesStartY = framesY
+
+    local CATEGORY_LABELS_FULL = {
+        raid = "Raid Buffs",
+        presence = "Presence Buffs",
+        personal = "Personal Buffs",
+        self = "Self Buffs",
+        custom = "Custom Buffs",
+    }
+
+    -- Store category row data for refresh
+    panel.categoryRows = {}
+
+    -- Create expandable category row
+    local function CreateCategoryRow(category, labelText, yPos)
+        local rowData = {}
+        rowData.category = category
+
+        -- Main row frame
+        local rowFrame = CreateFrame("Frame", nil, appearanceContent)
+        rowFrame:SetSize(PANEL_WIDTH - COL_PADDING * 2, 22)
+        rowFrame:SetPoint("TOPLEFT", framesX, yPos)
+        rowData.rowFrame = rowFrame
+
+        -- Category label
+        local catLabel = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        catLabel:SetPoint("LEFT", 0, 0)
+        catLabel:SetWidth(100)
+        catLabel:SetJustifyH("LEFT")
+        catLabel:SetText(labelText)
+
+        -- Split checkbox
+        local splitCb = CreateFrame("CheckButton", nil, rowFrame, "UICheckButtonTemplate")
+        splitCb:SetSize(20, 20)
+        splitCb:SetPoint("LEFT", catLabel, "RIGHT", 10, 0)
+        splitCb:SetChecked(IsCategorySplit(category))
+        SetupTooltip(
+            splitCb,
+            "Split to Own Frame",
+            "When enabled, this category's buffs will be displayed in a separate, independently movable frame with its own appearance settings.",
+            "ANCHOR_TOP"
+        )
+        rowData.splitCheckbox = splitCb
+
+        local splitLabel = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        splitLabel:SetPoint("LEFT", splitCb, "RIGHT", 2, 0)
+        splitLabel:SetText("Split")
+
+        -- Expand/collapse arrow (only shows when split)
+        local expandBtn = CreateFrame("Button", nil, rowFrame)
+        expandBtn:SetSize(16, 16)
+        expandBtn:SetPoint("LEFT", splitLabel, "RIGHT", 8, 0)
+        expandBtn:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-UP")
+        expandBtn:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight")
+        expandBtn:Hide()
+        rowData.expandBtn = expandBtn
+        rowData.expanded = false
+
+        -- Settings container (hidden by default)
+        local settingsFrame = CreateFrame("Frame", nil, appearanceContent)
+        settingsFrame:SetSize(PANEL_WIDTH - COL_PADDING * 2 - 20, 120)
+        settingsFrame:SetPoint("TOPLEFT", framesX + 20, yPos - 22)
+        settingsFrame:Hide()
+        rowData.settingsFrame = settingsFrame
+
+        -- Settings background (subtle indent)
+        local settingsBg = settingsFrame:CreateTexture(nil, "BACKGROUND")
+        settingsBg:SetAllPoints()
+        settingsBg:SetColorTexture(0.15, 0.15, 0.15, 0.5)
+
+        -- Settings content
+        local setY = -4
+        local setX = 4
+
+        -- Icon Size slider
+        local catSizeSlider, catSizeValue
+        catSizeSlider, catSizeValue, setY = CreateSlider(
+            settingsFrame,
+            setX,
+            setY,
+            "Icon Size",
+            16,
+            128,
+            1,
+            GetCategorySettings(category).iconSize or 64,
+            "",
+            function(val)
+                local db = BuffRemindersDB
+                if not db.categorySettings then
+                    db.categorySettings = {}
+                end
+                if not db.categorySettings[category] then
+                    db.categorySettings[category] = {}
+                end
+                db.categorySettings[category].iconSize = val
+                if testMode then
+                    RefreshTestDisplay()
+                else
+                    UpdateDisplay()
+                end
+            end
+        )
+        rowData.sizeSlider = catSizeSlider
+        rowData.sizeValue = catSizeValue
+
+        -- Spacing slider
+        local catSpacingSlider, catSpacingValue
+        catSpacingSlider, catSpacingValue, setY = CreateSlider(
+            settingsFrame,
+            setX,
+            setY,
+            "Spacing",
+            0,
+            50,
+            1,
+            math.floor((GetCategorySettings(category).spacing or 0.2) * 100),
+            "%",
+            function(val)
+                local db = BuffRemindersDB
+                if not db.categorySettings then
+                    db.categorySettings = {}
+                end
+                if not db.categorySettings[category] then
+                    db.categorySettings[category] = {}
+                end
+                db.categorySettings[category].spacing = val / 100
+                if testMode then
+                    RefreshTestDisplay()
+                else
+                    UpdateDisplay()
+                end
+            end
+        )
+        rowData.spacingSlider = catSpacingSlider
+        rowData.spacingValue = catSpacingValue
+
+        -- Icon Zoom slider
+        local catZoomSlider, catZoomValue
+        catZoomSlider, catZoomValue, setY = CreateSlider(
+            settingsFrame,
+            setX,
+            setY,
+            "Icon Zoom",
+            0,
+            15,
+            1,
+            GetCategorySettings(category).iconZoom or DEFAULT_ICON_ZOOM,
+            "%",
+            function(val)
+                local db = BuffRemindersDB
+                if not db.categorySettings then
+                    db.categorySettings = {}
+                end
+                if not db.categorySettings[category] then
+                    db.categorySettings[category] = {}
+                end
+                db.categorySettings[category].iconZoom = val
+                UpdateVisuals()
+            end
+        )
+        rowData.zoomSlider = catZoomSlider
+        rowData.zoomValue = catZoomValue
+
+        -- Border Size slider
+        local catBorderSlider, catBorderValue
+        catBorderSlider, catBorderValue, setY = CreateSlider(
+            settingsFrame,
+            setX,
+            setY,
+            "Border Size",
+            0,
+            8,
+            1,
+            GetCategorySettings(category).borderSize or DEFAULT_BORDER_SIZE,
+            "px",
+            function(val)
+                local db = BuffRemindersDB
+                if not db.categorySettings then
+                    db.categorySettings = {}
+                end
+                if not db.categorySettings[category] then
+                    db.categorySettings[category] = {}
+                end
+                db.categorySettings[category].borderSize = val
+                UpdateVisuals()
+            end
+        )
+        rowData.borderSlider = catBorderSlider
+        rowData.borderValue = catBorderValue
+
+        -- Direction buttons
+        local catDirLabel = settingsFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        catDirLabel:SetPoint("TOPLEFT", setX, setY)
+        catDirLabel:SetText("Direction:")
+
+        local catGrowBtns = {}
+        local catGrowDir = GetCategorySettings(category).growDirection or "CENTER"
+        for i, dir in ipairs(directions) do
+            local btn = CreateFrame("Button", nil, settingsFrame, "UIPanelButtonTemplate")
+            btn:SetSize(dirBtnWidth, 18)
+            btn:SetPoint("LEFT", catDirLabel, "RIGHT", 5 + (i - 1) * (dirBtnWidth + 2), 0)
+            btn:SetText(dirLabels[i])
+            btn:SetNormalFontObject("GameFontHighlightSmall")
+            btn:SetHighlightFontObject("GameFontHighlightSmall")
+            btn:SetDisabledFontObject("GameFontDisableSmall")
+            btn.direction = dir
+            btn:SetScript("OnClick", function()
+                local db = BuffRemindersDB
+                if not db.categorySettings then
+                    db.categorySettings = {}
+                end
+                if not db.categorySettings[category] then
+                    db.categorySettings[category] = {}
+                end
+                db.categorySettings[category].growDirection = dir
+                for _, b in ipairs(catGrowBtns) do
+                    b:SetEnabled(b.direction ~= dir)
+                end
+                if testMode then
+                    RefreshTestDisplay()
+                else
+                    UpdateDisplay()
+                end
+            end)
+            btn:SetEnabled(catGrowDir ~= dir)
+            catGrowBtns[i] = btn
+        end
+        rowData.growBtns = catGrowBtns
+
+        -- Reset button for this category (on same row as direction)
+        local catResetBtn = CreateButton(settingsFrame, 50, 18, "Reset", function()
+            local db = BuffRemindersDB
+            if not db.categorySettings then
+                db.categorySettings = {}
+            end
+            local catDefaults = defaults.categorySettings[category]
+            db.categorySettings[category] = {
+                position = catDefaults.position,
+                iconSize = catDefaults.iconSize,
+                spacing = catDefaults.spacing,
+                growDirection = catDefaults.growDirection,
+                iconZoom = catDefaults.iconZoom,
+                borderSize = catDefaults.borderSize,
+            }
+            -- Update sliders
+            catSizeSlider:SetValue(catDefaults.iconSize)
+            catSpacingSlider:SetValue(catDefaults.spacing * 100)
+            catZoomSlider:SetValue(catDefaults.iconZoom)
+            catBorderSlider:SetValue(catDefaults.borderSize)
+            for _, btn in ipairs(catGrowBtns) do
+                btn:SetEnabled(btn.direction ~= catDefaults.growDirection)
+            end
+            -- Reset position if frame exists
+            if categoryFrames and categoryFrames[category] then
+                local frame = categoryFrames[category]
+                frame:ClearAllPoints()
+                frame:SetPoint(
+                    catDefaults.position.point,
+                    UIParent,
+                    catDefaults.position.point,
+                    catDefaults.position.x,
+                    catDefaults.position.y
+                )
+            end
+            UpdateVisuals()
+        end)
+        catResetBtn:SetPoint("LEFT", catDirLabel, "RIGHT", 5 + 3 * (dirBtnWidth + 2) + 10, 0)
+        SetupTooltip(
+            catResetBtn,
+            "Reset " .. labelText,
+            "Reset all " .. labelText:lower() .. " settings to defaults",
+            "ANCHOR_TOP"
+        )
+        rowData.resetBtn = catResetBtn
+
+        -- Function to update row layout
+        local function UpdateRowLayout()
+            local isSplit = splitCb:GetChecked()
+            if isSplit then
+                expandBtn:Show()
+                if rowData.expanded then
+                    expandBtn:SetNormalTexture("Interface\\Buttons\\UI-MinusButton-UP")
+                    settingsFrame:Show()
+                else
+                    expandBtn:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-UP")
+                    settingsFrame:Hide()
+                end
+            else
+                expandBtn:Hide()
+                settingsFrame:Hide()
+                rowData.expanded = false
+            end
+        end
+        rowData.UpdateLayout = UpdateRowLayout
+
+        -- Split checkbox handler
+        splitCb:SetScript("OnClick", function(self)
+            local db = BuffRemindersDB
+            if not db.splitCategories then
+                db.splitCategories = {}
+            end
+            db.splitCategories[category] = self:GetChecked()
+            if self:GetChecked() then
+                rowData.expanded = true
+            end
+            UpdateRowLayout()
+            panel.UpdateCategoryLayout()
+            ReparentBuffFrames()
+            UpdateVisuals()
+        end)
+
+        -- Expand button handler
+        expandBtn:SetScript("OnClick", function()
+            rowData.expanded = not rowData.expanded
+            UpdateRowLayout()
+            panel.UpdateCategoryLayout()
+        end)
+
+        -- Function to refresh values
+        rowData.RefreshValues = function()
+            local catSettings = GetCategorySettings(category)
+            splitCb:SetChecked(IsCategorySplit(category))
+            catSizeSlider:SetValue(catSettings.iconSize or 64)
+            catSpacingSlider:SetValue((catSettings.spacing or 0.2) * 100)
+            catZoomSlider:SetValue(catSettings.iconZoom or DEFAULT_ICON_ZOOM)
+            catBorderSlider:SetValue(catSettings.borderSize or DEFAULT_BORDER_SIZE)
+            for _, btn in ipairs(catGrowBtns) do
+                btn:SetEnabled(btn.direction ~= (catSettings.growDirection or "CENTER"))
+            end
+            UpdateRowLayout()
+        end
+
+        return rowData
+    end
+
+    -- Create category rows
+    local categoryRowY = framesY
+    for _, category in ipairs(CATEGORIES) do
+        local rowData = CreateCategoryRow(category, CATEGORY_LABELS_FULL[category], categoryRowY)
+        panel.categoryRows[category] = rowData
+        categoryRowY = categoryRowY - 24
+    end
+
+    -- Function to recalculate layout when categories expand/collapse
+    panel.UpdateCategoryLayout = function()
+        local yPos = categoriesStartY
+        for _, category in ipairs(CATEGORIES) do
+            local rowData = panel.categoryRows[category]
+            rowData.rowFrame:ClearAllPoints()
+            rowData.rowFrame:SetPoint("TOPLEFT", framesX, yPos)
+            yPos = yPos - 24
+            if rowData.expanded and IsCategorySplit(category) then
+                rowData.settingsFrame:ClearAllPoints()
+                rowData.settingsFrame:SetPoint("TOPLEFT", framesX + 20, yPos)
+                rowData.settingsFrame:Show()
+                yPos = yPos - 120
+            else
+                rowData.settingsFrame:Hide()
+            end
+        end
+        panel.categoriesEndY = yPos
+        panel.UpdateAppearanceContentHeight()
+    end
+
+    -- Initial category end Y position
+    panel.categoriesEndY = categoryRowY
+
+    -- ========== SETTINGS TAB CONTENT ==========
+    local settingsY = 0
+    local settingsX = COL_PADDING
+
+    -- ========== SECTION: DISPLAY ==========
+    _, settingsY = CreateSectionHeader(settingsContent, "Display", settingsX, settingsY)
+
     local reminderCb
-    reminderCb, appRightY = CreateCheckbox(
-        appearanceContent,
-        appRightX,
-        appRightY,
-        'Show "BUFF!" reminder',
+    reminderCb, settingsY = CreateCheckbox(
+        settingsContent,
+        settingsX,
+        settingsY,
+        'Show "BUFF!" reminder text',
         BuffRemindersDB.showBuffReminder ~= false,
         function(self)
             BuffRemindersDB.showBuffReminder = self:GetChecked()
@@ -2782,19 +3120,137 @@ local function CreateOptionsPanel()
     )
     panel.reminderCheckbox = reminderCb
 
-    appRightY = appRightY - 8
+    settingsY = settingsY - SECTION_SPACING
 
-    -- Expiration Warning sub-section (in right column)
-    local expLabel = appearanceContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    expLabel:SetPoint("TOPLEFT", appRightX, appRightY)
-    expLabel:SetText("Expiration Warning")
-    appRightY = appRightY - 14
+    -- ========== SECTION: BEHAVIOR ==========
+    _, settingsY = CreateSectionHeader(settingsContent, "Behavior", settingsX, settingsY)
+
+    local behaviorContainer = CreateFrame("Frame", nil, settingsContent)
+    behaviorContainer:SetSize(PANEL_WIDTH - COL_PADDING * 2, 160)
+    behaviorContainer:SetPoint("TOPLEFT", settingsX, settingsY)
+    panel.behaviorContainer = behaviorContainer
+
+    local behY = 0
+
+    local groupCb, instanceCb
+    groupCb, behY = CreateCheckbox(
+        behaviorContainer,
+        0,
+        behY,
+        "Show only in group/raid",
+        BuffRemindersDB.showOnlyInGroup ~= false,
+        function(self)
+            BuffRemindersDB.showOnlyInGroup = self:GetChecked()
+            if instanceCb then
+                SetCheckboxEnabled(instanceCb, self:GetChecked())
+                if not self:GetChecked() then
+                    instanceCb:SetChecked(false)
+                    BuffRemindersDB.showOnlyInInstance = false
+                end
+            end
+            UpdateDisplay()
+        end
+    )
+    panel.groupCheckbox = groupCb
+
+    instanceCb, behY = CreateCheckbox(
+        behaviorContainer,
+        20,
+        behY,
+        "Only in instance",
+        BuffRemindersDB.showOnlyInInstance,
+        function(self)
+            BuffRemindersDB.showOnlyInInstance = self:GetChecked()
+            UpdateDisplay()
+        end
+    )
+    SetCheckboxEnabled(instanceCb, BuffRemindersDB.showOnlyInGroup)
+    panel.instanceCheckbox = instanceCb
+
+    local readyCheckCb, readyCheckSlider, readyCheckSliderValue
+    readyCheckCb, behY = CreateCheckbox(
+        behaviorContainer,
+        0,
+        behY,
+        "Show only on ready check",
+        BuffRemindersDB.showOnlyOnReadyCheck,
+        function(self)
+            BuffRemindersDB.showOnlyOnReadyCheck = self:GetChecked()
+            if readyCheckSlider then
+                SetSliderEnabled(readyCheckSlider, readyCheckSliderValue, self:GetChecked())
+            end
+            UpdateDisplay()
+        end
+    )
+    panel.readyCheckCheckbox = readyCheckCb
+
+    readyCheckSlider, readyCheckSliderValue, behY = CreateSlider(
+        behaviorContainer,
+        20,
+        behY,
+        "Duration",
+        10,
+        30,
+        1,
+        BuffRemindersDB.readyCheckDuration or 15,
+        "s",
+        function(val)
+            BuffRemindersDB.readyCheckDuration = val
+        end
+    )
+    SetSliderEnabled(readyCheckSlider, readyCheckSliderValue, BuffRemindersDB.showOnlyOnReadyCheck)
+    panel.readyCheckSlider = readyCheckSlider
+    panel.readyCheckSliderValue = readyCheckSliderValue
+
+    local playerClassCb
+    playerClassCb, behY = CreateCheckbox(
+        behaviorContainer,
+        0,
+        behY,
+        "Show only my class buffs",
+        BuffRemindersDB.showOnlyPlayerClassBuff,
+        function(self)
+            BuffRemindersDB.showOnlyPlayerClassBuff = self:GetChecked()
+            UpdateDisplay()
+        end,
+        "Only show buffs that your class can provide (e.g., warriors will only see Battle Shout)"
+    )
+    panel.playerClassCheckbox = playerClassCb
+
+    local playerMissingCb
+    playerMissingCb, behY = CreateCheckbox(
+        behaviorContainer,
+        0,
+        behY,
+        "Show only buffs I'm missing",
+        BuffRemindersDB.showOnlyPlayerMissing,
+        function(self)
+            BuffRemindersDB.showOnlyPlayerMissing = self:GetChecked()
+            UpdateDisplay()
+        end,
+        "Only show buffs that you personally are missing, instead of showing group buff coverage (e.g., 17/20)"
+    )
+    panel.playerMissingCheckbox = playerMissingCb
+
+    local behaviorHeight = math.abs(behY) + 10
+    behaviorContainer:SetHeight(behaviorHeight)
+    settingsY = settingsY - behaviorHeight - SECTION_SPACING
+
+    -- ========== SECTION: EXPIRATION WARNING ==========
+    _, settingsY = CreateSectionHeader(settingsContent, "Expiration Warning", settingsX, settingsY)
+
+    local expirationContainer = CreateFrame("Frame", nil, settingsContent)
+    expirationContainer:SetSize(PANEL_WIDTH - COL_PADDING * 2, 100)
+    expirationContainer:SetPoint("TOPLEFT", settingsX, settingsY)
+    panel.expirationContainer = expirationContainer
+
+    local expY = 0
 
     local glowCb
-    glowCb, appRightY = CreateCheckbox(
-        appearanceContent,
-        appRightX,
-        appRightY,
+    glowCb, expY = CreateCheckbox(
+        expirationContainer,
+        0,
+        expY,
         "Show glow when expiring",
         BuffRemindersDB.showExpirationGlow,
         function(self)
@@ -2829,10 +3285,10 @@ local function CreateOptionsPanel()
     panel.glowCheckbox = glowCb
 
     local thresholdSlider, thresholdValue
-    thresholdSlider, thresholdValue, appRightY = CreateSlider(
-        appearanceContent,
-        appRightX,
-        appRightY,
+    thresholdSlider, thresholdValue, expY = CreateSlider(
+        expirationContainer,
+        0,
+        expY,
         "Threshold",
         1,
         15,
@@ -2851,14 +3307,14 @@ local function CreateOptionsPanel()
     panel.thresholdSlider = thresholdSlider
     panel.thresholdValue = thresholdValue
 
-    -- Glow style dropdown
-    local styleLabel = appearanceContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    -- Style dropdown and preview on same row
+    local styleLabel = expirationContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     panel.styleLabel = styleLabel
-    styleLabel:SetPoint("TOPLEFT", appRightX, appRightY)
+    styleLabel:SetPoint("TOPLEFT", 0, expY)
     styleLabel:SetText("Style:")
 
     local styleDropdown =
-        CreateFrame("Frame", "BuffRemindersStyleDropdown", appearanceContent, "UIDropDownMenuTemplate")
+        CreateFrame("Frame", "BuffRemindersStyleDropdown", expirationContainer, "UIDropDownMenuTemplate")
     styleDropdown:SetPoint("LEFT", styleLabel, "RIGHT", -10, -2)
     UIDropDownMenu_SetWidth(styleDropdown, 100)
 
@@ -2887,8 +3343,7 @@ local function CreateOptionsPanel()
     UIDropDownMenu_SetText(styleDropdown, GlowStyles[BuffRemindersDB.glowStyle or 1].name)
     panel.styleDropdown = styleDropdown
 
-    -- Preview button
-    local previewBtn = CreateFrame("Button", nil, appearanceContent, "UIPanelButtonTemplate")
+    local previewBtn = CreateFrame("Button", nil, expirationContainer, "UIPanelButtonTemplate")
     previewBtn:SetSize(60, 18)
     previewBtn:SetPoint("LEFT", styleDropdown, "RIGHT", -5, 2)
     previewBtn:SetText("Preview")
@@ -2901,9 +3356,7 @@ local function CreateOptionsPanel()
     -- Helper to enable/disable glow-related controls
     local function SetGlowControlsEnabled(enabled)
         local color = enabled and 1 or 0.5
-        thresholdSlider:SetEnabled(enabled)
-        thresholdSlider.label:SetTextColor(color, color, color)
-        thresholdValue:SetTextColor(color, color, color)
+        SetSliderEnabled(thresholdSlider, thresholdValue, enabled)
         styleLabel:SetTextColor(color, color, color)
         UIDropDownMenu_EnableDropDown(styleDropdown)
         if not enabled then
@@ -2912,396 +3365,29 @@ local function CreateOptionsPanel()
         previewBtn:SetEnabled(enabled)
     end
     panel.SetGlowControlsEnabled = SetGlowControlsEnabled
-
-    -- Set initial state
     SetGlowControlsEnabled(BuffRemindersDB.showExpirationGlow)
 
-    appRightY = appRightY - 28
+    expY = expY - 28
+    local expirationHeight = math.abs(expY) + 20
+    expirationContainer:SetHeight(expirationHeight)
 
-    -- BOTTOM: Split Categories (full width, below both columns)
-    local appearanceY = math.min(appLeftY, appRightY) - SECTION_SPACING
+    -- Set settings content height
+    settingsY = settingsY - expirationHeight
+    local settingsHeight = math.abs(settingsY) + 20
+    settingsContent:SetHeight(settingsHeight)
 
-    -- Separator before Split Categories
-    local sep1 = appearanceContent:CreateTexture(nil, "ARTWORK")
-    sep1:SetSize(PANEL_WIDTH - COL_PADDING * 2, 1)
-    sep1:SetPoint("TOPLEFT", appLeftX, appearanceY)
-    sep1:SetColorTexture(0.4, 0.4, 0.4, 1)
-    appearanceY = appearanceY - SECTION_SPACING
-
-    -- ========== SPLIT CATEGORIES SECTION ==========
-    _, appearanceY = CreateSectionHeader(appearanceContent, "Split Categories", appLeftX, appearanceY)
-
-    local splitDesc = appearanceContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    splitDesc:SetPoint("TOPLEFT", appLeftX, appearanceY)
-    splitDesc:SetJustifyH("LEFT")
-    splitDesc:SetText("Split a category into its own movable frame with separate settings.")
-
-    -- Add help icon with tooltip hint after description
-    local helpIcon = appearanceContent:CreateTexture(nil, "ARTWORK")
-    helpIcon:SetSize(14, 14)
-    helpIcon:SetPoint("LEFT", splitDesc, "RIGHT", 4, 0)
-    helpIcon:SetAtlas("QuestNormal")
-    local helpBtn = CreateFrame("Button", nil, appearanceContent)
-    helpBtn:SetSize(14, 14)
-    helpBtn:SetPoint("CENTER", helpIcon, "CENTER", 0, 0)
-    helpBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Tip", 1, 0.82, 0)
-        GameTooltip:AddLine("Unlock the frame to see and move each category's area.", 1, 1, 1, true)
-        GameTooltip:Show()
-    end)
-    helpBtn:SetScript("OnLeave", function()
-        GameTooltip:Hide()
-    end)
-
-    appearanceY = appearanceY - 16
-
-    local CATEGORY_DROPDOWN_LABELS = {
-        raid = "Raid Buffs",
-        presence = "Presence Buffs",
-        personal = "Personal Buffs",
-        self = "Self Buffs",
-        custom = "Custom Buffs",
-    }
-
-    -- Category dropdown
-    local selectedCategory = "raid"
-    panel.selectedCategory = selectedCategory
-
-    local categoryDropdown =
-        CreateFrame("Frame", "BuffRemindersCategoryDropdown", appearanceContent, "UIDropDownMenuTemplate")
-    categoryDropdown:SetPoint("TOPLEFT", appLeftX - 15, appearanceY)
-    UIDropDownMenu_SetWidth(categoryDropdown, 120)
-    panel.categoryDropdown = categoryDropdown
-
-    -- Per-category sliders and controls (declared early for UpdateCategoryControls)
-    local splitCheckbox
-    local catSizeSlider, catSizeValue
-    local catSpacingSlider, catSpacingValue
-    local catZoomSlider, catZoomValue
-    local catBorderSlider, catBorderValue
-    local catGrowLabel
-    local catGrowBtns = {}
-    local resetCatPosBtn
-
-    -- Function to enable/disable split settings based on whether category is split
-    local function SetSplitSettingsEnabled(enabled)
-        local color = enabled and 1 or 0.5
-        if catSizeSlider then
-            catSizeSlider:SetEnabled(enabled)
-            catSizeSlider.label:SetTextColor(color, color, color)
-            catSizeValue:SetTextColor(color, color, color)
-        end
-        if catSpacingSlider then
-            catSpacingSlider:SetEnabled(enabled)
-            catSpacingSlider.label:SetTextColor(color, color, color)
-            catSpacingValue:SetTextColor(color, color, color)
-        end
-        if catZoomSlider then
-            catZoomSlider:SetEnabled(enabled)
-            catZoomSlider.label:SetTextColor(color, color, color)
-            catZoomValue:SetTextColor(color, color, color)
-        end
-        if catBorderSlider then
-            catBorderSlider:SetEnabled(enabled)
-            catBorderSlider.label:SetTextColor(color, color, color)
-            catBorderValue:SetTextColor(color, color, color)
-        end
-        if catGrowLabel then
-            catGrowLabel:SetTextColor(color, color, color)
-        end
-        for _, btn in ipairs(catGrowBtns) do
-            if enabled then
-                local catSettings = GetCategorySettings(selectedCategory)
-                btn:SetEnabled(btn.direction ~= (catSettings.growDirection or "CENTER"))
-            else
-                btn:SetEnabled(false)
-            end
-        end
-        if resetCatPosBtn then
-            resetCatPosBtn:SetEnabled(enabled)
-        end
-    end
-    panel.SetSplitSettingsEnabled = SetSplitSettingsEnabled
-
-    -- Function to update all controls when category changes
-    local function UpdateCategoryControls()
-        local isSplit = IsCategorySplit(selectedCategory)
-        local catSettings = GetCategorySettings(selectedCategory)
-
-        -- Update checkbox
-        if splitCheckbox then
-            splitCheckbox:SetChecked(isSplit)
-        end
-
-        -- Update slider values
-        if catSizeSlider then
-            catSizeSlider:SetValue(catSettings.iconSize or 64)
-        end
-        if catSpacingSlider then
-            catSpacingSlider:SetValue((catSettings.spacing or 0.2) * 100)
-        end
-        if catZoomSlider then
-            catZoomSlider:SetValue(catSettings.iconZoom or DEFAULT_ICON_ZOOM)
-        end
-        if catBorderSlider then
-            catBorderSlider:SetValue(catSettings.borderSize or DEFAULT_BORDER_SIZE)
-        end
-
-        -- Update direction buttons
-        for _, btn in ipairs(catGrowBtns) do
-            btn:SetEnabled(isSplit and btn.direction ~= (catSettings.growDirection or "CENTER"))
-        end
-
-        -- Enable/disable settings based on split status
-        SetSplitSettingsEnabled(isSplit)
-    end
-    panel.UpdateCategoryControls = UpdateCategoryControls
-
-    local function CategoryDropdown_Initialize(_, level)
-        for _, category in ipairs(CATEGORIES) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = CATEGORY_DROPDOWN_LABELS[category]
-            info.value = category
-            info.checked = selectedCategory == category
-            info.func = function()
-                selectedCategory = category
-                panel.selectedCategory = category
-                UIDropDownMenu_SetSelectedValue(categoryDropdown, category)
-                UIDropDownMenu_SetText(categoryDropdown, CATEGORY_DROPDOWN_LABELS[category])
-                UpdateCategoryControls()
-            end
-            UIDropDownMenu_AddButton(info, level)
-        end
+    -- Function to update layout when categories expand/collapse
+    panel.UpdateAppearanceContentHeight = function()
+        -- Update total content height based on categories
+        local totalHeight = math.abs(panel.categoriesEndY) + 40
+        appearanceContent:SetHeight(totalHeight)
     end
 
-    UIDropDownMenu_Initialize(categoryDropdown, CategoryDropdown_Initialize)
-    UIDropDownMenu_SetSelectedValue(categoryDropdown, selectedCategory)
-    UIDropDownMenu_SetText(categoryDropdown, CATEGORY_DROPDOWN_LABELS[selectedCategory])
-
-    appearanceY = appearanceY - 28
-
-    -- Split checkbox for selected category
-    splitCheckbox, appearanceY = CreateCheckbox(
-        appearanceContent,
-        appLeftX,
-        appearanceY,
-        "Split this category",
-        IsCategorySplit(selectedCategory),
-        function(self)
-            local db = BuffRemindersDB
-            if not db.splitCategories then
-                db.splitCategories = {}
-            end
-            db.splitCategories[selectedCategory] = self:GetChecked()
-            SetSplitSettingsEnabled(self:GetChecked())
-            ReparentBuffFrames()
-            UpdateVisuals()
-        end,
-        "Move this category to its own frame with independent position and settings"
-    )
-    panel.splitCheckbox = splitCheckbox
-
-    appearanceY = appearanceY - 4
-
-    -- Icon Size slider for selected category
-    local catSettings = GetCategorySettings(selectedCategory)
-    catSizeSlider, catSizeValue, appearanceY = CreateSlider(
-        appearanceContent,
-        appLeftX,
-        appearanceY,
-        "Icon Size",
-        16,
-        128,
-        1,
-        catSettings.iconSize or 64,
-        "",
-        function(val)
-            local db = BuffRemindersDB
-            if not db.categorySettings then
-                db.categorySettings = {}
-            end
-            if not db.categorySettings[selectedCategory] then
-                db.categorySettings[selectedCategory] = {}
-            end
-            db.categorySettings[selectedCategory].iconSize = val
-            if testMode then
-                RefreshTestDisplay()
-            else
-                UpdateDisplay()
-            end
-        end
-    )
-    panel.catSizeSlider = catSizeSlider
-    panel.catSizeValue = catSizeValue
-
-    -- Spacing slider for selected category
-    catSpacingSlider, catSpacingValue, appearanceY = CreateSlider(
-        appearanceContent,
-        appLeftX,
-        appearanceY,
-        "Spacing",
-        0,
-        50,
-        1,
-        math.floor((catSettings.spacing or 0.2) * 100),
-        "%",
-        function(val)
-            local db = BuffRemindersDB
-            if not db.categorySettings then
-                db.categorySettings = {}
-            end
-            if not db.categorySettings[selectedCategory] then
-                db.categorySettings[selectedCategory] = {}
-            end
-            db.categorySettings[selectedCategory].spacing = val / 100
-            if testMode then
-                RefreshTestDisplay()
-            else
-                UpdateDisplay()
-            end
-        end
-    )
-    panel.catSpacingSlider = catSpacingSlider
-    panel.catSpacingValue = catSpacingValue
-
-    -- Icon Zoom slider for selected category
-    catZoomSlider, catZoomValue, appearanceY = CreateSlider(
-        appearanceContent,
-        appLeftX,
-        appearanceY,
-        "Icon Zoom",
-        0,
-        15,
-        1,
-        catSettings.iconZoom or DEFAULT_ICON_ZOOM,
-        "%",
-        function(val)
-            local db = BuffRemindersDB
-            if not db.categorySettings then
-                db.categorySettings = {}
-            end
-            if not db.categorySettings[selectedCategory] then
-                db.categorySettings[selectedCategory] = {}
-            end
-            db.categorySettings[selectedCategory].iconZoom = val
-            UpdateVisuals()
-        end
-    )
-    panel.catZoomSlider = catZoomSlider
-    panel.catZoomValue = catZoomValue
-
-    -- Border Size slider for selected category
-    catBorderSlider, catBorderValue, appearanceY = CreateSlider(
-        appearanceContent,
-        appLeftX,
-        appearanceY,
-        "Border Size",
-        0,
-        8,
-        1,
-        catSettings.borderSize or DEFAULT_BORDER_SIZE,
-        "px",
-        function(val)
-            local db = BuffRemindersDB
-            if not db.categorySettings then
-                db.categorySettings = {}
-            end
-            if not db.categorySettings[selectedCategory] then
-                db.categorySettings[selectedCategory] = {}
-            end
-            db.categorySettings[selectedCategory].borderSize = val
-            UpdateVisuals()
-        end
-    )
-    panel.catBorderSlider = catBorderSlider
-    panel.catBorderValue = catBorderValue
-
-    -- Growth direction buttons for selected category
-    catGrowLabel = appearanceContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    catGrowLabel:SetPoint("TOPLEFT", appLeftX, appearanceY)
-    catGrowLabel:SetText("Direction:")
-    panel.catGrowLabel = catGrowLabel
-
-    local catGrowBtnWidth = 48
-    for i, dir in ipairs(directions) do
-        local btn = CreateFrame("Button", nil, appearanceContent, "UIPanelButtonTemplate")
-        btn:SetSize(catGrowBtnWidth, 18)
-        btn:SetPoint("LEFT", catGrowLabel, "RIGHT", 5 + (i - 1) * (catGrowBtnWidth + 2), 0)
-        btn:SetText(dirLabels[i])
-        btn:SetNormalFontObject("GameFontHighlightSmall")
-        btn:SetHighlightFontObject("GameFontHighlightSmall")
-        btn:SetDisabledFontObject("GameFontDisableSmall")
-        btn.direction = dir
-        btn:SetScript("OnClick", function()
-            local db = BuffRemindersDB
-            if not db.categorySettings then
-                db.categorySettings = {}
-            end
-            if not db.categorySettings[selectedCategory] then
-                db.categorySettings[selectedCategory] = {}
-            end
-            db.categorySettings[selectedCategory].growDirection = dir
-            for _, b in ipairs(catGrowBtns) do
-                b:SetEnabled(b.direction ~= dir)
-            end
-            if testMode then
-                RefreshTestDisplay()
-            else
-                UpdateDisplay()
-            end
-        end)
-        btn:SetEnabled((catSettings.growDirection or "CENTER") ~= dir)
-        catGrowBtns[i] = btn
-    end
-    panel.catGrowBtns = catGrowBtns
-
-    appearanceY = appearanceY - 26
-
-    -- Reset positions button for split categories
-    resetCatPosBtn = CreateButton(appearanceContent, 110, 18, "Reset positions", function()
-        local db = BuffRemindersDB
-        for _, category in ipairs(CATEGORIES) do
-            if db.categorySettings and db.categorySettings[category] then
-                db.categorySettings[category].position = {
-                    point = defaults.categorySettings[category].position.point,
-                    x = defaults.categorySettings[category].position.x,
-                    y = defaults.categorySettings[category].position.y,
-                }
-            end
-            -- Update frame position
-            local catFrame = categoryFrames[category]
-            if catFrame then
-                local defPos = defaults.categorySettings[category].position
-                catFrame:ClearAllPoints()
-                catFrame:SetPoint(defPos.point, UIParent, defPos.point, defPos.x, defPos.y)
-            end
-        end
-        if testMode then
-            RefreshTestDisplay()
-        else
-            UpdateDisplay()
-        end
-    end)
-    resetCatPosBtn:SetPoint("TOPLEFT", appLeftX, appearanceY)
-    SetupTooltip(
-        resetCatPosBtn,
-        "Reset positions",
-        "Reset all split category frame positions to their defaults",
-        "ANCHOR_TOP"
-    )
-    panel.resetCatPosBtn = resetCatPosBtn
-
-    appearanceY = appearanceY - 26
-
-    -- Set initial enabled state based on whether selected category is split
-    SetSplitSettingsEnabled(IsCategorySplit(selectedCategory))
-
-    -- Set appearance content height
-    appearanceContent:SetHeight(math.abs(appearanceY) + 20)
+    -- Set initial appearance content height
+    appearanceContent:SetHeight(math.abs(panel.categoriesEndY) + 40)
 
     -- Content height for bottom buttons positioning (use tallest tab)
-    local contentHeight = math.max(buffsContent:GetHeight(), appearanceContent:GetHeight())
+    local contentHeight = math.max(buffsContent:GetHeight(), appearanceContent:GetHeight(), settingsHeight)
 
     -- ========== CUSTOM BUFFS CONTENT ==========
     panel.customBuffRows = {}
@@ -3428,21 +3514,31 @@ local function CreateOptionsPanel()
     -- ========== BOTTOM BUTTONS (on main panel) ==========
     local contentBottomY = CONTENT_TOP - contentHeight - 20
 
+    -- Create a frame for the bottom section that sits above scroll content
+    local bottomFrame = CreateFrame("Frame", nil, panel)
+    bottomFrame:SetPoint("TOPLEFT", 0, contentBottomY + 5)
+    bottomFrame:SetPoint("BOTTOMRIGHT", 0, 0)
+    bottomFrame:SetFrameLevel(panel:GetFrameLevel() + 10) -- Ensure it's above scroll content
+
+    -- Background to mask any scroll content bleeding through
+    local bottomBg = bottomFrame:CreateTexture(nil, "BACKGROUND")
+    bottomBg:SetAllPoints()
+    bottomBg:SetColorTexture(0.1, 0.1, 0.1, 0.95)
+
     -- Separator line
-    local separator = panel:CreateTexture(nil, "ARTWORK")
+    local separator = bottomFrame:CreateTexture(nil, "ARTWORK")
     separator:SetSize(PANEL_WIDTH - 40, 1)
-    separator:SetPoint("TOP", 0, contentBottomY)
+    separator:SetPoint("TOP", 0, -5)
     separator:SetColorTexture(0.5, 0.5, 0.5, 1)
-    contentBottomY = contentBottomY - 15
 
     -- Button row (centered in panel)
     local btnWidth = 90
     local btnSpacing = 8
-    local totalBtnWidth = btnWidth * 4 + btnSpacing * 3
+    local totalBtnWidth = btnWidth * 2 + btnSpacing
 
-    local lockBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    local lockBtn = CreateFrame("Button", nil, bottomFrame, "UIPanelButtonTemplate")
     lockBtn:SetSize(btnWidth, 22)
-    lockBtn:SetPoint("TOP", -totalBtnWidth / 2 + btnWidth / 2, contentBottomY)
+    lockBtn:SetPoint("TOP", -totalBtnWidth / 2 + btnWidth / 2, -20)
     lockBtn:SetText(BuffRemindersDB.locked and "Unlock" or "Lock")
     lockBtn:SetScript("OnClick", function(self)
         BuffRemindersDB.locked = not BuffRemindersDB.locked
@@ -3452,55 +3548,9 @@ local function CreateOptionsPanel()
     SetupTooltip(lockBtn, "Lock/Unlock", "Unlock to drag and reposition the buff frames.", "ANCHOR_TOP")
     panel.lockBtn = lockBtn
 
-    local resetPosBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    resetPosBtn:SetSize(btnWidth, 22)
-    resetPosBtn:SetPoint("LEFT", lockBtn, "RIGHT", btnSpacing, 0)
-    resetPosBtn:SetText("Reset Pos")
-    resetPosBtn:SetScript("OnClick", function()
-        BuffRemindersDB.position = { point = "CENTER", x = 0, y = 0 }
-        mainFrame:ClearAllPoints()
-        mainFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-    end)
-    SetupTooltip(
-        resetPosBtn,
-        "Reset Position",
-        "Moves the buff tracker back to the center of the screen.",
-        "ANCHOR_TOP"
-    )
-
-    local resetRatiosBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    resetRatiosBtn:SetSize(btnWidth, 22)
-    resetRatiosBtn:SetPoint("LEFT", resetPosBtn, "RIGHT", btnSpacing, 0)
-    resetRatiosBtn:SetText("Reset Ratios")
-    resetRatiosBtn:SetScript("OnClick", function()
-        local db = BuffRemindersDB
-        if not db.categorySettings then
-            db.categorySettings = {}
-        end
-        if not db.categorySettings.main then
-            db.categorySettings.main = {}
-        end
-        db.categorySettings.main.spacing = 0.2
-        db.categorySettings.main.iconZoom = DEFAULT_ICON_ZOOM
-        db.categorySettings.main.borderSize = DEFAULT_BORDER_SIZE
-        panel.spacingSlider:SetValue(20)
-        panel.spacingValue:SetText("20%")
-        panel.zoomSlider:SetValue(DEFAULT_ICON_ZOOM)
-        panel.zoomValue:SetText(DEFAULT_ICON_ZOOM .. "%")
-        panel.borderSlider:SetValue(DEFAULT_BORDER_SIZE)
-        panel.borderValue:SetText(DEFAULT_BORDER_SIZE .. "px")
-        UpdateVisuals()
-    end)
-    SetupTooltip(
-        resetRatiosBtn,
-        "Reset Ratios",
-        "Resets spacing, icon zoom, and border size to defaults.",
-        "ANCHOR_TOP"
-    )
-
-    local testBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    local testBtn = CreateFrame("Button", nil, bottomFrame, "UIPanelButtonTemplate")
     testBtn:SetSize(btnWidth, 22)
-    testBtn:SetPoint("LEFT", resetRatiosBtn, "RIGHT", btnSpacing, 0)
+    testBtn:SetPoint("LEFT", lockBtn, "RIGHT", btnSpacing, 0)
     testBtn:SetText("Test")
     panel.testBtn = testBtn
     testBtn:SetScript("OnClick", function()
@@ -3592,9 +3642,17 @@ local function ToggleOptions()
         for _, btn in ipairs(optionsPanel.growBtns) do
             btn:SetEnabled(btn.direction ~= (mainSettings.growDirection or "CENTER"))
         end
-        -- Refresh split category controls (checkbox and settings for selected category)
-        if optionsPanel.UpdateCategoryControls then
-            optionsPanel.UpdateCategoryControls()
+        -- Refresh category rows (expandable split settings)
+        if optionsPanel.categoryRows then
+            for _, category in ipairs(CATEGORIES) do
+                local rowData = optionsPanel.categoryRows[category]
+                if rowData and rowData.RefreshValues then
+                    rowData.RefreshValues()
+                end
+            end
+            if optionsPanel.UpdateCategoryLayout then
+                optionsPanel.UpdateCategoryLayout()
+            end
         end
         if testMode then
             optionsPanel.testBtn:SetText("Stop Test")
