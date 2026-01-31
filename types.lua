@@ -29,7 +29,7 @@
 ---@field iconOverride? number
 ---@field infoTooltip? string
 
----@class PersonalBuff
+---@class TargetedBuff
 ---@field spellID SpellID
 ---@field key string
 ---@field name string
@@ -78,7 +78,7 @@
 ---@field testText FontString
 ---@field isPlayerBuff? boolean
 ---@field isPresenceBuff? boolean
----@field isPersonalBuff? boolean
+---@field isTargetedBuff? boolean
 ---@field isSelfBuff? boolean
 ---@field isCustomBuff? boolean
 ---@field buffCategory? CategoryName
@@ -87,7 +87,7 @@
 ---@field glowShowing? boolean
 ---@field currentGlowStyle? number
 
----@alias CategoryName "raid"|"presence"|"personal"|"self"|"custom"
+---@alias CategoryName "raid"|"presence"|"targeted"|"self"|"custom"
 
 ---@class CategoryPosition
 ---@field point string

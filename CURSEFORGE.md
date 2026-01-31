@@ -27,7 +27,7 @@ To open the options panel, type `/br`
 
 ### Buff Selection
 
-Choose which buffs to track. Buffs are organized by type: raid-wide buffs, presence buffs (at least one person needs it), personal buffs (buffs you cast on others), and self buffs.
+Choose which buffs to track. Buffs are organized by type: raid-wide buffs, presence buffs (at least one person needs it), targeted buffs (buffs you cast on others), and self buffs.
 
 ![BuffReminders Settings - Buffs](https://github.com/zerbiniandrea/BuffReminders/blob/main/images/settings-buffs.png?raw=true)
 

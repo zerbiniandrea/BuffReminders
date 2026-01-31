@@ -43,8 +43,8 @@ local PresenceBuffs = {
     },
 }
 
----@type PersonalBuff[]
-local PersonalBuffs = {
+---@type TargetedBuff[]
+local TargetedBuffs = {
     -- Beacons (alphabetical: Faith, Light)
     {
         spellID = 156910,
@@ -186,7 +186,7 @@ local BuffGroups = {
 
 -- Build icon override lookup table (for spells replaced by talents)
 local IconOverrides = {} ---@type table<number, number>
-for _, buffArray in ipairs({ PresenceBuffs, PersonalBuffs, SelfBuffs }) do
+for _, buffArray in ipairs({ PresenceBuffs, TargetedBuffs, SelfBuffs }) do
     for _, buff in ipairs(buffArray) do
         if buff.iconOverride then
             local spellList = (type(buff.spellID) == "table" and buff.spellID or { buff.spellID }) --[[@as number[] ]]
@@ -314,7 +314,7 @@ end
 -- ============================================================================
 
 ---Get the effective setting key for a buff (groupId if present, otherwise individual key)
----@param buff RaidBuff|PresenceBuff|PersonalBuff|SelfBuff
+---@param buff RaidBuff|PresenceBuff|TargetedBuff|SelfBuff
 ---@return string
 local function GetBuffSettingKey(buff)
     return buff.groupId or buff.key
@@ -396,7 +396,7 @@ local defaults = {
     splitCategories = { -- Which categories are split into their own frame (false = in main frame)
         raid = false,
         presence = false,
-        personal = false,
+        targeted = false,
         self = false,
         custom = false,
     },
@@ -425,7 +425,7 @@ local defaults = {
             iconZoom = 8,
             borderSize = 2,
         },
-        personal = {
+        targeted = {
             position = { point = "CENTER", x = 0, y = -20 },
             iconSize = 64,
             spacing = 0.2,
@@ -472,11 +472,11 @@ local optionsPanel
 
 -- Category frame system
 local categoryFrames = {}
-local CATEGORIES = { "raid", "presence", "personal", "self", "custom" }
+local CATEGORIES = { "raid", "presence", "targeted", "self", "custom" }
 local CATEGORY_LABELS = {
     raid = "Raid",
     presence = "Presence",
-    personal = "Personal",
+    targeted = "Targeted",
     self = "Self",
     custom = "Custom",
 }
@@ -796,12 +796,12 @@ local function IsPlayerBuffActive(spellID, role)
     return found
 end
 
----Check if player should cast their personal buff (returns true if a beneficiary needs it)
+---Check if player should cast their targeted buff (returns true if a beneficiary needs it)
 ---@param spellIDs SpellID
 ---@param requiredClass ClassName
 ---@param beneficiaryRole? RoleType
 ---@return boolean? Returns nil if player can't provide this buff
-local function ShouldShowPersonalBuff(spellIDs, requiredClass, beneficiaryRole)
+local function ShouldShowTargetedBuff(spellIDs, requiredClass, beneficiaryRole)
     if playerClass ~= requiredClass then
         return nil
     end
@@ -811,7 +811,7 @@ local function ShouldShowPersonalBuff(spellIDs, requiredClass, beneficiaryRole)
         return nil
     end
 
-    -- Personal buffs require a group (you cast them on others)
+    -- Targeted buffs require a group (you cast them on others)
     if GetNumGroupMembers() == 0 then
         return nil
     end
@@ -1196,7 +1196,7 @@ local function PositionBuffFramesWithSplits()
     local framesByCategory = {
         raid = {},
         presence = {},
-        personal = {},
+        targeted = {},
         self = {},
         custom = {},
     }
@@ -1215,10 +1215,10 @@ local function PositionBuffFramesWithSplits()
         end
     end
 
-    for _, buff in ipairs(PersonalBuffs) do
+    for _, buff in ipairs(TargetedBuffs) do
         local frame = buffFrames[buff.key]
         if frame and frame:IsShown() then
-            table.insert(framesByCategory.personal, frame)
+            table.insert(framesByCategory.targeted, frame)
         end
     end
 
@@ -1374,9 +1374,9 @@ RefreshTestDisplay = function()
         end
     end
 
-    -- Show ALL personal buffs (one per group)
+    -- Show ALL targeted buffs (one per group)
     local seenGroups = {}
-    for _, buff in ipairs(PersonalBuffs) do
+    for _, buff in ipairs(TargetedBuffs) do
         local frame = buffFrames[buff.key]
         if frame then
             if buff.groupId and seenGroups[buff.groupId] then
@@ -1585,9 +1585,9 @@ UpdateDisplay = function()
         end
     end
 
-    -- Process personal buffs (player's own buff responsibility)
+    -- Process targeted buffs (player's own buff responsibility)
     local visibleGroups = {} -- Track visible buffs by groupId for merging
-    for _, buff in ipairs(PersonalBuffs) do
+    for _, buff in ipairs(TargetedBuffs) do
         local frame = buffFrames[buff.key]
         local settingKey = GetBuffSettingKey(buff)
 
@@ -1597,7 +1597,7 @@ UpdateDisplay = function()
                 HideFrame(frame)
             end
         elseif frame and IsBuffEnabled(settingKey) then
-            local shouldShow = ShouldShowPersonalBuff(buff.spellID, buff.class, buff.beneficiaryRole)
+            local shouldShow = ShouldShowTargetedBuff(buff.spellID, buff.class, buff.beneficiaryRole)
             if shouldShow then
                 frame.icon:SetAllPoints()
                 frame.icon:SetTexCoord(TEXCOORD_INSET, 1 - TEXCOORD_INSET, TEXCOORD_INSET, 1 - TEXCOORD_INSET)
@@ -1809,14 +1809,14 @@ local function InitializeFrames()
         buffFrames[buff.key].buffCategory = "presence"
     end
 
-    for i, buff in ipairs(PersonalBuffs) do
+    for i, buff in ipairs(TargetedBuffs) do
         buffFrames[buff.key] = CreateBuffFrame(buff, #RaidBuffs + #PresenceBuffs + i)
-        buffFrames[buff.key].isPersonalBuff = true
-        buffFrames[buff.key].buffCategory = "personal"
+        buffFrames[buff.key].isTargetedBuff = true
+        buffFrames[buff.key].buffCategory = "targeted"
     end
 
     for i, buff in ipairs(SelfBuffs) do
-        buffFrames[buff.key] = CreateBuffFrame(buff, #RaidBuffs + #PresenceBuffs + #PersonalBuffs + i)
+        buffFrames[buff.key] = CreateBuffFrame(buff, #RaidBuffs + #PresenceBuffs + #TargetedBuffs + i)
         buffFrames[buff.key].isSelfBuff = true
         buffFrames[buff.key].buffCategory = "self"
     end
@@ -2487,13 +2487,13 @@ local function CreateOptionsPanel()
     buffsLeftY = buffsLeftY - 14
 
     -- RIGHT COLUMN: Individual buffs
-    -- Personal Buffs header
-    _, buffsRightY = CreateSectionHeader(buffsContent, "Personal Buffs", buffsRightX, buffsRightY)
-    local personalNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    personalNote:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
-    personalNote:SetText("(buffs you cast on others)")
+    -- Targeted Buffs header
+    _, buffsRightY = CreateSectionHeader(buffsContent, "Targeted Buffs", buffsRightX, buffsRightY)
+    local targetedNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    targetedNote:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
+    targetedNote:SetText("(buffs to maintain on someone else)")
     buffsRightY = buffsRightY - 14
-    buffsRightY = RenderBuffCheckboxes(buffsRightX, buffsRightY, PersonalBuffs)
+    buffsRightY = RenderBuffCheckboxes(buffsRightX, buffsRightY, TargetedBuffs)
 
     buffsRightY = buffsRightY - SECTION_SPACING
 
@@ -2501,7 +2501,7 @@ local function CreateOptionsPanel()
     _, buffsRightY = CreateSectionHeader(buffsContent, "Self Buffs", buffsRightX, buffsRightY)
     local selfNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     selfNote:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
-    selfNote:SetText("(buffs on yourself)")
+    selfNote:SetText("(buffs strictly on yourself)")
     buffsRightY = buffsRightY - 14
     buffsRightY = RenderBuffCheckboxes(buffsRightX, buffsRightY, SelfBuffs)
 
@@ -2741,7 +2741,7 @@ local function CreateOptionsPanel()
     local CATEGORY_LABELS_FULL = {
         raid = "Raid Buffs",
         presence = "Presence Buffs",
-        personal = "Personal Buffs",
+        targeted = "Targeted Buffs",
         self = "Self Buffs",
         custom = "Custom Buffs",
     }
@@ -3608,7 +3608,7 @@ local function ToggleOptions()
 
         RefreshBuffCheckboxes(RaidBuffs)
         RefreshBuffCheckboxes(PresenceBuffs)
-        RefreshBuffCheckboxes(PersonalBuffs)
+        RefreshBuffCheckboxes(TargetedBuffs)
         RefreshBuffCheckboxes(SelfBuffs)
         -- Refresh custom buffs section
         if optionsPanel.RenderCustomBuffRows then
