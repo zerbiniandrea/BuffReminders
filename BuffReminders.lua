@@ -4325,9 +4325,9 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         openBtn:SetText("Open Options")
         openBtn:SetScript("OnClick", function()
             ToggleOptions()
-            -- Close the WoW settings panel
+            -- Close the WoW settings panel properly (HideUIPanel handles keyboard focus cleanup)
             if SettingsPanel then
-                SettingsPanel:Hide()
+                HideUIPanel(SettingsPanel)
             end
         end)
 

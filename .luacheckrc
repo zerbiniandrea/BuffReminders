@@ -52,6 +52,7 @@ read_globals = {
 
 	-- WoW UI globals
 	"GameTooltip",
+	"HideUIPanel",
 	"STANDARD_TEXT_FONT",
 	"UISpecialFrames",
 	"UIDropDownMenu_AddButton",
