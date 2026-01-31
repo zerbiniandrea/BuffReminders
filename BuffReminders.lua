@@ -538,7 +538,11 @@ end
 ---@param unit string
 ---@return boolean
 local function IsValidGroupMember(unit)
-    return UnitExists(unit) and not UnitIsDeadOrGhost(unit) and UnitIsConnected(unit) and UnitCanAssist("player", unit)
+    return UnitExists(unit)
+        and not UnitIsDeadOrGhost(unit)
+        and UnitIsConnected(unit)
+        and UnitCanAssist("player", unit)
+        and UnitIsVisible(unit)
 end
 
 ---Iterate over valid group members, calling callback(unit) for each

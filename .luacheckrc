@@ -46,6 +46,7 @@ read_globals = {
 	"UnitIsConnected",
 	"UnitIsDeadOrGhost",
 	"UnitIsUnit",
+	"UnitIsVisible",
 
 	"tinsert",
 
