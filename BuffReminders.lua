@@ -2028,6 +2028,14 @@ local function CreateOptionsPanel()
     local panel = CreatePanel("BuffRemindersOptions", PANEL_WIDTH, 400, { escClose = true })
     panel:Hide()
 
+    -- Track all EditBoxes so we can clear focus when panel hides
+    local panelEditBoxes = {}
+    panel:SetScript("OnHide", function()
+        for _, editBox in ipairs(panelEditBoxes) do
+            editBox:ClearFocus()
+        end
+    end)
+
     -- Addon icon
     local addonIcon = CreateBuffIcon(panel, 28, "Interface\\AddOns\\BuffReminders\\icon.tga")
     addonIcon:SetPoint("TOPLEFT", 12, -8)
@@ -2391,6 +2399,9 @@ local function CreateOptionsPanel()
             self:Hide()
             valueBtn:Show()
         end)
+
+        -- Track this editBox for focus cleanup on panel hide
+        table.insert(panelEditBoxes, editBox)
 
         valueBtn:SetScript("OnClick", function()
             valueBtn:Hide()
@@ -3817,6 +3828,26 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
         escClose = true,
     })
 
+    -- Forward declare for OnHide handler
+    local spellRows, nameBox, missingBox
+
+    -- Clear focus from EditBoxes when modal hides to prevent keyboard capture
+    modal:SetScript("OnHide", function()
+        if spellRows then
+            for _, rowData in ipairs(spellRows) do
+                if rowData.editBox then
+                    rowData.editBox:ClearFocus()
+                end
+            end
+        end
+        if nameBox then
+            nameBox:ClearFocus()
+        end
+        if missingBox then
+            missingBox:ClearFocus()
+        end
+    end)
+
     -- Title and close button
     local title = modal:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -12)
@@ -3831,12 +3862,12 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     spellIdsLabel:SetText("Spell IDs:")
 
     -- State
-    local spellRows = {}
+    spellRows = {}
     local advancedShown = false
 
     -- Forward declarations
     local addSpellBtn, advancedBtn, advancedText, advancedFrame
-    local nameBox, missingBox, selectedClass
+    local selectedClass
 
     -- Single layout function that positions everything
     local function UpdateLayout()
