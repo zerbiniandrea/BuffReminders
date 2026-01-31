@@ -1558,8 +1558,6 @@ UpdateDisplay = function()
         local showBuff = (not readyCheckOnly or inReadyCheck)
             and (not db.showOnlyPlayerClassBuff or buff.class == playerClass)
             and (not presentClasses or presentClasses[buff.class])
-            and IsPlayerSpell(buff.spellID)
-            and (not buff.excludeTalentSpellID or not IsPlayerSpell(buff.excludeTalentSpellID))
 
         if frame and IsBuffEnabled(buff.key) and showBuff then
             local count, minRemaining = CountPresenceBuff(buff.spellID, playerOnly)
