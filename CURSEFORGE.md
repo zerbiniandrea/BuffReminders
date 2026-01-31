@@ -49,6 +49,10 @@ Track any buff by spell ID. Useful for consumables, world buffs, or any buff not
 
 *   **Combat lockout** - Due to WoW API restrictions, buff tracking only updates out of combat.
 *   **Mythic+ disabled** - Blizzard restricts aura/buff API access during active Mythic+ keystones (all buff data is marked as "secret"). The addon automatically hides in M+ and works normally in regular dungeons, raids, and open world.
+*   **Buff counting restrictions** - Both buff counts and buff providers (who can cast buffs) are tracked only for group members who are alive, connected, visible (not phased), and allied. This means:
+    *   Dead, offline, or phased players are excluded from totals
+    *   Raid buff providers (e.g., mages for Arcane Intellect) are only detected if they meet these conditions
+    *   In open world, opposing faction players are not counted (works normally in dungeons and raids where all group members are allied)
 *   **No spec-level filtering** - The addon will not constantly inspect each player's spec, as this would be too resource-intensive. This means it can't exclude buffs that don't benefit certain specs, like Intellect for Feral Druids.
 
 ## Support

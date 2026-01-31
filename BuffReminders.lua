@@ -3136,6 +3136,39 @@ local function CreateOptionsPanel()
 
     local behY = 0
 
+    -- Informational note about buff tracking
+    local trackingNote = behaviorContainer:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    trackingNote:SetPoint("TOPLEFT", 0, behY)
+    trackingNote:SetWidth(PANEL_WIDTH - COL_PADDING * 2 - 18)
+    trackingNote:SetJustifyH("LEFT")
+    trackingNote:SetText("Buff counts and buff providers are tracked only for alive, connected, and visible allies.")
+
+    -- Add info icon for open world faction details
+    local trackingInfoIcon = behaviorContainer:CreateTexture(nil, "ARTWORK")
+    trackingInfoIcon:SetSize(14, 14)
+    trackingInfoIcon:SetPoint("TOPLEFT", PANEL_WIDTH - COL_PADDING * 2 - 14, behY)
+    trackingInfoIcon:SetAtlas("QuestNormal")
+    local trackingInfoBtn = CreateFrame("Button", nil, behaviorContainer)
+    trackingInfoBtn:SetSize(14, 14)
+    trackingInfoBtn:SetPoint("CENTER", trackingInfoIcon, "CENTER", 0, 0)
+    trackingInfoBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Open World vs Instances", 1, 0.82, 0)
+        GameTooltip:AddLine(
+            "In open world, opposing faction players are not counted as allies. In dungeons and raids, all group members are allied and counted normally.",
+            1,
+            1,
+            1,
+            true
+        )
+        GameTooltip:Show()
+    end)
+    trackingInfoBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    behY = behY - 18
+
     local groupCb, instanceCb
     groupCb, behY = CreateCheckbox(
         behaviorContainer,
