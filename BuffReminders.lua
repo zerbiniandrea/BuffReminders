@@ -3556,6 +3556,11 @@ local function CreateOptionsPanel()
     testBtn:SetSize(btnWidth, 22)
     testBtn:SetPoint("LEFT", lockBtn, "RIGHT", btnSpacing, 0)
     testBtn:SetText("Test")
+    SetupTooltip(
+        testBtn,
+        "Test icon's appearance",
+        "Maintains appearance settings but shows ALL buffs, regardless of what you selected in the buffs section."
+    )
     panel.testBtn = testBtn
     testBtn:SetScript("OnClick", function()
         local isOn = ToggleTestMode()
