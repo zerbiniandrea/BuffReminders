@@ -539,19 +539,19 @@ local function IsCategorySplit(category)
     return db.splitCategories and db.splitCategories[category] == true
 end
 
----Check if any category is split
+---Check if all categories are split (mainFrame would be empty)
 ---@return boolean
-local function HasAnySplitCategory()
+local function AreAllCategoriesSplit()
     local db = BuffRemindersDB
     if not db.splitCategories then
         return false
     end
     for _, category in ipairs(CATEGORIES) do
-        if db.splitCategories[category] then
-            return true
+        if not db.splitCategories[category] then
+            return false
         end
     end
-    return false
+    return true
 end
 
 ---Get settings for a category (including "main" for non-split buffs)
@@ -1110,6 +1110,10 @@ local function CreateCategoryFrame(category)
     frame.editLabel:SetTextColor(0.4, 1, 0.4, 1)
     frame.editLabel:SetText(CATEGORY_LABELS[category] or category)
     frame.editLabel:Hide()
+
+    -- Expand hit rectangle to match the green border visual
+    -- Negative values expand the clickable area outward
+    frame:SetHitRectInsets(-(EDIT_PADDING + 2), -(EDIT_PADDING + 2), -(EDIT_PADDING + 2), -(EDIT_PADDING + 2))
 
     -- Make frame draggable
     frame:SetMovable(true)
@@ -1852,6 +1856,10 @@ local function InitializeFrames()
     mainFrame.editLabel:SetText("Main")
     mainFrame.editLabel:Hide()
 
+    -- Expand hit rectangle to match the green border visual
+    -- Negative values expand the clickable area outward
+    mainFrame:SetHitRectInsets(-(EDIT_PADDING + 2), -(EDIT_PADDING + 2), -(EDIT_PADDING + 2), -(EDIT_PADDING + 2))
+
     -- Legacy anchor frame (keeping for compatibility, but edit visuals are better)
     mainFrame.anchorFrame = CreateFrame("Frame", nil, mainFrame)
     mainFrame.anchorFrame:SetSize(65, 26)
@@ -1923,9 +1931,11 @@ ReparentBuffFrames = function()
         if category and IsCategorySplit(category) and categoryFrames[category] then
             -- This category is split - parent to its own frame
             frame:SetParent(categoryFrames[category])
+            frame:ClearAllPoints() -- Clear stale anchors after reparenting
         else
             -- This category is in main frame
             frame:SetParent(mainFrame)
+            frame:ClearAllPoints() -- Clear stale anchors after reparenting
         end
     end
 end
@@ -1996,42 +2006,30 @@ UpdateAnchor = function()
     end
     local db = BuffRemindersDB
     local unlocked = not db.locked
-    local hasSplits = HasAnySplitCategory()
 
     -- Hide legacy anchor frames (we use edit mode visuals now)
     if mainFrame.anchorFrame then
         mainFrame.anchorFrame:Hide()
     end
 
-    -- Update mainFrame edit mode
-    if unlocked and (mainFrame:IsShown() or not hasSplits) then
-        -- Show mainFrame when unlocked even if no buffs, so user can position it
-        if not mainFrame:IsShown() and not hasSplits then
-            mainFrame:Show()
-        end
+    -- Update mainFrame edit mode visuals (frame visibility is handled by PositionBuffFramesWithSplits)
+    local allSplit = AreAllCategoriesSplit()
+    if unlocked and not allSplit and mainFrame:IsShown() then
         SetEditModeVisuals(mainFrame, true, GetMainFrameLabel())
     else
         SetEditModeVisuals(mainFrame, false)
     end
 
-    -- Update each split category frame
+    -- Update edit mode visuals for split category frames (frame visibility is handled by PositionBuffFramesWithSplits)
     for _, category in ipairs(CATEGORIES) do
         local catFrame = categoryFrames[category]
         if catFrame then
             local isSplit = IsCategorySplit(category)
 
-            if isSplit and unlocked then
-                -- Show split category frame when unlocked even if no buffs
-                if not catFrame:IsShown() then
-                    catFrame:Show()
-                end
+            if isSplit and unlocked and catFrame:IsShown() then
                 SetEditModeVisuals(catFrame, true, CATEGORY_LABELS[category])
-                catFrame:EnableMouse(true)
             else
                 SetEditModeVisuals(catFrame, false)
-                if not isSplit then
-                    catFrame:Hide()
-                end
             end
         end
     end
@@ -2045,7 +2043,10 @@ UpdateAnchor = function()
         end
     end
     for _, frame in pairs(buffFrames) do
-        frame:EnableMouse(unlocked)
+        -- Only enable mouse on buff frames if they're in mainFrame (not in a split category)
+        local category = frame.buffCategory
+        local inSplitCategory = category and IsCategorySplit(category)
+        frame:EnableMouse(unlocked and not inSplitCategory)
     end
 end
 
@@ -3675,7 +3676,12 @@ local function CreateOptionsPanel()
     lockBtn:SetScript("OnClick", function(self)
         BuffRemindersDB.locked = not BuffRemindersDB.locked
         self:SetText(BuffRemindersDB.locked and "Unlock" or "Lock")
-        UpdateAnchor()
+        -- Refresh display using appropriate function based on test mode
+        if testMode then
+            RefreshTestDisplay()
+        else
+            UpdateDisplay()
+        end
     end)
     SetupTooltip(lockBtn, "Lock/Unlock", "Unlock to drag and reposition the buff frames.", "ANCHOR_TOP")
     panel.lockBtn = lockBtn
