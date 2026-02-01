@@ -1139,19 +1139,25 @@ local function CreateCategoryFrame(category)
 end
 
 -- Create icon frame for a buff
-local function CreateBuffFrame(buff, _)
+local function CreateBuffFrame(buff, category)
     local frame = CreateFrame("Frame", "BuffReminders_" .. buff.key, mainFrame)
     frame.key = buff.key
     frame.spellIDs = buff.spellID
     frame.displayName = buff.name
+    frame.buffCategory = category
 
     local db = BuffRemindersDB
-    frame:SetSize(db.iconSize, db.iconSize)
+    -- Use effective category settings (respects split categories)
+    local effectiveCat = (category and IsCategorySplit(category)) and category or "main"
+    local catSettings = GetCategorySettings(effectiveCat)
+    local iconSize = catSettings.iconSize or 64
+    frame:SetSize(iconSize, iconSize)
 
     -- Icon texture
     frame.icon = frame:CreateTexture(nil, "ARTWORK")
     frame.icon:SetAllPoints()
-    frame.icon:SetTexCoord(TEXCOORD_INSET, 1 - TEXCOORD_INSET, TEXCOORD_INSET, 1 - TEXCOORD_INSET)
+    local zoom = (catSettings.iconZoom or DEFAULT_ICON_ZOOM) / 100
+    frame.icon:SetTexCoord(zoom, 1 - zoom, zoom, 1 - zoom)
     frame.icon:SetDesaturated(false)
     frame.icon:SetVertexColor(1, 1, 1, 1)
     local texture = GetBuffTexture(buff.spellID, buff.iconByRole)
@@ -1160,9 +1166,10 @@ local function CreateBuffFrame(buff, _)
     end
 
     -- Border (background behind icon)
+    local borderSize = catSettings.borderSize or DEFAULT_BORDER_SIZE
     frame.border = frame:CreateTexture(nil, "BACKGROUND")
-    frame.border:SetPoint("TOPLEFT", -DEFAULT_BORDER_SIZE, DEFAULT_BORDER_SIZE)
-    frame.border:SetPoint("BOTTOMRIGHT", DEFAULT_BORDER_SIZE, -DEFAULT_BORDER_SIZE)
+    frame.border:SetPoint("TOPLEFT", -borderSize, borderSize)
+    frame.border:SetPoint("BOTTOMRIGHT", borderSize, -borderSize)
     frame.border:SetColorTexture(0, 0, 0, 1)
 
     -- Count text (font size scales with icon size, updated in UpdateVisuals)
@@ -1861,35 +1868,30 @@ local function InitializeFrames()
         categoryFrames[category] = CreateCategoryFrame(category)
     end
 
-    for i, buff in ipairs(RaidBuffs) do
-        buffFrames[buff.key] = CreateBuffFrame(buff, i)
-        buffFrames[buff.key].buffCategory = "raid"
+    for _, buff in ipairs(RaidBuffs) do
+        buffFrames[buff.key] = CreateBuffFrame(buff, "raid")
     end
 
-    for i, buff in ipairs(PresenceBuffs) do
-        buffFrames[buff.key] = CreateBuffFrame(buff, #RaidBuffs + i)
+    for _, buff in ipairs(PresenceBuffs) do
+        buffFrames[buff.key] = CreateBuffFrame(buff, "presence")
         buffFrames[buff.key].isPresenceBuff = true
-        buffFrames[buff.key].buffCategory = "presence"
     end
 
-    for i, buff in ipairs(TargetedBuffs) do
-        buffFrames[buff.key] = CreateBuffFrame(buff, #RaidBuffs + #PresenceBuffs + i)
+    for _, buff in ipairs(TargetedBuffs) do
+        buffFrames[buff.key] = CreateBuffFrame(buff, "targeted")
         buffFrames[buff.key].isTargetedBuff = true
-        buffFrames[buff.key].buffCategory = "targeted"
     end
 
-    for i, buff in ipairs(SelfBuffs) do
-        buffFrames[buff.key] = CreateBuffFrame(buff, #RaidBuffs + #PresenceBuffs + #TargetedBuffs + i)
+    for _, buff in ipairs(SelfBuffs) do
+        buffFrames[buff.key] = CreateBuffFrame(buff, "self")
         buffFrames[buff.key].isSelfBuff = true
-        buffFrames[buff.key].buffCategory = "self"
     end
 
     -- Create frames for custom buffs (always self buffs)
     if db.customBuffs then
         for _, customBuff in pairs(db.customBuffs) do
-            local frame = CreateBuffFrame(customBuff, 0)
+            local frame = CreateBuffFrame(customBuff, "custom")
             frame.isCustomBuff = true
-            frame.buffCategory = "custom"
             buffFrames[customBuff.key] = frame
         end
     end
@@ -1903,9 +1905,8 @@ local function CreateCustomBuffFrameRuntime(customBuff)
     if not mainFrame then
         return
     end
-    local frame = CreateBuffFrame(customBuff, 0)
+    local frame = CreateBuffFrame(customBuff, "custom")
     frame.isCustomBuff = true
-    frame.buffCategory = "custom"
     buffFrames[customBuff.key] = frame
 end
 
