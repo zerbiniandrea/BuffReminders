@@ -33,6 +33,7 @@ read_globals = {
 	"InCombatLockdown",
 	"IsInInstance",
 	"IsInRaid",
+	"ReloadUI",
 	"Settings",
 	"SettingsPanel",
 	"StaticPopup_Show",

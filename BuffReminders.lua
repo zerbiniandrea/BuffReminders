@@ -2085,6 +2085,136 @@ local function UpdateVisuals()
 end
 
 -- ============================================================================
+-- IMPORT/EXPORT FUNCTIONS
+-- ============================================================================
+
+-- Deep copy a table
+local function DeepCopy(orig)
+    local copy
+    if type(orig) == "table" then
+        copy = {}
+        for k, v in pairs(orig) do
+            copy[k] = DeepCopy(v)
+        end
+    else
+        copy = orig
+    end
+    return copy
+end
+
+-- Serialize a Lua table to a string representation
+local function SerializeTable(tbl, indent)
+    indent = indent or 0
+    local result = {}
+    local indentStr = string.rep("  ", indent)
+
+    table.insert(result, "{\n")
+
+    for k, v in pairs(tbl) do
+        local keyStr
+        if type(k) == "number" then
+            keyStr = string.format("%s[%d] = ", indentStr .. "  ", k)
+        else
+            keyStr = string.format('%s["%s"] = ', indentStr .. "  ", k)
+        end
+
+        if type(v) == "table" then
+            table.insert(result, keyStr .. SerializeTable(v, indent + 1))
+        elseif type(v) == "string" then
+            table.insert(result, string.format('%s"%s",\n', keyStr, v:gsub('"', '\\"')))
+        elseif type(v) == "boolean" then
+            table.insert(result, string.format("%s%s,\n", keyStr, tostring(v)))
+        elseif type(v) == "number" then
+            table.insert(result, string.format("%s%s,\n", keyStr, tostring(v)))
+        end
+    end
+
+    -- Only add trailing comma for nested tables (not root level)
+    if indent > 0 then
+        table.insert(result, indentStr .. "},\n")
+    else
+        table.insert(result, indentStr .. "}")
+    end
+    return table.concat(result)
+end
+
+-- Deserialize a string back to a Lua table (sandboxed)
+local function DeserializeTable(str)
+    if not str or str:trim() == "" then
+        return nil, "Empty input"
+    end
+
+    -- Wrap in return statement if not already present
+    if not str:match("^%s*return%s+") then
+        str = "return " .. str
+    end
+
+    -- Create sandboxed environment (no access to globals)
+    local env = {}
+
+    -- Try to load the string as Lua code
+    local func, err = loadstring(str)
+    if not func then
+        return nil, "Invalid format: " .. (err or "syntax error")
+    end
+
+    -- Set sandboxed environment
+    setfenv(func, env)
+
+    -- Execute and return the table
+    local success, result = pcall(func)
+    if not success then
+        return nil, "Failed to parse: " .. (result or "unknown error")
+    end
+
+    if type(result) ~= "table" then
+        return nil, "Invalid data: expected table, got " .. type(result)
+    end
+
+    return result
+end
+
+-- Export current settings to a serialized string (only includes valid settings from defaults + customBuffs)
+local function ExportSettings()
+    local export = {}
+
+    -- Only export fields that exist in defaults (excluding locked)
+    for key in pairs(defaults) do
+        if key ~= "locked" and BuffRemindersDB[key] ~= nil then
+            export[key] = DeepCopy(BuffRemindersDB[key])
+        end
+    end
+
+    -- Also include custom buffs
+    if BuffRemindersDB.customBuffs then
+        export.customBuffs = DeepCopy(BuffRemindersDB.customBuffs)
+    end
+
+    return SerializeTable(export)
+end
+
+-- Import settings from a serialized string (preserves locked state)
+local function ImportSettings(str)
+    local data, err = DeserializeTable(str)
+    if not data then
+        return false, err
+    end
+
+    -- Preserve current locked state
+    local currentLocked = BuffRemindersDB.locked
+
+    -- Deep merge imported data into BuffRemindersDB
+    for k, v in pairs(data) do
+        BuffRemindersDB[k] = DeepCopy(v)
+    end
+
+    -- Restore locked state
+    BuffRemindersDB.locked = currentLocked
+
+    return true
+end
+
+-- ============================================================================
 -- OPTIONS PANEL (Two-Column Layout)
 -- ============================================================================
 
@@ -2251,7 +2381,7 @@ local function CreateOptionsPanel()
     tabButtons.custom = CreateTab("custom", "Custom Buffs")
     tabButtons.appearance = CreateTab("appearance", "Appearance")
     tabButtons.settings = CreateTab("settings", "Settings")
-    tabButtons.profiles = CreateTab("profiles", "Profiles")
+    tabButtons.profiles = CreateTab("profiles", "Import/Export")
 
     -- Position tabs below title bar
     tabButtons.buffs:SetPoint("TOPLEFT", panel, "TOPLEFT", COL_PADDING, -40)
@@ -2331,9 +2461,163 @@ local function CreateOptionsPanel()
     profilesContent:Hide()
     contentContainers.profiles = profilesContent
 
-    local profilesComingSoon = profilesContent:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
-    profilesComingSoon:SetPoint("CENTER", profilesContent, "CENTER", 0, 50)
-    profilesComingSoon:SetText("Coming soon(ish)")
+    -- Import/Export UI
+    local yOffset = -10
+
+    -- Export section
+    local exportHeader = profilesContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    exportHeader:SetPoint("TOPLEFT", COL_PADDING, yOffset)
+    exportHeader:SetText("|cffffcc00Export Settings|r")
+    yOffset = yOffset - 20
+
+    local exportDesc = profilesContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    exportDesc:SetPoint("TOPLEFT", COL_PADDING, yOffset)
+    exportDesc:SetText("Copy the string below to share your settings with others.")
+    exportDesc:SetWidth(PANEL_WIDTH - COL_PADDING * 2)
+    exportDesc:SetJustifyH("LEFT")
+    yOffset = yOffset - 30
+
+    -- Export text box (scrollable, read-only)
+    local exportScrollFrame = CreateFrame("ScrollFrame", nil, profilesContent, "UIPanelScrollFrameTemplate")
+    exportScrollFrame:SetPoint("TOPLEFT", COL_PADDING, yOffset)
+    exportScrollFrame:SetSize(PANEL_WIDTH - COL_PADDING * 2 - 24, 80)
+
+    local exportEditBox = CreateFrame("EditBox", nil, exportScrollFrame)
+    exportEditBox:SetMultiLine(true)
+    exportEditBox:SetFontObject("GameFontHighlightSmall")
+    exportEditBox:SetWidth(PANEL_WIDTH - COL_PADDING * 2 - 24)
+    exportEditBox:SetAutoFocus(false)
+    exportEditBox:SetTextInsets(6, 6, 6, 6)
+    exportEditBox:SetScript("OnEscapePressed", function(self)
+        self:ClearFocus()
+    end)
+    exportEditBox:SetScript("OnTextChanged", function(self)
+        local text = self:GetText()
+        local height =
+            math.max(80, select(2, self:GetFont()) * math.max(1, select(2, string.gsub(text, "\n", "\n")) + 1) + 10)
+        self:SetHeight(height)
+    end)
+    exportEditBox:SetScript("OnEditFocusGained", function(self)
+        self:HighlightText() -- Auto-select all text when clicked
+    end)
+    exportScrollFrame:SetScrollChild(exportEditBox)
+
+    -- Add background to export box
+    local exportBg = exportScrollFrame:CreateTexture(nil, "BACKGROUND")
+    exportBg:SetAllPoints()
+    exportBg:SetColorTexture(0, 0, 0, 0.5)
+
+    -- Add border to export box for better visibility
+    local exportBorder = CreateFrame("Frame", nil, exportScrollFrame, "BackdropTemplate")
+    exportBorder:SetAllPoints(exportScrollFrame)
+    exportBorder:SetBackdrop({
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 12,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    exportBorder:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
+
+    -- Export button
+    local exportButton = CreateButton(profilesContent, 100, 22, "Export", function()
+        local exportString = ExportSettings()
+        exportEditBox:SetText(exportString)
+        exportEditBox:HighlightText()
+        exportEditBox:SetFocus()
+    end)
+    exportButton:SetPoint("TOPLEFT", COL_PADDING, yOffset - 90)
+
+    yOffset = yOffset - 120
+
+    -- Separator
+    local importExportSeparator = profilesContent:CreateTexture(nil, "ARTWORK")
+    importExportSeparator:SetPoint("TOPLEFT", COL_PADDING, yOffset)
+    importExportSeparator:SetSize(PANEL_WIDTH - COL_PADDING * 2, 1)
+    importExportSeparator:SetColorTexture(0.5, 0.5, 0.5, 0.5)
+    yOffset = yOffset - 15
+
+    -- Import section
+    local importHeader = profilesContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    importHeader:SetPoint("TOPLEFT", COL_PADDING, yOffset)
+    importHeader:SetText("|cffffcc00Import Settings|r")
+    yOffset = yOffset - 20
+
+    local importDesc = profilesContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    importDesc:SetPoint("TOPLEFT", COL_PADDING, yOffset)
+    importDesc:SetText("Paste a settings string below and click Import. This will overwrite your current settings.")
+    importDesc:SetWidth(PANEL_WIDTH - COL_PADDING * 2)
+    importDesc:SetJustifyH("LEFT")
+    yOffset = yOffset - 30
+
+    -- Import text box (scrollable, editable)
+    local importScrollFrame = CreateFrame("ScrollFrame", nil, profilesContent, "UIPanelScrollFrameTemplate")
+    importScrollFrame:SetPoint("TOPLEFT", COL_PADDING, yOffset)
+    importScrollFrame:SetSize(PANEL_WIDTH - COL_PADDING * 2 - 24, 80)
+
+    local importEditBox = CreateFrame("EditBox", nil, importScrollFrame)
+    importEditBox:SetMultiLine(true)
+    importEditBox:SetFontObject("GameFontHighlightSmall")
+    importEditBox:SetWidth(PANEL_WIDTH - COL_PADDING * 2 - 24)
+    importEditBox:SetAutoFocus(false)
+    importEditBox:SetTextInsets(6, 6, 6, 6) -- Add padding for better readability
+    importEditBox:EnableMouse(true) -- Ensure mouse clicks work
+    importEditBox:SetScript("OnEscapePressed", function(self)
+        self:ClearFocus()
+    end)
+    importEditBox:SetScript("OnTextChanged", function(self)
+        local text = self:GetText()
+        local height =
+            math.max(80, select(2, self:GetFont()) * math.max(1, select(2, string.gsub(text, "\n", "\n")) + 1) + 10)
+        self:SetHeight(height)
+    end)
+    importScrollFrame:SetScrollChild(importEditBox)
+
+    -- Add background to import box
+    local importBg = importScrollFrame:CreateTexture(nil, "BACKGROUND")
+    importBg:SetAllPoints()
+    importBg:SetColorTexture(0, 0, 0, 0.5)
+
+    -- Add border to import box with focus feedback
+    local importBorder = CreateFrame("Frame", nil, importScrollFrame, "BackdropTemplate")
+    importBorder:SetAllPoints(importScrollFrame)
+    importBorder:SetBackdrop({
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 12,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    importBorder:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
+
+    -- Change border color when focused/unfocused
+    importEditBox:SetScript("OnEditFocusGained", function(self)
+        importBorder:SetBackdropBorderColor(1, 0.82, 0, 1) -- Gold when focused
+        importBg:SetColorTexture(0.1, 0.1, 0.1, 0.8) -- Darker background
+        self:SetCursorPosition(self:GetText():len())
+    end)
+    importEditBox:SetScript("OnEditFocusLost", function(self)
+        importBorder:SetBackdropBorderColor(0.6, 0.6, 0.6, 1) -- Gray when unfocused
+        importBg:SetColorTexture(0, 0, 0, 0.5) -- Lighter background
+    end)
+
+    yOffset = yOffset - 90
+
+    -- Import button and status message
+    local importStatus = profilesContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    importStatus:SetWidth(PANEL_WIDTH - COL_PADDING * 2 - 120)
+    importStatus:SetJustifyH("LEFT")
+    importStatus:SetText("")
+
+    local importButton = CreateButton(profilesContent, 100, 22, "Import", function()
+        local importString = importEditBox:GetText()
+        local success, err = ImportSettings(importString)
+
+        if success then
+            importStatus:SetText("|cff00ff00Settings imported successfully!|r")
+            StaticPopup_Show("BUFFREMINDERS_RELOAD_UI")
+        else
+            importStatus:SetText("|cffff0000Error: " .. (err or "Unknown error") .. "|r")
+        end
+    end)
+    importButton:SetPoint("TOPLEFT", COL_PADDING, yOffset)
+    importStatus:SetPoint("LEFT", importButton, "RIGHT", 10, 0)
 
     panel.contentContainers = contentContainers
 
@@ -3877,6 +4161,19 @@ StaticPopupDialogs["BUFFREMINDERS_DELETE_CUSTOM"] = {
             end
             UpdateDisplay()
         end
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
+StaticPopupDialogs["BUFFREMINDERS_RELOAD_UI"] = {
+    text = "Settings imported successfully!\nReload UI to apply changes?",
+    button1 = "Reload",
+    button2 = "Cancel",
+    OnAccept = function()
+        ReloadUI()
     end,
     timeout = 0,
     whileDead = true,
