@@ -2245,12 +2245,14 @@ local function CreateOptionsPanel()
     tabButtons.custom = CreateTab("custom", "Custom Buffs")
     tabButtons.appearance = CreateTab("appearance", "Appearance")
     tabButtons.settings = CreateTab("settings", "Settings")
+    tabButtons.profiles = CreateTab("profiles", "Profiles")
 
     -- Position tabs below title bar
     tabButtons.buffs:SetPoint("TOPLEFT", panel, "TOPLEFT", COL_PADDING, -40)
     tabButtons.custom:SetPoint("LEFT", tabButtons.buffs, "RIGHT", 4, 0)
     tabButtons.appearance:SetPoint("LEFT", tabButtons.custom, "RIGHT", 4, 0)
     tabButtons.settings:SetPoint("LEFT", tabButtons.appearance, "RIGHT", 4, 0)
+    tabButtons.profiles:SetPoint("LEFT", tabButtons.settings, "RIGHT", 4, 0)
 
     tabButtons.buffs:SetScript("OnClick", function()
         SetActiveTab("buffs")
@@ -2263,6 +2265,9 @@ local function CreateOptionsPanel()
     end)
     tabButtons.custom:SetScript("OnClick", function()
         SetActiveTab("custom")
+    end)
+    tabButtons.profiles:SetScript("OnClick", function()
+        SetActiveTab("profiles")
     end)
 
     -- Separator line below tabs
@@ -2313,6 +2318,16 @@ local function CreateOptionsPanel()
     customContent:SetSize(PANEL_WIDTH, 400)
     customContent:Hide()
     contentContainers.custom = customContent
+
+    local profilesContent = CreateFrame("Frame", nil, panel)
+    profilesContent:SetPoint("TOPLEFT", 0, CONTENT_TOP)
+    profilesContent:SetSize(PANEL_WIDTH, 400)
+    profilesContent:Hide()
+    contentContainers.profiles = profilesContent
+
+    local profilesComingSoon = profilesContent:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
+    profilesComingSoon:SetPoint("CENTER", profilesContent, "CENTER", 0, 50)
+    profilesComingSoon:SetText("Coming soon(ish)")
 
     panel.contentContainers = contentContainers
 
