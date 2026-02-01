@@ -55,6 +55,7 @@
 ---@field iconOverride? number
 ---@field iconByRole? table<RoleType, number>
 ---@field infoTooltip? string
+---@field customCheck? fun(): boolean?
 
 ---@class BuffGroup
 ---@field displayName string

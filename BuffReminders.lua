@@ -174,6 +174,50 @@ local SelfBuffs = {
         groupId = "shamanShields",
         iconByRole = { HEALER = 52127, DAMAGER = 192106, TANK = 192106 },
     },
+    -- Rogue poisons: lethal (Instant, Wound, Deadly, Amplifying) and non-lethal (Numbing, Atrophic, Crippling)
+    -- With Dragon-Tempered Blades (381801): need 2 lethal + 2 non-lethal
+    -- Without talent: need 1 lethal + 1 non-lethal
+    {
+        spellID = 8679, -- Wound Poison (for icon)
+        key = "roguePoisons",
+        name = "Poisons",
+        class = "ROGUE",
+        missingText = "NO\nPOISON",
+        customCheck = function()
+            local lethalPoisons = { 315584, 8679, 2823, 381664 } -- Instant, Wound, Deadly, Amplifying
+            local nonLethalPoisons = { 5761, 381637, 3408 } -- Numbing, Atrophic, Crippling
+
+            local lethalCount = 0
+            local nonLethalCount = 0
+
+            for _, id in ipairs(lethalPoisons) do
+                local auraData
+                pcall(function()
+                    auraData = C_UnitAuras.GetUnitAuraBySpellID("player", id)
+                end)
+                if auraData then
+                    lethalCount = lethalCount + 1
+                end
+            end
+
+            for _, id in ipairs(nonLethalPoisons) do
+                local auraData
+                pcall(function()
+                    auraData = C_UnitAuras.GetUnitAuraBySpellID("player", id)
+                end)
+                if auraData then
+                    nonLethalCount = nonLethalCount + 1
+                end
+            end
+
+            -- Dragon-Tempered Blades (381801): can have 2 of each
+            local hasDragonTemperedBlades = IsPlayerSpell(381801)
+            local requiredLethal = hasDragonTemperedBlades and 2 or 1
+            local requiredNonLethal = hasDragonTemperedBlades and 2 or 1
+
+            return lethalCount < requiredLethal or nonLethalCount < requiredNonLethal
+        end,
+    },
 }
 
 ---@type table<string, BuffGroup>
@@ -826,8 +870,17 @@ end
 ---@param requiresTalent? number Only show if player HAS this talent
 ---@param excludeTalent? number Hide if player HAS this talent
 ---@param buffIdOverride? number Separate buff ID to check (if different from spellID)
+---@param customCheck? fun(): boolean? Custom check function for complex buff logic
 ---@return boolean? Returns nil if player can't/shouldn't use this buff
-local function ShouldShowSelfBuff(spellID, requiredClass, enchantID, requiresTalent, excludeTalent, buffIdOverride)
+local function ShouldShowSelfBuff(
+    spellID,
+    requiredClass,
+    enchantID,
+    requiresTalent,
+    excludeTalent,
+    buffIdOverride,
+    customCheck
+)
     if playerClass ~= requiredClass then
         return nil
     end
@@ -838,6 +891,11 @@ local function ShouldShowSelfBuff(spellID, requiredClass, enchantID, requiresTal
     end
     if excludeTalent and IsPlayerSpell(excludeTalent) then
         return nil
+    end
+
+    -- Custom check function takes precedence over standard checks
+    if customCheck then
+        return customCheck()
     end
 
     -- For buffs with multiple spellIDs (like shields), check if player knows ANY of them
@@ -1642,7 +1700,8 @@ UpdateDisplay = function()
                 buff.enchantID,
                 buff.requiresTalentSpellID,
                 buff.excludeTalentSpellID,
-                buff.buffIdOverride
+                buff.buffIdOverride,
+                buff.customCheck
             )
             if shouldShow then
                 frame.icon:SetAllPoints()
