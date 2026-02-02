@@ -1575,6 +1575,13 @@ UpdateDisplay = function()
         return
     end
 
+    -- Disable in arenas and battlegrounds (API restrictions in instanced PvP)
+    local _, instanceType = IsInInstance()
+    if instanceType == "pvp" or instanceType == "arena" then
+        HideAllDisplayFrames()
+        return
+    end
+
     local db = BuffRemindersDB
 
     -- Hide based on visibility settings
