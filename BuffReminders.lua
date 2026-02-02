@@ -1570,6 +1570,11 @@ UpdateDisplay = function()
         return
     end
 
+    if UnitIsDeadOrGhost("player") then
+        HideAllDisplayFrames()
+        return
+    end
+
     if C_ChallengeMode and C_ChallengeMode.IsChallengeModeActive and C_ChallengeMode.IsChallengeModeActive() then
         HideAllDisplayFrames()
         return
@@ -4672,6 +4677,8 @@ eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+eventFrame:RegisterEvent("PLAYER_DEAD")
+eventFrame:RegisterEvent("PLAYER_UNGHOST")
 eventFrame:RegisterEvent("UNIT_AURA")
 eventFrame:RegisterEvent("READY_CHECK")
 
@@ -4788,6 +4795,12 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         inCombat = true
         StopUpdates()
         mainFrame:Hide()
+    elseif event == "PLAYER_DEAD" then
+        HideAllDisplayFrames()
+    elseif event == "PLAYER_UNGHOST" then
+        if not inCombat then
+            UpdateDisplay()
+        end
     elseif event == "UNIT_AURA" then
         if not inCombat and mainFrame and mainFrame:IsShown() then
             UpdateDisplay()
