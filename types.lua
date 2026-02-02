@@ -28,6 +28,7 @@
 ---@field excludeTalentSpellID? number
 ---@field iconOverride? number
 ---@field infoTooltip? string
+---@field noGlow? boolean
 
 ---@class TargetedBuff
 ---@field spellID SpellID

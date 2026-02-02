@@ -50,6 +50,7 @@ local PresenceBuffs = {
         class = "WARLOCK",
         missingText = "NO\nSTONE",
         infoTooltip = "Ready Check Only|This buff is only shown during ready checks.",
+        noGlow = true,
     },
 }
 
@@ -1652,7 +1653,10 @@ UpdateDisplay = function()
 
         if frame and IsBuffEnabled(buff.key) and showBuff then
             local count, minRemaining = CountPresenceBuff(buff.spellID, playerOnly)
-            local expiringSoon = db.showExpirationGlow and minRemaining and minRemaining < (db.expirationThreshold * 60)
+            local expiringSoon = db.showExpirationGlow
+                and not buff.noGlow
+                and minRemaining
+                and minRemaining < (db.expirationThreshold * 60)
             if count == 0 then
                 frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
                 frame.count:SetText(buff.missingText or "")
