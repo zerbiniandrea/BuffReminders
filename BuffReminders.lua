@@ -1699,6 +1699,15 @@ local function HideAllDisplayFrames()
     end
 end
 
+-- TODO: Refactor UpdateDisplay loops
+-- The 5 category loops (Raid, Presence, Targeted, Self, Consumables) have significant duplication.
+-- Potential improvements:
+-- 1. Move pre-checks into buff data structures (e.g., excludeTalentSpellID, excludeIfSpellKnown, readyCheckOnly)
+-- 2. Create a unified ShouldShowBuff(buff, category) that reads check params from buff definition
+-- 3. Extract common "show frame with missing text" boilerplate into a helper
+-- 4. Targeted/Self/Consumables are most similar and could potentially share a single loop
+-- 5. Raid/Presence have unique expiration glow + count logic, may need to stay separate
+
 -- Update the display
 UpdateDisplay = function()
     if testMode then
