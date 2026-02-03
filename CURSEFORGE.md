@@ -1,6 +1,6 @@
 # BuffReminders
 
-[![](https://shields.io/badge/discord-5865F2?logo=discord&style=for-the-badge&logoColor=white)](https://discord.com/users/285458497020362762) [![](https://shields.io/badge/github-gray?logo=github&style=for-the-badge&logoColor=white)](https://github.com/zerbiniandrea/BuffReminders)
+[![](https://shields.io/badge/github-gray?logo=github&style=for-the-badge&logoColor=white)](https://github.com/zerbiniandrea/BuffReminders)
 
 A lightweight World of Warcraft addon that tracks missing buffs with a clean icon display.
 
@@ -10,14 +10,14 @@ From the author of [Raid Buffs Tracker](https://wago.io/iWkZ4Eq-i), one of the m
 
 ## Features
 
-*   Visual buff tracking - Shows buff icons with count overlay (e.g., "17/20" = 17 buffed out of 20)
-*   Auto-hide - Icons disappear when everyone has the buff
-*   Draggable frame - Position anywhere on screen, with configurable grow direction
-*   Split categories - Optionally separate buff categories into independent, movable frames
-*   Class reminder - Shows "BUFF!" under your class's buff icon when party members are missing it
-*   Expiration warning - Glow effect when buffs are about to expire, with 5 styles to choose from
-*   Smart filtering - Show only in group, hide buffs without provider, show only your class buff, count only benefiting classes
-*   Customizable - Adjust icon size, spacing, and text size
+- Visual buff tracking - Shows buff icons with count overlay (e.g., "17/20" = 17 buffed out of 20)
+- Auto-hide - Icons disappear when everyone has the buff
+- Draggable frame - Position anywhere on screen, with configurable grow direction
+- Split categories - Optionally separate buff categories into independent, movable frames
+- Class reminder - Shows "BUFF!" under your class's buff icon when party members are missing it
+- Expiration warning - Glow effect when buffs are about to expire, with 5 styles to choose from
+- Smart filtering - Show only in group, hide buffs without provider, show only your class buff, count only benefiting classes
+- Customizable - Adjust icon size, spacing, and text size
 
 ![Split Categories](https://github.com/zerbiniandrea/BuffReminders/blob/main/images/buffs-split-groups.png?raw=true)
 
@@ -47,15 +47,15 @@ Track any buff by spell ID. Useful for consumables, world buffs, or any buff not
 
 ## Limitations
 
-*   **Combat lockout** - Due to WoW API restrictions, buff tracking only updates out of combat.
-*   **Mythic+ disabled** - Blizzard restricts aura/buff API access during active Mythic+ keystones (all buff data is marked as "secret"). The addon automatically hides in M+ and works normally in regular dungeons, raids, and open world.
-*   **PvP disabled** - Similar API restrictions apply in arenas and battlegrounds. The addon automatically hides in instanced PvP content.
-*   **Buff counting restrictions** - Both buff counts and buff providers (who can cast buffs) are tracked only for group members who are alive, connected, visible (not phased), and allied. This means:
-    *   Dead, offline, or phased players are excluded from totals
-    *   Raid buff providers (e.g., mages for Arcane Intellect) are only detected if they meet these conditions
-    *   In open world, opposing faction players are not counted (works normally in dungeons and raids where all group members are allied)
-*   **No spec-level filtering** - The addon will not constantly inspect each player's spec, as this would be too resource-intensive. This means it can't exclude buffs that don't benefit certain specs, like Intellect for Feral Druids.
+- **Combat lockout** - Due to WoW API restrictions, buff tracking only updates out of combat.
+- **Mythic+ disabled** - Blizzard restricts aura/buff API access during active Mythic+ keystones (all buff data is marked as "secret"). The addon automatically hides in M+ and works normally in regular dungeons, raids, and open world.
+- **PvP disabled** - Similar API restrictions apply in arenas and battlegrounds. The addon automatically hides in instanced PvP content.
+- **Buff counting restrictions** - Both buff counts and buff providers (who can cast buffs) are tracked only for group members who are alive, connected, visible (not phased), and allied. This means:
+  - Dead, offline, or phased players are excluded from totals
+  - Raid buff providers (e.g., mages for Arcane Intellect) are only detected if they meet these conditions
+  - In open world, opposing faction players are not counted (works normally in dungeons and raids where all group members are allied)
+- **No spec-level filtering** - The addon will not constantly inspect each player's spec, as this would be too resource-intensive. This means it can't exclude buffs that don't benefit certain specs, like Intellect for Feral Druids.
 
 ## Support
 
-If you encounter issues or have suggestions, feel free to reach out on [Discord](https://discord.com/users/285458497020362762) or open an issue on [GitHub](https://github.com/zerbiniandrea/BuffReminders/issues).
+If you encounter issues or have suggestions, feel free to reach out on on Discord (.zerby) or open an issue on [GitHub](https://github.com/zerbiniandrea/BuffReminders/issues).

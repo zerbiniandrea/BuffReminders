@@ -3,7 +3,6 @@
   <img src="https://github.com/zerbiniandrea/BuffReminders/blob/main/images/logo.png?raw=true" width="180" />
 </p>
 <p align="center">
-  <a href="https://discord.com/users/285458497020362762"><img src="https://shields.io/badge/discord-5865F2?logo=discord&style=for-the-badge&logoColor=white" /></a>
   <a href="https://github.com/zerbiniandrea/BuffReminders"><img src="https://shields.io/badge/github-gray?logo=github&style=for-the-badge&logoColor=white" /></a>
 </p>
 <p align="center">A lightweight World of Warcraft addon that tracks missing buffs with a clean icon display.</p>
@@ -73,4 +72,4 @@ Track any buff by spell ID. Useful for consumables, world buffs, or any buff not
 
 ## Support
 
-If you encounter issues or have suggestions, feel free to reach out on [Discord](https://discord.com/users/285458497020362762) or open an issue on [GitHub](https://github.com/zerbiniandrea/BuffReminders/issues).
+If you encounter issues or have suggestions, feel free to reach out on Discord (.zerby) or open an issue on [GitHub](https://github.com/zerbiniandrea/BuffReminders/issues).
