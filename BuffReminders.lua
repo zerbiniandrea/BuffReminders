@@ -539,7 +539,7 @@ local defaults = {
     showOnlyPlayerMissing = false,
     showOnlyOnReadyCheck = false,
     readyCheckDuration = 15, -- seconds
-    growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT"
+    growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT", "UP", "DOWN"
     showExpirationGlow = true,
     expirationThreshold = 15, -- minutes
     glowStyle = 1, -- 1=Orange, 2=Gold, 3=Yellow, 4=White, 5=Red
@@ -1428,7 +1428,11 @@ local function PositionFramesInContainer(container, frames, iconSize, spacing, d
             frame:SetPoint("LEFT", container, "LEFT", (i - 1) * (iconSize + spacing), 0)
         elseif direction == "RIGHT" then
             frame:SetPoint("RIGHT", container, "RIGHT", -((i - 1) * (iconSize + spacing)), 0)
-        else -- CENTER
+        elseif direction == "UP" then
+            frame:SetPoint("BOTTOM", container, "BOTTOM", 0, (i - 1) * (iconSize + spacing))
+        elseif direction == "DOWN" then
+            frame:SetPoint("TOP", container, "TOP", 0, -((i - 1) * (iconSize + spacing)))
+        else -- CENTER (horizontal)
             local totalWidth = count * iconSize + (count - 1) * spacing
             local startX = -totalWidth / 2 + iconSize / 2
             frame:SetPoint("CENTER", container, "CENTER", startX + (i - 1) * (iconSize + spacing), 0)
@@ -1497,8 +1501,13 @@ local function PositionBuffFramesWithSplits()
         end
 
         -- Size mainFrame to fit contents
-        local totalWidth = #mainFrameBuffs * iconSize + (#mainFrameBuffs - 1) * spacing
-        mainFrame:SetSize(math.max(totalWidth, iconSize), iconSize)
+        local isVertical = direction == "UP" or direction == "DOWN"
+        local totalSize = #mainFrameBuffs * iconSize + (#mainFrameBuffs - 1) * spacing
+        if isVertical then
+            mainFrame:SetSize(iconSize, math.max(totalSize, iconSize))
+        else
+            mainFrame:SetSize(math.max(totalSize, iconSize), iconSize)
+        end
 
         PositionFramesInContainer(mainFrame, mainFrameBuffs, iconSize, spacing, direction)
         mainFrame:Show()
@@ -1530,8 +1539,13 @@ local function PositionBuffFramesWithSplits()
                 end
 
                 -- Size category frame to fit contents
-                local totalWidth = #frames * iconSize + (#frames - 1) * spacing
-                catFrame:SetSize(math.max(totalWidth, iconSize), iconSize)
+                local isVertical = direction == "UP" or direction == "DOWN"
+                local totalSize = #frames * iconSize + (#frames - 1) * spacing
+                if isVertical then
+                    catFrame:SetSize(iconSize, math.max(totalSize, iconSize))
+                else
+                    catFrame:SetSize(math.max(totalSize, iconSize), iconSize)
+                end
 
                 PositionFramesInContainer(catFrame, frames, iconSize, spacing, direction)
                 catFrame:Show()
@@ -3185,12 +3199,18 @@ local function CreateOptionsPanel()
     end
 
     -- Direction button constants
-    local directions = { "LEFT", "CENTER", "RIGHT" }
-    local dirLabels = { "Left", "Ctr", "Right" }
-    local dirBtnWidth = 40
+    local directions = { "LEFT", "CENTER", "RIGHT", "UP", "DOWN" }
+    local dirLabels = { "Left", "Ctr", "Right", "Up", "Down" }
+    local dirBtnWidth = 34
 
     -- ========== SECTION: MAIN FRAME ==========
-    _, framesY = CreateSectionHeader(appearanceContent, "Main Frame", framesX, framesY)
+    local mainFrameHeader
+    mainFrameHeader, framesY = CreateSectionHeader(appearanceContent, "Main Frame", framesX, framesY)
+
+    -- Reset button next to the header (will be wired up after sliders are created)
+    local mainResetBtn = CreateButton(appearanceContent, 50, 16, "Reset", function() end)
+    mainResetBtn:SetPoint("LEFT", mainFrameHeader, "RIGHT", 10, 0)
+    SetupTooltip(mainResetBtn, "Reset Main Frame", "Reset all main frame settings to defaults", "ANCHOR_TOP")
 
     -- Row 1: Icon Size + Direction buttons
     local sizeSlider, sizeValue
@@ -3341,8 +3361,8 @@ local function CreateOptionsPanel()
     end
     panel.growBtns = growBtns
 
-    -- Reset button for main frame (on same row as direction)
-    local mainResetBtn = CreateButton(appearanceContent, 50, 18, "Reset", function()
+    -- Wire up the Reset button handler now that sliders exist
+    mainResetBtn:SetScript("OnClick", function()
         local db = BuffRemindersDB
         if not db.categorySettings then
             db.categorySettings = {}
@@ -3374,8 +3394,6 @@ local function CreateOptionsPanel()
         )
         UpdateVisuals()
     end)
-    mainResetBtn:SetPoint("LEFT", mainDirLabel, "RIGHT", 5 + 3 * (dirBtnWidth + 2) + 10, 0)
-    SetupTooltip(mainResetBtn, "Reset Main Frame", "Reset all main frame settings to defaults", "ANCHOR_TOP")
 
     framesY = framesY - 24 - SECTION_SPACING
 
@@ -3479,11 +3497,7 @@ local function CreateOptionsPanel()
                     db.categorySettings[category] = {}
                 end
                 db.categorySettings[category].iconSize = val
-                if testMode then
-                    RefreshTestDisplay()
-                else
-                    UpdateDisplay()
-                end
+                UpdateVisuals()
             end
         )
         rowData.sizeSlider = catSizeSlider
@@ -3613,8 +3627,10 @@ local function CreateOptionsPanel()
         end
         rowData.growBtns = catGrowBtns
 
-        -- Reset button for this category (on same row as direction)
-        local catResetBtn = CreateButton(settingsFrame, 50, 18, "Reset", function()
+        rowData.growBtns = catGrowBtns
+
+        -- Reset button on the top row (right-aligned)
+        local catResetBtn = CreateButton(rowFrame, 50, 18, "Reset", function()
             local db = BuffRemindersDB
             if not db.categorySettings then
                 db.categorySettings = {}
@@ -3650,7 +3666,7 @@ local function CreateOptionsPanel()
             end
             UpdateVisuals()
         end)
-        catResetBtn:SetPoint("LEFT", catDirLabel, "RIGHT", 5 + 3 * (dirBtnWidth + 2) + 10, 0)
+        catResetBtn:SetPoint("RIGHT", rowFrame, "RIGHT", 0, 0)
         SetupTooltip(
             catResetBtn,
             "Reset " .. labelText,
