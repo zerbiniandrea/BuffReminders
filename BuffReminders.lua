@@ -1069,7 +1069,10 @@ local function ShouldShowConsumableBuff(spellIDs, buffIconID, checkWeaponEnchant
             if not auraData then
                 break
             end
-            if auraData.icon == buffIconID then
+            local success, iconMatches = pcall(function()
+                return auraData.icon == buffIconID
+            end)
+            if success and iconMatches then
                 return false -- Has a buff with this icon
             end
         end
