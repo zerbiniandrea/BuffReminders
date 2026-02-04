@@ -470,6 +470,595 @@ local function CreateBuffIcon(parent, size, textureID)
 end
 
 -- ============================================================================
+-- UI COMPONENT FACTORY
+-- ============================================================================
+-- Reusable UI components for the options panel (Platynator-style factory pattern).
+-- These reduce code duplication and provide consistent styling.
+
+---@class ComponentConfig
+---@class SliderConfig : ComponentConfig
+---@field label string Display label for the slider
+---@field min number Minimum value
+---@field max number Maximum value
+---@field step? number Step increment (default 1)
+---@field value number Initial value
+---@field suffix? string Value suffix (e.g., "px", "%")
+---@field onChange fun(val: number) Callback when value changes
+---@field labelWidth? number Width of label (default 70)
+---@field sliderWidth? number Width of slider (default 100)
+
+---@class CheckboxConfig : ComponentConfig
+---@field label string Display label
+---@field checked boolean Initial checked state
+---@field tooltip? string Tooltip description
+---@field onChange fun(checked: boolean) Callback when checked state changes
+
+---@class DirectionButtonsConfig : ComponentConfig
+---@field label? string Optional label (default "Direction:")
+---@field selected string Currently selected direction ("LEFT"|"CENTER"|"RIGHT"|"UP"|"DOWN")
+---@field onChange fun(dir: string) Callback when direction changes
+
+---@class CategoryHeaderConfig : ComponentConfig
+---@field text string Header text
+---@field category CategoryName Category for visibility toggles
+
+-- Panel EditBoxes tracking (populated by CreateOptionsPanel, used by Components)
+local panelEditBoxes = nil ---@type table[]?
+
+local Components = {}
+
+---Create a compact slider with clickable numeric input and editbox
+---@param parent table Parent frame
+---@param config SliderConfig Configuration table
+---@return table holder Frame containing slider with .slider, .valueText, .SetValue(v), .GetValue()
+function Components.Slider(parent, config)
+    local labelWidth = config.labelWidth or 70
+    local sliderWidth = config.sliderWidth or 100
+    local step = config.step or 1
+    local suffix = config.suffix or ""
+
+    -- Container frame
+    local holder = CreateFrame("Frame", nil, parent)
+    holder:SetSize(labelWidth + sliderWidth + 60, 20)
+
+    -- Label
+    local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetPoint("LEFT", 0, 0)
+    label:SetWidth(labelWidth)
+    label:SetJustifyH("LEFT")
+    label:SetText(config.label)
+    holder.label = label
+
+    -- Slider
+    local slider = CreateFrame("Slider", nil, holder, "OptionsSliderTemplate")
+    slider:SetPoint("LEFT", label, "RIGHT", 5, 0)
+    slider:SetSize(sliderWidth, 14)
+    slider:SetMinMaxValues(config.min, config.max)
+    slider:SetValueStep(step)
+    slider:SetObeyStepOnDrag(true)
+    slider:SetValue(config.value)
+    slider.Low:SetText("")
+    slider.High:SetText("")
+    slider.Text:SetText("")
+    holder.slider = slider
+
+    -- Clickable value display button
+    local valueBtn = CreateFrame("Button", nil, holder)
+    valueBtn:SetPoint("LEFT", slider, "RIGHT", 6, 0)
+    valueBtn:SetSize(40, 16)
+
+    local valueText = valueBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    valueText:SetAllPoints()
+    valueText:SetJustifyH("LEFT")
+    valueText:SetText(config.value .. suffix)
+    holder.valueText = valueText
+
+    -- Edit box (hidden by default)
+    local editBox = CreateFrame("EditBox", nil, holder, "InputBoxTemplate")
+    editBox:SetSize(35, 16)
+    editBox:SetPoint("LEFT", slider, "RIGHT", 6, 0)
+    editBox:SetAutoFocus(false)
+    editBox:SetNumeric(true)
+    editBox:Hide()
+
+    editBox:SetScript("OnEnterPressed", function(self)
+        local num = tonumber(self:GetText())
+        if num then
+            num = math.max(config.min, math.min(config.max, num))
+            slider:SetValue(num)
+        end
+        self:Hide()
+        valueBtn:Show()
+    end)
+
+    editBox:SetScript("OnEscapePressed", function(self)
+        self:Hide()
+        valueBtn:Show()
+    end)
+
+    editBox:SetScript("OnEditFocusLost", function(self)
+        self:Hide()
+        valueBtn:Show()
+    end)
+
+    -- Track editbox for focus cleanup on panel hide
+    if panelEditBoxes then
+        table.insert(panelEditBoxes, editBox)
+    end
+
+    valueBtn:SetScript("OnClick", function()
+        valueBtn:Hide()
+        editBox:SetText(tostring(math.floor(slider:GetValue())))
+        editBox:Show()
+        editBox:SetFocus()
+        editBox:HighlightText()
+    end)
+    SetupTooltip(valueBtn, "Click to type a value", nil, "ANCHOR_TOP")
+
+    slider:SetScript("OnValueChanged", function(_, val)
+        val = math.floor(val)
+        valueText:SetText(val .. suffix)
+        config.onChange(val)
+    end)
+
+    -- Mouse wheel support (Platynator pattern)
+    holder:EnableMouseWheel(true)
+    holder:SetScript("OnMouseWheel", function(_, delta)
+        if slider:IsEnabled() then
+            local newVal = slider:GetValue() + (delta * step)
+            newVal = math.max(config.min, math.min(config.max, newVal))
+            slider:SetValue(newVal)
+        end
+    end)
+
+    -- Public methods
+    function holder:SetValue(val)
+        slider:SetValue(val)
+    end
+
+    function holder:GetValue()
+        return slider:GetValue()
+    end
+
+    function holder:SetEnabled(enabled)
+        local color = enabled and 1 or 0.5
+        slider:SetEnabled(enabled)
+        label:SetTextColor(color, color, color)
+        valueText:SetTextColor(color, color, color)
+    end
+
+    return holder
+end
+
+---Create a checkbox with label and optional tooltip
+---@param parent table Parent frame
+---@param config CheckboxConfig Configuration table
+---@return table holder Frame containing checkbox with .checkbox, .SetChecked(v), .GetChecked()
+function Components.Checkbox(parent, config)
+    -- Container frame
+    local holder = CreateFrame("Frame", nil, parent)
+    holder:SetSize(200, 20)
+
+    local cb = CreateFrame("CheckButton", nil, holder, "UICheckButtonTemplate")
+    cb:SetSize(20, 20)
+    cb:SetPoint("LEFT", 0, 0)
+    cb:SetChecked(config.checked)
+    cb:SetScript("OnClick", function(self)
+        config.onChange(self:GetChecked())
+    end)
+    holder.checkbox = cb
+
+    local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetPoint("LEFT", cb, "RIGHT", 4, 0)
+    label:SetText(config.label)
+    holder.label = label
+    cb.label = label -- For SetCheckboxEnabled compatibility
+
+    if config.tooltip then
+        SetupTooltip(cb, config.label, config.tooltip)
+    end
+
+    -- Public methods
+    function holder:SetChecked(checked)
+        cb:SetChecked(checked)
+    end
+
+    function holder:GetChecked()
+        return cb:GetChecked()
+    end
+
+    function holder:SetEnabled(enabled)
+        cb:SetEnabled(enabled)
+        if enabled then
+            label:SetTextColor(1, 1, 1)
+        else
+            label:SetTextColor(0.5, 0.5, 0.5)
+        end
+    end
+
+    return holder
+end
+
+---Create direction buttons (LEFT, CENTER, RIGHT, UP, DOWN)
+---@param parent table Parent frame
+---@param config DirectionButtonsConfig Configuration table
+---@return table holder Frame containing direction buttons with .SetDirection(dir)
+function Components.DirectionButtons(parent, config)
+    local directions = { "LEFT", "CENTER", "RIGHT", "UP", "DOWN" }
+    local dirLabels = { "Left", "Ctr", "Right", "Up", "Down" }
+    local dirBtnWidth = 34
+
+    -- Container frame
+    local holder = CreateFrame("Frame", nil, parent)
+    holder:SetSize(70 + 5 * (dirBtnWidth + 2), 20)
+
+    -- Label
+    local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetPoint("LEFT", 0, 0)
+    label:SetText(config.label or "Direction:")
+    holder.label = label
+
+    local buttons = {}
+    for i, dir in ipairs(directions) do
+        local btn = CreateFrame("Button", nil, holder, "UIPanelButtonTemplate")
+        btn:SetSize(dirBtnWidth, 18)
+        btn:SetPoint("LEFT", label, "RIGHT", 5 + (i - 1) * (dirBtnWidth + 2), 0)
+        btn:SetText(dirLabels[i])
+        btn:SetNormalFontObject("GameFontHighlightSmall")
+        btn:SetHighlightFontObject("GameFontHighlightSmall")
+        btn:SetDisabledFontObject("GameFontDisableSmall")
+        btn.direction = dir
+        btn:SetScript("OnClick", function()
+            for _, b in ipairs(buttons) do
+                b:SetEnabled(b.direction ~= dir)
+            end
+            config.onChange(dir)
+        end)
+        btn:SetEnabled(config.selected ~= dir)
+        buttons[i] = btn
+    end
+    holder.buttons = buttons
+
+    -- Public method to update selection
+    function holder:SetDirection(dir)
+        for _, btn in ipairs(buttons) do
+            btn:SetEnabled(btn.direction ~= dir)
+        end
+    end
+
+    return holder
+end
+
+---Create category header with content visibility toggles [W][S][D][R]
+---@param parent table Parent frame
+---@param config CategoryHeaderConfig Configuration table
+---@param updateCallback fun() Function to call when visibility changes (UpdateDisplay or RefreshTestDisplay)
+---@return table header FontString for the header
+function Components.CategoryHeader(parent, config, updateCallback)
+    local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    header:SetText("|cffffcc00" .. config.text .. "|r")
+
+    local toggles = {
+        { key = "openWorld", label = "W", tooltip = "Open World" },
+        { key = "scenario", label = "S", tooltip = "Scenarios (Delves, Torghast, etc.)" },
+        { key = "dungeon", label = "D", tooltip = "Dungeons (including M+)" },
+        { key = "raid", label = "R", tooltip = "Raids" },
+    }
+
+    local lastToggle
+    for i, toggle in ipairs(toggles) do
+        local btn = CreateFrame("Button", nil, parent)
+        btn:SetSize(18, 14)
+        if i == 1 then
+            btn:SetPoint("LEFT", header, "RIGHT", 8, 0)
+        else
+            btn:SetPoint("LEFT", lastToggle, "RIGHT", 2, 0)
+        end
+
+        local bg = btn:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints()
+        bg.key = toggle.key
+
+        local btnLabel = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        btnLabel:SetPoint("CENTER", 0, 0)
+        btnLabel:SetText(toggle.label)
+
+        local function UpdateToggleVisual()
+            local db = BuffRemindersDB
+            local visibility = db.categoryVisibility and db.categoryVisibility[config.category]
+            local enabled = not visibility or visibility[toggle.key] ~= false
+            if enabled then
+                bg:SetColorTexture(0.2, 0.6, 0.2, 0.8) -- Green
+                btnLabel:SetTextColor(1, 1, 1)
+            else
+                bg:SetColorTexture(0.4, 0.2, 0.2, 0.8) -- Dim red
+                btnLabel:SetTextColor(0.6, 0.6, 0.6)
+            end
+        end
+        btn.UpdateVisual = UpdateToggleVisual
+        UpdateToggleVisual()
+
+        btn:SetScript("OnClick", function()
+            local db = BuffRemindersDB
+            if not db.categoryVisibility then
+                db.categoryVisibility = {}
+            end
+            if not db.categoryVisibility[config.category] then
+                db.categoryVisibility[config.category] =
+                    { openWorld = true, scenario = true, dungeon = true, raid = true }
+            end
+            db.categoryVisibility[config.category][toggle.key] = not db.categoryVisibility[config.category][toggle.key]
+            UpdateToggleVisual()
+            updateCallback()
+        end)
+
+        btn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText(toggle.tooltip, 1, 1, 1)
+            GameTooltip:AddLine("Click to toggle visibility in " .. toggle.tooltip:lower(), 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        btn:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+
+        lastToggle = btn
+    end
+
+    return header
+end
+
+---@class DropdownOption
+---@field label string Display text
+---@field value any Value to pass to callback
+
+---@class DropdownConfig : ComponentConfig
+---@field label string Label text
+---@field options DropdownOption[] Available options
+---@field selected any Currently selected value
+---@field width? number Dropdown width (default 100)
+---@field onChange fun(value: any) Callback when selection changes
+
+---Create a dropdown with label (Platynator-style wrapper around UIDropDownMenu)
+---@param parent table Parent frame
+---@param config DropdownConfig Configuration table
+---@param uniqueName string Unique global name for the dropdown frame
+---@return table holder Frame containing dropdown with .SetValue(v), .GetValue(), .SetEnabled(bool)
+function Components.Dropdown(parent, config, uniqueName)
+    local width = config.width or 100
+
+    -- Container frame
+    local holder = CreateFrame("Frame", nil, parent)
+    holder:SetSize(70 + width + 20, 26)
+
+    -- Label
+    local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetPoint("LEFT", 0, 0)
+    label:SetText(config.label)
+    holder.label = label
+
+    -- Dropdown
+    local dropdown = CreateFrame("Frame", uniqueName, holder, "UIDropDownMenuTemplate")
+    dropdown:SetPoint("LEFT", label, "RIGHT", -10, -2)
+    UIDropDownMenu_SetWidth(dropdown, width)
+    holder.dropdown = dropdown
+
+    -- Store current value
+    local currentValue = config.selected
+
+    -- Initialize dropdown
+    local function InitializeDropdown(_, level)
+        for _, opt in ipairs(config.options) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = opt.label
+            info.value = opt.value
+            info.checked = currentValue == opt.value
+            info.func = function()
+                currentValue = opt.value
+                UIDropDownMenu_SetSelectedValue(dropdown, opt.value)
+                UIDropDownMenu_SetText(dropdown, opt.label)
+                config.onChange(opt.value)
+            end
+            UIDropDownMenu_AddButton(info, level)
+        end
+    end
+
+    UIDropDownMenu_Initialize(dropdown, InitializeDropdown)
+    UIDropDownMenu_SetSelectedValue(dropdown, config.selected)
+
+    -- Set initial text
+    for _, opt in ipairs(config.options) do
+        if opt.value == config.selected then
+            UIDropDownMenu_SetText(dropdown, opt.label)
+            break
+        end
+    end
+
+    -- Public methods
+    function holder:SetValue(value)
+        currentValue = value
+        UIDropDownMenu_SetSelectedValue(dropdown, value)
+        for _, opt in ipairs(config.options) do
+            if opt.value == value then
+                UIDropDownMenu_SetText(dropdown, opt.label)
+                break
+            end
+        end
+    end
+
+    function holder:GetValue()
+        return currentValue
+    end
+
+    function holder:SetEnabled(enabled)
+        local color = enabled and 1 or 0.5
+        label:SetTextColor(color, color, color)
+        if enabled then
+            UIDropDownMenu_EnableDropDown(dropdown)
+        else
+            UIDropDownMenu_DisableDropDown(dropdown)
+        end
+    end
+
+    return holder
+end
+
+---@class TabConfig : ComponentConfig
+---@field name string Internal tab name
+---@field label string Display label
+---@field width? number Tab width (default 90)
+---@field height? number Tab height (default 22)
+
+---Create a flat-style tab button
+---@param parent table Parent frame
+---@param config TabConfig Configuration table
+---@return table tab Tab button with .SetActive(bool), .isActive
+function Components.Tab(parent, config)
+    local width = config.width or 90
+    local height = config.height or 22
+
+    local tab = CreateFrame("Button", nil, parent)
+    tab:SetSize(width, height)
+    tab.tabName = config.name
+
+    -- Background (highlighted when active)
+    local bg = tab:CreateTexture(nil, "BACKGROUND")
+    bg:SetPoint("TOPLEFT", 1, -1)
+    bg:SetPoint("BOTTOMRIGHT", -1, 0)
+    bg:SetColorTexture(0.2, 0.2, 0.2, 0)
+    tab.bg = bg
+
+    -- Bottom line (shows when active)
+    local bottomLine = tab:CreateTexture(nil, "BORDER")
+    bottomLine:SetHeight(2)
+    bottomLine:SetPoint("BOTTOMLEFT", 1, 0)
+    bottomLine:SetPoint("BOTTOMRIGHT", -1, 0)
+    bottomLine:SetColorTexture(0.6, 0.6, 0.6, 0)
+    tab.bottomLine = bottomLine
+
+    -- Text
+    local text = tab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    text:SetPoint("CENTER", 0, 0)
+    text:SetText(config.label)
+    tab.text = text
+
+    -- Hover effect
+    tab:SetScript("OnEnter", function(self)
+        if not self.isActive then
+            self.bg:SetColorTexture(0.25, 0.25, 0.25, 0.5)
+        end
+    end)
+    tab:SetScript("OnLeave", function(self)
+        if not self.isActive then
+            self.bg:SetColorTexture(0.2, 0.2, 0.2, 0)
+        end
+    end)
+
+    -- Public method to set active state
+    function tab:SetActive(active)
+        self.isActive = active
+        if active then
+            self.bg:SetColorTexture(0.2, 0.2, 0.2, 0.8)
+            self.bottomLine:SetColorTexture(0.8, 0.6, 0, 1)
+            self.text:SetFontObject("GameFontHighlightSmall")
+        else
+            self.bg:SetColorTexture(0.2, 0.2, 0.2, 0)
+            self.bottomLine:SetColorTexture(0.6, 0.6, 0.6, 0)
+            self.text:SetFontObject("GameFontNormalSmall")
+        end
+    end
+
+    return tab
+end
+
+---@class TextInputConfig : ComponentConfig
+---@field label string Display label
+---@field value? string Initial value
+---@field width? number Input width (default 150)
+---@field labelWidth? number Label width (default 80)
+---@field numeric? boolean Numeric only input
+---@field onChange? fun(text: string) Callback when text changes (on enter/focus lost)
+
+---Create a labeled text input
+---@param parent table Parent frame
+---@param config TextInputConfig Configuration table
+---@return table holder Frame with .editBox, .SetValue(v), .GetValue()
+function Components.TextInput(parent, config)
+    local width = config.width or 150
+    local labelWidth = config.labelWidth or 80
+
+    local holder = CreateFrame("Frame", nil, parent)
+    holder:SetSize(labelWidth + width + 5, 20)
+
+    -- Label
+    local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetPoint("LEFT", 0, 0)
+    label:SetWidth(labelWidth)
+    label:SetJustifyH("LEFT")
+    label:SetText(config.label)
+    holder.label = label
+
+    -- Edit box
+    local editBox = CreateFrame("EditBox", nil, holder, "InputBoxTemplate")
+    editBox:SetSize(width, 18)
+    editBox:SetPoint("LEFT", label, "RIGHT", 5, 0)
+    editBox:SetAutoFocus(false)
+    if config.numeric then
+        editBox:SetNumeric(true)
+    end
+    if config.value then
+        editBox:SetText(config.value)
+    end
+    holder.editBox = editBox
+
+    -- Track editbox for focus cleanup
+    if panelEditBoxes then
+        table.insert(panelEditBoxes, editBox)
+    end
+
+    -- Callbacks
+    if config.onChange then
+        editBox:SetScript("OnEnterPressed", function(self)
+            self:ClearFocus()
+            config.onChange(self:GetText())
+        end)
+        editBox:SetScript("OnEditFocusLost", function(self)
+            config.onChange(self:GetText())
+        end)
+    else
+        editBox:SetScript("OnEnterPressed", function(self)
+            self:ClearFocus()
+        end)
+    end
+    editBox:SetScript("OnEscapePressed", function(self)
+        self:ClearFocus()
+    end)
+
+    -- Public methods
+    function holder:SetValue(text)
+        editBox:SetText(text or "")
+    end
+
+    function holder:GetValue()
+        return editBox:GetText()
+    end
+
+    function holder:SetEnabled(enabled)
+        editBox:SetEnabled(enabled)
+        local color = enabled and 1 or 0.5
+        label:SetTextColor(color, color, color)
+    end
+
+    return holder
+end
+
+---Initialize panelEditBoxes reference (called from CreateOptionsPanel)
+---@param editBoxes table[] The editboxes array from the options panel
+function Components.SetEditBoxesRef(editBoxes)
+    panelEditBoxes = editBoxes
+end
+
+-- ============================================================================
 -- BUFF HELPER FUNCTIONS
 -- ============================================================================
 
@@ -694,6 +1283,16 @@ local function GetCategorySettings(category)
         return db.categorySettings[category]
     end
     return defaults.categorySettings[category] or defaults.categorySettings.main
+end
+
+---Get or create category settings entry in DB (reduces boilerplate in onChange handlers)
+---@param category string
+---@return table settings The category settings table
+local function GetOrCreateCategorySettings(category)
+    local db = BuffRemindersDB
+    db.categorySettings = db.categorySettings or {}
+    db.categorySettings[category] = db.categorySettings[category] or {}
+    return db.categorySettings[category]
 end
 
 ---Get the effective category for a frame (its own category if split, otherwise "main")
@@ -2732,7 +3331,8 @@ local function CreateOptionsPanel()
     panel:Hide()
 
     -- Track all EditBoxes so we can clear focus when panel hides
-    local panelEditBoxes = {}
+    local panelEditBoxes = {} -- luacheck: ignore 431 (intentionally shadows module-level nil)
+    Components.SetEditBoxesRef(panelEditBoxes)
     panel:SetScript("OnHide", function()
         for _, editBox in ipairs(panelEditBoxes) do
             editBox:ClearFocus()
@@ -2814,62 +3414,11 @@ local function CreateOptionsPanel()
     -- ========== TABS (flat style, sitting at top) ==========
     local tabButtons = {}
     local contentContainers = {}
-    local TAB_HEIGHT = 22
-
-    local function CreateTab(name, label)
-        local tab = CreateFrame("Button", nil, panel)
-        tab:SetSize(90, TAB_HEIGHT)
-        tab.tabName = name
-
-        -- Background (highlighted when active)
-        local bg = tab:CreateTexture(nil, "BACKGROUND")
-        bg:SetPoint("TOPLEFT", 1, -1)
-        bg:SetPoint("BOTTOMRIGHT", -1, 0)
-        bg:SetColorTexture(0.2, 0.2, 0.2, 0)
-        tab.bg = bg
-
-        -- Bottom line (shows when active, connects to content)
-        local bottomLine = tab:CreateTexture(nil, "BORDER")
-        bottomLine:SetHeight(2)
-        bottomLine:SetPoint("BOTTOMLEFT", 1, 0)
-        bottomLine:SetPoint("BOTTOMRIGHT", -1, 0)
-        bottomLine:SetColorTexture(0.6, 0.6, 0.6, 0)
-        tab.bottomLine = bottomLine
-
-        -- Text
-        local text = tab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        text:SetPoint("CENTER", 0, 0)
-        text:SetText(label)
-        tab.text = text
-
-        -- Hover effect
-        tab:SetScript("OnEnter", function(self)
-            if not self.isActive then
-                self.bg:SetColorTexture(0.25, 0.25, 0.25, 0.5)
-            end
-        end)
-        tab:SetScript("OnLeave", function(self)
-            if not self.isActive then
-                self.bg:SetColorTexture(0.2, 0.2, 0.2, 0)
-            end
-        end)
-
-        return tab
-    end
+    local TAB_HEIGHT = 22 -- Used for positioning separator and content
 
     local function SetActiveTab(tabName)
         for name, tab in pairs(tabButtons) do
-            if name == tabName then
-                tab.isActive = true
-                tab.bg:SetColorTexture(0.2, 0.2, 0.2, 0.8)
-                tab.bottomLine:SetColorTexture(0.8, 0.6, 0, 1)
-                tab.text:SetFontObject("GameFontHighlightSmall")
-            else
-                tab.isActive = false
-                tab.bg:SetColorTexture(0.2, 0.2, 0.2, 0)
-                tab.bottomLine:SetColorTexture(0.6, 0.6, 0.6, 0)
-                tab.text:SetFontObject("GameFontNormalSmall")
-            end
+            tab:SetActive(name == tabName)
         end
         for name, container in pairs(contentContainers) do
             if name == tabName then
@@ -2880,11 +3429,11 @@ local function CreateOptionsPanel()
         end
     end
 
-    tabButtons.buffs = CreateTab("buffs", "Buffs")
-    tabButtons.custom = CreateTab("custom", "Custom Buffs")
-    tabButtons.appearance = CreateTab("appearance", "Appearance")
-    tabButtons.settings = CreateTab("settings", "Settings")
-    tabButtons.profiles = CreateTab("profiles", "Import/Export")
+    tabButtons.buffs = Components.Tab(panel, { name = "buffs", label = "Buffs" })
+    tabButtons.custom = Components.Tab(panel, { name = "custom", label = "Custom Buffs" })
+    tabButtons.appearance = Components.Tab(panel, { name = "appearance", label = "Appearance" })
+    tabButtons.settings = Components.Tab(panel, { name = "settings", label = "Settings" })
+    tabButtons.profiles = Components.Tab(panel, { name = "profiles", label = "Import/Export" })
 
     -- Position tabs below title bar
     tabButtons.buffs:SetPoint("TOPLEFT", panel, "TOPLEFT", COL_PADDING, -40)
@@ -2944,6 +3493,15 @@ local function CreateOptionsPanel()
     appearanceContent:SetSize(PANEL_WIDTH - 24, 400) -- Width minus scrollbar
     appearanceScrollFrame:SetScrollChild(appearanceContent)
     panel.appearanceScrollFrame = appearanceScrollFrame
+
+    -- Update callback for category visibility changes (used by Components.CategoryHeader)
+    local function OnCategoryVisibilityChange()
+        if testMode then
+            RefreshTestDisplay()
+        else
+            UpdateDisplay()
+        end
+    end
 
     -- Settings tab content
     local settingsContent = CreateFrame("Frame", nil, panel)
@@ -3239,175 +3797,6 @@ local function CreateOptionsPanel()
         return cb, y - ITEM_HEIGHT
     end
 
-    -- Create category header with content visibility toggles [W][D][R]
-    ---@param parent table
-    ---@param text string
-    ---@param category CategoryName
-    ---@param x number
-    ---@param y number
-    ---@return table header
-    ---@return number newY
-    local function CreateCategoryHeader(parent, text, category, x, y)
-        local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        header:SetPoint("TOPLEFT", x, y)
-        header:SetText("|cffffcc00" .. text .. "|r")
-
-        -- Content visibility toggle buttons
-        local toggles = {
-            { key = "openWorld", label = "W", tooltip = "Open World" },
-            { key = "scenario", label = "S", tooltip = "Scenarios (Delves, Torghast, etc.)" },
-            { key = "dungeon", label = "D", tooltip = "Dungeons (including M+)" },
-            { key = "raid", label = "R", tooltip = "Raids" },
-        }
-
-        local lastToggle
-        for i, toggle in ipairs(toggles) do
-            local btn = CreateFrame("Button", nil, parent)
-            btn:SetSize(18, 14)
-            if i == 1 then
-                btn:SetPoint("LEFT", header, "RIGHT", 8, 0)
-            else
-                btn:SetPoint("LEFT", lastToggle, "RIGHT", 2, 0)
-            end
-
-            -- Background texture
-            local bg = btn:CreateTexture(nil, "BACKGROUND")
-            bg:SetAllPoints()
-            bg.key = toggle.key
-
-            -- Label text
-            local label = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-            label:SetPoint("CENTER", 0, 0)
-            label:SetText(toggle.label)
-
-            -- Update visual state based on setting
-            local function UpdateToggleVisual()
-                local db = BuffRemindersDB
-                local visibility = db.categoryVisibility and db.categoryVisibility[category]
-                local enabled = not visibility or visibility[toggle.key] ~= false
-                if enabled then
-                    bg:SetColorTexture(0.2, 0.6, 0.2, 0.8) -- Green
-                    label:SetTextColor(1, 1, 1)
-                else
-                    bg:SetColorTexture(0.4, 0.2, 0.2, 0.8) -- Dim red
-                    label:SetTextColor(0.6, 0.6, 0.6)
-                end
-            end
-            btn.UpdateVisual = UpdateToggleVisual
-            UpdateToggleVisual()
-
-            btn:SetScript("OnClick", function()
-                local db = BuffRemindersDB
-                if not db.categoryVisibility then
-                    db.categoryVisibility = {}
-                end
-                if not db.categoryVisibility[category] then
-                    db.categoryVisibility[category] = { openWorld = true, scenario = true, dungeon = true, raid = true }
-                end
-                db.categoryVisibility[category][toggle.key] = not db.categoryVisibility[category][toggle.key]
-                UpdateToggleVisual()
-                if testMode then
-                    RefreshTestDisplay()
-                else
-                    UpdateDisplay()
-                end
-            end)
-
-            btn:SetScript("OnEnter", function(self)
-                GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                GameTooltip:SetText(toggle.tooltip, 1, 1, 1)
-                GameTooltip:AddLine("Click to toggle visibility in " .. toggle.tooltip:lower(), 0.7, 0.7, 0.7)
-                GameTooltip:Show()
-            end)
-            btn:SetScript("OnLeave", function()
-                GameTooltip:Hide()
-            end)
-
-            lastToggle = btn
-        end
-
-        return header, y - 18
-    end
-
-    -- Create compact slider with clickable numeric input
-    local function CreateSlider(parent, x, y, labelText, minVal, maxVal, step, initVal, suffix, onChange)
-        local label = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        label:SetPoint("TOPLEFT", x, y)
-        label:SetWidth(70)
-        label:SetJustifyH("LEFT")
-        label:SetText(labelText)
-
-        local slider = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
-        slider:SetPoint("LEFT", label, "RIGHT", 5, 0)
-        slider:SetSize(100, 14)
-        slider:SetMinMaxValues(minVal, maxVal)
-        slider:SetValueStep(step)
-        slider:SetObeyStepOnDrag(true)
-        slider:SetValue(initVal)
-        slider.Low:SetText("")
-        slider.High:SetText("")
-        slider.Text:SetText("")
-
-        -- Clickable value display
-        local valueBtn = CreateFrame("Button", nil, parent)
-        valueBtn:SetPoint("LEFT", slider, "RIGHT", 6, 0)
-        valueBtn:SetSize(40, 16)
-
-        local value = valueBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        value:SetAllPoints()
-        value:SetJustifyH("LEFT")
-        value:SetText(initVal .. (suffix or ""))
-
-        -- Edit box (hidden by default)
-        local editBox = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
-        editBox:SetSize(35, 16)
-        editBox:SetPoint("LEFT", slider, "RIGHT", 6, 0)
-        editBox:SetAutoFocus(false)
-        editBox:SetNumeric(true)
-        editBox:Hide()
-
-        editBox:SetScript("OnEnterPressed", function(self)
-            local num = tonumber(self:GetText())
-            if num then
-                num = math.max(minVal, math.min(maxVal, num))
-                slider:SetValue(num)
-            end
-            self:Hide()
-            valueBtn:Show()
-        end)
-
-        editBox:SetScript("OnEscapePressed", function(self)
-            self:Hide()
-            valueBtn:Show()
-        end)
-
-        editBox:SetScript("OnEditFocusLost", function(self)
-            self:Hide()
-            valueBtn:Show()
-        end)
-
-        -- Track this editBox for focus cleanup on panel hide
-        table.insert(panelEditBoxes, editBox)
-
-        valueBtn:SetScript("OnClick", function()
-            valueBtn:Hide()
-            editBox:SetText(tostring(math.floor(slider:GetValue())))
-            editBox:Show()
-            editBox:SetFocus()
-            editBox:HighlightText()
-        end)
-        SetupTooltip(valueBtn, "Click to type a value", nil, "ANCHOR_TOP")
-
-        slider:SetScript("OnValueChanged", function(self, val)
-            val = math.floor(val)
-            value:SetText(val .. (suffix or ""))
-            onChange(val)
-        end)
-
-        slider.label = label
-        return slider, value, y - 24
-    end
-
     -- Render checkboxes for any buff array
     -- Handles grouping automatically if groupId field is present
     local function RenderBuffCheckboxes(x, y, buffArray)
@@ -3484,7 +3873,10 @@ local function CreateOptionsPanel()
 
     -- LEFT COLUMN: Group-wide buffs
     -- Raid Buffs header
-    _, buffsLeftY = CreateCategoryHeader(buffsContent, "Raid Buffs", "raid", buffsLeftX, buffsLeftY)
+    local raidHeader =
+        Components.CategoryHeader(buffsContent, { text = "Raid Buffs", category = "raid" }, OnCategoryVisibilityChange)
+    raidHeader:SetPoint("TOPLEFT", buffsLeftX, buffsLeftY)
+    buffsLeftY = buffsLeftY - 18
     local raidNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     raidNote:SetPoint("TOPLEFT", buffsLeftX, buffsLeftY)
     raidNote:SetText("(for the whole group)")
@@ -3494,7 +3886,13 @@ local function CreateOptionsPanel()
     buffsLeftY = buffsLeftY - SECTION_SPACING
 
     -- Presence Buffs header
-    _, buffsLeftY = CreateCategoryHeader(buffsContent, "Presence Buffs", "presence", buffsLeftX, buffsLeftY)
+    local presenceHeader = Components.CategoryHeader(
+        buffsContent,
+        { text = "Presence Buffs", category = "presence" },
+        OnCategoryVisibilityChange
+    )
+    presenceHeader:SetPoint("TOPLEFT", buffsLeftX, buffsLeftY)
+    buffsLeftY = buffsLeftY - 18
     local presenceNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     presenceNote:SetPoint("TOPLEFT", buffsLeftX, buffsLeftY)
     presenceNote:SetText("(at least 1 person needs)")
@@ -3504,7 +3902,13 @@ local function CreateOptionsPanel()
     buffsLeftY = buffsLeftY - SECTION_SPACING
 
     -- Consumables header
-    _, buffsLeftY = CreateCategoryHeader(buffsContent, "Consumables", "consumable", buffsLeftX, buffsLeftY)
+    local consumableHeader = Components.CategoryHeader(
+        buffsContent,
+        { text = "Consumables", category = "consumable" },
+        OnCategoryVisibilityChange
+    )
+    consumableHeader:SetPoint("TOPLEFT", buffsLeftX, buffsLeftY)
+    buffsLeftY = buffsLeftY - 18
     local consumablesNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     consumablesNote:SetPoint("TOPLEFT", buffsLeftX + 5, buffsLeftY)
     consumablesNote:SetText("(flasks, food, runes, and weapon oils)")
@@ -3513,7 +3917,13 @@ local function CreateOptionsPanel()
 
     -- RIGHT COLUMN: Individual buffs
     -- Targeted Buffs header
-    _, buffsRightY = CreateCategoryHeader(buffsContent, "Targeted Buffs", "targeted", buffsRightX, buffsRightY)
+    local targetedHeader = Components.CategoryHeader(
+        buffsContent,
+        { text = "Targeted Buffs", category = "targeted" },
+        OnCategoryVisibilityChange
+    )
+    targetedHeader:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
+    buffsRightY = buffsRightY - 18
     local targetedNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     targetedNote:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
     targetedNote:SetText("(buffs to maintain on someone else)")
@@ -3523,7 +3933,10 @@ local function CreateOptionsPanel()
     buffsRightY = buffsRightY - SECTION_SPACING
 
     -- Self Buffs header
-    _, buffsRightY = CreateCategoryHeader(buffsContent, "Self Buffs", "self", buffsRightX, buffsRightY)
+    local selfHeader =
+        Components.CategoryHeader(buffsContent, { text = "Self Buffs", category = "self" }, OnCategoryVisibilityChange)
+    selfHeader:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
+    buffsRightY = buffsRightY - 18
     local selfNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     selfNote:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
     selfNote:SetText("(buffs strictly on yourself)")
@@ -3550,23 +3963,6 @@ local function CreateOptionsPanel()
     end
     panel.SetCheckboxEnabled = SetCheckboxEnabled
 
-    -- Helper to enable/disable slider with label greying
-    local function SetSliderEnabled(slider, valueText, enabled)
-        local color = enabled and 1 or 0.5
-        slider:SetEnabled(enabled)
-        if slider.label then
-            slider.label:SetTextColor(color, color, color)
-        end
-        if valueText then
-            valueText:SetTextColor(color, color, color)
-        end
-    end
-
-    -- Direction button constants
-    local directions = { "LEFT", "CENTER", "RIGHT", "UP", "DOWN" }
-    local dirLabels = { "Left", "Ctr", "Right", "Up", "Down" }
-    local dirBtnWidth = 34
-
     -- ========== SECTION: MAIN FRAME ==========
     local mainFrameHeader
     mainFrameHeader, framesY = CreateSectionHeader(appearanceContent, "Main Frame", framesX, framesY)
@@ -3576,165 +3972,96 @@ local function CreateOptionsPanel()
     mainResetBtn:SetPoint("LEFT", mainFrameHeader, "RIGHT", 10, 0)
     SetupTooltip(mainResetBtn, "Reset Main Frame", "Reset all main frame settings to defaults", "ANCHOR_TOP")
 
-    -- Row 1: Icon Size + Direction buttons
-    local sizeSlider, sizeValue
-    sizeSlider, sizeValue, _ = CreateSlider(
-        appearanceContent,
-        framesX,
-        framesY,
-        "Icon Size",
-        16,
-        128,
-        1,
-        GetCategorySettings("main").iconSize or 64,
-        "",
-        function(val)
-            local db = BuffRemindersDB
-            if not db.categorySettings then
-                db.categorySettings = {}
-            end
-            if not db.categorySettings.main then
-                db.categorySettings.main = {}
-            end
-            db.categorySettings.main.iconSize = val
+    -- Row 1: Icon Size
+    local sizeHolder = Components.Slider(appearanceContent, {
+        label = "Icon Size",
+        min = 16,
+        max = 128,
+        value = GetCategorySettings("main").iconSize or 64,
+        onChange = function(val)
+            GetOrCreateCategorySettings("main").iconSize = val
             UpdateVisuals()
-        end
-    )
-    panel.sizeSlider = sizeSlider
-    panel.sizeValue = sizeValue
-
+        end,
+    })
+    sizeHolder:SetPoint("TOPLEFT", framesX, framesY)
+    panel.sizeSlider = sizeHolder.slider
+    panel.sizeValue = sizeHolder.valueText
     framesY = framesY - 24
 
     -- Row 2: Spacing
-    local spacingSlider, spacingValue
-    spacingSlider, spacingValue, framesY = CreateSlider(
-        appearanceContent,
-        framesX,
-        framesY,
-        "Spacing",
-        0,
-        50,
-        1,
-        math.floor((GetCategorySettings("main").spacing or 0.2) * 100),
-        "%",
-        function(val)
-            local db = BuffRemindersDB
-            if not db.categorySettings then
-                db.categorySettings = {}
-            end
-            if not db.categorySettings.main then
-                db.categorySettings.main = {}
-            end
-            db.categorySettings.main.spacing = val / 100
+    local spacingHolder = Components.Slider(appearanceContent, {
+        label = "Spacing",
+        min = 0,
+        max = 50,
+        value = math.floor((GetCategorySettings("main").spacing or 0.2) * 100),
+        suffix = "%",
+        onChange = function(val)
+            GetOrCreateCategorySettings("main").spacing = val / 100
             if testMode then
                 RefreshTestDisplay()
             else
                 UpdateDisplay()
             end
-        end
-    )
-    panel.spacingSlider = spacingSlider
-    panel.spacingValue = spacingValue
+        end,
+    })
+    spacingHolder:SetPoint("TOPLEFT", framesX, framesY)
+    panel.spacingSlider = spacingHolder.slider
+    panel.spacingValue = spacingHolder.valueText
+    framesY = framesY - 24
 
     -- Row 3: Icon Zoom
-    local zoomSlider, zoomValue
-    zoomSlider, zoomValue, framesY = CreateSlider(
-        appearanceContent,
-        framesX,
-        framesY,
-        "Icon Zoom",
-        0,
-        15,
-        1,
-        GetCategorySettings("main").iconZoom or DEFAULT_ICON_ZOOM,
-        "%",
-        function(val)
-            local db = BuffRemindersDB
-            if not db.categorySettings then
-                db.categorySettings = {}
-            end
-            if not db.categorySettings.main then
-                db.categorySettings.main = {}
-            end
-            db.categorySettings.main.iconZoom = val
+    local zoomHolder = Components.Slider(appearanceContent, {
+        label = "Icon Zoom",
+        min = 0,
+        max = 15,
+        value = GetCategorySettings("main").iconZoom or DEFAULT_ICON_ZOOM,
+        suffix = "%",
+        onChange = function(val)
+            GetOrCreateCategorySettings("main").iconZoom = val
             UpdateVisuals()
-        end
-    )
-    panel.zoomSlider = zoomSlider
-    panel.zoomValue = zoomValue
+        end,
+    })
+    zoomHolder:SetPoint("TOPLEFT", framesX, framesY)
+    panel.zoomSlider = zoomHolder.slider
+    panel.zoomValue = zoomHolder.valueText
+    framesY = framesY - 24
 
     -- Row 4: Border Size
-    local borderSlider, borderValue
-    borderSlider, borderValue, framesY = CreateSlider(
-        appearanceContent,
-        framesX,
-        framesY,
-        "Border Size",
-        0,
-        8,
-        1,
-        GetCategorySettings("main").borderSize or DEFAULT_BORDER_SIZE,
-        "px",
-        function(val)
-            local db = BuffRemindersDB
-            if not db.categorySettings then
-                db.categorySettings = {}
-            end
-            if not db.categorySettings.main then
-                db.categorySettings.main = {}
-            end
-            db.categorySettings.main.borderSize = val
+    local borderHolder = Components.Slider(appearanceContent, {
+        label = "Border Size",
+        min = 0,
+        max = 8,
+        value = GetCategorySettings("main").borderSize or DEFAULT_BORDER_SIZE,
+        suffix = "px",
+        onChange = function(val)
+            GetOrCreateCategorySettings("main").borderSize = val
             UpdateVisuals()
-        end
-    )
-    panel.borderSlider = borderSlider
-    panel.borderValue = borderValue
+        end,
+    })
+    borderHolder:SetPoint("TOPLEFT", framesX, framesY)
+    panel.borderSlider = borderHolder.slider
+    panel.borderValue = borderHolder.valueText
+    framesY = framesY - 24
 
-    -- Row 5: Direction buttons with label
-    local mainDirLabel = appearanceContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    mainDirLabel:SetPoint("TOPLEFT", framesX, framesY)
-    mainDirLabel:SetText("Direction:")
-
-    local growBtns = {}
-    local mainGrowDir = GetCategorySettings("main").growDirection or "CENTER"
-    for i, dir in ipairs(directions) do
-        local btn = CreateFrame("Button", nil, appearanceContent, "UIPanelButtonTemplate")
-        btn:SetSize(dirBtnWidth, 18)
-        btn:SetPoint("LEFT", mainDirLabel, "RIGHT", 5 + (i - 1) * (dirBtnWidth + 2), 0)
-        btn:SetText(dirLabels[i])
-        btn:SetNormalFontObject("GameFontHighlightSmall")
-        btn:SetHighlightFontObject("GameFontHighlightSmall")
-        btn:SetDisabledFontObject("GameFontDisableSmall")
-        btn.direction = dir
-        btn:SetScript("OnClick", function()
-            local db = BuffRemindersDB
-            if not db.categorySettings then
-                db.categorySettings = {}
-            end
-            if not db.categorySettings.main then
-                db.categorySettings.main = {}
-            end
-            db.categorySettings.main.growDirection = dir
-            for _, b in ipairs(growBtns) do
-                b:SetEnabled(b.direction ~= dir)
-            end
+    -- Row 5: Direction buttons
+    local mainDirHolder = Components.DirectionButtons(appearanceContent, {
+        selected = GetCategorySettings("main").growDirection or "CENTER",
+        onChange = function(dir)
+            GetOrCreateCategorySettings("main").growDirection = dir
             if testMode then
                 RefreshTestDisplay()
             else
                 UpdateDisplay()
             end
-        end)
-        btn:SetEnabled(mainGrowDir ~= dir)
-        growBtns[i] = btn
-    end
-    panel.growBtns = growBtns
+        end,
+    })
+    mainDirHolder:SetPoint("TOPLEFT", framesX, framesY)
+    panel.growBtns = mainDirHolder.buttons
 
     -- Wire up the Reset button handler now that sliders exist
     mainResetBtn:SetScript("OnClick", function()
         local db = BuffRemindersDB
-        if not db.categorySettings then
-            db.categorySettings = {}
-        end
+        db.categorySettings = db.categorySettings or {}
         db.categorySettings.main = {
             position = defaults.categorySettings.main.position,
             iconSize = defaults.categorySettings.main.iconSize,
@@ -3744,13 +4071,11 @@ local function CreateOptionsPanel()
             borderSize = defaults.categorySettings.main.borderSize,
         }
         -- Update sliders
-        panel.sizeSlider:SetValue(defaults.categorySettings.main.iconSize)
-        panel.spacingSlider:SetValue(defaults.categorySettings.main.spacing * 100)
-        panel.zoomSlider:SetValue(defaults.categorySettings.main.iconZoom)
-        panel.borderSlider:SetValue(defaults.categorySettings.main.borderSize)
-        for _, btn in ipairs(growBtns) do
-            btn:SetEnabled(btn.direction ~= defaults.categorySettings.main.growDirection)
-        end
+        sizeHolder:SetValue(defaults.categorySettings.main.iconSize)
+        spacingHolder:SetValue(defaults.categorySettings.main.spacing * 100)
+        zoomHolder:SetValue(defaults.categorySettings.main.iconZoom)
+        borderHolder:SetValue(defaults.categorySettings.main.borderSize)
+        mainDirHolder:SetDirection(defaults.categorySettings.main.growDirection)
         -- Reset position (update both legacy and new locations)
         db.position = {
             point = defaults.categorySettings.main.position.point,
@@ -3850,164 +4175,96 @@ local function CreateOptionsPanel()
         local setX = 4
 
         -- Icon Size slider
-        local catSizeSlider, catSizeValue
-        catSizeSlider, catSizeValue, setY = CreateSlider(
-            settingsFrame,
-            setX,
-            setY,
-            "Icon Size",
-            16,
-            128,
-            1,
-            GetCategorySettings(category).iconSize or 64,
-            "",
-            function(val)
-                local db = BuffRemindersDB
-                if not db.categorySettings then
-                    db.categorySettings = {}
-                end
-                if not db.categorySettings[category] then
-                    db.categorySettings[category] = {}
-                end
-                db.categorySettings[category].iconSize = val
+        local catSizeHolder = Components.Slider(settingsFrame, {
+            label = "Icon Size",
+            min = 16,
+            max = 128,
+            value = GetCategorySettings(category).iconSize or 64,
+            onChange = function(val)
+                GetOrCreateCategorySettings(category).iconSize = val
                 UpdateVisuals()
-            end
-        )
-        rowData.sizeSlider = catSizeSlider
-        rowData.sizeValue = catSizeValue
+            end,
+        })
+        catSizeHolder:SetPoint("TOPLEFT", setX, setY)
+        rowData.sizeSlider = catSizeHolder.slider
+        rowData.sizeHolder = catSizeHolder
+        setY = setY - 24
 
         -- Spacing slider
-        local catSpacingSlider, catSpacingValue
-        catSpacingSlider, catSpacingValue, setY = CreateSlider(
-            settingsFrame,
-            setX,
-            setY,
-            "Spacing",
-            0,
-            50,
-            1,
-            math.floor((GetCategorySettings(category).spacing or 0.2) * 100),
-            "%",
-            function(val)
-                local db = BuffRemindersDB
-                if not db.categorySettings then
-                    db.categorySettings = {}
-                end
-                if not db.categorySettings[category] then
-                    db.categorySettings[category] = {}
-                end
-                db.categorySettings[category].spacing = val / 100
+        local catSpacingHolder = Components.Slider(settingsFrame, {
+            label = "Spacing",
+            min = 0,
+            max = 50,
+            value = math.floor((GetCategorySettings(category).spacing or 0.2) * 100),
+            suffix = "%",
+            onChange = function(val)
+                GetOrCreateCategorySettings(category).spacing = val / 100
                 if testMode then
                     RefreshTestDisplay()
                 else
                     UpdateDisplay()
                 end
-            end
-        )
-        rowData.spacingSlider = catSpacingSlider
-        rowData.spacingValue = catSpacingValue
+            end,
+        })
+        catSpacingHolder:SetPoint("TOPLEFT", setX, setY)
+        rowData.spacingSlider = catSpacingHolder.slider
+        rowData.spacingHolder = catSpacingHolder
+        setY = setY - 24
 
         -- Icon Zoom slider
-        local catZoomSlider, catZoomValue
-        catZoomSlider, catZoomValue, setY = CreateSlider(
-            settingsFrame,
-            setX,
-            setY,
-            "Icon Zoom",
-            0,
-            15,
-            1,
-            GetCategorySettings(category).iconZoom or DEFAULT_ICON_ZOOM,
-            "%",
-            function(val)
-                local db = BuffRemindersDB
-                if not db.categorySettings then
-                    db.categorySettings = {}
-                end
-                if not db.categorySettings[category] then
-                    db.categorySettings[category] = {}
-                end
-                db.categorySettings[category].iconZoom = val
+        local catZoomHolder = Components.Slider(settingsFrame, {
+            label = "Icon Zoom",
+            min = 0,
+            max = 15,
+            value = GetCategorySettings(category).iconZoom or DEFAULT_ICON_ZOOM,
+            suffix = "%",
+            onChange = function(val)
+                GetOrCreateCategorySettings(category).iconZoom = val
                 UpdateVisuals()
-            end
-        )
-        rowData.zoomSlider = catZoomSlider
-        rowData.zoomValue = catZoomValue
+            end,
+        })
+        catZoomHolder:SetPoint("TOPLEFT", setX, setY)
+        rowData.zoomSlider = catZoomHolder.slider
+        rowData.zoomHolder = catZoomHolder
+        setY = setY - 24
 
         -- Border Size slider
-        local catBorderSlider, catBorderValue
-        catBorderSlider, catBorderValue, setY = CreateSlider(
-            settingsFrame,
-            setX,
-            setY,
-            "Border Size",
-            0,
-            8,
-            1,
-            GetCategorySettings(category).borderSize or DEFAULT_BORDER_SIZE,
-            "px",
-            function(val)
-                local db = BuffRemindersDB
-                if not db.categorySettings then
-                    db.categorySettings = {}
-                end
-                if not db.categorySettings[category] then
-                    db.categorySettings[category] = {}
-                end
-                db.categorySettings[category].borderSize = val
+        local catBorderHolder = Components.Slider(settingsFrame, {
+            label = "Border Size",
+            min = 0,
+            max = 8,
+            value = GetCategorySettings(category).borderSize or DEFAULT_BORDER_SIZE,
+            suffix = "px",
+            onChange = function(val)
+                GetOrCreateCategorySettings(category).borderSize = val
                 UpdateVisuals()
-            end
-        )
-        rowData.borderSlider = catBorderSlider
-        rowData.borderValue = catBorderValue
+            end,
+        })
+        catBorderHolder:SetPoint("TOPLEFT", setX, setY)
+        rowData.borderSlider = catBorderHolder.slider
+        rowData.borderHolder = catBorderHolder
+        setY = setY - 24
 
         -- Direction buttons
-        local catDirLabel = settingsFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        catDirLabel:SetPoint("TOPLEFT", setX, setY)
-        catDirLabel:SetText("Direction:")
-
-        local catGrowBtns = {}
-        local catGrowDir = GetCategorySettings(category).growDirection or "CENTER"
-        for i, dir in ipairs(directions) do
-            local btn = CreateFrame("Button", nil, settingsFrame, "UIPanelButtonTemplate")
-            btn:SetSize(dirBtnWidth, 18)
-            btn:SetPoint("LEFT", catDirLabel, "RIGHT", 5 + (i - 1) * (dirBtnWidth + 2), 0)
-            btn:SetText(dirLabels[i])
-            btn:SetNormalFontObject("GameFontHighlightSmall")
-            btn:SetHighlightFontObject("GameFontHighlightSmall")
-            btn:SetDisabledFontObject("GameFontDisableSmall")
-            btn.direction = dir
-            btn:SetScript("OnClick", function()
-                local db = BuffRemindersDB
-                if not db.categorySettings then
-                    db.categorySettings = {}
-                end
-                if not db.categorySettings[category] then
-                    db.categorySettings[category] = {}
-                end
-                db.categorySettings[category].growDirection = dir
-                for _, b in ipairs(catGrowBtns) do
-                    b:SetEnabled(b.direction ~= dir)
-                end
+        local catDirHolder = Components.DirectionButtons(settingsFrame, {
+            selected = GetCategorySettings(category).growDirection or "CENTER",
+            onChange = function(dir)
+                GetOrCreateCategorySettings(category).growDirection = dir
                 if testMode then
                     RefreshTestDisplay()
                 else
                     UpdateDisplay()
                 end
-            end)
-            btn:SetEnabled(catGrowDir ~= dir)
-            catGrowBtns[i] = btn
-        end
-        rowData.growBtns = catGrowBtns
-
-        rowData.growBtns = catGrowBtns
+            end,
+        })
+        catDirHolder:SetPoint("TOPLEFT", setX, setY)
+        rowData.growBtns = catDirHolder.buttons
+        rowData.dirHolder = catDirHolder
 
         -- Reset button on the top row (right-aligned)
         local catResetBtn = CreateButton(rowFrame, 50, 18, "Reset", function()
             local db = BuffRemindersDB
-            if not db.categorySettings then
-                db.categorySettings = {}
-            end
+            db.categorySettings = db.categorySettings or {}
             local catDefaults = defaults.categorySettings[category]
             db.categorySettings[category] = {
                 position = catDefaults.position,
@@ -4018,13 +4275,11 @@ local function CreateOptionsPanel()
                 borderSize = catDefaults.borderSize,
             }
             -- Update sliders
-            catSizeSlider:SetValue(catDefaults.iconSize)
-            catSpacingSlider:SetValue(catDefaults.spacing * 100)
-            catZoomSlider:SetValue(catDefaults.iconZoom)
-            catBorderSlider:SetValue(catDefaults.borderSize)
-            for _, btn in ipairs(catGrowBtns) do
-                btn:SetEnabled(btn.direction ~= catDefaults.growDirection)
-            end
+            catSizeHolder:SetValue(catDefaults.iconSize)
+            catSpacingHolder:SetValue(catDefaults.spacing * 100)
+            catZoomHolder:SetValue(catDefaults.iconZoom)
+            catBorderHolder:SetValue(catDefaults.borderSize)
+            catDirHolder:SetDirection(catDefaults.growDirection)
             -- Reset position if frame exists
             if categoryFrames and categoryFrames[category] then
                 local frame = categoryFrames[category]
@@ -4071,9 +4326,7 @@ local function CreateOptionsPanel()
         -- Split checkbox handler
         splitCb:SetScript("OnClick", function(self)
             local db = BuffRemindersDB
-            if not db.splitCategories then
-                db.splitCategories = {}
-            end
+            db.splitCategories = db.splitCategories or {}
             db.splitCategories[category] = self:GetChecked()
             if self:GetChecked() then
                 rowData.expanded = true
@@ -4095,13 +4348,11 @@ local function CreateOptionsPanel()
         rowData.RefreshValues = function()
             local catSettings = GetCategorySettings(category)
             splitCb:SetChecked(IsCategorySplit(category))
-            catSizeSlider:SetValue(catSettings.iconSize or 64)
-            catSpacingSlider:SetValue((catSettings.spacing or 0.2) * 100)
-            catZoomSlider:SetValue(catSettings.iconZoom or DEFAULT_ICON_ZOOM)
-            catBorderSlider:SetValue(catSettings.borderSize or DEFAULT_BORDER_SIZE)
-            for _, btn in ipairs(catGrowBtns) do
-                btn:SetEnabled(btn.direction ~= (catSettings.growDirection or "CENTER"))
-            end
+            catSizeHolder:SetValue(catSettings.iconSize or 64)
+            catSpacingHolder:SetValue((catSettings.spacing or 0.2) * 100)
+            catZoomHolder:SetValue(catSettings.iconZoom or DEFAULT_ICON_ZOOM)
+            catBorderHolder:SetValue(catSettings.borderSize or DEFAULT_BORDER_SIZE)
+            catDirHolder:SetDirection(catSettings.growDirection or "CENTER")
             UpdateRowLayout()
         end
 
@@ -4241,7 +4492,7 @@ local function CreateOptionsPanel()
     SetCheckboxEnabled(instanceCb, BuffRemindersDB.showOnlyInGroup)
     panel.instanceCheckbox = instanceCb
 
-    local readyCheckCb, readyCheckSlider, readyCheckSliderValue
+    local readyCheckCb
     readyCheckCb, behY = CreateCheckbox(
         behaviorContainer,
         0,
@@ -4250,31 +4501,30 @@ local function CreateOptionsPanel()
         BuffRemindersDB.showOnlyOnReadyCheck,
         function(self)
             BuffRemindersDB.showOnlyOnReadyCheck = self:GetChecked()
-            if readyCheckSlider then
-                SetSliderEnabled(readyCheckSlider, readyCheckSliderValue, self:GetChecked())
+            if panel.readyCheckHolder then
+                panel.readyCheckHolder:SetEnabled(self:GetChecked())
             end
             UpdateDisplay()
         end
     )
     panel.readyCheckCheckbox = readyCheckCb
 
-    readyCheckSlider, readyCheckSliderValue, behY = CreateSlider(
-        behaviorContainer,
-        20,
-        behY,
-        "Duration",
-        10,
-        30,
-        1,
-        BuffRemindersDB.readyCheckDuration or 15,
-        "s",
-        function(val)
+    local readyCheckHolder = Components.Slider(behaviorContainer, {
+        label = "Duration",
+        min = 10,
+        max = 30,
+        value = BuffRemindersDB.readyCheckDuration or 15,
+        suffix = "s",
+        onChange = function(val)
             BuffRemindersDB.readyCheckDuration = val
-        end
-    )
-    SetSliderEnabled(readyCheckSlider, readyCheckSliderValue, BuffRemindersDB.showOnlyOnReadyCheck)
-    panel.readyCheckSlider = readyCheckSlider
-    panel.readyCheckSliderValue = readyCheckSliderValue
+        end,
+    })
+    readyCheckHolder:SetPoint("TOPLEFT", 20, behY)
+    readyCheckHolder:SetEnabled(BuffRemindersDB.showOnlyOnReadyCheck)
+    panel.readyCheckSlider = readyCheckHolder.slider
+    panel.readyCheckSliderValue = readyCheckHolder.valueText
+    panel.readyCheckHolder = readyCheckHolder
+    behY = behY - 24
 
     local playerClassCb
     playerClassCb, behY = CreateCheckbox(
@@ -4380,68 +4630,53 @@ local function CreateOptionsPanel()
     end)
     panel.glowCheckbox = glowCb
 
-    local thresholdSlider, thresholdValue
-    thresholdSlider, thresholdValue, expY = CreateSlider(
-        expirationContainer,
-        0,
-        expY,
-        "Threshold",
-        1,
-        15,
-        1,
-        BuffRemindersDB.expirationThreshold or 5,
-        " min",
-        function(val)
+    local thresholdHolder = Components.Slider(expirationContainer, {
+        label = "Threshold",
+        min = 1,
+        max = 15,
+        value = BuffRemindersDB.expirationThreshold or 5,
+        suffix = " min",
+        onChange = function(val)
             BuffRemindersDB.expirationThreshold = val
             if testMode then
                 RefreshTestDisplay()
             else
                 UpdateDisplay()
             end
-        end
-    )
-    panel.thresholdSlider = thresholdSlider
-    panel.thresholdValue = thresholdValue
+        end,
+    })
+    thresholdHolder:SetPoint("TOPLEFT", 0, expY)
+    panel.thresholdSlider = thresholdHolder.slider
+    panel.thresholdValue = thresholdHolder.valueText
+    panel.thresholdHolder = thresholdHolder
+    expY = expY - 24
 
-    -- Style dropdown and preview on same row
-    local styleLabel = expirationContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    panel.styleLabel = styleLabel
-    styleLabel:SetPoint("TOPLEFT", 0, expY)
-    styleLabel:SetText("Style:")
-
-    local styleDropdown =
-        CreateFrame("Frame", "BuffRemindersStyleDropdown", expirationContainer, "UIDropDownMenuTemplate")
-    styleDropdown:SetPoint("LEFT", styleLabel, "RIGHT", -10, -2)
-    UIDropDownMenu_SetWidth(styleDropdown, 100)
-
-    local function StyleDropdown_Initialize(_, level)
-        for i, style in ipairs(GlowStyles) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = style.name
-            info.value = i
-            info.checked = (BuffRemindersDB.glowStyle or 1) == i
-            info.func = function()
-                BuffRemindersDB.glowStyle = i
-                UIDropDownMenu_SetSelectedValue(styleDropdown, i)
-                UIDropDownMenu_SetText(styleDropdown, style.name)
-                if testMode then
-                    RefreshTestDisplay()
-                else
-                    UpdateDisplay()
-                end
-            end
-            UIDropDownMenu_AddButton(info, level)
-        end
+    -- Style dropdown - build options from GlowStyles
+    local styleOptions = {}
+    for i, style in ipairs(GlowStyles) do
+        styleOptions[i] = { label = style.name, value = i }
     end
 
-    UIDropDownMenu_Initialize(styleDropdown, StyleDropdown_Initialize)
-    UIDropDownMenu_SetSelectedValue(styleDropdown, BuffRemindersDB.glowStyle or 1)
-    UIDropDownMenu_SetText(styleDropdown, GlowStyles[BuffRemindersDB.glowStyle or 1].name)
-    panel.styleDropdown = styleDropdown
+    local styleHolder = Components.Dropdown(expirationContainer, {
+        label = "Style:",
+        options = styleOptions,
+        selected = BuffRemindersDB.glowStyle or 1,
+        width = 100,
+        onChange = function(val)
+            BuffRemindersDB.glowStyle = val
+            if testMode then
+                RefreshTestDisplay()
+            else
+                UpdateDisplay()
+            end
+        end,
+    }, "BuffRemindersStyleDropdown")
+    styleHolder:SetPoint("TOPLEFT", 0, expY)
+    panel.styleHolder = styleHolder
 
     local previewBtn = CreateFrame("Button", nil, expirationContainer, "UIPanelButtonTemplate")
     previewBtn:SetSize(60, 18)
-    previewBtn:SetPoint("LEFT", styleDropdown, "RIGHT", -5, 2)
+    previewBtn:SetPoint("LEFT", styleHolder, "RIGHT", 5, 0)
     previewBtn:SetText("Preview")
     previewBtn:SetNormalFontObject("GameFontHighlightSmall")
     previewBtn:SetScript("OnClick", function()
@@ -4451,12 +4686,11 @@ local function CreateOptionsPanel()
 
     -- Helper to enable/disable glow-related controls
     local function SetGlowControlsEnabled(enabled)
-        local color = enabled and 1 or 0.5
-        SetSliderEnabled(thresholdSlider, thresholdValue, enabled)
-        styleLabel:SetTextColor(color, color, color)
-        UIDropDownMenu_EnableDropDown(styleDropdown)
-        if not enabled then
-            UIDropDownMenu_DisableDropDown(styleDropdown)
+        if panel.thresholdHolder then
+            panel.thresholdHolder:SetEnabled(enabled)
+        end
+        if panel.styleHolder then
+            panel.styleHolder:SetEnabled(enabled)
         end
         previewBtn:SetEnabled(enabled)
     end
@@ -4490,7 +4724,13 @@ local function CreateOptionsPanel()
 
     -- Header with visibility toggles
     local customY = 0
-    _, customY = CreateCategoryHeader(customContent, "Custom Buffs", "custom", COL_PADDING, customY)
+    local customHeader = Components.CategoryHeader(
+        customContent,
+        { text = "Custom Buffs", category = "custom" },
+        OnCategoryVisibilityChange
+    )
+    customHeader:SetPoint("TOPLEFT", COL_PADDING, customY)
+    customY = customY - 18
 
     local customDesc = customContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     customDesc:SetPoint("TOPLEFT", COL_PADDING, customY)
@@ -4737,9 +4977,8 @@ local function ToggleOptions()
             optionsPanel.thresholdSlider:SetValue(db.expirationThreshold or 5)
             optionsPanel.thresholdValue:SetText((db.expirationThreshold or 5) .. " min")
         end
-        if optionsPanel.styleDropdown then
-            UIDropDownMenu_SetSelectedValue(optionsPanel.styleDropdown, db.glowStyle or 1)
-            UIDropDownMenu_SetText(optionsPanel.styleDropdown, GlowStyles[db.glowStyle or 1].name)
+        if optionsPanel.styleHolder then
+            optionsPanel.styleHolder:SetValue(db.glowStyle or 1)
         end
         if optionsPanel.SetGlowControlsEnabled then
             optionsPanel.SetGlowControlsEnabled(db.showExpirationGlow)
@@ -5091,34 +5330,28 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     -- Advanced options content
     local advY = 0
 
-    local nameLabel = advancedFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    nameLabel:SetPoint("TOPLEFT", 0, advY)
-    nameLabel:SetText("Display Name:")
-
-    nameBox = CreateFrame("EditBox", nil, advancedFrame, "InputBoxTemplate")
-    nameBox:SetSize(150, 18)
-    nameBox:SetPoint("LEFT", nameLabel, "RIGHT", 5, 0)
-    nameBox:SetAutoFocus(false)
-    if editingBuff and editingBuff.name then
-        nameBox:SetText(editingBuff.name)
-    end
+    local nameHolder = Components.TextInput(advancedFrame, {
+        label = "Display Name:",
+        value = editingBuff and editingBuff.name or "",
+        width = 150,
+        labelWidth = 85,
+    })
+    nameHolder:SetPoint("TOPLEFT", 0, advY)
+    nameBox = nameHolder.editBox -- Keep reference for save handler
 
     advY = advY - 25
 
-    local missingLabel = advancedFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    missingLabel:SetPoint("TOPLEFT", 0, advY)
-    missingLabel:SetText("Missing Text:")
-
-    missingBox = CreateFrame("EditBox", nil, advancedFrame, "InputBoxTemplate")
-    missingBox:SetSize(80, 18)
-    missingBox:SetPoint("LEFT", missingLabel, "RIGHT", 5, 0)
-    missingBox:SetAutoFocus(false)
-    if editingBuff and editingBuff.missingText then
-        missingBox:SetText(editingBuff.missingText:gsub("\n", "\\n"))
-    end
+    local missingHolder = Components.TextInput(advancedFrame, {
+        label = "Missing Text:",
+        value = editingBuff and editingBuff.missingText and editingBuff.missingText:gsub("\n", "\\n") or "",
+        width = 80,
+        labelWidth = 85,
+    })
+    missingHolder:SetPoint("TOPLEFT", 0, advY)
+    missingBox = missingHolder.editBox -- Keep reference for save handler
 
     local missingHint = advancedFrame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    missingHint:SetPoint("LEFT", missingBox, "RIGHT", 5, 0)
+    missingHint:SetPoint("LEFT", missingHolder, "RIGHT", 5, 0)
     missingHint:SetText("(use \\n for newline)")
 
     advY = advY - 25
