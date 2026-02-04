@@ -419,24 +419,20 @@ local function CreatePanel(name, width, height, options)
     return panel
 end
 
----Create a styled button with consistent font
+---Create a styled button using standard Blizzard dynamic resize template
 ---@param parent Frame
----@param width number
----@param height number
 ---@param text string
 ---@param onClick function
----@param smallFont? boolean Use small font (default true)
+---@param tooltip? {title: string, desc?: string} Optional tooltip configuration
 ---@return table
-local function CreateButton(parent, width, height, text, onClick, smallFont)
-    local btn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    btn:SetSize(width, height)
+local function CreateButton(parent, text, onClick, tooltip)
+    local btn = CreateFrame("Button", nil, parent, "UIPanelDynamicResizeButtonTemplate")
     btn:SetText(text)
-    if smallFont ~= false then
-        btn:SetNormalFontObject("GameFontHighlightSmall")
-        btn:SetHighlightFontObject("GameFontHighlightSmall")
-        btn:SetDisabledFontObject("GameFontDisableSmall")
-    end
+    DynamicResizeButton_Resize(btn)
     btn:SetScript("OnClick", onClick)
+    if tooltip then
+        SetupTooltip(btn, tooltip.title, tooltip.desc, "ANCHOR_TOP")
+    end
     return btn
 end
 
@@ -497,6 +493,7 @@ end
 ---@field label? string Optional label (default "Direction:")
 ---@field selected string Currently selected direction ("LEFT"|"CENTER"|"RIGHT"|"UP"|"DOWN")
 ---@field onChange fun(dir: string) Callback when direction changes
+---@field width? number Dropdown width (default 90)
 
 ---@class CategoryHeaderConfig : ComponentConfig
 ---@field text string Header text
@@ -504,6 +501,9 @@ end
 
 -- Panel EditBoxes tracking (populated by CreateOptionsPanel, used by Components)
 local panelEditBoxes = nil ---@type table[]?
+
+-- Counter for unique dropdown names
+local directionDropdownCounter = 0
 
 local Components = {}
 
@@ -682,15 +682,19 @@ end
 ---Create direction buttons (LEFT, CENTER, RIGHT, UP, DOWN)
 ---@param parent table Parent frame
 ---@param config DirectionButtonsConfig Configuration table
----@return table holder Frame containing direction buttons with .SetDirection(dir)
+---@return table holder Frame containing direction dropdown with .SetDirection(dir)
 function Components.DirectionButtons(parent, config)
     local directions = { "LEFT", "CENTER", "RIGHT", "UP", "DOWN" }
-    local dirLabels = { "Left", "Ctr", "Right", "Up", "Down" }
-    local dirBtnWidth = 34
+    local dirLabels = { LEFT = "Left", CENTER = "Center", RIGHT = "Right", UP = "Up", DOWN = "Down" }
+    local width = config.width or 90
+
+    -- Generate unique name for dropdown
+    directionDropdownCounter = directionDropdownCounter + 1
+    local dropdownName = "BuffRemindersDirectionDropdown" .. directionDropdownCounter
 
     -- Container frame
     local holder = CreateFrame("Frame", nil, parent)
-    holder:SetSize(70 + 5 * (dirBtnWidth + 2), 20)
+    holder:SetSize(70 + width + 20, 26)
 
     -- Label
     local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -698,33 +702,45 @@ function Components.DirectionButtons(parent, config)
     label:SetText(config.label or "Direction:")
     holder.label = label
 
-    local buttons = {}
-    for i, dir in ipairs(directions) do
-        local btn = CreateFrame("Button", nil, holder, "UIPanelButtonTemplate")
-        btn:SetSize(dirBtnWidth, 18)
-        btn:SetPoint("LEFT", label, "RIGHT", 5 + (i - 1) * (dirBtnWidth + 2), 0)
-        btn:SetText(dirLabels[i])
-        btn:SetNormalFontObject("GameFontHighlightSmall")
-        btn:SetHighlightFontObject("GameFontHighlightSmall")
-        btn:SetDisabledFontObject("GameFontDisableSmall")
-        btn.direction = dir
-        btn:SetScript("OnClick", function()
-            for _, b in ipairs(buttons) do
-                b:SetEnabled(b.direction ~= dir)
-            end
-            config.onChange(dir)
-        end)
-        btn:SetEnabled(config.selected ~= dir)
-        buttons[i] = btn
-    end
-    holder.buttons = buttons
+    -- Dropdown
+    local dropdown = CreateFrame("Frame", dropdownName, holder, "UIDropDownMenuTemplate")
+    dropdown:SetPoint("LEFT", label, "RIGHT", -10, -2)
+    UIDropDownMenu_SetWidth(dropdown, width)
+    holder.dropdown = dropdown
 
-    -- Public method to update selection
-    function holder:SetDirection(dir)
-        for _, btn in ipairs(buttons) do
-            btn:SetEnabled(btn.direction ~= dir)
+    -- Store current value
+    local currentValue = config.selected
+
+    -- Initialize dropdown
+    local function InitializeDropdown(_, level)
+        for _, dir in ipairs(directions) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = dirLabels[dir] or dir
+            info.value = dir
+            info.checked = currentValue == dir
+            info.func = function()
+                currentValue = dir
+                UIDropDownMenu_SetSelectedValue(dropdown, dir)
+                UIDropDownMenu_SetText(dropdown, dirLabels[dir] or dir)
+                config.onChange(dir)
+            end
+            UIDropDownMenu_AddButton(info, level)
         end
     end
+
+    UIDropDownMenu_Initialize(dropdown, InitializeDropdown)
+    UIDropDownMenu_SetSelectedValue(dropdown, config.selected)
+    UIDropDownMenu_SetText(dropdown, dirLabels[config.selected] or config.selected)
+
+    -- Public method to update selection (backwards compatible)
+    function holder:SetDirection(dir)
+        currentValue = dir
+        UIDropDownMenu_SetSelectedValue(dropdown, dir)
+        UIDropDownMenu_SetText(dropdown, dirLabels[dir] or dir)
+    end
+
+    -- Backwards compatibility: empty buttons table (no longer used)
+    holder.buttons = {}
 
     return holder
 end
@@ -3587,7 +3603,7 @@ local function CreateOptionsPanel()
     exportBorder:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
 
     -- Export button
-    local exportButton = CreateButton(profilesContent, 100, 22, "Export", function()
+    local exportButton = CreateButton(profilesContent, "Export", function()
         local exportString, err = BuffReminders:Export()
         if exportString then
             exportEditBox:SetText(exportString)
@@ -3678,7 +3694,7 @@ local function CreateOptionsPanel()
     importStatus:SetJustifyH("LEFT")
     importStatus:SetText("")
 
-    local importButton = CreateButton(profilesContent, 100, 22, "Import", function()
+    local importButton = CreateButton(profilesContent, "Import", function()
         local importString = importEditBox:GetText()
         local success, err = BuffReminders:Import(importString)
 
@@ -3968,9 +3984,11 @@ local function CreateOptionsPanel()
     mainFrameHeader, framesY = CreateSectionHeader(appearanceContent, "Main Frame", framesX, framesY)
 
     -- Reset button next to the header (will be wired up after sliders are created)
-    local mainResetBtn = CreateButton(appearanceContent, 50, 16, "Reset", function() end)
+    local mainResetBtn = CreateButton(appearanceContent, "Reset", function() end, {
+        title = "Reset Main Frame",
+        desc = "Reset all main frame settings to defaults",
+    })
     mainResetBtn:SetPoint("LEFT", mainFrameHeader, "RIGHT", 10, 0)
-    SetupTooltip(mainResetBtn, "Reset Main Frame", "Reset all main frame settings to defaults", "ANCHOR_TOP")
 
     -- Row 1: Icon Size
     local sizeHolder = Components.Slider(appearanceContent, {
@@ -4160,7 +4178,7 @@ local function CreateOptionsPanel()
 
         -- Settings container (hidden by default)
         local settingsFrame = CreateFrame("Frame", nil, appearanceContent)
-        settingsFrame:SetSize(PANEL_WIDTH - COL_PADDING * 2 - 20, 120)
+        settingsFrame:SetSize(PANEL_WIDTH - COL_PADDING * 2 - 20, 134)
         settingsFrame:SetPoint("TOPLEFT", framesX + 20, yPos - 22)
         settingsFrame:Hide()
         rowData.settingsFrame = settingsFrame
@@ -4262,7 +4280,7 @@ local function CreateOptionsPanel()
         rowData.dirHolder = catDirHolder
 
         -- Reset button on the top row (right-aligned)
-        local catResetBtn = CreateButton(rowFrame, 50, 18, "Reset", function()
+        local catResetBtn = CreateButton(rowFrame, "Reset", function()
             local db = BuffRemindersDB
             db.categorySettings = db.categorySettings or {}
             local catDefaults = defaults.categorySettings[category]
@@ -4293,14 +4311,11 @@ local function CreateOptionsPanel()
                 )
             end
             UpdateVisuals()
-        end)
-        catResetBtn:SetPoint("RIGHT", rowFrame, "RIGHT", 0, 0)
-        SetupTooltip(
-            catResetBtn,
-            "Reset " .. labelText,
-            "Reset all " .. labelText:lower() .. " settings to defaults",
-            "ANCHOR_TOP"
-        )
+        end, {
+            title = "Reset " .. labelText,
+            desc = "Reset all " .. labelText:lower() .. " settings to defaults",
+        })
+        catResetBtn:SetPoint("RIGHT", rowFrame, "RIGHT", -30, 0)
         rowData.resetBtn = catResetBtn
 
         -- Function to update row layout
@@ -4379,7 +4394,7 @@ local function CreateOptionsPanel()
                 rowData.settingsFrame:ClearAllPoints()
                 rowData.settingsFrame:SetPoint("TOPLEFT", framesX + 20, yPos)
                 rowData.settingsFrame:Show()
-                yPos = yPos - 120
+                yPos = yPos - 134
             else
                 rowData.settingsFrame:Hide()
             end
@@ -4674,14 +4689,10 @@ local function CreateOptionsPanel()
     styleHolder:SetPoint("TOPLEFT", 0, expY)
     panel.styleHolder = styleHolder
 
-    local previewBtn = CreateFrame("Button", nil, expirationContainer, "UIPanelButtonTemplate")
-    previewBtn:SetSize(60, 18)
-    previewBtn:SetPoint("LEFT", styleHolder, "RIGHT", 5, 0)
-    previewBtn:SetText("Preview")
-    previewBtn:SetNormalFontObject("GameFontHighlightSmall")
-    previewBtn:SetScript("OnClick", function()
+    local previewBtn = CreateButton(expirationContainer, "Preview", function()
         ShowGlowDemo()
     end)
+    previewBtn:SetPoint("LEFT", styleHolder, "RIGHT", 5, 0)
     panel.previewBtn = previewBtn
 
     -- Helper to enable/disable glow-related controls
@@ -4810,14 +4821,14 @@ local function CreateOptionsPanel()
                 classLabel:SetText("(" .. customBuff.class:sub(1, 3) .. ")")
             end
 
-            -- Edit button (smaller, matching style)
-            local editBtn = CreateButton(row, 36, 18, "Edit", function()
+            -- Edit button
+            local editBtn = CreateButton(row, "Edit", function()
                 ShowCustomBuffModal(key, RenderCustomBuffRows)
             end)
-            editBtn:SetPoint("RIGHT", row, "RIGHT", -44, 0)
+            editBtn:SetPoint("RIGHT", row, "RIGHT", -50, 0)
 
-            -- Delete button (smaller, matching style)
-            local deleteBtn = CreateButton(row, 36, 18, "Del", function()
+            -- Delete button
+            local deleteBtn = CreateButton(row, "Delete", function()
                 StaticPopup_Show("BUFFREMINDERS_DELETE_CUSTOM", customBuff.name or key, nil, {
                     key = key,
                     refreshPanel = RenderCustomBuffRows,
@@ -4830,7 +4841,7 @@ local function CreateOptionsPanel()
         end
 
         -- Add button
-        local addBtn = CreateButton(customBuffsContainer, 110, 18, "+ Add Custom Buff", function()
+        local addBtn = CreateButton(customBuffsContainer, "+ Add Custom Buff", function()
             ShowCustomBuffModal(nil, RenderCustomBuffRows)
         end)
         addBtn:SetPoint("TOPLEFT", 0, rowY - 4)
@@ -4866,42 +4877,39 @@ local function CreateOptionsPanel()
     separator:SetPoint("TOP", 0, -5)
     separator:SetColorTexture(0.5, 0.5, 0.5, 1)
 
-    -- Button row (centered in panel)
-    local btnWidth = 90
-    local btnSpacing = 8
-    local totalBtnWidth = btnWidth * 2 + btnSpacing
+    -- Button row (centered using holder frame)
+    local btnHolder = CreateFrame("Frame", nil, bottomFrame)
+    btnHolder:SetPoint("TOP", 0, -20)
+    btnHolder:SetSize(1, 22)
 
-    local lockBtn = CreateFrame("Button", nil, bottomFrame, "UIPanelButtonTemplate")
-    lockBtn:SetSize(btnWidth, 22)
-    lockBtn:SetPoint("TOP", -totalBtnWidth / 2 + btnWidth / 2, -20)
-    lockBtn:SetText(BuffRemindersDB.locked and "Unlock" or "Lock")
-    lockBtn:SetScript("OnClick", function(self)
+    local lockBtn = CreateButton(btnHolder, BuffRemindersDB.locked and "Unlock" or "Lock", function(self)
         BuffRemindersDB.locked = not BuffRemindersDB.locked
         self:SetText(BuffRemindersDB.locked and "Unlock" or "Lock")
-        -- Refresh display using appropriate function based on test mode
+        DynamicResizeButton_Resize(self)
         if testMode then
             RefreshTestDisplay()
         else
             UpdateDisplay()
         end
-    end)
-    SetupTooltip(lockBtn, "Lock/Unlock", "Unlock to drag and reposition the buff frames.", "ANCHOR_TOP")
+    end, { title = "Lock/Unlock", desc = "Unlock to drag and reposition the buff frames." })
+    lockBtn:SetPoint("RIGHT", btnHolder, "CENTER", -4, 0)
     panel.lockBtn = lockBtn
 
-    local testBtn = CreateFrame("Button", nil, bottomFrame, "UIPanelButtonTemplate")
-    testBtn:SetSize(btnWidth, 22)
-    testBtn:SetPoint("LEFT", lockBtn, "RIGHT", btnSpacing, 0)
-    testBtn:SetText("Test")
-    SetupTooltip(
-        testBtn,
-        "Test icon's appearance",
-        "Maintains appearance settings but shows ALL buffs, regardless of what you selected in the buffs section."
+    local testBtn = CreateButton(
+        btnHolder,
+        "Test",
+        function(self)
+            local isOn = ToggleTestMode()
+            self:SetText(isOn and "Stop Test" or "Test")
+            DynamicResizeButton_Resize(self)
+        end,
+        {
+            title = "Test icon's appearance",
+            desc = "Shows ALL buffs regardless of what you selected in the buffs section.",
+        }
     )
+    testBtn:SetPoint("LEFT", btnHolder, "CENTER", 4, 0)
     panel.testBtn = testBtn
-    testBtn:SetScript("OnClick", function()
-        local isOn = ToggleTestMode()
-        testBtn:SetText(isOn and "Stop Test" or "Test")
-    end)
 
     contentBottomY = contentBottomY - 30
 
@@ -5309,7 +5317,7 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     end
 
     -- Add spell ID button
-    addSpellBtn = CreateButton(modal, 100, 18, "+ Add Spell ID", function()
+    addSpellBtn = CreateButton(modal, "+ Add Spell ID", function()
         CreateSpellRow(nil)
         UpdateLayout()
     end)

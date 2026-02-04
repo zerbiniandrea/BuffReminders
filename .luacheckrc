@@ -59,6 +59,7 @@ read_globals = {
 	"tinsert",
 
 	-- WoW UI globals
+	"DynamicResizeButton_Resize",
 	"GameTooltip",
 	"HideUIPanel",
 	"STANDARD_TEXT_FONT",
