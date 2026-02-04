@@ -8,7 +8,7 @@ local EXPORT_PREFIX = "!BR_"
 local BUFF_TABLES = {
     ---@type RaidBuff[]
     raid = {
-        { spellID = 1459, key = "intellect", name = "Arcane Intellect", class = "MAGE" },
+        { spellID = { 1459, 432778 }, key = "intellect", name = "Arcane Intellect", class = "MAGE" }, -- 432778 = NPC version
         { spellID = 6673, key = "attackPower", name = "Battle Shout", class = "WARRIOR" },
         {
             spellID = {
@@ -30,7 +30,7 @@ local BUFF_TABLES = {
             name = "Blessing of the Bronze",
             class = "EVOKER",
         },
-        { spellID = 1126, key = "versatility", name = "Mark of the Wild", class = "DRUID" },
+        { spellID = { 1126, 432661 }, key = "versatility", name = "Mark of the Wild", class = "DRUID" }, -- 432661 = NPC version
         { spellID = 21562, key = "stamina", name = "Power Word: Fortitude", class = "PRIEST" },
         { spellID = 462854, key = "skyfury", name = "Skyfury", class = "SHAMAN" },
     },
@@ -770,7 +770,7 @@ local function FormatRemainingTime(seconds)
     end
 end
 
----Get classes present in the group
+---Get classes present in the group (players only, excludes NPCs)
 ---@return table<ClassName, boolean>
 local function GetGroupClasses()
     local classes = {}
@@ -783,9 +783,12 @@ local function GetGroupClasses()
     end
 
     IterateGroupMembers(function(unit)
-        local _, class = UnitClass(unit)
-        if class then
-            classes[class] = true
+        -- Only count actual players as potential buffers (NPCs won't cast buffs like Skyfury)
+        if UnitIsPlayer(unit) then
+            local _, class = UnitClass(unit)
+            if class then
+                classes[class] = true
+            end
         end
     end)
     return classes
