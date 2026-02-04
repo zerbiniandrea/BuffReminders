@@ -85,15 +85,129 @@ BR.CallbackRegistry = CallbackRegistry
 -- Centralized settings management with automatic callback triggering.
 -- UI components call Config.Set() and interested systems subscribe to changes.
 --
--- TODO: Add validation like Platynator:
--- 1. Centralized settings registry with defaults and refresh types
--- 2. IsValidOption() to catch typos at runtime
--- 3. Debug mode that warns on unknown config paths
+-- Validation: Paths are validated against registered settings. Invalid paths
+-- print a warning in debug mode to catch typos early.
 
 BR.Config = {}
 
--- Refresh types: which callback to fire for each setting
--- Settings not listed here just fire "SettingChanged"
+-- Debug mode: set to true to print warnings for invalid config paths
+BR.Config.DebugMode = false
+
+-- ============================================================================
+-- SETTINGS REGISTRY (Single Source of Truth)
+-- ============================================================================
+-- All valid settings defined here with their refresh types.
+-- This catches typos and documents the config structure.
+
+-- Root-level settings (path = key directly)
+local RootSettings = {
+    splitCategories = "FramesReparent",
+    showBuffReminder = "VisualsRefresh",
+    frameLocked = nil, -- No refresh needed
+    hideInCombat = nil,
+    showOnlyInGroup = nil,
+    position = nil, -- Table with x, y
+}
+
+-- Per-category settings (path = categorySettings.{category}.{key})
+local CategorySettingKeys = {
+    iconSize = "VisualsRefresh",
+    iconZoom = "VisualsRefresh",
+    borderSize = "VisualsRefresh",
+    spacing = "LayoutRefresh",
+    growDirection = "LayoutRefresh",
+}
+
+-- Valid category names
+local ValidCategories = {
+    main = true,
+    raid = true,
+    presence = true,
+    targeted = true,
+    self = true,
+    consumable = true,
+}
+
+-- Dynamic tables (path = {root}.{anyKey})
+-- These allow any second-level key (buff names, visibility contexts, etc.)
+local DynamicRoots = {
+    enabledBuffs = "DisplayRefresh",
+    categoryVisibility = "DisplayRefresh",
+}
+
+---Check if a config path is valid
+---@param segments string[] Path segments
+---@return boolean isValid
+---@return string? refreshType
+local function ValidatePath(segments)
+    if #segments == 0 then
+        return false, nil
+    end
+
+    local root = segments[1]
+
+    -- Check root-level settings (explicit key check since some have nil refresh type)
+    local isRootSetting = root == "splitCategories"
+        or root == "showBuffReminder"
+        or root == "frameLocked"
+        or root == "hideInCombat"
+        or root == "showOnlyInGroup"
+        or root == "position"
+    if isRootSetting then
+        if #segments == 1 then
+            return true, RootSettings[root]
+        end
+        -- position.x, position.y are valid
+        if root == "position" and #segments == 2 then
+            return true, nil
+        end
+        return false, nil
+    end
+
+    -- Check categorySettings.{category}.{setting}
+    if root == "categorySettings" then
+        if #segments < 2 then
+            return true, nil -- Just "categorySettings" is valid (for iteration)
+        end
+        local category = segments[2]
+        if not ValidCategories[category] then
+            return false, nil
+        end
+        if #segments == 2 then
+            return true, nil -- Just "categorySettings.main" is valid
+        end
+        if #segments == 3 then
+            local setting = segments[3]
+            if CategorySettingKeys[setting] ~= nil then
+                return true, CategorySettingKeys[setting]
+            end
+            return false, nil
+        end
+        return false, nil
+    end
+
+    -- Check dynamic roots (enabledBuffs.*, categoryVisibility.*)
+    if DynamicRoots[root] then
+        -- Any subpath is valid for dynamic roots
+        return true, DynamicRoots[root]
+    end
+
+    return false, nil
+end
+
+---Check if a config path is valid and get its refresh type
+---@param path string Dot-separated path
+---@return boolean isValid
+---@return string? refreshType
+function BR.Config.IsValidPath(path)
+    local segments = {}
+    for segment in path:gmatch("[^.]+") do
+        table.insert(segments, segment)
+    end
+    return ValidatePath(segments)
+end
+
+-- Legacy RefreshType lookup (for backward compatibility with segment-based lookup)
 local RefreshType = {
     -- Visual properties
     ["iconSize"] = "VisualsRefresh",
@@ -111,7 +225,7 @@ local RefreshType = {
 }
 
 ---Set a config value and trigger appropriate callbacks
----@param path string Dot-separated path like "main.iconSize" or "enabledBuffs.intellect"
+---@param path string Dot-separated path like "categorySettings.main.iconSize" or "enabledBuffs.intellect"
 ---@param value any The new value
 function BR.Config.Set(path, value)
     local db = BuffRemindersDB
@@ -127,6 +241,12 @@ function BR.Config.Set(path, value)
 
     if #segments == 0 then
         return
+    end
+
+    -- Validate path (debug mode only warns, doesn't block)
+    local isValid, validatedRefreshType = ValidatePath(segments)
+    if not isValid and BR.Config.DebugMode then
+        print("|cffff6600BuffReminders:|r Invalid config path: " .. path)
     end
 
     -- Navigate to parent and get old value
@@ -153,13 +273,17 @@ function BR.Config.Set(path, value)
     -- Fire SettingChanged callback
     CallbackRegistry:TriggerEvent("SettingChanged", path, value, oldValue)
 
-    -- Fire type-specific refresh callback if applicable
-    -- Check each segment for a refresh type (e.g., "main.iconSize" matches "iconSize")
-    for _, segment in ipairs(segments) do
-        local refreshType = RefreshType[segment]
-        if refreshType then
-            CallbackRegistry:TriggerEvent(refreshType, path)
-            break
+    -- Use validated refresh type if available, otherwise fall back to segment lookup
+    if validatedRefreshType then
+        CallbackRegistry:TriggerEvent(validatedRefreshType, path)
+    else
+        -- Legacy: check each segment for a refresh type
+        for _, segment in ipairs(segments) do
+            local refreshType = RefreshType[segment]
+            if refreshType then
+                CallbackRegistry:TriggerEvent(refreshType, path)
+                break
+            end
         end
     end
 end
@@ -206,6 +330,12 @@ function BR.Config.SetMulti(changes)
         end
 
         if #segments > 0 then
+            -- Validate path (debug mode only warns, doesn't block)
+            local isValid, validatedRefreshType = ValidatePath(segments)
+            if not isValid and BR.Config.DebugMode then
+                print("|cffff6600BuffReminders:|r Invalid config path: " .. path)
+            end
+
             local parent = db
             for i = 1, #segments - 1 do
                 local key = segments[i]
@@ -222,12 +352,16 @@ function BR.Config.SetMulti(changes)
                 parent[finalKey] = value
                 CallbackRegistry:TriggerEvent("SettingChanged", path, value, oldValue)
 
-                -- Collect refresh types
-                for _, segment in ipairs(segments) do
-                    local refreshType = RefreshType[segment]
-                    if refreshType then
-                        refreshTypes[refreshType] = true
-                        break
+                -- Collect refresh types (prefer validated, fall back to segment lookup)
+                if validatedRefreshType then
+                    refreshTypes[validatedRefreshType] = true
+                else
+                    for _, segment in ipairs(segments) do
+                        local refreshType = RefreshType[segment]
+                        if refreshType then
+                            refreshTypes[refreshType] = true
+                            break
+                        end
                     end
                 end
             end
