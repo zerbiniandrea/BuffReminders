@@ -15,6 +15,7 @@
 
 ## Features
 
+- **M+ and combat support** - Detects missing buffs via action bar glow even when Blizzard's buff API is restricted
 - Class reminder when your buff is missing
 - Visual buff tracking with count overlay (e.g., "17/20" = 17 buffed out of 20)
 - Split into movable category frames
@@ -60,9 +61,7 @@ Track any buff by spell ID. Useful for consumables, world buffs, or any buff not
 
 ## Limitations
 
-- **Combat lockout** - Due to WoW API restrictions, buff tracking only updates out of combat.
-- **Mythic+ disabled** - Blizzard restricts aura/buff API access during active Mythic+ keystones (all buff data is marked as "secret"). The addon automatically hides in M+ and works normally in regular dungeons, raids, and open world.
-- **PvP disabled** - Similar API restrictions apply in arenas and battlegrounds. The addon automatically hides in instanced PvP content.
+- **Combat/M+/PvP** - Blizzard restricts buff API access during combat, M+ keystones, and instanced PvP. Full group tracking is only available out of combat. However, with "Glow Fallback" enabled (Settings tab), the addon detects when your own raid buff is missing by monitoring action bar spell glows - this works everywhere including M+ and combat.
 - **Buff counting restrictions** - Both buff counts and buff providers (who can cast buffs) are tracked only for group members who are alive, connected, visible (not phased), and allied. This means:
   - Dead, offline, or phased players are excluded from totals
   - Raid buff providers (e.g., mages for Arcane Intellect) are only detected if they meet these conditions
@@ -72,3 +71,7 @@ Track any buff by spell ID. Useful for consumables, world buffs, or any buff not
 ## Support
 
 Got a bug to report, a feature idea, or just want to see what's coming next? Join the [Discord](https://discord.gg/qGHQr2DP7F)!
+
+## Credits
+
+Huge thanks to [Time Spiral Tracker](https://www.curseforge.com/wow/addons/time-spiral-tracker) for the idea of using action bar spell glows to detect missing buffs.
