@@ -9,5 +9,6 @@
 ## IconTexture: Interface\AddOns\BuffReminders\icon.tga
 
 Core.lua
+Buffs.lua
 Components.lua
 BuffReminders.lua
