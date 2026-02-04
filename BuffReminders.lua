@@ -1188,6 +1188,9 @@ local UpdateDisplay, UpdateAnchor, ShowGlowDemo, ToggleTestMode, RefreshTestDisp
 local ShowCustomBuffModal
 local UpdateFallbackDisplay
 
+-- Track if any frame is currently being dragged (to prevent repositioning during drag)
+local isDraggingFrame = false
+
 -- Glow style definitions
 local GlowStyles = {
     {
@@ -1454,12 +1457,14 @@ local function CreateCategoryFrame(category)
 
     frame:SetScript("OnDragStart", function(self)
         if not BuffRemindersDB.locked then
+            isDraggingFrame = true
             self:StartMoving()
         end
     end)
 
     frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
+        isDraggingFrame = false
         -- Save anchor position (based on growth direction) relative to UIParent CENTER
         local dragCatSettings = GetCategorySettings(category)
         local direction = dragCatSettings.growDirection or "CENTER"
@@ -1552,6 +1557,7 @@ local function CreateBuffFrame(buff, category)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", function(self)
         if not BuffRemindersDB.locked then
+            isDraggingFrame = true
             local parent = self:GetParent()
             if parent then
                 parent:StartMoving()
@@ -1561,9 +1567,11 @@ local function CreateBuffFrame(buff, category)
     frame:SetScript("OnDragStop", function(self)
         local parent = self:GetParent()
         if not parent then
+            isDraggingFrame = false
             return
         end
         parent:StopMovingOrSizing()
+        isDraggingFrame = false
         -- Save anchor position (based on growth direction) relative to UIParent CENTER
         local settings = BuffRemindersDB
         local catKey = parent.category or "main"
@@ -1625,6 +1633,11 @@ end
 -- Position buff frames with split category support
 -- Handles mixed mode: some categories in mainFrame, some split into their own frames
 local function PositionBuffFramesWithSplits()
+    -- Skip repositioning if any frame is currently being dragged
+    if isDraggingFrame then
+        return
+    end
+
     local db = BuffRemindersDB
 
     -- Collect visible frames by category
@@ -1937,6 +1950,10 @@ end
 
 -- Helper to hide all display frames (mainFrame, category frames, and all buff frames)
 local function HideAllDisplayFrames()
+    -- Skip hiding if any frame is being dragged
+    if isDraggingFrame then
+        return
+    end
     mainFrame:Hide()
     for _, category in ipairs(CATEGORIES) do
         if categoryFrames[category] then
@@ -2227,12 +2244,14 @@ local function SetupDragging()
 
     mainFrame:SetScript("OnDragStart", function(self)
         if not BuffRemindersDB.locked then
+            isDraggingFrame = true
             self:StartMoving()
         end
     end)
 
     mainFrame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
+        isDraggingFrame = false
         -- Save anchor position (based on growth direction) relative to UIParent CENTER
         local mainSettings = GetCategorySettings("main")
         local direction = mainSettings.growDirection or "CENTER"
