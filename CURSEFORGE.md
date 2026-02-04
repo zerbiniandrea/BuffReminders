@@ -1,7 +1,7 @@
 # BuffReminders
 
 [![](https://shields.io/badge/github-gray?logo=github&style=for-the-badge&logoColor=white)](https://github.com/zerbiniandrea/BuffReminders)
-[![](https://shields.io/badge/discord-5865F2?logo=discord&style=for-the-badge&logoColor=white)](https://discord.gg/qGHQr2DP7F)
+[![](https://shields.io/badge/discord-5865F2?logo=discord&style=for-the-badge&logoColor=white)](https://discord.gg/qezQ2hXJJ7)
 
 A lightweight World of Warcraft addon that tracks missing buffs with a clean icon display.
 
@@ -56,7 +56,7 @@ Track any buff by spell ID. Useful for consumables, world buffs, or any buff not
 
 ## Support
 
-Got a bug to report, a feature idea, or just want to see what's coming next? Join the [Discord](https://discord.gg/qGHQr2DP7F)!
+Got a bug to report, a feature idea, or just want to see what's coming next? Join the [Discord](https://discord.gg/qezQ2hXJJ7)!
 
 ## Credits
 
