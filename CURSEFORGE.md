@@ -11,14 +11,12 @@ From the author of [Raid Buffs Tracker](https://wago.io/iWkZ4Eq-i), one of the m
 
 ## Features
 
-- Visual buff tracking - Shows buff icons with count overlay (e.g., "17/20" = 17 buffed out of 20)
-- Auto-hide - Icons disappear when everyone has the buff
-- Draggable frame - Position anywhere on screen, with configurable grow direction
-- Split categories - Optionally separate buff categories into independent, movable frames
-- Class reminder - Shows "BUFF!" under your class's buff icon when party members are missing it
-- Expiration warning - Glow effect when buffs are about to expire, with 5 styles to choose from
-- Smart filtering - Show only in group, hide buffs without provider, show only your class buff, count only benefiting classes
-- Customizable - Adjust icon size, spacing, and text size
+- Class reminder when your buff is missing
+- Visual buff tracking with count overlay (e.g., "17/20" = 17 buffed out of 20)
+- Split into movable category frames
+- Expiration glow warnings (5 styles)
+- Custom buff tracking by spell ID
+- Highly configurable (filtering, sizing, visibility)
 
 ![Split Categories](https://github.com/zerbiniandrea/BuffReminders/blob/main/images/buffs-split-groups.png?raw=true)
 
@@ -59,4 +57,4 @@ Track any buff by spell ID. Useful for consumables, world buffs, or any buff not
 
 ## Support
 
-If you encounter issues or have suggestions, feel free to reach out on on Discord (.zerby) or open an issue on [GitHub](https://github.com/zerbiniandrea/BuffReminders/issues).
+Got a bug to report, a feature idea, or just want to see what's coming next? Join the [Discord](https://discord.gg/qGHQr2DP7F)!
