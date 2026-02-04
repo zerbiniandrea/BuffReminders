@@ -3718,7 +3718,11 @@ local function CreateOptionsPanel()
             for _, b in ipairs(growBtns) do
                 b:SetEnabled(b.direction ~= dir)
             end
-            UpdateDisplay()
+            if testMode then
+                RefreshTestDisplay()
+            else
+                UpdateDisplay()
+            end
         end)
         btn:SetEnabled(mainGrowDir ~= dir)
         growBtns[i] = btn
