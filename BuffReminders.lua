@@ -543,6 +543,7 @@ local defaults = {
     showExpirationGlow = true,
     expirationThreshold = 15, -- minutes
     glowStyle = 1, -- 1=Orange, 2=Gold, 3=Yellow, 4=White, 5=Red
+    useGlowFallback = false, -- EXPERIMENTAL: Show own raid buff via action bar glow during combat/M+
     optionsPanelScale = 1.2, -- base scale (displayed as 100%)
     splitCategories = { -- Which categories are split into their own frame (false = in main frame)
         raid = false,
@@ -625,11 +626,11 @@ local buffFrames = {}
 local updateTicker
 local inReadyCheck = false
 local readyCheckTimer = nil
-local inCombat = false
 local testMode = false
 local testModeData = nil -- Stores seeded fake values for consistent test display
 local playerClass = nil -- Cached player class, set once on init
 local optionsPanel
+local glowingSpells = {} -- Track which spell IDs are currently glowing (for action bar glow fallback)
 
 -- Category frame system
 local categoryFrames = {}
@@ -1098,9 +1099,43 @@ local function ShouldShowConsumableBuff(spellIDs, buffIconID, checkWeaponEnchant
     return true -- Missing all consumable buffs/enchants/items
 end
 
+---Check if any of the given spell IDs are currently glowing on the action bar
+---@param spellIDs SpellID
+---@return boolean
+local function IsSpellGlowing(spellIDs)
+    local ids = type(spellIDs) == "table" and spellIDs or { spellIDs }
+    for _, id in ipairs(ids) do
+        if glowingSpells[id] then
+            return true
+        end
+    end
+    return false
+end
+
+-- Cache for player's raid buff (computed once, never changes)
+local playerRaidBuff = nil
+local playerRaidBuffComputed = false
+
+---Find the player's own raid buff (the one their class provides)
+---@return RaidBuff|nil
+local function GetPlayerRaidBuff()
+    if playerRaidBuffComputed then
+        return playerRaidBuff
+    end
+    for _, buff in ipairs(RaidBuffs) do
+        if buff.class == playerClass then
+            playerRaidBuff = buff
+            break
+        end
+    end
+    playerRaidBuffComputed = true
+    return playerRaidBuff
+end
+
 -- Forward declarations
 local UpdateDisplay, UpdateAnchor, ShowGlowDemo, ToggleTestMode, RefreshTestDisplay
 local ShowCustomBuffModal
+local UpdateFallbackDisplay
 
 -- Glow style definitions
 local GlowStyles = {
@@ -1739,6 +1774,34 @@ local function HideAllDisplayFrames()
     end
 end
 
+-- Update the fallback display (shows player's own raid buff via glow during combat/M+/PvP)
+-- Assumes caller has already determined we're in restricted mode and called HideAllDisplayFrames()
+UpdateFallbackDisplay = function()
+    if not mainFrame or not BuffRemindersDB.useGlowFallback then
+        return
+    end
+
+    local playerBuff = GetPlayerRaidBuff()
+    if not playerBuff then
+        return
+    end
+
+    local frame = buffFrames[playerBuff.key]
+    if not frame or not IsBuffEnabled(playerBuff.key) then
+        return
+    end
+
+    if IsSpellGlowing(playerBuff.spellID) then
+        frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
+        frame.count:SetText("NO\nBUFF!")
+        frame:Show()
+        SetExpirationGlow(frame, false)
+        PositionBuffFramesWithSplits()
+        mainFrame:Show()
+    end
+    -- No else branch - HideAllDisplayFrames was already called by caller
+end
+
 -- TODO: Refactor UpdateDisplay loops
 -- The 5 category loops (Raid, Presence, Targeted, Self, Consumables) have significant duplication.
 -- Potential improvements:
@@ -1754,25 +1817,23 @@ UpdateDisplay = function()
         return
     end
 
-    if inCombat then
-        HideAllDisplayFrames()
-        return
-    end
-
-    if UnitIsDeadOrGhost("player") then
-        HideAllDisplayFrames()
-        return
-    end
-
-    if C_ChallengeMode and C_ChallengeMode.IsChallengeModeActive and C_ChallengeMode.IsChallengeModeActive() then
-        HideAllDisplayFrames()
-        return
-    end
-
-    -- Disable in arenas and battlegrounds (API restrictions in instanced PvP)
+    -- Early exit: can't check buffs when dead, in combat, M+, or instanced PvP
     local _, instanceType = IsInInstance()
-    if instanceType == "pvp" or instanceType == "arena" then
+    local inMythicPlus = C_ChallengeMode
+        and C_ChallengeMode.IsChallengeModeActive
+        and C_ChallengeMode.IsChallengeModeActive()
+    if
+        UnitIsDeadOrGhost("player")
+        or InCombatLockdown()
+        or inMythicPlus
+        or instanceType == "pvp"
+        or instanceType == "arena"
+    then
         HideAllDisplayFrames()
+        -- Fallback only when alive (dead players can't cast)
+        if not UnitIsDeadOrGhost("player") then
+            UpdateFallbackDisplay()
+        end
         return
     end
 
@@ -3933,6 +3994,28 @@ local function CreateOptionsPanel()
     )
     panel.playerMissingCheckbox = playerMissingCb
 
+    -- EXPERIMENTAL label for glow fallback
+    local experimentalLabel = behaviorContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    experimentalLabel:SetPoint("TOPLEFT", 0, behY - 8)
+    experimentalLabel:SetText("EXPERIMENTAL")
+    experimentalLabel:SetTextColor(1, 0.5, 0) -- Orange color
+    behY = behY - 18
+
+    local glowFallbackCb
+    glowFallbackCb, behY = CreateCheckbox(
+        behaviorContainer,
+        0,
+        behY,
+        "Show own raid buff during combat/M+",
+        BuffRemindersDB.useGlowFallback == true,
+        function(self)
+            BuffRemindersDB.useGlowFallback = self:GetChecked()
+            UpdateFallbackDisplay()
+        end,
+        "Uses WoW's action bar glow to detect when someone needs your raid buff, even during combat or in Mythic+ where normal tracking is disabled.\n\nRequires the spell to be on your action bars."
+    )
+    panel.glowFallbackCheckbox = glowFallbackCb
+
     local behaviorHeight = math.abs(behY) + 10
     behaviorContainer:SetHeight(behaviorHeight)
     settingsY = settingsY - behaviorHeight - SECTION_SPACING
@@ -4917,6 +5000,8 @@ eventFrame:RegisterEvent("PLAYER_DEAD")
 eventFrame:RegisterEvent("PLAYER_UNGHOST")
 eventFrame:RegisterEvent("UNIT_AURA")
 eventFrame:RegisterEvent("READY_CHECK")
+eventFrame:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
+eventFrame:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == addonName then
@@ -5016,29 +5101,23 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         if not mainFrame then
             InitializeFrames()
         end
-        inCombat = InCombatLockdown()
-        if not inCombat then
+        if not InCombatLockdown() then
             StartUpdates()
         end
     elseif event == "GROUP_ROSTER_UPDATE" then
-        if not inCombat then
-            UpdateDisplay()
-        end
+        UpdateDisplay()
     elseif event == "PLAYER_REGEN_ENABLED" then
-        inCombat = false
         StartUpdates()
     elseif event == "PLAYER_REGEN_DISABLED" then
-        inCombat = true
         StopUpdates()
-        mainFrame:Hide()
+        UpdateDisplay()
     elseif event == "PLAYER_DEAD" then
         HideAllDisplayFrames()
     elseif event == "PLAYER_UNGHOST" then
-        if not inCombat then
-            UpdateDisplay()
-        end
+        UpdateDisplay()
     elseif event == "UNIT_AURA" then
-        if not inCombat and mainFrame and mainFrame:IsShown() then
+        -- Skip in combat (auras change frequently, but we can't check buffs anyway)
+        if not InCombatLockdown() and mainFrame and mainFrame:IsShown() then
             UpdateDisplay()
         end
     elseif event == "READY_CHECK" then
@@ -5047,9 +5126,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             readyCheckTimer:Cancel()
         end
         inReadyCheck = true
-        if not inCombat then
-            UpdateDisplay()
-        end
+        UpdateDisplay()
         -- Start timer to reset ready check state
         local duration = BuffRemindersDB.readyCheckDuration or 15
         readyCheckTimer = C_Timer.NewTimer(duration, function()
@@ -5057,5 +5134,13 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             readyCheckTimer = nil
             UpdateDisplay()
         end)
+    elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
+        local spellID = arg1
+        glowingSpells[spellID] = true
+        UpdateDisplay()
+    elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" then
+        local spellID = arg1
+        glowingSpells[spellID] = nil
+        UpdateDisplay()
     end
 end)
