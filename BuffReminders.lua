@@ -1280,6 +1280,59 @@ local function HideFrame(frame)
     SetExpirationGlow(frame, false)
 end
 
+---Show a frame with missing text styling
+---@param frame BuffFrame
+---@param missingText? string
+---@return boolean true (for anyVisible chaining)
+local function ShowMissingFrame(frame, missingText)
+    frame.icon:SetAllPoints()
+    frame.icon:SetTexCoord(TEXCOORD_INSET, 1 - TEXCOORD_INSET, TEXCOORD_INSET, 1 - TEXCOORD_INSET)
+    frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
+    frame.count:SetText(missingText or "")
+    frame:Show()
+    SetExpirationGlow(frame, false)
+    return true
+end
+
+---Check if buff passes common pre-conditions
+---@param buff table Any buff type with optional pre-check fields
+---@param presentClasses? table<ClassName, boolean>
+---@param db table Database settings
+---@return boolean passes
+local function PassesPreChecks(buff, presentClasses, db)
+    -- Ready check only
+    local readyCheckOnly = buff.readyCheckOnly or (buff.infoTooltip and buff.infoTooltip:match("^Ready Check Only"))
+    if readyCheckOnly and not inReadyCheck then
+        return false
+    end
+
+    -- Class filtering
+    if buff.class then
+        if db.showOnlyPlayerClassBuff and buff.class ~= playerClass then
+            return false
+        end
+        if presentClasses and not presentClasses[buff.class] then
+            return false
+        end
+    end
+
+    -- Talent exclusion
+    if buff.excludeTalentSpellID and IsPlayerSpell(buff.excludeTalentSpellID) then
+        return false
+    end
+
+    -- Spell knowledge exclusion
+    if buff.excludeIfSpellKnown then
+        for _, spellID in ipairs(buff.excludeIfSpellKnown) do
+            if IsPlayerSpell(spellID) then
+                return false
+            end
+        end
+    end
+
+    return true
+end
+
 -- Create a category frame for grouped display mode
 local function CreateCategoryFrame(category)
     local db = BuffRemindersDB
@@ -1792,24 +1845,12 @@ UpdateFallbackDisplay = function()
     end
 
     if IsSpellGlowing(playerBuff.spellID) then
-        frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
-        frame.count:SetText("NO\nBUFF!")
-        frame:Show()
-        SetExpirationGlow(frame, false)
+        ShowMissingFrame(frame, "NO\nBUFF!")
         PositionBuffFramesWithSplits()
         mainFrame:Show()
     end
     -- No else branch - HideAllDisplayFrames was already called by caller
 end
-
--- TODO: Refactor UpdateDisplay loops
--- The 5 category loops (Raid, Presence, Targeted, Self, Consumables) have significant duplication.
--- Potential improvements:
--- 1. Move pre-checks into buff data structures (e.g., excludeTalentSpellID, excludeIfSpellKnown, readyCheckOnly)
--- 2. Create a unified ShouldShowBuff(buff, category) that reads check params from buff definition
--- 3. Extract common "show frame with missing text" boilerplate into a helper
--- 4. Targeted/Self/Consumables are most similar and could potentially share a single loop
--- 5. Raid/Presence have unique expiration glow + count logic, may need to stay separate
 
 -- Update the display
 UpdateDisplay = function()
@@ -1907,11 +1948,7 @@ UpdateDisplay = function()
                 and minRemaining
                 and minRemaining < (db.expirationThreshold * 60)
             if count == 0 then
-                frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
-                frame.count:SetText(buff.missingText or "")
-                frame:Show()
-                anyVisible = true
-                SetExpirationGlow(frame, false)
+                anyVisible = ShowMissingFrame(frame, buff.missingText) or anyVisible
             elseif expiringSoon then
                 ---@cast minRemaining number
                 frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame), "OUTLINE")
@@ -1933,21 +1970,10 @@ UpdateDisplay = function()
         local frame = buffFrames[buff.key]
         local settingKey = GetBuffSettingKey(buff)
 
-        -- Skip if player has a talent that replaces this buff
-        if buff.excludeTalentSpellID and IsPlayerSpell(buff.excludeTalentSpellID) then
-            if frame then
-                HideFrame(frame)
-            end
-        elseif frame and IsBuffEnabled(settingKey) then
+        if frame and IsBuffEnabled(settingKey) and PassesPreChecks(buff, nil, db) then
             local shouldShow = ShouldShowTargetedBuff(buff.spellID, buff.class, buff.beneficiaryRole)
             if shouldShow then
-                frame.icon:SetAllPoints()
-                frame.icon:SetTexCoord(TEXCOORD_INSET, 1 - TEXCOORD_INSET, TEXCOORD_INSET, 1 - TEXCOORD_INSET)
-                frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
-                frame.count:SetText(buff.missingText or "")
-                frame:Show()
-                anyVisible = true
-                SetExpirationGlow(frame, false)
+                anyVisible = ShowMissingFrame(frame, buff.missingText) or anyVisible
                 -- Track for group merging
                 if buff.groupId then
                     visibleGroups[buff.groupId] = visibleGroups[buff.groupId] or {}
@@ -1990,8 +2016,6 @@ UpdateDisplay = function()
                 buff.customCheck
             )
             if shouldShow then
-                frame.icon:SetAllPoints()
-                frame.icon:SetTexCoord(TEXCOORD_INSET, 1 - TEXCOORD_INSET, TEXCOORD_INSET, 1 - TEXCOORD_INSET)
                 -- Update icon based on current role (for role-dependent buffs like shields)
                 if buff.iconByRole then
                     local texture = GetBuffTexture(buff.spellID, buff.iconByRole)
@@ -1999,11 +2023,7 @@ UpdateDisplay = function()
                         frame.icon:SetTexture(texture)
                     end
                 end
-                frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
-                frame.count:SetText(buff.missingText or "")
-                frame:Show()
-                anyVisible = true
-                SetExpirationGlow(frame, false)
+                anyVisible = ShowMissingFrame(frame, buff.missingText) or anyVisible
             else
                 HideFrame(frame)
             end
@@ -2017,32 +2037,11 @@ UpdateDisplay = function()
         local frame = buffFrames[buff.key]
         local settingKey = buff.groupId or buff.key
 
-        -- Skip if player knows an excluded spell (e.g., shamans/paladins with imbues)
-        local excluded = false
-        if buff.excludeIfSpellKnown then
-            for _, spellID in ipairs(buff.excludeIfSpellKnown) do
-                if IsPlayerSpell(spellID) then
-                    excluded = true
-                    break
-                end
-            end
-        end
-
-        -- Skip ready check only buffs when not in ready check
-        local readyCheckOnly = buff.readyCheckOnly
-        local showBuff = not readyCheckOnly or inReadyCheck
-
-        if frame and IsBuffEnabled(settingKey) and not excluded and showBuff then
+        if frame and IsBuffEnabled(settingKey) and PassesPreChecks(buff, nil, db) then
             local shouldShow =
                 ShouldShowConsumableBuff(buff.spellID, buff.buffIconID, buff.checkWeaponEnchant, buff.itemID)
             if shouldShow then
-                frame.icon:SetAllPoints()
-                frame.icon:SetTexCoord(TEXCOORD_INSET, 1 - TEXCOORD_INSET, TEXCOORD_INSET, 1 - TEXCOORD_INSET)
-                frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
-                frame.count:SetText(buff.missingText)
-                frame:Show()
-                anyVisible = true
-                SetExpirationGlow(frame, false)
+                anyVisible = ShowMissingFrame(frame, buff.missingText) or anyVisible
             else
                 HideFrame(frame)
             end
@@ -2060,11 +2059,7 @@ UpdateDisplay = function()
             if frame and IsBuffEnabled(customBuff.key) and classMatch then
                 local hasBuff = UnitHasBuff("player", customBuff.spellID)
                 if not hasBuff then
-                    frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
-                    frame.count:SetText(customBuff.missingText or "NO\nBUFF")
-                    frame:Show()
-                    anyVisible = true
-                    SetExpirationGlow(frame, false)
+                    anyVisible = ShowMissingFrame(frame, customBuff.missingText or "NO\nBUFF") or anyVisible
                 else
                     HideFrame(frame)
                 end

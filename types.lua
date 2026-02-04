@@ -2,10 +2,20 @@
 -- Type definitions for LuaLS (lua-language-server)
 -- This file is NOT loaded by WoW - it's only used for type checking during development
 
--- WoW API types (stubs)
+-- WoW API types (stubs with commonly used methods)
 ---@class Frame
+---@field Show fun(self: Frame)
+---@field Hide fun(self: Frame)
+
 ---@class Texture
+---@field SetAllPoints fun(self: Texture, target?: any)
+---@field SetTexCoord fun(self: Texture, left: number, right: number, top: number, bottom: number)
+---@field SetTexture fun(self: Texture, texture: number|string)
+
 ---@class FontString
+---@field SetFont fun(self: FontString, font: string, size: number, flags?: string)
+---@field SetText fun(self: FontString, text: string)
+
 ---@class AnimationGroup
 
 ---@alias SpellID number|number[]
