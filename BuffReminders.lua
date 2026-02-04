@@ -1102,16 +1102,64 @@ local function ShouldShowConsumableBuff(spellIDs, buffIconID, checkWeaponEnchant
     return true -- Missing all consumable buffs/enchants/items
 end
 
+-- Action bar button names to scan for glows
+local ACTION_BAR_BUTTONS = {
+    "ActionButton",
+    "MultiBarBottomLeftButton",
+    "MultiBarBottomRightButton",
+    "MultiBarRightButton",
+    "MultiBarLeftButton",
+    "MultiBar5Button",
+    "MultiBar6Button",
+    "MultiBar7Button",
+}
+
+---Check if a specific action button has an active glow overlay
+---@param button table
+---@return boolean
+local function ButtonHasGlow(button)
+    -- Check for SpellActivationAlert (Blizzard's glow frame)
+    if button.SpellActivationAlert and button.SpellActivationAlert:IsShown() then
+        return true
+    end
+    -- Check for overlay (older method)
+    if button.overlay and button.overlay:IsShown() then
+        return true
+    end
+    return false
+end
+
 ---Check if any of the given spell IDs are currently glowing on the action bar
 ---@param spellIDs SpellID
 ---@return boolean
 local function IsSpellGlowing(spellIDs)
     local ids = type(spellIDs) == "table" and spellIDs or { spellIDs }
     for _, id in ipairs(ids) do
+        -- Check cached event data first (populated by glow events)
         if glowingSpells[id] then
             return true
         end
     end
+
+    -- On reload, events don't fire for already-active glows
+    -- Scan action bar buttons directly to check for active overlays
+    for _, barName in ipairs(ACTION_BAR_BUTTONS) do
+        for i = 1, 12 do
+            local button = _G[barName .. i]
+            if button and ButtonHasGlow(button) then
+                -- Check if this button has one of our spell IDs
+                local actionType, actionId = GetActionInfo(button.action or 0)
+                if actionType == "spell" then
+                    for _, id in ipairs(ids) do
+                        if actionId == id then
+                            return true
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     return false
 end
 
@@ -1820,13 +1868,17 @@ ToggleTestMode = function(showLabels)
     end
 end
 
--- Helper to hide all display frames (mainFrame and all category frames)
+-- Helper to hide all display frames (mainFrame, category frames, and all buff frames)
 local function HideAllDisplayFrames()
     mainFrame:Hide()
     for _, category in ipairs(CATEGORIES) do
         if categoryFrames[category] then
             categoryFrames[category]:Hide()
         end
+    end
+    -- Also hide individual buff frames (so they don't reappear when mainFrame is shown by fallback)
+    for _, frame in pairs(buffFrames) do
+        frame:Hide()
     end
 end
 
@@ -5102,6 +5154,10 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         if not InCombatLockdown() then
             StartUpdates()
         end
+        -- Delayed update to catch glow events that fire after reload
+        C_Timer.After(0.5, function()
+            UpdateDisplay()
+        end)
     elseif event == "GROUP_ROSTER_UPDATE" then
         UpdateDisplay()
     elseif event == "PLAYER_REGEN_ENABLED" then

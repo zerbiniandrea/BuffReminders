@@ -21,6 +21,7 @@ globals = {
 
 read_globals = {
 	-- WoW API
+	"C_ActionBar",
 	"C_AddOns",
 	"C_ChallengeMode",
 	"C_EncodingUtil",
@@ -29,6 +30,7 @@ read_globals = {
 	"C_Timer",
 	"C_UnitAuras",
 	"CreateFrame",
+	"GetActionInfo",
 	"GetNumGroupMembers",
 	"GetSpecialization",
 	"GetSpecializationRole",
