@@ -76,29 +76,33 @@ local defaults = {
     position = { point = "CENTER", x = 0, y = 0 },
     locked = true,
     enabledBuffs = {},
-    iconSize = 64,
-    spacing = 0.2, -- multiplier of iconSize (reset ratios default)
-    showBuffReminder = true,
     showOnlyInGroup = false,
     showOnlyInInstance = false,
     showOnlyPlayerClassBuff = false,
     showOnlyPlayerMissing = false,
     showOnlyOnReadyCheck = false,
     readyCheckDuration = 15, -- seconds
-    growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT", "UP", "DOWN"
-    showExpirationGlow = true,
-    expirationThreshold = 15, -- minutes
-    glowStyle = 1, -- 1=Orange, 2=Gold, 3=Yellow, 4=White, 5=Red
     useGlowFallback = false, -- EXPERIMENTAL: Show own raid buff via action bar glow during M+
     optionsPanelScale = 1.2, -- base scale (displayed as 100%)
-    splitCategories = { -- Which categories are split into their own frame (false = in main frame)
-        raid = false,
-        presence = false,
-        targeted = false,
-        self = false,
-        consumable = false,
-        custom = false,
-    }, ---@type SplitCategories
+    showLoginMessages = true,
+
+    -- Global defaults (inherited by categories unless overridden)
+    ---@type DefaultSettings
+    defaults = {
+        -- Appearance
+        iconSize = 64,
+        textSize = 12,
+        spacing = 0.2, -- multiplier of iconSize
+        iconZoom = 8, -- percentage
+        borderSize = 2,
+        growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT", "UP", "DOWN"
+        -- Behavior
+        showBuffReminder = true,
+        showExpirationGlow = true,
+        expirationThreshold = 15, -- minutes
+        glowStyle = 1, -- 1=Orange, 2=Gold, 3=Yellow, 4=White, 5=Red
+    },
+
     ---@type CategoryVisibility
     categoryVisibility = { -- Which content types each category shows in
         raid = { openWorld = true, dungeon = true, scenario = true, raid = true },
@@ -108,63 +112,48 @@ local defaults = {
         consumable = { openWorld = false, dungeon = true, scenario = true, raid = true },
         custom = { openWorld = true, dungeon = true, scenario = true, raid = true },
     },
+
     ---@type AllCategorySettings
-    categorySettings = { -- Per-category settings (main = non-split buffs, others = when split)
+    categorySettings = { -- Per-category settings
         main = {
             position = { point = "CENTER", x = 0, y = 0 },
-            iconSize = 64,
-            spacing = 0.2,
-            growDirection = "CENTER",
-            iconZoom = 8,
-            borderSize = 2,
+            -- main frame always uses defaults for appearance/behavior
         },
         raid = {
             position = { point = "CENTER", x = 0, y = 60 },
-            iconSize = 64,
-            spacing = 0.2,
-            growDirection = "CENTER",
-            iconZoom = 8,
-            borderSize = 2,
+            useCustomAppearance = false,
+            useCustomBehavior = false,
+            split = false,
         },
         presence = {
             position = { point = "CENTER", x = 0, y = 20 },
-            iconSize = 64,
-            spacing = 0.2,
-            growDirection = "CENTER",
-            iconZoom = 8,
-            borderSize = 2,
+            useCustomAppearance = false,
+            useCustomBehavior = false,
+            split = false,
         },
         targeted = {
             position = { point = "CENTER", x = 0, y = -20 },
-            iconSize = 64,
-            spacing = 0.2,
-            growDirection = "CENTER",
-            iconZoom = 8,
-            borderSize = 2,
+            useCustomAppearance = false,
+            useCustomBehavior = false,
+            split = false,
         },
         self = {
             position = { point = "CENTER", x = 0, y = -60 },
-            iconSize = 64,
-            spacing = 0.2,
-            growDirection = "CENTER",
-            iconZoom = 8,
-            borderSize = 2,
+            useCustomAppearance = false,
+            useCustomBehavior = false,
+            split = false,
         },
         consumable = {
             position = { point = "CENTER", x = 0, y = -100 },
-            iconSize = 64,
-            spacing = 0.2,
-            growDirection = "CENTER",
-            iconZoom = 8,
-            borderSize = 2,
+            useCustomAppearance = false,
+            useCustomBehavior = false,
+            split = false,
         },
         custom = {
             position = { point = "CENTER", x = 0, y = -140 },
-            iconSize = 64,
-            spacing = 0.2,
-            growDirection = "CENTER",
-            iconZoom = 8,
-            borderSize = 2,
+            useCustomAppearance = false,
+            useCustomBehavior = false,
+            split = false,
         },
     },
 }
@@ -211,6 +200,13 @@ BR.CATEGORIES = CATEGORIES
 ---@return boolean
 local function IsCategorySplit(category)
     local db = BuffRemindersDB
+    -- Check new location first (categorySettings.{cat}.split)
+    if db.categorySettings and db.categorySettings[category] then
+        if db.categorySettings[category].split ~= nil then
+            return db.categorySettings[category].split == true
+        end
+    end
+    -- Fall back to legacy location (splitCategories.{cat})
     return db.splitCategories and db.splitCategories[category] == true
 end
 
@@ -229,15 +225,86 @@ local function AreAllCategoriesSplit()
     return true
 end
 
----Get settings for a category (including "main" for non-split buffs)
+---Get settings for a category with inheritance from defaults
+---Uses BR.Config.GetCategorySetting for inherited values when applicable
 ---@param category string
----@return table
+---@return table A table with all effective settings for this category
 local function GetCategorySettings(category)
     local db = BuffRemindersDB
-    if db.categorySettings and db.categorySettings[category] then
-        return db.categorySettings[category]
+    local catSettings = db.categorySettings and db.categorySettings[category]
+    local globalDefaults = db.defaults or defaults.defaults
+
+    -- For main frame, always use global defaults
+    if category == "main" then
+        return {
+            position = catSettings and catSettings.position or { point = "CENTER", x = 0, y = 0 },
+            iconSize = globalDefaults.iconSize or 64,
+            textSize = globalDefaults.textSize or 12,
+            spacing = globalDefaults.spacing or 0.2,
+            iconZoom = globalDefaults.iconZoom or 8,
+            borderSize = globalDefaults.borderSize or 2,
+            growDirection = globalDefaults.growDirection or "CENTER",
+            showBuffReminder = globalDefaults.showBuffReminder ~= false,
+            showExpirationGlow = globalDefaults.showExpirationGlow ~= false,
+            expirationThreshold = globalDefaults.expirationThreshold or 15,
+            glowStyle = globalDefaults.glowStyle or 1,
+        }
     end
-    return defaults.categorySettings[category] or defaults.categorySettings.main
+
+    -- For other categories, use inheritance
+    local result = {}
+    local defaultCatSettings = defaults.categorySettings[category] or {}
+
+    -- Position is always category-specific
+    result.position = catSettings and catSettings.position
+        or defaultCatSettings.position
+        or { point = "CENTER", x = 0, y = 0 }
+    result.split = catSettings and catSettings.split or false
+
+    -- Appearance: inherit from defaults unless useCustomAppearance is true
+    local useCustomAppearance = catSettings and catSettings.useCustomAppearance
+    if useCustomAppearance then
+        result.iconSize = (catSettings and catSettings.iconSize) or globalDefaults.iconSize or 64
+        result.textSize = (catSettings and catSettings.textSize) or globalDefaults.textSize or 12
+        result.spacing = (catSettings and catSettings.spacing) or globalDefaults.spacing or 0.2
+        result.iconZoom = (catSettings and catSettings.iconZoom) or globalDefaults.iconZoom or 8
+        result.borderSize = (catSettings and catSettings.borderSize) or globalDefaults.borderSize or 2
+    else
+        result.iconSize = globalDefaults.iconSize or 64
+        result.textSize = globalDefaults.textSize or 12
+        result.spacing = globalDefaults.spacing or 0.2
+        result.iconZoom = globalDefaults.iconZoom or 8
+        result.borderSize = globalDefaults.borderSize or 2
+    end
+
+    -- Direction: inherit from defaults unless split (split frames have their own direction)
+    if result.split then
+        result.growDirection = (catSettings and catSettings.growDirection) or globalDefaults.growDirection or "CENTER"
+    else
+        result.growDirection = globalDefaults.growDirection or "CENTER"
+    end
+
+    -- Behavior: inherit from defaults unless useCustomBehavior is true
+    local useCustomBehavior = catSettings and catSettings.useCustomBehavior
+    if useCustomBehavior then
+        result.showBuffReminder = catSettings and catSettings.showBuffReminder ~= nil and catSettings.showBuffReminder
+            or globalDefaults.showBuffReminder ~= false
+        result.showExpirationGlow = catSettings
+                and catSettings.showExpirationGlow ~= nil
+                and catSettings.showExpirationGlow
+            or globalDefaults.showExpirationGlow ~= false
+        result.expirationThreshold = (catSettings and catSettings.expirationThreshold)
+            or globalDefaults.expirationThreshold
+            or 15
+        result.glowStyle = (catSettings and catSettings.glowStyle) or globalDefaults.glowStyle or 1
+    else
+        result.showBuffReminder = globalDefaults.showBuffReminder ~= false
+        result.showExpirationGlow = globalDefaults.showExpirationGlow ~= false
+        result.expirationThreshold = globalDefaults.expirationThreshold or 15
+        result.glowStyle = globalDefaults.glowStyle or 1
+    end
+
+    return result
 end
 
 ---Get the effective category for a frame (its own category if split, otherwise "main")
@@ -1570,7 +1637,6 @@ end
 
 -- Update icon sizes and text (called when settings change)
 local function UpdateVisuals()
-    local db = BuffRemindersDB
     for _, frame in pairs(buffFrames) do
         -- Use effective category settings (split category or "main")
         local effectiveCat = GetEffectiveCategory(frame)
@@ -1580,7 +1646,8 @@ local function UpdateVisuals()
         frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, 1), "OUTLINE")
         if frame.buffText then
             frame.buffText:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, 0.8), "OUTLINE")
-            if db.showBuffReminder then
+            -- Use per-category showBuffReminder setting
+            if catSettings.showBuffReminder then
                 frame.buffText:Show()
             else
                 frame.buffText:Hide()
@@ -1861,42 +1928,85 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
             end)
         end
 
-        for k, v in pairs(defaults) do
-            if BuffRemindersDB[k] == nil then
-                if type(v) == "table" then
-                    BuffRemindersDB[k] = {}
-                    for k2, v2 in pairs(v) do
-                        BuffRemindersDB[k][k2] = v2
+        -- Deep copy default values for missing keys
+        local function DeepCopyDefault(source, target)
+            for k, v in pairs(source) do
+                if target[k] == nil then
+                    if type(v) == "table" then
+                        target[k] = {}
+                        DeepCopyDefault(v, target[k])
+                    else
+                        target[k] = v
                     end
-                else
-                    BuffRemindersDB[k] = v
+                elseif type(v) == "table" and type(target[k]) == "table" then
+                    -- Recursively fill in missing nested keys
+                    DeepCopyDefault(v, target[k])
                 end
             end
         end
+        DeepCopyDefault(defaults, BuffRemindersDB)
 
         -- Initialize custom buffs storage
         if not BuffRemindersDB.customBuffs then
             BuffRemindersDB.customBuffs = {}
         end
 
-        -- Migrate old global settings to categorySettings.main
         local db = BuffRemindersDB
+
+        -- Migrate from old schema to new schema (v3.0 migration)
+        -- Detect old schema by checking if defaults table exists
+        if not db.defaults then
+            db.defaults = {}
+            -- Migrate global appearance settings to defaults
+            db.defaults.iconSize = db.iconSize or defaults.defaults.iconSize
+            db.defaults.spacing = db.spacing or defaults.defaults.spacing
+            db.defaults.growDirection = db.growDirection or defaults.defaults.growDirection
+            db.defaults.iconZoom = DEFAULT_ICON_ZOOM
+            db.defaults.borderSize = DEFAULT_BORDER_SIZE
+            db.defaults.textSize = 12
+            -- Migrate global behavior settings to defaults
+            db.defaults.showBuffReminder = db.showBuffReminder ~= false
+            db.defaults.showExpirationGlow = db.showExpirationGlow ~= false
+            db.defaults.expirationThreshold = db.expirationThreshold or defaults.defaults.expirationThreshold
+            db.defaults.glowStyle = db.glowStyle or defaults.defaults.glowStyle
+        end
+
+        -- Migrate splitCategories to categorySettings.{cat}.split
+        if db.splitCategories then
+            for cat, isSplit in pairs(db.splitCategories) do
+                if not db.categorySettings then
+                    db.categorySettings = {}
+                end
+                if not db.categorySettings[cat] then
+                    db.categorySettings[cat] = {}
+                end
+                if db.categorySettings[cat].split == nil then
+                    db.categorySettings[cat].split = isSplit
+                end
+            end
+        end
+
+        -- Migrate old categorySettings with appearance values to use useCustomAppearance
+        if db.categorySettings then
+            for cat, catSettings in pairs(db.categorySettings) do
+                if cat ~= "main" and catSettings.iconSize then
+                    -- Old schema had explicit appearance values, enable custom appearance
+                    if catSettings.useCustomAppearance == nil then
+                        catSettings.useCustomAppearance = true
+                    end
+                end
+            end
+        end
+
+        -- Ensure categorySettings.main exists
         if not db.categorySettings then
             db.categorySettings = {}
         end
         if not db.categorySettings.main then
             db.categorySettings.main = {}
         end
-        -- Copy old settings if categorySettings.main doesn't have them
-        if db.iconSize and not db.categorySettings.main.iconSize then
-            db.categorySettings.main.iconSize = db.iconSize
-        end
-        if db.spacing and not db.categorySettings.main.spacing then
-            db.categorySettings.main.spacing = db.spacing
-        end
-        if db.growDirection and not db.categorySettings.main.growDirection then
-            db.categorySettings.main.growDirection = db.growDirection
-        end
+
+        -- Migrate old position to categorySettings.main.position
         if db.position and not db.categorySettings.main.position then
             db.categorySettings.main.position = {
                 point = db.position.point,

@@ -50,6 +50,14 @@ function BR.CreateButton(parent, text, onClick, tooltip)
     if tooltip then
         BR.SetupTooltip(btn, tooltip.title, tooltip.desc, "ANCHOR_TOP")
     end
+    -- Add SetEnabled wrapper for convenience
+    function btn:SetEnabled(enabled)
+        if enabled then
+            self:Enable()
+        else
+            self:Disable()
+        end
+    end
     return btn
 end
 
@@ -112,11 +120,38 @@ local RootSettings = {
 
 -- Per-category settings (path = categorySettings.{category}.{key})
 local CategorySettingKeys = {
+    -- Appearance (visual properties)
     iconSize = "VisualsRefresh",
     iconZoom = "VisualsRefresh",
     borderSize = "VisualsRefresh",
+    textSize = "VisualsRefresh",
     spacing = "LayoutRefresh",
     growDirection = "LayoutRefresh",
+    -- Behavior
+    showBuffReminder = "VisualsRefresh",
+    showExpirationGlow = "VisualsRefresh",
+    expirationThreshold = "VisualsRefresh",
+    glowStyle = "VisualsRefresh",
+    -- Toggles
+    useCustomAppearance = nil, -- No refresh, just toggle state
+    useCustomBehavior = nil, -- No refresh, just toggle state
+    split = "FramesReparent",
+}
+
+-- Defaults settings (path = defaults.{key})
+local DefaultSettingKeys = {
+    -- Appearance
+    iconSize = "VisualsRefresh",
+    iconZoom = "VisualsRefresh",
+    borderSize = "VisualsRefresh",
+    textSize = "VisualsRefresh",
+    spacing = "LayoutRefresh",
+    growDirection = "LayoutRefresh",
+    -- Behavior
+    showBuffReminder = "VisualsRefresh",
+    showExpirationGlow = "VisualsRefresh",
+    expirationThreshold = "VisualsRefresh",
+    glowStyle = "VisualsRefresh",
 }
 
 -- Valid category names
@@ -127,6 +162,7 @@ local ValidCategories = {
     targeted = true,
     self = true,
     consumable = true,
+    custom = true,
 }
 
 -- Dynamic tables (path = {root}.{anyKey})
@@ -134,6 +170,7 @@ local ValidCategories = {
 local DynamicRoots = {
     enabledBuffs = "DisplayRefresh",
     categoryVisibility = "DisplayRefresh",
+    splitCategories = "FramesReparent",
 }
 
 ---Check if a config path is valid
@@ -148,8 +185,7 @@ local function ValidatePath(segments)
     local root = segments[1]
 
     -- Check root-level settings (explicit key check since some have nil refresh type)
-    local isRootSetting = root == "splitCategories"
-        or root == "showBuffReminder"
+    local isRootSetting = root == "showBuffReminder"
         or root == "frameLocked"
         or root == "hideInCombat"
         or root == "showOnlyInGroup"
@@ -161,6 +197,25 @@ local function ValidatePath(segments)
         -- position.x, position.y are valid
         if root == "position" and #segments == 2 then
             return true, nil
+        end
+        return false, nil
+    end
+
+    -- Check defaults.{setting}
+    if root == "defaults" then
+        if #segments == 1 then
+            return true, nil -- Just "defaults" is valid
+        end
+        if #segments == 2 then
+            local setting = segments[2]
+            if DefaultSettingKeys[setting] ~= nil then
+                return true, DefaultSettingKeys[setting]
+            end
+            -- position is also valid under defaults
+            if setting == "position" then
+                return true, nil
+            end
+            return false, nil
         end
         return false, nil
     end
@@ -179,15 +234,34 @@ local function ValidatePath(segments)
         end
         if #segments == 3 then
             local setting = segments[3]
-            if CategorySettingKeys[setting] ~= nil then
-                return true, CategorySettingKeys[setting]
+            -- Check if it's a known category setting key (including those with nil refresh)
+            local knownKeys = {
+                "position",
+                "iconSize",
+                "iconZoom",
+                "borderSize",
+                "textSize",
+                "spacing",
+                "growDirection",
+                "showBuffReminder",
+                "showExpirationGlow",
+                "expirationThreshold",
+                "glowStyle",
+                "useCustomAppearance",
+                "useCustomBehavior",
+                "split",
+            }
+            for _, key in ipairs(knownKeys) do
+                if setting == key then
+                    return true, CategorySettingKeys[setting]
+                end
             end
             return false, nil
         end
         return false, nil
     end
 
-    -- Check dynamic roots (enabledBuffs.*, categoryVisibility.*)
+    -- Check dynamic roots (enabledBuffs.*, categoryVisibility.*, splitCategories.*)
     if DynamicRoots[root] then
         -- Any subpath is valid for dynamic roots
         return true, DynamicRoots[root]
@@ -373,6 +447,88 @@ function BR.Config.SetMulti(changes)
     for refreshType in pairs(refreshTypes) do
         CallbackRegistry:TriggerEvent(refreshType)
     end
+end
+
+-- ============================================================================
+-- CATEGORY SETTING INHERITANCE
+-- ============================================================================
+-- Categories can inherit appearance and behavior settings from defaults,
+-- or use their own custom values when useCustomAppearance/useCustomBehavior is true.
+
+-- Keys that are appearance-related (inherit from defaults when useCustomAppearance is false)
+local AppearanceKeys = {
+    iconSize = true,
+    textSize = true,
+    spacing = true,
+    iconZoom = true,
+    borderSize = true,
+}
+
+-- Keys that are behavior-related (inherit from defaults when useCustomBehavior is false)
+local BehaviorKeys = {
+    showBuffReminder = true,
+    showExpirationGlow = true,
+    expirationThreshold = true,
+    glowStyle = true,
+}
+
+---Get a category setting with inheritance from defaults
+---@param category string Category name (raid, presence, etc.)
+---@param key string Setting key (iconSize, showBuffReminder, etc.)
+---@return any value The effective value for this setting
+function BR.Config.GetCategorySetting(category, key)
+    local db = BuffRemindersDB
+    if not db then
+        return nil
+    end
+
+    local catSettings = db.categorySettings and db.categorySettings[category]
+    if not catSettings then
+        -- No category settings, fall back to defaults
+        return db.defaults and db.defaults[key]
+    end
+
+    -- Check if this key uses inheritance
+    if AppearanceKeys[key] then
+        -- Appearance: use custom value only if useCustomAppearance is true
+        if not catSettings.useCustomAppearance then
+            return db.defaults and db.defaults[key]
+        end
+    elseif BehaviorKeys[key] then
+        -- Behavior: use custom value only if useCustomBehavior is true
+        if not catSettings.useCustomBehavior then
+            return db.defaults and db.defaults[key]
+        end
+    end
+
+    -- Use category-specific value if set, otherwise fall back to defaults
+    local value = catSettings[key]
+    if value ~= nil then
+        return value
+    end
+    return db.defaults and db.defaults[key]
+end
+
+---Check if a category has custom appearance enabled
+---@param category string
+---@return boolean
+function BR.Config.HasCustomAppearance(category)
+    local db = BuffRemindersDB
+    if not db or not db.categorySettings or not db.categorySettings[category] then
+        return false
+    end
+    return db.categorySettings[category].useCustomAppearance == true
+end
+
+---Check if a category has custom behavior enabled
+---@param category string
+---@return boolean
+function BR.Config.HasCustomBehavior(category)
+    local db = BuffRemindersDB
+    if not db or not db.categorySettings or not db.categorySettings[category] then
+        return false
+    end
+    return db.categorySettings[category].useCustomBehavior == true
 end
 
 -- ============================================================================

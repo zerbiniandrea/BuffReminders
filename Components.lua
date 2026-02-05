@@ -323,6 +323,17 @@ function Components.DirectionButtons(parent, config)
     -- Backwards compatibility: empty buttons table (no longer used)
     holder.buttons = {}
 
+    -- SetEnabled method for toggling interactivity
+    function holder:SetEnabled(enabled)
+        if enabled then
+            UIDropDownMenu_EnableDropDown(dropdown)
+            label:SetTextColor(1, 0.82, 0)
+        else
+            UIDropDownMenu_DisableDropDown(dropdown)
+            label:SetTextColor(0.5, 0.5, 0.5)
+        end
+    end
+
     return holder
 end
 
@@ -704,4 +715,264 @@ function Components.ClearRegistry()
     for i = #RefreshableComponents, 1, -1 do
         RefreshableComponents[i] = nil
     end
+end
+
+---Create a scrollable content container with auto-calculated width
+---@param parent Frame Parent frame
+---@param config ScrollableContainerConfig Configuration table
+---@return table scrollFrame Scroll frame with :GetContentFrame(), :SetContentHeight(h), :GetContentWidth()
+---@return table content Content frame
+function Components.ScrollableContainer(parent, config)
+    local contentHeight = config.contentHeight or 600
+    local scrollbarWidth = config.scrollbarWidth or 24
+
+    -- Holder frame (the scroll frame itself)
+    local scrollFrame = CreateFrame("ScrollFrame", nil, parent, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetClipsChildren(true)
+
+    -- Position scrollbar
+    local scrollBar = scrollFrame.ScrollBar
+    if scrollBar then
+        scrollBar:ClearAllPoints()
+        scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", -16, -16)
+        scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", -16, 16)
+    end
+
+    -- Content frame
+    local content = CreateFrame("Frame", nil, scrollFrame)
+    local parentWidth = parent.GetWidth and parent:GetWidth() or 540
+    local contentWidth = parentWidth - scrollbarWidth
+    content:SetSize(contentWidth, contentHeight)
+    scrollFrame:SetScrollChild(content)
+
+    -- Public methods
+    function scrollFrame:GetContentFrame()
+        return content
+    end
+
+    function scrollFrame:GetContentWidth()
+        return contentWidth
+    end
+
+    function scrollFrame:GetContentHeight()
+        return contentHeight
+    end
+
+    function scrollFrame:SetContentHeight(height)
+        contentHeight = height
+        content:SetHeight(height)
+    end
+
+    return scrollFrame, content
+end
+
+---Create a vertical layout helper for positioning elements
+---@param parent table Parent frame
+---@param config VerticalLayoutConfig Configuration table
+---@return table layout Layout helper with :Add(component, spacing), :AddText(fontString, height), :Space(amount), :GetY()
+function Components.VerticalLayout(parent, config)
+    local x = config.x or 0
+    local y = config.y or 0
+    local currentY = y
+
+    local layout = {}
+
+    ---Add a component at the current Y position and advance
+    ---@param component table Component frame to position
+    ---@param height? number Height to advance (uses component height if not specified)
+    ---@param spacing? number Extra spacing after component (default 0)
+    function layout:Add(component, height, spacing)
+        component:SetPoint("TOPLEFT", parent, "TOPLEFT", x, currentY)
+        local advanceHeight = height or (component.GetHeight and component:GetHeight()) or 20
+        currentY = currentY - advanceHeight - (spacing or 0)
+    end
+
+    ---Add a font string at the current Y position and advance
+    ---@param fontString table FontString to position
+    ---@param height number Height to advance
+    ---@param spacing? number Extra spacing after text (default 0)
+    function layout:AddText(fontString, height, spacing)
+        fontString:SetPoint("TOPLEFT", parent, "TOPLEFT", x, currentY)
+        currentY = currentY - height - (spacing or 0)
+    end
+
+    ---Add vertical space
+    ---@param amount number Space to add
+    function layout:Space(amount)
+        currentY = currentY - amount
+    end
+
+    ---Get current Y position
+    ---@return number
+    function layout:GetY()
+        return currentY
+    end
+
+    ---Set X position for subsequent items
+    ---@param newX number New X position
+    function layout:SetX(newX)
+        x = newX
+    end
+
+    ---Get current X position
+    ---@return number
+    function layout:GetX()
+        return x
+    end
+
+    return layout
+end
+
+---Create an accordion-style collapsible section
+---@param parent table Parent frame
+---@param config CollapsibleSectionConfig Configuration table
+---@return table holder Frame with :SetCollapsed(bool), :IsCollapsed(), :GetContentFrame(), :GetContentHeight(), :SetContentHeight(h)
+function Components.CollapsibleSection(parent, config)
+    local HEADER_HEIGHT = 24
+    local CONTENT_PADDING = 10
+    local BORDER_COLOR = { 0.25, 0.25, 0.25, 1 }
+    local CONTENT_BG_COLOR = { 0.08, 0.08, 0.08, 0.95 }
+
+    -- Container frame with backdrop for border
+    local holder = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+
+    -- Calculate width: explicit > parent-based with scrollbar offset > parent > default
+    local sectionWidth = config.width
+    if not sectionWidth then
+        local parentWidth = parent.GetWidth and parent:GetWidth() or 480
+        local scrollbarOffset = config.scrollbarOffset or 0
+        sectionWidth = parentWidth - scrollbarOffset
+    end
+    holder:SetSize(sectionWidth, HEADER_HEIGHT)
+    holder:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    holder:SetBackdropColor(0, 0, 0, 0) -- Transparent bg (header/content have their own)
+    holder:SetBackdropBorderColor(unpack(BORDER_COLOR))
+
+    -- Header button (clickable)
+    local header = CreateFrame("Button", nil, holder)
+    header:SetSize(holder:GetWidth() - 2, HEADER_HEIGHT - 1) -- Account for border
+    header:SetPoint("TOPLEFT", 1, -1)
+
+    -- Header background
+    local headerBg = header:CreateTexture(nil, "BACKGROUND")
+    headerBg:SetAllPoints()
+    headerBg:SetColorTexture(0.18, 0.18, 0.18, 1)
+
+    -- Collapse indicator (chevron style)
+    local indicator = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    indicator:SetPoint("LEFT", 10, 0)
+    indicator:SetText("\226\150\182") -- ▶ triangle
+    indicator:SetTextColor(0.6, 0.6, 0.6)
+
+    -- Title
+    local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("LEFT", indicator, "RIGHT", 8, 0)
+    title:SetText(config.title)
+
+    -- Content container (has background)
+    local contentBg = CreateFrame("Frame", nil, holder)
+    contentBg:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, 0)
+    contentBg:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", 0, 0)
+    contentBg:SetHeight(100)
+    contentBg:Hide()
+
+    -- Content background texture
+    local contentBgTex = contentBg:CreateTexture(nil, "BACKGROUND")
+    contentBgTex:SetAllPoints()
+    contentBgTex:SetColorTexture(unpack(CONTENT_BG_COLOR))
+
+    -- Separator line between header and content
+    local separator = contentBg:CreateTexture(nil, "ARTWORK")
+    separator:SetHeight(1)
+    separator:SetPoint("TOPLEFT", 0, 0)
+    separator:SetPoint("TOPRIGHT", 0, 0)
+    separator:SetColorTexture(0.25, 0.25, 0.25, 1)
+
+    -- Content frame (where children go, with padding)
+    local content = CreateFrame("Frame", nil, contentBg)
+    content:SetPoint("TOPLEFT", CONTENT_PADDING, -CONTENT_PADDING)
+    content:SetPoint("TOPRIGHT", -CONTENT_PADDING, -CONTENT_PADDING)
+    content:SetHeight(100) -- Default height, will be set by caller
+
+    -- State
+    local isCollapsed = config.defaultCollapsed ~= false -- Default to collapsed
+    local contentHeight = 100
+
+    -- Update visual state
+    local function UpdateVisual()
+        if isCollapsed then
+            indicator:SetText("\226\150\182") -- ▶
+            contentBg:Hide()
+            holder:SetHeight(HEADER_HEIGHT)
+        else
+            indicator:SetText("\226\150\188") -- ▼
+            contentBg:Show()
+            holder:SetHeight(HEADER_HEIGHT + contentHeight + CONTENT_PADDING * 2)
+        end
+
+        if config.onToggle then
+            config.onToggle(not isCollapsed)
+        end
+    end
+
+    -- Hover effect
+    header:SetScript("OnEnter", function()
+        headerBg:SetColorTexture(0.22, 0.22, 0.22, 1)
+        indicator:SetTextColor(0.8, 0.8, 0.8)
+    end)
+    header:SetScript("OnLeave", function()
+        headerBg:SetColorTexture(0.18, 0.18, 0.18, 1)
+        indicator:SetTextColor(0.6, 0.6, 0.6)
+    end)
+
+    -- Click to toggle
+    header:SetScript("OnClick", function()
+        isCollapsed = not isCollapsed
+        UpdateVisual()
+    end)
+
+    -- Public methods
+    function holder:SetCollapsed(collapsed)
+        isCollapsed = collapsed
+        UpdateVisual()
+    end
+
+    function holder:IsCollapsed()
+        return isCollapsed
+    end
+
+    function holder:GetContentFrame()
+        return content
+    end
+
+    function holder:GetContentHeight()
+        return contentHeight
+    end
+
+    function holder:SetContentHeight(height)
+        contentHeight = height
+        content:SetHeight(height)
+        contentBg:SetHeight(height + CONTENT_PADDING * 2)
+        if not isCollapsed then
+            holder:SetHeight(HEADER_HEIGHT + contentHeight + CONTENT_PADDING * 2)
+        end
+    end
+
+    function holder:SetTitle(newTitle)
+        title:SetText(newTitle)
+    end
+
+    -- Refresh method (re-apply collapsed state)
+    function holder:Refresh()
+        UpdateVisual()
+    end
+
+    -- Initialize
+    UpdateVisual()
+
+    return holder
 end

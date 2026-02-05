@@ -6,6 +6,8 @@
 ---@class Frame
 ---@field Show fun(self: Frame)
 ---@field Hide fun(self: Frame)
+---@field GetWidth fun(self: Frame): number
+---@field GetHeight fun(self: Frame): number
 
 ---@class Texture
 ---@field SetAllPoints fun(self: Texture, target?: any)
@@ -119,13 +121,33 @@
 ---@field x number
 ---@field y number
 
----@class CategorySetting
----@field position CategoryPosition
+---@class DefaultSettings
 ---@field iconSize number
+---@field textSize number
 ---@field spacing number
----@field growDirection string
 ---@field iconZoom number
 ---@field borderSize number
+---@field growDirection string
+---@field showBuffReminder boolean
+---@field showExpirationGlow boolean
+---@field expirationThreshold number
+---@field glowStyle number
+
+---@class CategorySetting
+---@field position CategoryPosition
+---@field iconSize? number
+---@field textSize? number
+---@field spacing? number
+---@field growDirection? string
+---@field iconZoom? number
+---@field borderSize? number
+---@field showBuffReminder? boolean
+---@field showExpirationGlow? boolean
+---@field expirationThreshold? number
+---@field glowStyle? number
+---@field useCustomAppearance? boolean
+---@field useCustomBehavior? boolean
+---@field split? boolean
 
 --- All category settings must be defined here. When adding a new category:
 --- 1. Add it to CategoryName alias above
@@ -167,3 +189,22 @@
 ---@field groupId string?                    -- For merged buffs (beacons)
 ---@field groupMerged boolean?               -- Hidden, merged into group primary
 ---@field iconByRole table<RoleType,number>? -- Role-based icon override
+
+-- ============================================================================
+-- UI COMPONENT CONFIG TYPES (Components.lua)
+-- ============================================================================
+
+---@class ScrollableContainerConfig
+---@field contentHeight? number Initial content height (default 600)
+---@field scrollbarWidth? number Width reserved for scrollbar (default 24)
+
+---@class VerticalLayoutConfig
+---@field x? number Starting X position (default 0)
+---@field y? number Starting Y position (default 0)
+
+---@class CollapsibleSectionConfig
+---@field title string Header text
+---@field defaultCollapsed? boolean Start collapsed (default true)
+---@field width? number Optional explicit width override
+---@field scrollbarOffset? number Offset to subtract from parent width (used when width not specified)
+---@field onToggle? fun(expanded: boolean) Optional callback when toggled
