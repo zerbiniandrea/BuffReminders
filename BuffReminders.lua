@@ -1172,15 +1172,21 @@ UpdateDisplay = function()
         return
     end
 
-    -- Early exit: can't check buffs when dead, in combat, M+, or instanced PvP
+    -- Early exit: can't check buffs when dead, in combat, M+, instanced PvP, or player housing
     local _, instanceType = IsInInstance()
     local inMythicPlus = C_ChallengeMode
         and C_ChallengeMode.IsChallengeModeActive
         and C_ChallengeMode.IsChallengeModeActive()
+    local inHousing = C_Housing
+        and (
+            (C_Housing.IsInsideHouseOrPlot and C_Housing.IsInsideHouseOrPlot())
+            or (C_Housing.IsOnNeighborhoodMap and C_Housing.IsOnNeighborhoodMap())
+        )
     if
         UnitIsDeadOrGhost("player")
         or InCombatLockdown()
         or inMythicPlus
+        or inHousing
         or instanceType == "pvp"
         or instanceType == "arena"
     then

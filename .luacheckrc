@@ -24,6 +24,7 @@ read_globals = {
 	"C_ActionBar",
 	"C_AddOns",
 	"C_ChallengeMode",
+	"C_Housing",
 	"C_EncodingUtil",
 	"C_Item",
 	"C_Spell",
