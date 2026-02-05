@@ -110,14 +110,10 @@ local function CreateOptionsPanel()
         Components.RefreshAll()
     end)
 
-    -- Addon icon
-    local addonIcon = CreateBuffIcon(panel, 28, "Interface\\AddOns\\BuffReminders\\icon.tga")
-    addonIcon:SetPoint("TOPLEFT", 12, -8)
-
-    -- Title (next to icon)
+    -- Title (inline with tab row)
     local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("LEFT", addonIcon, "RIGHT", 8, 0)
-    title:SetText("BuffReminders")
+    title:SetPoint("TOPLEFT", COL_PADDING, -10)
+    title:SetText("|cffffffffBuff|r|cffffcc00Reminders|r")
 
     -- Version (next to title, smaller font)
     local version = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -133,7 +129,7 @@ local function CreateOptionsPanel()
     local currentPct = math.floor(currentScale / BASE_SCALE * 100 + 0.5)
 
     local scaleHolder = CreateFrame("Frame", nil, panel)
-    scaleHolder:SetPoint("TOPRIGHT", -48, -14)
+    scaleHolder:SetPoint("TOPRIGHT", -48, -8)
     scaleHolder:SetSize(60, 16)
 
     local scaleDown = scaleHolder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -231,8 +227,8 @@ local function CreateOptionsPanel()
     tabButtons.settings = Components.Tab(panel, { name = "settings", label = "Settings", width = 65 })
     tabButtons.profiles = Components.Tab(panel, { name = "profiles", label = "Import/Export", width = 95 })
 
-    -- Position tabs below title bar
-    tabButtons.buffs:SetPoint("TOPLEFT", panel, "TOPLEFT", COL_PADDING, -40)
+    -- Position tabs below title
+    tabButtons.buffs:SetPoint("TOPLEFT", panel, "TOPLEFT", COL_PADDING, -30)
     tabButtons.appearance:SetPoint("LEFT", tabButtons.buffs, "RIGHT", 2, 0)
     tabButtons.settings:SetPoint("LEFT", tabButtons.appearance, "RIGHT", 2, 0)
     tabButtons.profiles:SetPoint("LEFT", tabButtons.settings, "RIGHT", 2, 0)
@@ -246,12 +242,12 @@ local function CreateOptionsPanel()
     -- Separator line below tabs
     local tabSeparator = panel:CreateTexture(nil, "ARTWORK")
     tabSeparator:SetHeight(1)
-    tabSeparator:SetPoint("TOPLEFT", COL_PADDING, -40 - TAB_HEIGHT)
-    tabSeparator:SetPoint("TOPRIGHT", -COL_PADDING, -40 - TAB_HEIGHT)
+    tabSeparator:SetPoint("TOPLEFT", COL_PADDING, -30 - TAB_HEIGHT)
+    tabSeparator:SetPoint("TOPRIGHT", -COL_PADDING, -30 - TAB_HEIGHT)
     tabSeparator:SetColorTexture(0.3, 0.3, 0.3, 1)
 
     -- ========== CONTENT CONTAINERS ==========
-    local CONTENT_TOP = -40 - TAB_HEIGHT - 10
+    local CONTENT_TOP = -30 - TAB_HEIGHT - 10
 
     -- Helper to create a scrollable content container using Components
     local function CreateScrollableContent(name)
