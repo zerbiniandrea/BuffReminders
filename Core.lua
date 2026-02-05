@@ -76,6 +76,7 @@ CallbackRegistry:GenerateCallbackEvents({
     "VisualsRefresh", -- Fired when visual properties (size, zoom, border) change
     "LayoutRefresh", -- Fired when layout needs recalculation (spacing, direction)
     "FramesReparent", -- Fired when frames need reparenting (split category change)
+    "BuffStateChanged", -- Fired when buff state entries are recomputed
 })
 BR.CallbackRegistry = CallbackRegistry
 

@@ -152,3 +152,16 @@
 ---@field raid boolean
 
 ---@alias CategoryVisibility table<CategoryName, ContentVisibility>
+
+---@class BuffStateEntry
+---@field key string                         -- "intellect", "devotionAura", etc.
+---@field category CategoryName              -- "raid", "presence", "targeted", "self", "consumable", "custom"
+---@field visible boolean                    -- Should show?
+---@field displayType "count"|"missing"|"expiring"
+---@field countText string?                  -- "17/20" for raid buffs
+---@field missingText string?                -- "NO\nAURA" for non-raid
+---@field expiringTime number?               -- Seconds remaining if expiring
+---@field shouldGlow boolean                 -- Expiration glow?
+---@field groupId string?                    -- For merged buffs (beacons)
+---@field groupMerged boolean?               -- Hidden, merged into group primary
+---@field iconByRole table<RoleType,number>? -- Role-based icon override

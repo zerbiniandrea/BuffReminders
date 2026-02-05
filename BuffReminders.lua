@@ -37,13 +37,6 @@ end
 -- BUFF HELPER FUNCTIONS
 -- ============================================================================
 
----Get the effective setting key for a buff (groupId if present, otherwise individual key)
----@param buff RaidBuff|PresenceBuff|TargetedBuff|SelfBuff
----@return string
-local function GetBuffSettingKey(buff)
-    return buff.groupId or buff.key
-end
-
 ---Generate a unique key for a custom buff
 ---@param spellID SpellID
 ---@return string
@@ -69,8 +62,13 @@ local function ValidateSpellID(spellID)
     return name ~= nil, name, iconID
 end
 
--- BuffBeneficiaries from Buffs.lua (classes that benefit from each buff)
-local BuffBeneficiaries = BR.BuffBeneficiaries
+-- Get helpers from State.lua
+local GetBuffSettingKey = function(buff)
+    return BR.StateHelpers.GetBuffSettingKey(buff)
+end
+local IsBuffEnabled = function(key)
+    return BR.StateHelpers.IsBuffEnabled(key)
+end
 
 -- Default settings
 -- Note: enabledBuffs defaults to all enabled - only set false to disable by default
@@ -178,12 +176,15 @@ local MISSING_TEXT_SCALE = 0.6 -- scale for "NO X" warning text
 local mainFrame
 local buffFrames = {}
 local updateTicker
-local inReadyCheck = false
 local readyCheckTimer = nil
 local testMode = false
 local testModeData = nil -- Stores seeded fake values for consistent test display
 local playerClass = nil -- Cached player class, set once on init
 local glowingSpells = {} -- Track which spell IDs are currently glowing (for action bar glow fallback)
+
+-- Throttle for UNIT_AURA events (can fire rapidly during raid-wide buffs)
+local AURA_THROTTLE = 0.2 -- seconds
+local lastAuraUpdate = 0
 
 -- Category frame system
 local categoryFrames = {}
@@ -245,85 +246,6 @@ local function GetEffectiveCategory(frame)
     return "main"
 end
 
----Check if a buff is enabled (defaults to true if not explicitly set to false)
----@param key string
----@return boolean
-local function IsBuffEnabled(key)
-    local db = BuffRemindersDB
-    return db.enabledBuffs[key] ~= false
-end
-
----Get the current content type based on instance/zone
----@return "openWorld"|"dungeon"|"scenario"|"raid"
-local function GetCurrentContentType()
-    local inInstance, instanceType = IsInInstance()
-    if not inInstance then
-        return "openWorld"
-    end
-    if instanceType == "raid" then
-        return "raid"
-    end
-    if instanceType == "scenario" then
-        return "scenario"
-    end
-    -- Treat party/dungeon and any unknown instanced content as dungeon
-    -- PvP/arena are already filtered out in UpdateDisplay before this is called
-    return "dungeon"
-end
-
----Check if a category should be visible for the current content type
----@param category CategoryName
----@return boolean
-local function IsCategoryVisibleForContent(category)
-    local db = BuffRemindersDB
-    if not db.categoryVisibility then
-        return true
-    end
-    local visibility = db.categoryVisibility[category]
-    if not visibility then
-        return true
-    end
-    local contentType = GetCurrentContentType()
-    return visibility[contentType] ~= false
-end
-
----Check if a unit is a valid group member for buff tracking
----Excludes: non-existent, dead/ghost, disconnected, hostile (cross-faction in open world)
----@param unit string
----@return boolean
-local function IsValidGroupMember(unit)
-    return UnitExists(unit)
-        and not UnitIsDeadOrGhost(unit)
-        and UnitIsConnected(unit)
-        and UnitCanAssist("player", unit)
-        and UnitIsVisible(unit)
-end
-
----Iterate over valid group members, calling callback(unit) for each
----Handles raid vs party unit naming automatically
----@param callback fun(unit: string)
-local function IterateGroupMembers(callback)
-    local inRaid = IsInRaid()
-    local groupSize = GetNumGroupMembers()
-
-    for i = 1, groupSize do
-        local unit
-        if inRaid then
-            unit = "raid" .. i
-        else
-            if i == 1 then
-                unit = "player"
-            else
-                unit = "party" .. (i - 1)
-            end
-        end
-
-        if IsValidGroupMember(unit) then
-            callback(unit)
-        end
-    end
-end
-
 -- Fixed text scale ratio (font size = iconSize * TEXT_SCALE_RATIO)
 local TEXT_SCALE_RATIO = 0.32
 
@@ -349,69 +271,8 @@ local function GetFrameFontSize(frame, scale)
     return GetFontSize(scale, iconSize)
 end
 
----Format remaining time in seconds to a short string (e.g., "5m" or "30s")
----@param seconds number
----@return string
-local function FormatRemainingTime(seconds)
-    local mins = math.floor(seconds / 60)
-    if mins > 0 then
-        return mins .. "m"
-    else
-        return math.floor(seconds) .. "s"
-    end
-end
-
----Get classes present in the group (players only, excludes NPCs)
----@return table<ClassName, boolean>
-local function GetGroupClasses()
-    local classes = {}
-
-    if GetNumGroupMembers() == 0 then
-        if playerClass then
-            classes[playerClass] = true
-        end
-        return classes
-    end
-
-    IterateGroupMembers(function(unit)
-        -- Only count actual players as potential buffers (NPCs won't cast buffs like Skyfury)
-        if UnitIsPlayer(unit) then
-            local _, class = UnitClass(unit)
-            if class then
-                classes[class] = true
-            end
-        end
-    end)
-    return classes
-end
-
----Check if unit has a specific buff (handles single spellID or table of spellIDs)
----@param unit string
----@param spellIDs SpellID
----@return boolean hasBuff
----@return number? remainingTime
----@return string? sourceUnit
-local function UnitHasBuff(unit, spellIDs)
-    if type(spellIDs) ~= "table" then
-        spellIDs = { spellIDs }
-    end
-
-    for _, id in ipairs(spellIDs) do
-        local auraData
-        pcall(function()
-            auraData = C_UnitAuras.GetUnitAuraBySpellID(unit, id)
-        end)
-        if auraData then
-            local remaining = nil
-            if auraData.expirationTime and auraData.expirationTime > 0 then
-                remaining = auraData.expirationTime - GetTime()
-            end
-            return true, remaining, auraData.sourceUnit
-        end
-    end
-
-    return false, nil, nil
-end
+-- Use functions from State.lua
+local FormatRemainingTime = BR.StateHelpers.FormatRemainingTime
 
 ---Get player's current role
 ---@return RoleType?
@@ -449,251 +310,6 @@ local function GetBuffTexture(spellIDs, iconByRole)
         texture = C_Spell.GetSpellTexture(id)
     end)
     return texture
-end
-
----Count group members missing a buff
----@param spellIDs SpellID
----@param buffKey? string Used for class benefit filtering
----@param playerOnly? boolean Only check the player, not the group
----@return number missing
----@return number total
----@return number? minRemaining
-local function CountMissingBuff(spellIDs, buffKey, playerOnly)
-    local missing = 0
-    local total = 0
-    local minRemaining = nil
-    local beneficiaries = BuffBeneficiaries[buffKey]
-
-    if playerOnly or GetNumGroupMembers() == 0 then
-        -- Solo/player-only: check if player benefits
-        if beneficiaries and not beneficiaries[playerClass] then
-            return 0, 0, nil -- player doesn't benefit, skip
-        end
-        total = 1
-        local hasBuff, remaining = UnitHasBuff("player", spellIDs)
-        if not hasBuff then
-            missing = 1
-        elseif remaining then
-            minRemaining = remaining
-        end
-        return missing, total, minRemaining
-    end
-
-    IterateGroupMembers(function(unit)
-        -- Check if unit's class benefits from this buff
-        local _, unitClass = UnitClass(unit)
-        if not beneficiaries or beneficiaries[unitClass] then
-            total = total + 1
-            local hasBuff, remaining = UnitHasBuff(unit, spellIDs)
-            if not hasBuff then
-                missing = missing + 1
-            elseif remaining then
-                if not minRemaining or remaining < minRemaining then
-                    minRemaining = remaining
-                end
-            end
-        end
-    end)
-
-    return missing, total, minRemaining
-end
-
----Count group members with a presence buff
----@param spellIDs SpellID
----@param playerOnly? boolean Only check the player, not the group
----@return number count
----@return number? minRemaining
-local function CountPresenceBuff(spellIDs, playerOnly)
-    local found = 0
-    local minRemaining = nil
-
-    if playerOnly or GetNumGroupMembers() == 0 then
-        local hasBuff, remaining = UnitHasBuff("player", spellIDs)
-        if hasBuff then
-            found = 1
-            minRemaining = remaining
-        end
-        return found, minRemaining
-    end
-
-    IterateGroupMembers(function(unit)
-        local hasBuff, remaining = UnitHasBuff(unit, spellIDs)
-        if hasBuff then
-            found = found + 1
-            if remaining then
-                if not minRemaining or remaining < minRemaining then
-                    minRemaining = remaining
-                end
-            end
-        end
-    end)
-
-    return found, minRemaining
-end
-
----Check if player's buff is active on anyone in the group
----@param spellID number
----@param role? RoleType Only check units with this role
----@return boolean
-local function IsPlayerBuffActive(spellID, role)
-    local found = false
-
-    IterateGroupMembers(function(unit)
-        if found then
-            return
-        end
-        if not role or UnitGroupRolesAssigned(unit) == role then
-            local hasBuff, _, sourceUnit = UnitHasBuff(unit, spellID)
-            if hasBuff and sourceUnit and UnitIsUnit(sourceUnit, "player") then
-                found = true
-            end
-        end
-    end)
-
-    return found
-end
-
----Check if player should cast their targeted buff (returns true if a beneficiary needs it)
----@param spellIDs SpellID
----@param requiredClass ClassName
----@param beneficiaryRole? RoleType
----@return boolean? Returns nil if player can't provide this buff
-local function ShouldShowTargetedBuff(spellIDs, requiredClass, beneficiaryRole)
-    if playerClass ~= requiredClass then
-        return nil
-    end
-
-    local spellID = (type(spellIDs) == "table" and spellIDs[1] or spellIDs) --[[@as number]]
-    if not IsPlayerSpell(spellID) then
-        return nil
-    end
-
-    -- Targeted buffs require a group (you cast them on others)
-    if GetNumGroupMembers() == 0 then
-        return nil
-    end
-
-    return not IsPlayerBuffActive(spellID, beneficiaryRole)
-end
-
----Check if player should cast their self buff or weapon imbue (returns true if missing)
----@param spellID SpellID
----@param requiredClass ClassName
----@param enchantID? number For weapon imbues, checks if this enchant is on either weapon
----@param requiresTalent? number Only show if player HAS this talent
----@param excludeTalent? number Hide if player HAS this talent
----@param buffIdOverride? number Separate buff ID to check (if different from spellID)
----@param customCheck? fun(): boolean? Custom check function for complex buff logic
----@return boolean? Returns nil if player can't/shouldn't use this buff
-local function ShouldShowSelfBuff(
-    spellID,
-    requiredClass,
-    enchantID,
-    requiresTalent,
-    excludeTalent,
-    buffIdOverride,
-    customCheck
-)
-    if playerClass ~= requiredClass then
-        return nil
-    end
-
-    -- Talent checks (before spell availability check for talent-gated buffs)
-    if requiresTalent and not IsPlayerSpell(requiresTalent) then
-        return nil
-    end
-    if excludeTalent and IsPlayerSpell(excludeTalent) then
-        return nil
-    end
-
-    -- Custom check function takes precedence over standard checks
-    if customCheck then
-        return customCheck()
-    end
-
-    -- For buffs with multiple spellIDs (like shields), check if player knows ANY of them
-    local spellIDs = type(spellID) == "table" and spellID or { spellID }
-    local knowsAnySpell = false
-    for _, id in ipairs(spellIDs) do
-        if IsPlayerSpell(id) then
-            knowsAnySpell = true
-            break
-        end
-    end
-    if not knowsAnySpell then
-        return nil
-    end
-
-    -- Weapon imbue: check if this specific enchant is on either weapon
-    if enchantID then
-        local _, _, _, mainHandEnchantID, _, _, _, offHandEnchantID = GetWeaponEnchantInfo()
-        return mainHandEnchantID ~= enchantID and offHandEnchantID ~= enchantID
-    end
-
-    -- Regular buff check - use buffIdOverride if provided, otherwise use spellID
-    local hasBuff, _ = UnitHasBuff("player", buffIdOverride or spellID)
-    return not hasBuff
-end
-
----Check if player is missing a consumable buff, weapon enchant, or inventory item (returns true if missing)
----@param spellIDs? SpellID
----@param buffIconID? number
----@param checkWeaponEnchant? boolean
----@param itemID? number|number[]
----@return boolean
-local function ShouldShowConsumableBuff(spellIDs, buffIconID, checkWeaponEnchant, itemID)
-    -- Check buff auras by spell ID
-    if spellIDs then
-        local spellList = type(spellIDs) == "table" and spellIDs or { spellIDs }
-        for _, id in ipairs(spellList) do
-            local hasBuff, _ = UnitHasBuff("player", id)
-            if hasBuff then
-                return false -- Has at least one of the consumable buffs
-            end
-        end
-    end
-
-    -- Check buff auras by icon ID (e.g., food buffs all use icon 136000)
-    if buffIconID then
-        for i = 1, 40 do
-            local auraData = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
-            if not auraData then
-                break
-            end
-            local success, iconMatches = pcall(function()
-                return auraData.icon == buffIconID
-            end)
-            if success and iconMatches then
-                return false -- Has a buff with this icon
-            end
-        end
-    end
-
-    -- Check if any weapon enchant exists (oils, stones, shaman imbues, etc.)
-    if checkWeaponEnchant then
-        local hasMainHandEnchant = GetWeaponEnchantInfo()
-        if hasMainHandEnchant then
-            return false -- Has a weapon enchant
-        end
-    end
-
-    -- Check inventory for item
-    if itemID then
-        local itemList = type(itemID) == "table" and itemID or { itemID }
-        for _, id in ipairs(itemList) do
-            local ok, count = pcall(C_Item.GetItemCount, id, false, true)
-            if ok and count and count > 0 then
-                return false -- Has the item in inventory
-            end
-        end
-    end
-
-    -- If we have nothing to check, return false
-    if not spellIDs and not buffIconID and not checkWeaponEnchant and not itemID then
-        return false
-    end
-
-    return true -- Missing all consumable buffs/enchants/items
 end
 
 -- Action bar button names to scan for glows
@@ -941,45 +557,6 @@ local function ShowMissingFrame(frame, missingText)
     frame.count:SetText(missingText or "")
     frame:Show()
     SetExpirationGlow(frame, false)
-    return true
-end
-
----Check if buff passes common pre-conditions
----@param buff table Any buff type with optional pre-check fields
----@param presentClasses? table<ClassName, boolean>
----@param db table Database settings
----@return boolean passes
-local function PassesPreChecks(buff, presentClasses, db)
-    -- Ready check only
-    local readyCheckOnly = buff.readyCheckOnly or (buff.infoTooltip and buff.infoTooltip:match("^Ready Check Only"))
-    if readyCheckOnly and not inReadyCheck then
-        return false
-    end
-
-    -- Class filtering
-    if buff.class then
-        if db.showOnlyPlayerClassBuff and buff.class ~= playerClass then
-            return false
-        end
-        if presentClasses and not presentClasses[buff.class] then
-            return false
-        end
-    end
-
-    -- Talent exclusion
-    if buff.excludeTalentSpellID and IsPlayerSpell(buff.excludeTalentSpellID) then
-        return false
-    end
-
-    -- Spell knowledge exclusion
-    if buff.excludeIfSpellKnown then
-        for _, spellID in ipairs(buff.excludeIfSpellKnown) do
-            if IsPlayerSpell(spellID) then
-                return false
-            end
-        end
-    end
-
     return true
 end
 
@@ -1618,7 +1195,7 @@ UpdateDisplay = function()
     local db = BuffRemindersDB
 
     -- Hide based on visibility settings
-    if db.showOnlyOnReadyCheck and not inReadyCheck then
+    if db.showOnlyOnReadyCheck and not BR.BuffState.GetReadyCheckState() then
         HideAllDisplayFrames()
         return
     end
@@ -1635,180 +1212,39 @@ UpdateDisplay = function()
         end
     end
 
-    local presentClasses = GetGroupClasses()
+    -- Refresh buff state
+    BR.BuffState.Refresh()
 
     local anyVisible = false
 
-    -- Process coverage buffs (need everyone to have them)
-    local playerOnly = db.showOnlyPlayerMissing
-    local raidVisible = IsCategoryVisibleForContent("raid")
-    for _, buff in ipairs(RaidBuffs) do
-        local frame = buffFrames[buff.key]
-        local showBuff = raidVisible
-            and (not db.showOnlyPlayerClassBuff or buff.class == playerClass)
-            and (not presentClasses or presentClasses[buff.class])
-
-        if frame and IsBuffEnabled(buff.key) and showBuff then
-            local missing, total, minRemaining = CountMissingBuff(buff.spellID, buff.key, playerOnly)
-            local expiringSoon = db.showExpirationGlow and minRemaining and minRemaining < (db.expirationThreshold * 60)
-            if missing > 0 then
-                local buffed = total - missing
-                -- In player-only mode, just show the icon; in group mode, show "X/Y"
-                frame.count:SetText(playerOnly and "" or (buffed .. "/" .. total))
-                frame:Show()
-                anyVisible = true
-                SetExpirationGlow(frame, expiringSoon)
-            elseif expiringSoon then
-                ---@cast minRemaining number
-                frame.count:SetText(FormatRemainingTime(minRemaining))
-                frame:Show()
-                anyVisible = true
-                SetExpirationGlow(frame, true)
-            else
-                HideFrame(frame)
-            end
-        elseif frame then
-            HideFrame(frame)
-        end
-    end
-
-    -- Process presence buffs (need at least 1 person to have them)
-    local presenceVisible = IsCategoryVisibleForContent("presence")
-    for _, buff in ipairs(PresenceBuffs) do
-        local frame = buffFrames[buff.key]
-        local readyCheckOnly = buff.infoTooltip and buff.infoTooltip:match("^Ready Check Only")
-        local showBuff = presenceVisible
-            and (not readyCheckOnly or inReadyCheck)
-            and (not db.showOnlyPlayerClassBuff or buff.class == playerClass)
-            and (not presentClasses or presentClasses[buff.class])
-
-        if frame and IsBuffEnabled(buff.key) and showBuff then
-            local count, minRemaining = CountPresenceBuff(buff.spellID, playerOnly)
-            local expiringSoon = db.showExpirationGlow
-                and not buff.noGlow
-                and minRemaining
-                and minRemaining < (db.expirationThreshold * 60)
-            if count == 0 then
-                anyVisible = ShowMissingFrame(frame, buff.missingText) or anyVisible
-            elseif expiringSoon then
-                ---@cast minRemaining number
-                frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame), "OUTLINE")
-                frame.count:SetText(FormatRemainingTime(minRemaining))
-                frame:Show()
-                anyVisible = true
-                SetExpirationGlow(frame, true)
-            else
-                HideFrame(frame)
-            end
-        elseif frame then
-            HideFrame(frame)
-        end
-    end
-
-    -- Process targeted buffs (player's own buff responsibility)
-    local targetedVisible = IsCategoryVisibleForContent("targeted")
-    local visibleGroups = {} -- Track visible buffs by groupId for merging
-    for _, buff in ipairs(TargetedBuffs) do
-        local frame = buffFrames[buff.key]
-        local settingKey = GetBuffSettingKey(buff)
-
-        if frame and IsBuffEnabled(settingKey) and targetedVisible and PassesPreChecks(buff, nil, db) then
-            local shouldShow = ShouldShowTargetedBuff(buff.spellID, buff.class, buff.beneficiaryRole)
-            if shouldShow then
-                anyVisible = ShowMissingFrame(frame, buff.missingText) or anyVisible
-                -- Track for group merging
-                if buff.groupId then
-                    visibleGroups[buff.groupId] = visibleGroups[buff.groupId] or {}
-                    table.insert(visibleGroups[buff.groupId], { frame = frame, spellID = buff.spellID })
-                end
-            else
-                HideFrame(frame)
-            end
-        elseif frame then
-            HideFrame(frame)
-        end
-    end
-
-    -- Merge grouped buffs that are both visible (show first icon with group text)
-    for groupId, group in pairs(visibleGroups) do
-        if #group >= 2 then
-            local primary = group[1]
-            local groupInfo = BuffGroups[groupId]
-            primary.frame.count:SetText(groupInfo and groupInfo.missingText or "")
-            -- Hide other frames in the group
-            for i = 2, #group do
-                group[i].frame:Hide()
-            end
-        end
-    end
-
-    -- Process self buffs (player's own buff on themselves, including weapon imbues)
-    local selfVisible = IsCategoryVisibleForContent("self")
-    for _, buff in ipairs(SelfBuffs) do
-        local frame = buffFrames[buff.key]
-        local settingKey = buff.groupId or buff.key
-
-        if frame and IsBuffEnabled(settingKey) and selfVisible then
-            local shouldShow = ShouldShowSelfBuff(
-                buff.spellID,
-                buff.class,
-                buff.enchantID,
-                buff.requiresTalentSpellID,
-                buff.excludeTalentSpellID,
-                buff.buffIdOverride,
-                buff.customCheck
-            )
-            if shouldShow then
-                -- Update icon based on current role (for role-dependent buffs like shields)
-                if buff.iconByRole then
-                    local texture = GetBuffTexture(buff.spellID, buff.iconByRole)
-                    if texture then
-                        frame.icon:SetTexture(texture)
+    -- Render from BR.BuffState.entries
+    for key, entry in pairs(BR.BuffState.entries) do
+        local frame = buffFrames[key]
+        if frame then
+            if entry.visible and not entry.groupMerged then
+                -- Apply display based on entry.displayType
+                if entry.displayType == "count" then
+                    frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame), "OUTLINE")
+                    frame.count:SetText(entry.countText or "")
+                    frame:Show()
+                    SetExpirationGlow(frame, entry.shouldGlow)
+                elseif entry.displayType == "expiring" then
+                    frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame), "OUTLINE")
+                    frame.count:SetText(entry.countText or "")
+                    frame:Show()
+                    SetExpirationGlow(frame, true)
+                else -- "missing"
+                    -- Update icon based on current role (for role-dependent buffs like shields)
+                    if entry.iconByRole then
+                        local texture = GetBuffTexture(frame.spellIDs, entry.iconByRole)
+                        if texture then
+                            frame.icon:SetTexture(texture)
+                        end
                     end
+                    ShowMissingFrame(frame, entry.missingText)
                 end
-                anyVisible = ShowMissingFrame(frame, buff.missingText) or anyVisible
+                anyVisible = true
             else
-                HideFrame(frame)
-            end
-        elseif frame then
-            HideFrame(frame)
-        end
-    end
-
-    -- Process consumable buffs (food, flasks, runes, healthstones)
-    local consumableVisible = IsCategoryVisibleForContent("consumable")
-    for _, buff in ipairs(Consumables) do
-        local frame = buffFrames[buff.key]
-        local settingKey = buff.groupId or buff.key
-
-        if frame and IsBuffEnabled(settingKey) and consumableVisible and PassesPreChecks(buff, nil, db) then
-            local shouldShow =
-                ShouldShowConsumableBuff(buff.spellID, buff.buffIconID, buff.checkWeaponEnchant, buff.itemID)
-            if shouldShow then
-                anyVisible = ShowMissingFrame(frame, buff.missingText) or anyVisible
-            else
-                HideFrame(frame)
-            end
-        elseif frame then
-            HideFrame(frame)
-        end
-    end
-
-    -- Process custom buffs (self buffs only - show if player doesn't have the buff)
-    local customVisible = IsCategoryVisibleForContent("custom")
-    if db.customBuffs then
-        for _, customBuff in pairs(db.customBuffs) do
-            local frame = buffFrames[customBuff.key]
-            -- Check class filter (nil means any class)
-            local classMatch = not customBuff.class or customBuff.class == playerClass
-            if frame and IsBuffEnabled(customBuff.key) and customVisible and classMatch then
-                local hasBuff = UnitHasBuff("player", customBuff.spellID)
-                if not hasBuff then
-                    anyVisible = ShowMissingFrame(frame, customBuff.missingText or "NO\nBUFF") or anyVisible
-                else
-                    HideFrame(frame)
-                end
-            elseif frame then
                 HideFrame(frame)
             end
         end
@@ -2212,8 +1648,8 @@ BR.Helpers = {
     IsCategorySplit = IsCategorySplit,
     GetBuffTexture = GetBuffTexture,
     DeepCopy = DeepCopy,
-    GetCurrentContentType = GetCurrentContentType,
-    IsCategoryVisibleForContent = IsCategoryVisibleForContent,
+    GetCurrentContentType = BR.StateHelpers.GetCurrentContentType,
+    IsCategoryVisibleForContent = BR.StateHelpers.IsCategoryVisibleForContent,
     ValidateSpellID = ValidateSpellID,
     GenerateCustomBuffKey = GenerateCustomBuffKey,
 }
@@ -2377,9 +1813,10 @@ eventFrame:RegisterEvent("READY_CHECK")
 eventFrame:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
 eventFrame:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
 
-eventFrame:SetScript("OnEvent", function(self, event, arg1)
+eventFrame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == addonName then
         _, playerClass = UnitClass("player")
+        BR.BuffState.SetPlayerClass(playerClass)
         if not BuffRemindersDB then
             BuffRemindersDB = {}
         end
@@ -2511,20 +1948,26 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         UpdateDisplay()
     elseif event == "UNIT_AURA" then
         -- Skip in combat (auras change frequently, but we can't check buffs anyway)
+        -- Throttle rapid events (e.g., raid-wide buff application)
         if not InCombatLockdown() and mainFrame and mainFrame:IsShown() then
-            UpdateDisplay()
+            local now = GetTime()
+            if now - lastAuraUpdate >= AURA_THROTTLE then
+                lastAuraUpdate = now
+                UpdateDisplay()
+            end
+            -- else: throttled, 1s ticker will catch it
         end
     elseif event == "READY_CHECK" then
         -- Cancel any existing timer
         if readyCheckTimer then
             readyCheckTimer:Cancel()
         end
-        inReadyCheck = true
+        BR.BuffState.SetReadyCheckState(true)
         UpdateDisplay()
         -- Start timer to reset ready check state
         local duration = BuffRemindersDB.readyCheckDuration or 15
         readyCheckTimer = C_Timer.NewTimer(duration, function()
-            inReadyCheck = false
+            BR.BuffState.SetReadyCheckState(false)
             readyCheckTimer = nil
             UpdateDisplay()
         end)
