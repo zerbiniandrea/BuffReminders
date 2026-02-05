@@ -185,6 +185,9 @@
 ---@field groupMerged boolean?               -- Hidden, merged into group primary
 ---@field iconByRole table<RoleType,number>? -- Role-based icon override
 
+---@class BuffRemindersDB
+---@field dbVersion? integer
+
 -- ============================================================================
 -- UI COMPONENT CONFIG TYPES (Components.lua)
 -- ============================================================================

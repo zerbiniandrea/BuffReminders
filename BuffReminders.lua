@@ -1806,6 +1806,11 @@ local function ImportSettings(str)
     -- Restore locked state
     BuffRemindersDB.locked = currentLocked
 
+    -- Re-apply metatable on defaults (DeepCopy produces a plain table)
+    if BuffRemindersDB.defaults then
+        setmetatable(BuffRemindersDB.defaults, { __index = defaults.defaults })
+    end
+
     return true
 end
 
@@ -1902,10 +1907,15 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
             end)
         end
 
-        -- Deep copy default values for missing keys
+        -- Deep copy default values for missing keys (skips 'defaults' sub-table, served by metatable)
         local function DeepCopyDefault(source, target)
             for k, v in pairs(source) do
-                if target[k] == nil then
+                if k == "defaults" then
+                    -- Skip: served by metatable __index
+                    if target[k] == nil then
+                        target[k] = {}
+                    end
+                elseif target[k] == nil then
                     if type(v) == "table" then
                         target[k] = {}
                         DeepCopyDefault(v, target[k])
@@ -1918,133 +1928,166 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
                 end
             end
         end
-        DeepCopyDefault(defaults, BuffRemindersDB)
-
-        -- Initialize custom buffs storage
-        if not BuffRemindersDB.customBuffs then
-            BuffRemindersDB.customBuffs = {}
-        end
 
         local db = BuffRemindersDB
 
-        -- Migrate from old schema to new schema (v3.0 migration)
-        -- Detect old schema by checking for OLD root-level keys (not absence of new table,
-        -- because DeepCopyDefault already fills in db.defaults before we get here)
-        local isOldSchema = db.iconSize ~= nil
-            or db.spacing ~= nil
-            or db.growDirection ~= nil
-            or db.showExpirationGlow ~= nil
-        if isOldSchema then
-            -- Migrate global appearance settings to defaults
-            db.defaults.iconSize = db.iconSize or defaults.defaults.iconSize
-            db.defaults.spacing = db.spacing or defaults.defaults.spacing
-            db.defaults.growDirection = db.growDirection or defaults.defaults.growDirection
-            -- Migrate global behavior settings to defaults
-            db.defaults.showExpirationGlow = db.showExpirationGlow ~= false
-            db.defaults.expirationThreshold = db.expirationThreshold or defaults.defaults.expirationThreshold
-            db.defaults.glowStyle = db.glowStyle or defaults.defaults.glowStyle
-            -- Clean up old root-level keys
-            db.iconSize = nil
-            db.spacing = nil
-            db.growDirection = nil
-        end
+        -- ====================================================================
+        -- Versioned migrations — each runs exactly once, tracked by dbVersion
+        -- ====================================================================
+        local DB_VERSION = 2
 
-        -- Migrate splitCategories to categorySettings.{cat}.split
-        if db.splitCategories then
-            for cat, isSplit in pairs(db.splitCategories) do
+        local migrations = {
+            -- [1] Consolidate all pre-versioning migrations (v2.8 → v3.x)
+            [1] = function()
+                -- Ensure db.defaults exists (DeepCopyDefault hasn't run yet)
+                if not db.defaults then
+                    db.defaults = {}
+                end
+
+                -- Migrate from old schema to new schema (v3.0 migration)
+                local isOldSchema = db.iconSize ~= nil
+                    or db.spacing ~= nil
+                    or db.growDirection ~= nil
+                    or db.showExpirationGlow ~= nil
+                if isOldSchema then
+                    -- Migrate global appearance settings to defaults
+                    db.defaults.iconSize = db.iconSize or defaults.defaults.iconSize
+                    db.defaults.spacing = db.spacing or defaults.defaults.spacing
+                    db.defaults.growDirection = db.growDirection or defaults.defaults.growDirection
+                    -- Migrate global behavior settings to defaults
+                    db.defaults.showExpirationGlow = db.showExpirationGlow ~= false
+                    db.defaults.expirationThreshold = db.expirationThreshold or defaults.defaults.expirationThreshold
+                    db.defaults.glowStyle = db.glowStyle or defaults.defaults.glowStyle
+                    -- Clean up old root-level keys
+                    db.iconSize = nil
+                    db.spacing = nil
+                    db.growDirection = nil
+                end
+
+                -- Migrate splitCategories to categorySettings.{cat}.split
+                if db.splitCategories then
+                    for cat, isSplit in pairs(db.splitCategories) do
+                        if not db.categorySettings then
+                            db.categorySettings = {}
+                        end
+                        if not db.categorySettings[cat] then
+                            db.categorySettings[cat] = {}
+                        end
+                        db.categorySettings[cat].split = isSplit
+                    end
+                    db.splitCategories = nil
+                end
+
+                -- Migrate old categorySettings with appearance values to use useCustomAppearance
+                if isOldSchema and db.categorySettings then
+                    for cat, catSettings in pairs(db.categorySettings) do
+                        if cat ~= "main" and catSettings.iconSize then
+                            catSettings.useCustomAppearance = catSettings.split == true
+                        end
+                    end
+                end
+
+                -- Migrate root-level showBuffReminder to raid category (v2.8.1 users)
+                if db.showBuffReminder ~= nil then
+                    if db.categorySettings and db.categorySettings.raid then
+                        db.categorySettings.raid.showBuffReminder = db.showBuffReminder
+                    end
+                end
+
+                -- Migrate: remove useCustomBehavior, per-category glow, consolidate showBuffReminder
+                if db.categorySettings then
+                    for cat, catSettings in pairs(db.categorySettings) do
+                        if cat ~= "main" then
+                            if cat == "raid" then
+                                if catSettings.useCustomBehavior == false and catSettings.showBuffReminder == nil then
+                                    catSettings.showBuffReminder = db.defaults and db.defaults.showBuffReminder ~= false
+                                end
+                            else
+                                catSettings.showBuffReminder = nil
+                            end
+                            catSettings.useCustomBehavior = nil
+                            catSettings.showExpirationGlow = nil
+                            catSettings.expirationThreshold = nil
+                            catSettings.glowStyle = nil
+                        end
+                    end
+                end
+
+                -- Migrate legacy root-level glow settings to defaults
+                if db.showExpirationGlow ~= nil then
+                    db.defaults.showExpirationGlow = db.showExpirationGlow
+                    db.showExpirationGlow = nil
+                end
+                if db.expirationThreshold ~= nil then
+                    db.defaults.expirationThreshold = db.expirationThreshold
+                    db.expirationThreshold = nil
+                end
+                if db.glowStyle ~= nil then
+                    db.defaults.glowStyle = db.glowStyle
+                    db.glowStyle = nil
+                end
+
+                -- Remove showBuffReminder from defaults (now per-category raid-only)
+                if db.defaults then
+                    db.defaults.showBuffReminder = nil
+                end
+                db.showBuffReminder = nil
+
+                -- Remove showOnlyInInstance (replaced by per-category W/S/D/R visibility toggles)
+                db.showOnlyInInstance = nil
+
+                -- Ensure categorySettings.main exists
                 if not db.categorySettings then
                     db.categorySettings = {}
                 end
-                if not db.categorySettings[cat] then
-                    db.categorySettings[cat] = {}
+                if not db.categorySettings.main then
+                    db.categorySettings.main = {}
                 end
-                db.categorySettings[cat].split = isSplit
-            end
-            db.splitCategories = nil
-        end
 
-        -- Migrate old categorySettings with appearance values to use useCustomAppearance
-        -- Only enable custom appearance for categories that were actually split,
-        -- since non-split categories used main frame settings in old schema
-        if isOldSchema and db.categorySettings then
-            for cat, catSettings in pairs(db.categorySettings) do
-                if cat ~= "main" and catSettings.iconSize then
-                    catSettings.useCustomAppearance = catSettings.split == true
+                -- Migrate old position to categorySettings.main.position
+                if db.position and not db.categorySettings.main.position then
+                    db.categorySettings.main.position = {
+                        point = db.position.point,
+                        x = db.position.x,
+                        y = db.position.y,
+                    }
                 end
-            end
-        end
+            end,
 
-        -- Migrate root-level showBuffReminder to raid category (v2.8.1 users)
-        if db.showBuffReminder ~= nil then
-            if db.categorySettings and db.categorySettings.raid then
-                db.categorySettings.raid.showBuffReminder = db.showBuffReminder
-            end
-        end
-
-        -- Migrate: remove useCustomBehavior, per-category glow, consolidate showBuffReminder
-        if db.categorySettings then
-            for cat, catSettings in pairs(db.categorySettings) do
-                if cat ~= "main" then
-                    -- For raid: if useCustomBehavior was false, copy showBuffReminder from defaults
-                    if cat == "raid" then
-                        if catSettings.useCustomBehavior == false and catSettings.showBuffReminder == nil then
-                            catSettings.showBuffReminder = db.defaults and db.defaults.showBuffReminder ~= false
+            -- [2] Strip db.defaults keys matching code defaults (enable metatable inheritance)
+            [2] = function()
+                if db.defaults then
+                    for key, value in pairs(db.defaults) do
+                        if defaults.defaults[key] ~= nil and value == defaults.defaults[key] then
+                            db.defaults[key] = nil
                         end
-                    else
-                        -- Non-raid categories don't use showBuffReminder anymore
-                        catSettings.showBuffReminder = nil
                     end
-                    -- Clean up removed fields
-                    catSettings.useCustomBehavior = nil
-                    catSettings.showExpirationGlow = nil
-                    catSettings.expirationThreshold = nil
-                    catSettings.glowStyle = nil
                 end
+            end,
+        }
+
+        -- Run pending migrations
+        local currentVersion = db.dbVersion or 0
+        for version = currentVersion + 1, DB_VERSION do
+            if migrations[version] then
+                migrations[version]()
             end
         end
+        db.dbVersion = DB_VERSION
 
-        -- Migrate legacy root-level glow settings to defaults
-        -- Unconditionally overwrite: DeepCopyDefault may have filled db.defaults with
-        -- code defaults, but the user's old root-level value should take priority
-        if db.showExpirationGlow ~= nil then
-            db.defaults.showExpirationGlow = db.showExpirationGlow
-            db.showExpirationGlow = nil
-        end
-        if db.expirationThreshold ~= nil then
-            db.defaults.expirationThreshold = db.expirationThreshold
-            db.expirationThreshold = nil
-        end
-        if db.glowStyle ~= nil then
-            db.defaults.glowStyle = db.glowStyle
-            db.glowStyle = nil
+        -- Deep copy defaults for non-defaults tables
+        DeepCopyDefault(defaults, db)
+
+        -- Initialize custom buffs storage
+        if not db.customBuffs then
+            db.customBuffs = {}
         end
 
-        -- Remove showBuffReminder from defaults (now per-category raid-only)
-        if db.defaults then
-            db.defaults.showBuffReminder = nil
+        -- Set up metatable so db.defaults inherits from code defaults
+        if not db.defaults then
+            db.defaults = {}
         end
-        -- Clean up old root-level showBuffReminder (migrated to categorySettings.raid above)
-        db.showBuffReminder = nil
-
-        -- Remove showOnlyInInstance (replaced by per-category W/S/D/R visibility toggles)
-        db.showOnlyInInstance = nil
-
-        -- Ensure categorySettings.main exists
-        if not db.categorySettings then
-            db.categorySettings = {}
-        end
-        if not db.categorySettings.main then
-            db.categorySettings.main = {}
-        end
-
-        -- Migrate old position to categorySettings.main.position
-        if db.position and not db.categorySettings.main.position then
-            db.categorySettings.main.position = {
-                point = db.position.point,
-                x = db.position.x,
-                y = db.position.y,
-            }
-        end
+        setmetatable(db.defaults, { __index = defaults.defaults })
 
         -- Initialize categoryVisibility with defaults for each category
         if not db.categoryVisibility then
