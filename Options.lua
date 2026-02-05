@@ -514,7 +514,7 @@ local function CreateOptionsPanel()
         for _, key in ipairs(sortedKeys) do
             local customBuff = db.customBuffs[key]
             local row = CreateFrame("Frame", nil, customBuffsContainer)
-            row:SetSize(PANEL_WIDTH - COL_PADDING * 2, ITEM_HEIGHT)
+            row:SetSize(COL_WIDTH, ITEM_HEIGHT)
             row:SetPoint("TOPLEFT", 0, rowY)
 
             local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
@@ -534,18 +534,14 @@ local function CreateOptionsPanel()
             label:SetPoint("LEFT", icon, "RIGHT", 4, 0)
             label:SetText(customBuff.name or ("Spell " .. customBuff.spellID))
 
-            local editBtn = CreateButton(row, "Edit", function()
-                ShowCustomBuffModal(key, RenderCustomBuffRows)
+            -- Right-click to edit
+            row:EnableMouse(true)
+            row:SetScript("OnMouseUp", function(_, button)
+                if button == "RightButton" then
+                    ShowCustomBuffModal(key, RenderCustomBuffRows)
+                end
             end)
-            editBtn:SetPoint("RIGHT", row, "RIGHT", -50, 0)
-
-            local deleteBtn = CreateButton(row, "Delete", function()
-                StaticPopup_Show("BUFFREMINDERS_DELETE_CUSTOM", customBuff.name or key, nil, {
-                    key = key,
-                    refreshPanel = RenderCustomBuffRows,
-                })
-            end)
-            deleteBtn:SetPoint("LEFT", editBtn, "RIGHT", 4, 0)
+            BR.SetupTooltip(row, "Right-click to edit or delete", nil, "ANCHOR_CURSOR")
 
             table.insert(panel.customBuffRows, row)
             rowY = rowY - ITEM_HEIGHT
@@ -1733,6 +1729,22 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     cancelBtn:SetScript("OnClick", function()
         modal:Hide()
     end)
+
+    -- Delete button (only when editing existing buff)
+    if existingKey and editingBuff then
+        local buffName = editingBuff.name or existingKey
+        local deleteBtn = CreateFrame("Button", nil, modal, "UIPanelButtonTemplate")
+        deleteBtn:SetSize(80, 22)
+        deleteBtn:SetPoint("BOTTOMLEFT", 20, 15)
+        deleteBtn:SetText("Delete")
+        deleteBtn:SetScript("OnClick", function()
+            modal:Hide()
+            StaticPopup_Show("BUFFREMINDERS_DELETE_CUSTOM", buffName, nil, {
+                key = existingKey,
+                refreshPanel = refreshPanelCallback,
+            })
+        end)
+    end
 
     local saveBtn = CreateFrame("Button", nil, modal, "UIPanelButtonTemplate")
     saveBtn:SetSize(80, 22)
