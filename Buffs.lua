@@ -119,6 +119,15 @@ BR.BUFF_TABLES = {
     },
     ---@type SelfBuff[]
     self = {
+        -- Mage Arcane Familiar
+        {
+            spellID = 205022,
+            buffIdOverride = 210126,
+            key = "arcaneFamiliar",
+            name = "Arcane Familiar",
+            class = "MAGE",
+            missingText = "NO\nFAMILIAR",
+        },
         -- Warlock Grimoire of Sacrifice
         {
             spellID = 108503,
