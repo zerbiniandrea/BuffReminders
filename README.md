@@ -47,18 +47,6 @@ Configure when and how the addon displays. Control visibility (group only, insta
   <img src="https://github.com/zerbiniandrea/BuffReminders/blob/main/images/settings-options.png?raw=true" />
 </p>
 
-<p align="center">
-  <img src="https://github.com/zerbiniandrea/BuffReminders/blob/main/images/glows.png?raw=true" />
-</p>
-
-### Custom Buffs
-
-Track any buff by spell ID. Useful for consumables, world buffs, or any buff not included by default. Custom buffs check if you have the buff on yourself.
-
-<p align="center">
-  <img src="https://github.com/zerbiniandrea/BuffReminders/blob/main/images/settings-custombuffs.png?raw=true" />
-</p>
-
 ## Limitations
 
 - **Combat/M+/PvP** - Blizzard restricts buff API access during combat, M+ keystones, and instanced PvP. Full group tracking is only available out of combat. However, with "Glow Fallback" enabled (Settings tab), the addon detects when your own raid buff is missing by monitoring action bar spell glows - this works in M+.
