@@ -1913,7 +1913,7 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
 
     -- Forward declarations
     local addSpellBtn, advancedBtn, advancedText, advancedFrame
-    local selectedClass
+    local classDropdownHolder
 
     -- Single layout function that positions everything
     local function UpdateLayout()
@@ -2098,10 +2098,6 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
 
     advY = advY - 25
 
-    local classLabel = advancedFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    classLabel:SetPoint("TOPLEFT", 0, advY)
-    classLabel:SetText("Only for class:")
-
     local classOptions = {
         { value = nil, label = "Any" },
         { value = "WARRIOR", label = "Warrior" },
@@ -2118,34 +2114,15 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
         { value = "DEMONHUNTER", label = "Demon Hunter" },
         { value = "EVOKER", label = "Evoker" },
     }
-    selectedClass = editingBuff and editingBuff.class or nil
 
-    local classDropdown =
-        CreateFrame("Frame", "BuffRemindersCustomClassDropdown", advancedFrame, "UIDropDownMenuTemplate")
-    classDropdown:SetPoint("LEFT", classLabel, "RIGHT", -10, -2)
-    UIDropDownMenu_SetWidth(classDropdown, 100)
-
-    UIDropDownMenu_Initialize(classDropdown, function(_, level)
-        for _, cls in ipairs(classOptions) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = cls.label
-            info.value = cls.value
-            info.checked = selectedClass == cls.value
-            info.func = function()
-                selectedClass = cls.value
-                UIDropDownMenu_SetSelectedValue(classDropdown, cls.value)
-                UIDropDownMenu_SetText(classDropdown, cls.label)
-            end
-            UIDropDownMenu_AddButton(info, level)
-        end
-    end)
-    UIDropDownMenu_SetSelectedValue(classDropdown, selectedClass)
-    for _, cls in ipairs(classOptions) do
-        if cls.value == selectedClass then
-            UIDropDownMenu_SetText(classDropdown, cls.label)
-            break
-        end
-    end
+    classDropdownHolder = Components.Dropdown(advancedFrame, {
+        label = "Only for class:",
+        options = classOptions,
+        selected = editingBuff and editingBuff.class or nil,
+        width = 100,
+        onChange = function() end,
+    }, "BuffRemindersCustomClassDropdown")
+    classDropdownHolder:SetPoint("TOPLEFT", 0, advY)
 
     -- Advanced toggle handler
     advancedBtn:SetScript("OnClick", function()
@@ -2221,7 +2198,7 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
             key = key,
             name = displayName,
             missingText = missingTextValue,
-            class = selectedClass,
+            class = classDropdownHolder:GetValue(),
         }
 
         BuffRemindersDB.customBuffs[key] = customBuff
