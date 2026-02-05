@@ -656,7 +656,11 @@ function BuffState.Refresh()
     currentWeaponEnchants.offHandID = offID
 
     local playerOnly = db.showOnlyPlayerMissing
-    local expirationThreshold = (db.expirationThreshold or 15) * 60
+    -- TODO: make glow truly global — currently only raid/presence buffs track time remaining,
+    -- so targeted/self/consumable/custom buffs never glow. Add expiration tracking to all categories.
+    local glowDefaults = db.defaults or {}
+    local expirationThreshold = (glowDefaults.expirationThreshold or 15) * 60
+    local showExpirationGlow = glowDefaults.showExpirationGlow ~= false
 
     -- Process raid buffs (coverage - need everyone to have them)
     local raidVisible = IsCategoryVisibleForContent("raid")
@@ -667,7 +671,7 @@ function BuffState.Refresh()
 
         if IsBuffEnabled(buff.key) and showBuff then
             local missing, total, minRemaining = CountMissingBuff(buff.spellID, buff.key, playerOnly)
-            local expiringSoon = db.showExpirationGlow and minRemaining and minRemaining < expirationThreshold
+            local expiringSoon = showExpirationGlow and minRemaining and minRemaining < expirationThreshold
 
             if missing > 0 then
                 entry.visible = true
@@ -701,7 +705,7 @@ function BuffState.Refresh()
 
         if IsBuffEnabled(buff.key) and showBuff then
             local count, minRemaining = CountPresenceBuff(buff.spellID, playerOnly)
-            local expiringSoon = db.showExpirationGlow
+            local expiringSoon = showExpirationGlow
                 and not buff.noGlow
                 and minRemaining
                 and minRemaining < expirationThreshold

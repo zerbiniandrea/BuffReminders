@@ -319,15 +319,6 @@ local function CreateOptionsPanel()
     -- ========== BUFFS TAB (Two-Column Layout) ==========
     local buffsContent, _ = CreateScrollableContent("buffs")
 
-    -- Update callback for category visibility changes
-    local function OnCategoryVisibilityChange()
-        if BR.Display.IsTestMode() then
-            RefreshTestDisplay()
-        else
-            UpdateDisplay()
-        end
-    end
-
     -- Render checkboxes for a buff array (single column within each side)
     local function RenderBuffCheckboxes(parent, x, y, buffArray)
         local groupSpells = {}
@@ -407,10 +398,7 @@ local function CreateOptionsPanel()
 
     -- LEFT COLUMN: Group-wide buffs
     -- Raid Buffs
-    local raidHeader =
-        Components.CategoryHeader(buffsContent, { text = "Raid Buffs", category = "raid" }, OnCategoryVisibilityChange)
-    raidHeader:SetPoint("TOPLEFT", buffsLeftX, buffsLeftY)
-    buffsLeftY = buffsLeftY - 18
+    _, buffsLeftY = CreateSectionHeader(buffsContent, "Raid Buffs", buffsLeftX, buffsLeftY)
     local raidNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     raidNote:SetPoint("TOPLEFT", buffsLeftX, buffsLeftY)
     raidNote:SetText("(for the whole group)")
@@ -419,13 +407,7 @@ local function CreateOptionsPanel()
     buffsLeftY = buffsLeftY - SECTION_SPACING
 
     -- Presence Buffs
-    local presenceHeader = Components.CategoryHeader(
-        buffsContent,
-        { text = "Presence Buffs", category = "presence" },
-        OnCategoryVisibilityChange
-    )
-    presenceHeader:SetPoint("TOPLEFT", buffsLeftX, buffsLeftY)
-    buffsLeftY = buffsLeftY - 18
+    _, buffsLeftY = CreateSectionHeader(buffsContent, "Presence Buffs", buffsLeftX, buffsLeftY)
     local presenceNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     presenceNote:SetPoint("TOPLEFT", buffsLeftX, buffsLeftY)
     presenceNote:SetText("(at least 1 person needs)")
@@ -434,13 +416,7 @@ local function CreateOptionsPanel()
     buffsLeftY = buffsLeftY - SECTION_SPACING
 
     -- Consumables
-    local consumableHeader = Components.CategoryHeader(
-        buffsContent,
-        { text = "Consumables", category = "consumable" },
-        OnCategoryVisibilityChange
-    )
-    consumableHeader:SetPoint("TOPLEFT", buffsLeftX, buffsLeftY)
-    buffsLeftY = buffsLeftY - 18
+    _, buffsLeftY = CreateSectionHeader(buffsContent, "Consumables", buffsLeftX, buffsLeftY)
     local consumablesNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     consumablesNote:SetPoint("TOPLEFT", buffsLeftX, buffsLeftY)
     consumablesNote:SetText("(flasks, food, runes, oils)")
@@ -449,13 +425,7 @@ local function CreateOptionsPanel()
 
     -- RIGHT COLUMN: Individual buffs
     -- Targeted Buffs
-    local targetedHeader = Components.CategoryHeader(
-        buffsContent,
-        { text = "Targeted Buffs", category = "targeted" },
-        OnCategoryVisibilityChange
-    )
-    targetedHeader:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
-    buffsRightY = buffsRightY - 18
+    _, buffsRightY = CreateSectionHeader(buffsContent, "Targeted Buffs", buffsRightX, buffsRightY)
     local targetedNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     targetedNote:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
     targetedNote:SetText("(buffs on someone else)")
@@ -464,10 +434,7 @@ local function CreateOptionsPanel()
     buffsRightY = buffsRightY - SECTION_SPACING
 
     -- Self Buffs
-    local selfHeader =
-        Components.CategoryHeader(buffsContent, { text = "Self Buffs", category = "self" }, OnCategoryVisibilityChange)
-    selfHeader:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
-    buffsRightY = buffsRightY - 18
+    _, buffsRightY = CreateSectionHeader(buffsContent, "Self Buffs", buffsRightX, buffsRightY)
     local selfNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     selfNote:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
     selfNote:SetText("(buffs strictly on yourself)")
@@ -476,13 +443,7 @@ local function CreateOptionsPanel()
     buffsRightY = buffsRightY - SECTION_SPACING
 
     -- Custom Buffs (right column)
-    local customHeader = Components.CategoryHeader(
-        buffsContent,
-        { text = "Custom Buffs", category = "custom" },
-        OnCategoryVisibilityChange
-    )
-    customHeader:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
-    buffsRightY = buffsRightY - 18
+    _, buffsRightY = CreateSectionHeader(buffsContent, "Custom Buffs", buffsRightX, buffsRightY)
     panel.customBuffRows = {}
 
     local customBuffsContainer = CreateFrame("Frame", nil, buffsContent)
@@ -648,20 +609,33 @@ local function CreateOptionsPanel()
     defDirHolder:SetPoint("TOPLEFT", appX, appY)
     appY = appY - 35 -- Extra space for Direction dropdown menu
 
-    -- Default Behavior section
-    _, appY = CreateSectionHeader(appearanceContent, "Default Behavior", appX, appY)
+    local resetMainPosBtn = CreateButton(appearanceContent, "Reset Main Frame Position", function()
+        local mainDefaults = defaults.categorySettings.main
+        if mainDefaults and mainDefaults.position then
+            BR.Display.ResetMainFramePosition(
+                mainDefaults.position.point,
+                mainDefaults.position.x,
+                mainDefaults.position.y
+            )
+            BuffRemindersDB.position = {
+                point = mainDefaults.position.point,
+                x = mainDefaults.position.x,
+                y = mainDefaults.position.y,
+            }
+            if BuffRemindersDB.categorySettings and BuffRemindersDB.categorySettings.main then
+                BuffRemindersDB.categorySettings.main.position = {
+                    point = mainDefaults.position.point,
+                    x = mainDefaults.position.x,
+                    y = mainDefaults.position.y,
+                }
+            end
+        end
+    end, { title = "Reset Position", desc = "Reset the main buff frame to center of screen." })
+    resetMainPosBtn:SetPoint("TOPLEFT", appX, appY)
+    appY = appY - 30
 
-    local defReminderHolder = Components.Checkbox(appearanceContent, {
-        label = 'Show "BUFF!" reminder text',
-        get = function()
-            return BuffRemindersDB.defaults and BuffRemindersDB.defaults.showBuffReminder ~= false
-        end,
-        onChange = function(checked)
-            BR.Config.Set("defaults.showBuffReminder", checked)
-        end,
-    })
-    defReminderHolder:SetPoint("TOPLEFT", appX, appY)
-    appY = appY - 22
+    -- Expiration Glow section
+    _, appY = CreateSectionHeader(appearanceContent, "Expiration Glow", appX, appY)
 
     local defGlowHolder = Components.Checkbox(appearanceContent, {
         label = "Show expiration glow",
@@ -754,6 +728,39 @@ local function CreateOptionsPanel()
         local catY = 0
 
         local db = BuffRemindersDB
+
+        -- Visibility callback for W/S/D/R toggles
+        local function OnCategoryVisibilityChange()
+            if BR.Display.IsTestMode() then
+                RefreshTestDisplay()
+            else
+                UpdateDisplay()
+            end
+        end
+
+        -- W/S/D/R content visibility toggles
+        local visToggles = Components.VisibilityToggles(catContent, {
+            category = category,
+            onChange = OnCategoryVisibilityChange,
+        })
+        visToggles:SetPoint("TOPLEFT", 0, catY)
+        catY = catY - 20
+
+        -- "BUFF!" text (raid only)
+        if category == "raid" then
+            local reminderHolder = Components.Checkbox(catContent, {
+                label = 'Show "BUFF!" reminder text',
+                get = function()
+                    local cs = db.categorySettings and db.categorySettings.raid
+                    return not cs or cs.showBuffReminder ~= false
+                end,
+                onChange = function(checked)
+                    BR.Config.Set("categorySettings.raid.showBuffReminder", checked)
+                end,
+            })
+            reminderHolder:SetPoint("TOPLEFT", 0, catY)
+            catY = catY - 22
+        end
 
         -- Split frame checkbox
         local splitHolder = Components.Checkbox(catContent, {
@@ -935,94 +942,6 @@ local function CreateOptionsPanel()
         end)
         catY = catY - 52
 
-        -- Use custom behavior checkbox
-        local useCustomBehHolder = Components.Checkbox(catContent, {
-            label = "Use custom behavior",
-            get = function()
-                return db.categorySettings
-                    and db.categorySettings[category]
-                    and db.categorySettings[category].useCustomBehavior == true
-            end,
-            tooltip = "When disabled, this category inherits behavior settings from Global Defaults",
-            onChange = function(checked)
-                if not db.categorySettings then
-                    db.categorySettings = {}
-                end
-                if not db.categorySettings[category] then
-                    db.categorySettings[category] = {}
-                end
-                db.categorySettings[category].useCustomBehavior = checked
-                UpdateVisuals()
-            end,
-        })
-        useCustomBehHolder:SetPoint("TOPLEFT", 0, catY)
-        catY = catY - 22
-
-        -- Behavior controls (vertical layout to fit)
-        -- "BUFF!" text only relevant for raid and presence buffs
-        local reminderHolder = nil
-        if category == "raid" or category == "presence" then
-            reminderHolder = Components.Checkbox(catContent, {
-                label = 'Show "BUFF!" reminder text',
-                get = function()
-                    return BR.Config.GetCategorySetting(category, "showBuffReminder") ~= false
-                end,
-                onChange = function(checked)
-                    BR.Config.Set("categorySettings." .. category .. ".showBuffReminder", checked)
-                end,
-            })
-            reminderHolder:SetPoint("TOPLEFT", 10, catY)
-            catY = catY - 20
-        end
-
-        local glowHolder = Components.Checkbox(catContent, {
-            label = "Show expiration glow",
-            get = function()
-                return BR.Config.GetCategorySetting(category, "showExpirationGlow") ~= false
-            end,
-            onChange = function(checked)
-                BR.Config.Set("categorySettings." .. category .. ".showExpirationGlow", checked)
-            end,
-        })
-        glowHolder:SetPoint("TOPLEFT", 10, catY)
-
-        local thresholdHolder = Components.Slider(catContent, {
-            label = "at",
-            min = 1,
-            max = 15,
-            get = function()
-                return BR.Config.GetCategorySetting(category, "expirationThreshold") or 15
-            end,
-            suffix = " min",
-            labelWidth = 15,
-            sliderWidth = 60,
-            onChange = function(val)
-                BR.Config.Set("categorySettings." .. category .. ".expirationThreshold", val)
-            end,
-        })
-        thresholdHolder:SetPoint("LEFT", glowHolder, "RIGHT", 5, 0)
-
-        local function UpdateBehaviorEnabled()
-            local enabled = db.categorySettings
-                and db.categorySettings[category]
-                and db.categorySettings[category].useCustomBehavior == true
-            if reminderHolder then
-                reminderHolder:SetEnabled(enabled)
-            end
-            glowHolder:SetEnabled(enabled)
-            thresholdHolder:SetEnabled(enabled)
-        end
-        UpdateBehaviorEnabled()
-
-        local origBehClick = useCustomBehHolder.checkbox:GetScript("OnClick")
-        useCustomBehHolder.checkbox:SetScript("OnClick", function(self)
-            if origBehClick then
-                origBehClick(self)
-            end
-            UpdateBehaviorEnabled()
-        end)
-        catY = catY - 22
-
         section:SetContentHeight(math.abs(catY) + 10)
         table.insert(categorySections, section)
         previousSection = section
@@ -1055,19 +974,6 @@ local function CreateOptionsPanel()
         end,
     })
     groupHolder:SetPoint("TOPLEFT", setX, setY)
-    setY = setY - 22
-
-    local instanceHolder = Components.Checkbox(settingsContent, {
-        label = "Only in instance",
-        get = function()
-            return BuffRemindersDB.showOnlyInInstance == true
-        end,
-        onChange = function(checked)
-            BuffRemindersDB.showOnlyInInstance = checked
-            UpdateDisplay()
-        end,
-    })
-    instanceHolder:SetPoint("TOPLEFT", setX + 20, setY)
     setY = setY - 22
 
     local readyCheckHolder = Components.Checkbox(settingsContent, {

@@ -128,7 +128,6 @@
 ---@field iconZoom number
 ---@field borderSize number
 ---@field growDirection string
----@field showBuffReminder boolean
 ---@field showExpirationGlow boolean
 ---@field expirationThreshold number
 ---@field glowStyle number
@@ -142,11 +141,7 @@
 ---@field iconZoom? number
 ---@field borderSize? number
 ---@field showBuffReminder? boolean
----@field showExpirationGlow? boolean
----@field expirationThreshold? number
----@field glowStyle? number
 ---@field useCustomAppearance? boolean
----@field useCustomBehavior? boolean
 ---@field split? boolean
 
 --- All category settings must be defined here. When adding a new category:

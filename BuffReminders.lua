@@ -77,7 +77,6 @@ local defaults = {
     locked = true,
     enabledBuffs = {},
     showOnlyInGroup = false,
-    showOnlyInInstance = false,
     showOnlyPlayerClassBuff = false,
     showOnlyPlayerMissing = false,
     showOnlyOnReadyCheck = false,
@@ -96,8 +95,7 @@ local defaults = {
         iconZoom = 8, -- percentage
         borderSize = 2,
         growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT", "UP", "DOWN"
-        -- Behavior
-        showBuffReminder = true,
+        -- Behavior (glow is global-only)
         showExpirationGlow = true,
         expirationThreshold = 15, -- minutes
         glowStyle = 1, -- 1=Orange, 2=Gold, 3=Yellow, 4=White, 5=Red
@@ -122,37 +120,32 @@ local defaults = {
         raid = {
             position = { point = "CENTER", x = 0, y = 60 },
             useCustomAppearance = false,
-            useCustomBehavior = false,
+            showBuffReminder = true,
             split = false,
         },
         presence = {
             position = { point = "CENTER", x = 0, y = 20 },
             useCustomAppearance = false,
-            useCustomBehavior = false,
             split = false,
         },
         targeted = {
             position = { point = "CENTER", x = 0, y = -20 },
             useCustomAppearance = false,
-            useCustomBehavior = false,
             split = false,
         },
         self = {
             position = { point = "CENTER", x = 0, y = -60 },
             useCustomAppearance = false,
-            useCustomBehavior = false,
             split = false,
         },
         consumable = {
             position = { point = "CENTER", x = 0, y = -100 },
             useCustomAppearance = false,
-            useCustomBehavior = false,
             split = false,
         },
         custom = {
             position = { point = "CENTER", x = 0, y = -140 },
             useCustomAppearance = false,
-            useCustomBehavior = false,
             split = false,
         },
     },
@@ -244,7 +237,7 @@ local function GetCategorySettings(category)
             iconZoom = globalDefaults.iconZoom or 8,
             borderSize = globalDefaults.borderSize or 2,
             growDirection = globalDefaults.growDirection or "CENTER",
-            showBuffReminder = globalDefaults.showBuffReminder ~= false,
+            showBuffReminder = false, -- main uses per-frame logic based on buff's actual category
             showExpirationGlow = globalDefaults.showExpirationGlow ~= false,
             expirationThreshold = globalDefaults.expirationThreshold or 15,
             glowStyle = globalDefaults.glowStyle or 1,
@@ -284,25 +277,17 @@ local function GetCategorySettings(category)
         result.growDirection = globalDefaults.growDirection or "CENTER"
     end
 
-    -- Behavior: inherit from defaults unless useCustomBehavior is true
-    local useCustomBehavior = catSettings and catSettings.useCustomBehavior
-    if useCustomBehavior then
-        result.showBuffReminder = catSettings and catSettings.showBuffReminder ~= nil and catSettings.showBuffReminder
-            or globalDefaults.showBuffReminder ~= false
-        result.showExpirationGlow = catSettings
-                and catSettings.showExpirationGlow ~= nil
-                and catSettings.showExpirationGlow
-            or globalDefaults.showExpirationGlow ~= false
-        result.expirationThreshold = (catSettings and catSettings.expirationThreshold)
-            or globalDefaults.expirationThreshold
-            or 15
-        result.glowStyle = (catSettings and catSettings.glowStyle) or globalDefaults.glowStyle or 1
+    -- BUFF! text: direct per-category for raid only
+    if category == "raid" then
+        result.showBuffReminder = not catSettings or catSettings.showBuffReminder ~= false
     else
-        result.showBuffReminder = globalDefaults.showBuffReminder ~= false
-        result.showExpirationGlow = globalDefaults.showExpirationGlow ~= false
-        result.expirationThreshold = globalDefaults.expirationThreshold or 15
-        result.glowStyle = globalDefaults.glowStyle or 1
+        result.showBuffReminder = false
     end
+
+    -- Glow: always from global defaults
+    result.showExpirationGlow = globalDefaults.showExpirationGlow ~= false
+    result.expirationThreshold = globalDefaults.expirationThreshold or 15
+    result.glowStyle = globalDefaults.glowStyle or 1
 
     return result
 end
@@ -578,7 +563,7 @@ BR.GlowStyles = GlowStyles
 -- Show/hide expiration glow on a buff frame
 local function SetExpirationGlow(frame, show)
     local db = BuffRemindersDB
-    local styleIndex = db.glowStyle or 1
+    local styleIndex = (db.defaults and db.defaults.glowStyle) or 1
 
     if show then
         if not frame.glowShowing or frame.currentGlowStyle ~= styleIndex then
@@ -784,15 +769,16 @@ local function CreateBuffFrame(buff, category)
     frame.count:SetTextColor(1, 1, 1, 1)
     frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(1), "OUTLINE")
 
-    -- "BUFF!" text for the class that provides this buff
+    -- "BUFF!" text for the class that provides this buff (raid buffs only)
     frame.isPlayerBuff = (playerClass == buff.class)
-    if frame.isPlayerBuff then
+    if frame.isPlayerBuff and category == "raid" then
         frame.buffText = frame:CreateFontString(nil, "OVERLAY")
         frame.buffText:SetPoint("TOP", frame, "BOTTOM", 0, -6)
         frame.buffText:SetFont(STANDARD_TEXT_FONT, GetFontSize(0.8), "OUTLINE")
         frame.buffText:SetTextColor(1, 1, 1, 1)
         frame.buffText:SetText("BUFF!")
-        if not db.showBuffReminder then
+        local raidCs = db.categorySettings and db.categorySettings.raid
+        if raidCs and raidCs.showBuffReminder == false then
             frame.buffText:Hide()
         end
     end
@@ -1063,7 +1049,7 @@ RefreshTestDisplay = function()
         local frame = buffFrames[buff.key]
         if frame then
             frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame), "OUTLINE")
-            if db.showExpirationGlow and not glowShown then
+            if (db.defaults and db.defaults.showExpirationGlow ~= false) and not glowShown then
                 frame.count:SetText(FormatRemainingTime(testModeData.fakeRemaining))
                 SetExpirationGlow(frame, true)
                 glowShown = true
@@ -1191,7 +1177,7 @@ ToggleTestMode = function(showLabels)
         local db = BuffRemindersDB
         testModeData = {
             fakeTotal = math.random(10, 20),
-            fakeRemaining = math.random(1, db.expirationThreshold or 15) * 60,
+            fakeRemaining = math.random(1, (db.defaults and db.defaults.expirationThreshold) or 15) * 60,
             fakeMissing = {},
             showLabels = showLabels,
         }
@@ -1284,16 +1270,9 @@ UpdateDisplay = function()
         return
     end
 
-    if db.showOnlyInGroup then
-        if db.showOnlyInInstance then
-            if not IsInInstance() then
-                HideAllDisplayFrames()
-                return
-            end
-        elseif GetNumGroupMembers() == 0 then
-            HideAllDisplayFrames()
-            return
-        end
+    if db.showOnlyInGroup and GetNumGroupMembers() == 0 then
+        HideAllDisplayFrames()
+        return
     end
 
     -- Refresh buff state
@@ -1646,12 +1625,14 @@ local function UpdateVisuals()
         frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, 1), "OUTLINE")
         if frame.buffText then
             frame.buffText:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, 0.8), "OUTLINE")
-            -- Use per-category showBuffReminder setting
-            if catSettings.showBuffReminder then
-                frame.buffText:Show()
-            else
-                frame.buffText:Hide()
+            -- BUFF! text: use buff's actual category (raid only)
+            local buffCat = frame.buffCategory
+            local showReminder = false
+            if buffCat == "raid" then
+                local cs = BuffRemindersDB.categorySettings and BuffRemindersDB.categorySettings.raid
+                showReminder = not cs or cs.showBuffReminder ~= false
             end
+            frame.buffText:SetShown(showReminder)
         end
         -- Update icon zoom (texcoord)
         local zoom = (catSettings.iconZoom or DEFAULT_ICON_ZOOM) / 100
@@ -1997,6 +1978,56 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
                 end
             end
         end
+
+        -- Migrate: remove useCustomBehavior, per-category glow, consolidate showBuffReminder
+        if db.categorySettings then
+            for cat, catSettings in pairs(db.categorySettings) do
+                if cat ~= "main" then
+                    -- For raid: if useCustomBehavior was false, copy showBuffReminder from defaults
+                    if cat == "raid" then
+                        if catSettings.useCustomBehavior == false and catSettings.showBuffReminder == nil then
+                            catSettings.showBuffReminder = db.defaults and db.defaults.showBuffReminder ~= false
+                        end
+                    else
+                        -- Non-raid categories don't use showBuffReminder anymore
+                        catSettings.showBuffReminder = nil
+                    end
+                    -- Clean up removed fields
+                    catSettings.useCustomBehavior = nil
+                    catSettings.showExpirationGlow = nil
+                    catSettings.expirationThreshold = nil
+                    catSettings.glowStyle = nil
+                end
+            end
+        end
+
+        -- Migrate legacy root-level glow settings to defaults
+        if db.showExpirationGlow ~= nil then
+            if db.defaults and db.defaults.showExpirationGlow == nil then
+                db.defaults.showExpirationGlow = db.showExpirationGlow
+            end
+            db.showExpirationGlow = nil
+        end
+        if db.expirationThreshold ~= nil then
+            if db.defaults and db.defaults.expirationThreshold == nil then
+                db.defaults.expirationThreshold = db.expirationThreshold
+            end
+            db.expirationThreshold = nil
+        end
+        if db.glowStyle ~= nil then
+            if db.defaults and db.defaults.glowStyle == nil then
+                db.defaults.glowStyle = db.glowStyle
+            end
+            db.glowStyle = nil
+        end
+
+        -- Remove showBuffReminder from defaults (now per-category raid-only)
+        if db.defaults then
+            db.defaults.showBuffReminder = nil
+        end
+
+        -- Remove showOnlyInInstance (replaced by per-category W/S/D/R visibility toggles)
+        db.showOnlyInInstance = nil
 
         -- Ensure categorySettings.main exists
         if not db.categorySettings then

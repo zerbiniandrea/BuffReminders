@@ -216,7 +216,6 @@ BR.Config.DebugMode = false
 -- Root-level settings (path = key directly)
 local RootSettings = {
     splitCategories = "FramesReparent",
-    showBuffReminder = "VisualsRefresh",
     frameLocked = nil, -- No refresh needed
     hideInCombat = nil,
     showOnlyInGroup = nil,
@@ -234,12 +233,8 @@ local CategorySettingKeys = {
     growDirection = "LayoutRefresh",
     -- Behavior
     showBuffReminder = "VisualsRefresh",
-    showExpirationGlow = "VisualsRefresh",
-    expirationThreshold = "VisualsRefresh",
-    glowStyle = "VisualsRefresh",
     -- Toggles
     useCustomAppearance = nil, -- No refresh, just toggle state
-    useCustomBehavior = nil, -- No refresh, just toggle state
     split = "FramesReparent",
 }
 
@@ -252,8 +247,7 @@ local DefaultSettingKeys = {
     textSize = "VisualsRefresh",
     spacing = "LayoutRefresh",
     growDirection = "LayoutRefresh",
-    -- Behavior
-    showBuffReminder = "VisualsRefresh",
+    -- Behavior (glow is global-only, lives under defaults)
     showExpirationGlow = "VisualsRefresh",
     expirationThreshold = "VisualsRefresh",
     glowStyle = "VisualsRefresh",
@@ -290,8 +284,7 @@ local function ValidatePath(segments)
     local root = segments[1]
 
     -- Check root-level settings (explicit key check since some have nil refresh type)
-    local isRootSetting = root == "showBuffReminder"
-        or root == "frameLocked"
+    local isRootSetting = root == "frameLocked"
         or root == "hideInCombat"
         or root == "showOnlyInGroup"
         or root == "position"
@@ -349,11 +342,7 @@ local function ValidatePath(segments)
                 "spacing",
                 "growDirection",
                 "showBuffReminder",
-                "showExpirationGlow",
-                "expirationThreshold",
-                "glowStyle",
                 "useCustomAppearance",
-                "useCustomBehavior",
                 "split",
             }
             for _, key in ipairs(knownKeys) do
@@ -393,7 +382,6 @@ local RefreshType = {
     ["iconSize"] = "VisualsRefresh",
     ["iconZoom"] = "VisualsRefresh",
     ["borderSize"] = "VisualsRefresh",
-    ["showBuffReminder"] = "VisualsRefresh",
     -- Layout properties
     ["spacing"] = "LayoutRefresh",
     ["growDirection"] = "LayoutRefresh",
@@ -569,14 +557,6 @@ local AppearanceKeys = {
     borderSize = true,
 }
 
--- Keys that are behavior-related (inherit from defaults when useCustomBehavior is false)
-local BehaviorKeys = {
-    showBuffReminder = true,
-    showExpirationGlow = true,
-    expirationThreshold = true,
-    glowStyle = true,
-}
-
 ---Get a category setting with inheritance from defaults
 ---@param category string Category name (raid, presence, etc.)
 ---@param key string Setting key (iconSize, showBuffReminder, etc.)
@@ -599,11 +579,6 @@ function BR.Config.GetCategorySetting(category, key)
         if not catSettings.useCustomAppearance then
             return db.defaults and db.defaults[key]
         end
-    elseif BehaviorKeys[key] then
-        -- Behavior: use custom value only if useCustomBehavior is true
-        if not catSettings.useCustomBehavior then
-            return db.defaults and db.defaults[key]
-        end
     end
 
     -- Use category-specific value if set, otherwise fall back to defaults
@@ -623,17 +598,6 @@ function BR.Config.HasCustomAppearance(category)
         return false
     end
     return db.categorySettings[category].useCustomAppearance == true
-end
-
----Check if a category has custom behavior enabled
----@param category string
----@return boolean
-function BR.Config.HasCustomBehavior(category)
-    local db = BuffRemindersDB
-    if not db or not db.categorySettings or not db.categorySettings[category] then
-        return false
-    end
-    return db.categorySettings[category].useCustomBehavior == true
 end
 
 -- ============================================================================
