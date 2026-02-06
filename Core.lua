@@ -81,6 +81,8 @@ local CategorySettingKeys = {
     textColor = "VisualsRefresh",
     spacing = "LayoutRefresh",
     growDirection = "LayoutRefresh",
+    -- Layout
+    priority = "LayoutRefresh",
     -- Behavior
     showBuffReminder = "VisualsRefresh",
     -- Toggles

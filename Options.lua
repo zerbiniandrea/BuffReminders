@@ -911,6 +911,30 @@ local function CreateOptionsPanel()
         splitHolder:SetPoint("TOPLEFT", 0, catY)
         catY = catY - 22
 
+        -- Priority slider (only relevant when not split)
+        local priorityHolder = Components.Slider(catContent, {
+            label = "Priority",
+            min = 1,
+            max = 7,
+            step = 1,
+            get = function()
+                local cs = db.categorySettings and db.categorySettings[category]
+                return cs and cs.priority or defaults.categorySettings[category].priority
+            end,
+            enabled = function()
+                return not IsCategorySplit(category)
+            end,
+            tooltip = {
+                title = "Display Priority",
+                desc = "Controls the order of this category in the combined frame. Lower values are displayed first.",
+            },
+            onChange = function(val)
+                BR.Config.Set("categorySettings." .. category .. ".priority", val)
+            end,
+        })
+        priorityHolder:SetPoint("TOPLEFT", 10, catY)
+        catY = catY - 32
+
         -- Shared enabled predicates for this category
         local function isCategorySplitEnabled()
             return IsCategorySplit(category)

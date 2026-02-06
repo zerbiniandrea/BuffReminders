@@ -192,6 +192,7 @@ end
 ---@field enabled? fun(): boolean Getter for enabled state, evaluated on Refresh()
 ---@field suffix? string Value suffix (e.g., "px", "%")
 ---@field onChange fun(val: number) Callback when value changes
+---@field tooltip? string|{title: string, desc?: string} Tooltip shown on hover (string or {title, desc} table)
 ---@field labelWidth? number Width of label (default 70)
 ---@field sliderWidth? number Width of slider (default 100)
 
@@ -507,6 +508,32 @@ function Components.Slider(parent, config)
             config.onChange(math.floor(currentValue))
         end
     end)
+
+    -- Hover tooltip (on all interactive children, chained with existing scripts)
+    if config.tooltip then
+        local title, desc
+        if type(config.tooltip) == "table" then
+            title = config.tooltip.title
+            desc = config.tooltip.desc
+        else
+            title = config.tooltip --[[@as string]]
+        end
+        holder:EnableMouse(true)
+        local function showTip()
+            ShowTooltip(holder, title, desc, "ANCHOR_TOP")
+        end
+        local function hideTip()
+            HideTooltip()
+        end
+        holder:HookScript("OnEnter", showTip)
+        holder:HookScript("OnLeave", hideTip)
+        thumb:HookScript("OnEnter", showTip)
+        thumb:HookScript("OnLeave", hideTip)
+        sliderFrame:HookScript("OnEnter", showTip)
+        sliderFrame:HookScript("OnLeave", hideTip)
+        valueBtn:HookScript("OnEnter", showTip)
+        valueBtn:HookScript("OnLeave", hideTip)
+    end
 
     -- Initial visual
     UpdateVisual()

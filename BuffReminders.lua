@@ -127,36 +127,43 @@ local defaults = {
             useCustomAppearance = false,
             showBuffReminder = true,
             split = false,
+            priority = 1,
         },
         presence = {
             position = { point = "CENTER", x = 0, y = 20 },
             useCustomAppearance = false,
             split = false,
+            priority = 2,
         },
         targeted = {
             position = { point = "CENTER", x = 0, y = -20 },
             useCustomAppearance = false,
             split = false,
+            priority = 3,
         },
         self = {
             position = { point = "CENTER", x = 0, y = -60 },
             useCustomAppearance = false,
             split = false,
+            priority = 4,
         },
         pet = {
             position = { point = "CENTER", x = 0, y = -100 },
             useCustomAppearance = false,
             split = false,
+            priority = 5,
         },
         consumable = {
             position = { point = "CENTER", x = 0, y = -140 },
             useCustomAppearance = false,
             split = false,
+            priority = 6,
         },
         custom = {
             position = { point = "CENTER", x = 0, y = -180 },
             useCustomAppearance = false,
             split = false,
+            priority = 7,
         },
     },
 }
@@ -953,11 +960,27 @@ local function PositionBuffFramesWithSplits()
         end
     end
 
-    -- Collect frames for mainFrame (non-split categories) in definition order
+    -- Build sorted category list by priority for non-split ordering
+    local sortedCategories = {}
+    for i, category in ipairs(CATEGORIES) do
+        table.insert(sortedCategories, { name = category, index = i })
+    end
+    table.sort(sortedCategories, function(a, b)
+        local aPri = db.categorySettings and db.categorySettings[a.name] and db.categorySettings[a.name].priority
+            or defaults.categorySettings[a.name].priority
+        local bPri = db.categorySettings and db.categorySettings[b.name] and db.categorySettings[b.name].priority
+            or defaults.categorySettings[b.name].priority
+        if aPri == bPri then
+            return a.index < b.index
+        end
+        return aPri < bPri
+    end)
+
+    -- Collect frames for mainFrame (non-split categories) in priority order
     local mainFrameBuffs = {}
-    for _, category in ipairs(CATEGORIES) do
-        if not IsCategorySplit(category) then
-            for _, frame in ipairs(framesByCategory[category]) do
+    for _, entry in ipairs(sortedCategories) do
+        if not IsCategorySplit(entry.name) then
+            for _, frame in ipairs(framesByCategory[entry.name]) do
                 table.insert(mainFrameBuffs, frame)
             end
         end

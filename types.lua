@@ -152,6 +152,7 @@
 ---@field showBuffReminder? boolean
 ---@field useCustomAppearance? boolean
 ---@field split? boolean
+---@field priority? number
 
 --- All category settings must be defined here. When adding a new category:
 --- 1. Add it to CategoryName alias above
