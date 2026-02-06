@@ -258,7 +258,7 @@ local function CreateOptionsPanel()
             scrollbarWidth = SCROLLBAR_WIDTH,
         })
         scrollFrame:SetPoint("TOPLEFT", 0, CONTENT_TOP)
-        scrollFrame:SetPoint("BOTTOMRIGHT", -SCROLLBAR_WIDTH, 50)
+        scrollFrame:SetPoint("BOTTOMRIGHT", 0, 50)
         scrollFrame:Hide()
 
         contentContainers[name] = scrollFrame
@@ -741,7 +741,7 @@ local function CreateOptionsPanel()
         appearanceContent:SetHeight(totalHeight + 50)
     end
 
-    local SECTION_SCROLLBAR_OFFSET = SCROLLBAR_WIDTH + 34 -- scrollbar + side margins
+    local SECTION_SCROLLBAR_OFFSET = COL_PADDING
     for _, category in ipairs(CATEGORY_ORDER) do
         local section = Components.CollapsibleSection(appearanceContent, {
             title = CATEGORY_LABELS[category],
@@ -756,7 +756,7 @@ local function CreateOptionsPanel()
         if previousSection then
             section:SetPoint("TOPLEFT", previousSection, "BOTTOMLEFT", 0, -4)
         else
-            section:SetPoint("TOPLEFT", appX - 8, appY)
+            section:SetPoint("TOPLEFT", appX, appY)
         end
 
         local catContent = section:GetContentFrame()

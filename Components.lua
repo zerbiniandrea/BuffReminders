@@ -1559,8 +1559,8 @@ function Components.ScrollableContainer(parent, config)
     local scrollBar = scrollFrame.ScrollBar
     if scrollBar then
         scrollBar:ClearAllPoints()
-        scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", -16, -16)
-        scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", -16, 16)
+        scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", -18, -16)
+        scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", -18, 16)
 
         -- Apply modern styling
         ApplyModernScrollbarStyle(scrollBar)
