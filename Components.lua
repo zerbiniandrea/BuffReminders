@@ -1952,8 +1952,10 @@ function Components.ColorSwatch(parent, config)
         end
         if not enabled then
             swatchBtn:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
+            swatchBtn:SetAlpha(0.35)
         else
             swatchBtn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+            swatchBtn:SetAlpha(1)
         end
     end
 

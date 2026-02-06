@@ -957,7 +957,12 @@ local function CreateOptionsPanel()
         -- Direction and Reset button on same line
         local dirHolder = Components.DirectionButtons(catContent, {
             get = function()
-                return GetCategorySettings(category).growDirection or "CENTER"
+                local catSettings = db.categorySettings and db.categorySettings[category]
+                local val = catSettings and catSettings.growDirection
+                if val ~= nil then
+                    return val
+                end
+                return db.defaults and db.defaults.growDirection or "CENTER"
             end,
             enabled = isCategorySplitEnabled,
             onChange = function(dir)
