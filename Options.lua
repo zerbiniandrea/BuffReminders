@@ -11,6 +11,7 @@ local CreateButton = BR.CreateButton
 local CreatePanel = BR.CreatePanel
 local CreateSectionHeader = BR.CreateSectionHeader
 local CreateBuffIcon = BR.CreateBuffIcon
+local StyleEditBox = BR.StyleEditBox
 
 -- Shared constants
 local TEXCOORD_INSET = BR.TEXCOORD_INSET
@@ -1404,7 +1405,10 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     modalTitle:SetPoint("TOP", 0, -12)
     modalTitle:SetText(editingBuff and "Edit Custom Buff" or "Add Custom Buff")
 
-    local modalCloseBtn = CreateFrame("Button", nil, modal, "UIPanelCloseButton")
+    local modalCloseBtn = CreateButton(modal, "x", function()
+        modal:Hide()
+    end)
+    modalCloseBtn:SetSize(22, 22)
     modalCloseBtn:SetPoint("TOPRIGHT", -5, -5)
 
     local spellIdsLabel = modal:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -1450,20 +1454,22 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
         local rowFrame = CreateFrame("Frame", nil, modal)
         rowFrame:SetSize(MODAL_WIDTH - 40, ROW_HEIGHT - 2)
 
-        local editBox = CreateFrame("EditBox", nil, rowFrame, "InputBoxTemplate")
-        editBox:SetSize(70, 20)
-        editBox:SetPoint("LEFT", 0, 0)
+        local editBox = CreateFrame("EditBox", nil, rowFrame)
+        editBox:SetFontObject("GameFontHighlightSmall")
         editBox:SetAutoFocus(false)
+        local editContainer = StyleEditBox(editBox)
+        editContainer:SetSize(70, 20)
+        editContainer:SetPoint("LEFT", 0, 0)
         if initialSpellID then
             editBox:SetText(tostring(initialSpellID))
         end
 
-        local lookupBtn = CreateFrame("Button", nil, rowFrame, "UIPanelButtonTemplate")
-        lookupBtn:SetSize(50, 20)
-        lookupBtn:SetPoint("LEFT", editBox, "RIGHT", 5, 0)
-        lookupBtn:SetText("Lookup")
-        lookupBtn:SetNormalFontObject("GameFontHighlightSmall")
-        lookupBtn:SetHighlightFontObject("GameFontHighlightSmall")
+        local doLookup -- forward declare for onClick
+        local lookupBtn = CreateButton(rowFrame, "Lookup", function()
+            doLookup()
+        end)
+        lookupBtn:SetSize(55, 20)
+        lookupBtn:SetPoint("LEFT", editContainer, "RIGHT", 5, 0)
 
         local icon = CreateBuffIcon(rowFrame, 18)
         icon:SetPoint("LEFT", lookupBtn, "RIGHT", 8, 0)
@@ -1475,12 +1481,9 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
         nameText:SetJustifyH("LEFT")
         nameText:SetWordWrap(false)
 
-        local removeBtn = CreateFrame("Button", nil, rowFrame, "UIPanelButtonTemplate")
-        removeBtn:SetSize(20, 20)
+        local removeBtn = CreateButton(rowFrame, "-", nil)
+        removeBtn:SetSize(22, 20)
         removeBtn:SetPoint("RIGHT", 0, 0)
-        removeBtn:SetText("-")
-        removeBtn:SetNormalFontObject("GameFontHighlightSmall")
-        removeBtn:SetHighlightFontObject("GameFontHighlightSmall")
         removeBtn:Hide()
 
         local rowData = {
@@ -1494,7 +1497,18 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
             spellName = nil,
         }
 
-        lookupBtn:SetScript("OnClick", function()
+        removeBtn:SetScript("OnClick", function()
+            for i, rd in ipairs(spellRows) do
+                if rd == rowData then
+                    rowData.frame:Hide()
+                    table.remove(spellRows, i)
+                    UpdateLayout()
+                    break
+                end
+            end
+        end)
+
+        doLookup = function()
             local spellID = tonumber(editBox:GetText())
             if not spellID then
                 icon:Hide()
@@ -1514,23 +1528,12 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
                 nameText:SetText("|cffff4d4dNot found|r")
                 rowData.validated, rowData.spellID, rowData.spellName = false, nil, nil
             end
-        end)
-
-        removeBtn:SetScript("OnClick", function()
-            for i, rd in ipairs(spellRows) do
-                if rd == rowData then
-                    rowData.frame:Hide()
-                    table.remove(spellRows, i)
-                    UpdateLayout()
-                    break
-                end
-            end
-        end)
+        end
 
         table.insert(spellRows, rowData)
 
         if initialSpellID then
-            lookupBtn:GetScript("OnClick")()
+            doLookup()
         end
 
         return rowData
@@ -1622,35 +1625,25 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     saveError:SetJustifyH("LEFT")
     saveError:SetTextColor(1, 0.3, 0.3)
 
-    local cancelBtn = CreateFrame("Button", nil, modal, "UIPanelButtonTemplate")
-    cancelBtn:SetSize(80, 22)
-    cancelBtn:SetPoint("BOTTOMRIGHT", -20, 15)
-    cancelBtn:SetText("Cancel")
-    cancelBtn:SetScript("OnClick", function()
+    local cancelBtn = CreateButton(modal, "Cancel", function()
         modal:Hide()
     end)
+    cancelBtn:SetPoint("BOTTOMRIGHT", -20, 15)
 
     -- Delete button (only when editing existing buff)
     if existingKey and editingBuff then
         local buffName = editingBuff.name or existingKey
-        local deleteBtn = CreateFrame("Button", nil, modal, "UIPanelButtonTemplate")
-        deleteBtn:SetSize(80, 22)
-        deleteBtn:SetPoint("BOTTOMLEFT", 20, 15)
-        deleteBtn:SetText("Delete")
-        deleteBtn:SetScript("OnClick", function()
+        local deleteBtn = CreateButton(modal, "Delete", function()
             modal:Hide()
             StaticPopup_Show("BUFFREMINDERS_DELETE_CUSTOM", buffName, nil, {
                 key = existingKey,
                 refreshPanel = refreshPanelCallback,
             })
         end)
+        deleteBtn:SetPoint("BOTTOMLEFT", 20, 15)
     end
 
-    local saveBtn = CreateFrame("Button", nil, modal, "UIPanelButtonTemplate")
-    saveBtn:SetSize(80, 22)
-    saveBtn:SetPoint("RIGHT", cancelBtn, "LEFT", -10, 0)
-    saveBtn:SetText("Save")
-    saveBtn:SetScript("OnClick", function()
+    local saveBtn = CreateButton(modal, "Save", function()
         local validatedIDs = {}
         local firstName = nil
         for _, rowData in ipairs(spellRows) do
@@ -1704,6 +1697,7 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
         end
         UpdateDisplay()
     end)
+    saveBtn:SetPoint("RIGHT", cancelBtn, "LEFT", -10, 0)
 
     if #existingSpellIDs > 0 then
         for _, spellID in ipairs(existingSpellIDs) do

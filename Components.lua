@@ -222,6 +222,56 @@ local SliderColors = {
     textDisabled = { 0.5, 0.5, 0.5, 1 },
 }
 
+-- TextInput color constants (shared with StyleEditBox and TextArea)
+local TextInputColors = {
+    bg = { 0.08, 0.08, 0.08, 0.9 },
+    bgFocused = { 0.1, 0.1, 0.1, 0.95 },
+    border = { 0.3, 0.3, 0.3, 1 },
+    borderFocused = { 1, 0.82, 0, 1 },
+}
+
+---Style any EditBox with dark flat UI (dark bg, gray border, gold focus highlight).
+---Wraps the EditBox in a BackdropTemplate container. Caller should set size/position on the returned container.
+---@param editBox table The EditBox to style
+---@return table container The backdrop container frame
+local function StyleEditBox(editBox)
+    local colors = TextInputColors
+    local parent = editBox:GetParent()
+
+    local container = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    container:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    container:SetBackdropColor(unpack(colors.bg))
+    container:SetBackdropBorderColor(unpack(colors.border))
+
+    editBox:SetParent(container)
+    editBox:ClearAllPoints()
+    editBox:SetPoint("TOPLEFT", 4, -2)
+    editBox:SetPoint("BOTTOMRIGHT", -4, 2)
+    editBox:SetTextColor(1, 1, 1, 1)
+
+    editBox:HookScript("OnEditFocusGained", function()
+        container:SetBackdropColor(unpack(colors.bgFocused))
+        container:SetBackdropBorderColor(unpack(colors.borderFocused))
+    end)
+
+    editBox:HookScript("OnEditFocusLost", function()
+        container:SetBackdropColor(unpack(colors.bg))
+        container:SetBackdropBorderColor(unpack(colors.border))
+    end)
+
+    editBox:HookScript("OnEscapePressed", function(self)
+        self:ClearFocus()
+    end)
+
+    return container
+end
+
+BR.StyleEditBox = StyleEditBox
+
 ---Create a modern flat-style slider with thin track and small thumb
 ---@param parent table Parent frame
 ---@param config SliderConfig Configuration table
@@ -399,12 +449,14 @@ function Components.Slider(parent, config)
     end)
 
     -- Edit box (hidden by default)
-    local editBox = CreateFrame("EditBox", nil, holder, "InputBoxTemplate")
-    editBox:SetSize(35, 16)
-    editBox:SetPoint("LEFT", sliderFrame, "RIGHT", 6, 0)
+    local editBox = CreateFrame("EditBox", nil, holder)
+    editBox:SetFontObject("GameFontHighlightSmall")
     editBox:SetAutoFocus(false)
     editBox:SetNumeric(true)
-    editBox:Hide()
+    local editContainer = StyleEditBox(editBox)
+    editContainer:SetSize(35, 16)
+    editContainer:SetPoint("LEFT", sliderFrame, "RIGHT", 6, 0)
+    editContainer:Hide()
 
     editBox:SetScript("OnEnterPressed", function(self)
         local num = tonumber(self:GetText())
@@ -415,17 +467,17 @@ function Components.Slider(parent, config)
             UpdateVisual()
             config.onChange(math.floor(currentValue))
         end
-        self:Hide()
+        editContainer:Hide()
         valueBtn:Show()
     end)
 
-    editBox:SetScript("OnEscapePressed", function(self)
-        self:Hide()
+    editBox:SetScript("OnEscapePressed", function()
+        editContainer:Hide()
         valueBtn:Show()
     end)
 
-    editBox:SetScript("OnEditFocusLost", function(self)
-        self:Hide()
+    editBox:SetScript("OnEditFocusLost", function()
+        editContainer:Hide()
         valueBtn:Show()
     end)
 
@@ -437,7 +489,7 @@ function Components.Slider(parent, config)
     valueBtn:SetScript("OnClick", function()
         valueBtn:Hide()
         editBox:SetText(tostring(math.floor(currentValue)))
-        editBox:Show()
+        editContainer:Show()
         editBox:SetFocus()
         editBox:HighlightText()
     end)
@@ -699,7 +751,7 @@ function Components.Checkbox(parent, config)
             title = config.tooltip.title
             desc = config.tooltip.desc
         else
-            title = config.tooltip
+            title = config.tooltip --[[@as string]]
         end
         holder:EnableMouse(true)
         local function showTip()
@@ -1421,10 +1473,12 @@ function Components.TextInput(parent, config)
     holder.label = label
 
     -- Edit box
-    local editBox = CreateFrame("EditBox", nil, holder, "InputBoxTemplate")
-    editBox:SetSize(width, 18)
-    editBox:SetPoint("LEFT", label, "RIGHT", 5, 0)
+    local editBox = CreateFrame("EditBox", nil, holder)
+    editBox:SetFontObject("GameFontHighlightSmall")
     editBox:SetAutoFocus(false)
+    local inputContainer = StyleEditBox(editBox)
+    inputContainer:SetSize(width, 18)
+    inputContainer:SetPoint("LEFT", label, "RIGHT", 5, 0)
     if config.numeric then
         editBox:SetNumeric(true)
     end
@@ -1453,9 +1507,6 @@ function Components.TextInput(parent, config)
             self:ClearFocus()
         end)
     end
-    editBox:SetScript("OnEscapePressed", function(self)
-        self:ClearFocus()
-    end)
 
     -- Public methods
     function holder:SetValue(text)
@@ -1470,6 +1521,8 @@ function Components.TextInput(parent, config)
         editBox:SetEnabled(enabled)
         local color = enabled and 1 or 0.5
         label:SetTextColor(color, color, color)
+        local borderAlpha = enabled and 1 or 0.4
+        inputContainer:SetBackdropBorderColor(0.3, 0.3, 0.3, borderAlpha)
     end
 
     -- Refresh method for OnShow pattern
