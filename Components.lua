@@ -1540,6 +1540,427 @@ function Components.TextInput(parent, config)
     return holder
 end
 
+-- ============================================================================
+-- NUMERIC STEPPER
+-- ============================================================================
+
+---Create a compact numeric stepper with [-] value [+] buttons
+---@param parent table Parent frame
+---@param config table Configuration: label, min, max, step?, labelWidth?, get?, enabled?, onChange?
+---@return table holder Frame with .SetValue(n), .GetValue(), .SetEnabled(bool), .Refresh()
+function Components.NumericStepper(parent, config)
+    local labelWidth = config.labelWidth or 70
+    local step = config.step or 1
+    local BTN_SIZE = 16
+    local VALUE_WIDTH = 26
+
+    -- Container frame
+    local holder = CreateFrame("Frame", nil, parent)
+    holder:SetSize(labelWidth + BTN_SIZE * 2 + VALUE_WIDTH + 16, 20)
+
+    -- Label
+    local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetPoint("LEFT", 0, 0)
+    label:SetWidth(labelWidth)
+    label:SetJustifyH("LEFT")
+    label:SetText(config.label)
+    holder.label = label
+
+    -- State
+    local currentValue = config.min or 0
+    if config.get then
+        currentValue = config.get()
+    end
+    local isEnabled = true
+
+    -- Clickable value display button
+    local valueBtn = CreateFrame("Button", nil, holder)
+    valueBtn:SetSize(VALUE_WIDTH, BTN_SIZE)
+
+    local valueText = valueBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    valueText:SetAllPoints()
+    valueText:SetJustifyH("CENTER")
+
+    -- Forward declarations (buttons needed by UpdateButtonStates, defined below)
+    local UpdateButtonStates
+
+    local function UpdateValueText()
+        valueText:SetText(tostring(currentValue))
+        if UpdateButtonStates then
+            UpdateButtonStates()
+        end
+    end
+
+    local function ClampAndSet(val)
+        val = math.max(config.min or 0, math.min(config.max or 100, val))
+        val = math.floor(val / step + 0.5) * step
+        if val ~= currentValue then
+            currentValue = val
+            UpdateValueText()
+            if config.onChange then
+                config.onChange(currentValue)
+            end
+        else
+            UpdateButtonStates()
+        end
+    end
+
+    -- Minus button
+    local minusBtn = CreateFrame("Button", nil, holder, "BackdropTemplate")
+    minusBtn:SetSize(BTN_SIZE, BTN_SIZE)
+    minusBtn:SetPoint("LEFT", label, "RIGHT", 4, 0)
+    minusBtn:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    minusBtn:SetBackdropColor(0.2, 0.2, 0.2, 1)
+    minusBtn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+
+    local minusLabel = minusBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    minusLabel:SetPoint("CENTER", 0, 0)
+    minusLabel:SetText("-")
+
+    -- Value positioned between buttons
+    valueBtn:SetPoint("LEFT", minusBtn, "RIGHT", 2, 0)
+
+    -- Plus button
+    local plusBtn = CreateFrame("Button", nil, holder, "BackdropTemplate")
+    plusBtn:SetSize(BTN_SIZE, BTN_SIZE)
+    plusBtn:SetPoint("LEFT", valueBtn, "RIGHT", 2, 0)
+    plusBtn:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    plusBtn:SetBackdropColor(0.2, 0.2, 0.2, 1)
+    plusBtn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+
+    local plusLabel = plusBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    plusLabel:SetPoint("CENTER", 0, 0)
+    plusLabel:SetText("+")
+
+    -- Update button appearance based on whether value is at min/max
+    UpdateButtonStates = function()
+        if not isEnabled then
+            return
+        end
+        local atMin = currentValue <= (config.min or 0)
+        local atMax = currentValue >= (config.max or 100)
+        if atMin then
+            minusBtn:SetBackdropColor(0.15, 0.15, 0.15, 1)
+            minusBtn:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
+            minusLabel:SetTextColor(0.35, 0.35, 0.35)
+        else
+            minusBtn:SetBackdropColor(0.2, 0.2, 0.2, 1)
+            minusBtn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+            minusLabel:SetTextColor(1, 1, 1)
+        end
+        if atMax then
+            plusBtn:SetBackdropColor(0.15, 0.15, 0.15, 1)
+            plusBtn:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
+            plusLabel:SetTextColor(0.35, 0.35, 0.35)
+        else
+            plusBtn:SetBackdropColor(0.2, 0.2, 0.2, 1)
+            plusBtn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+            plusLabel:SetTextColor(1, 1, 1)
+        end
+    end
+
+    -- Edit box (hidden by default, shown on value click)
+    local editBox = CreateFrame("EditBox", nil, holder)
+    editBox:SetFontObject("GameFontHighlightSmall")
+    editBox:SetAutoFocus(false)
+    editBox:SetNumeric(true)
+    local editContainer = StyleEditBox(editBox)
+    editContainer:SetSize(VALUE_WIDTH + 4, BTN_SIZE)
+    editContainer:SetPoint("LEFT", minusBtn, "RIGHT", 0, 0)
+    editContainer:Hide()
+
+    editBox:SetScript("OnEnterPressed", function(self)
+        local num = tonumber(self:GetText())
+        if num then
+            ClampAndSet(num)
+        end
+        editContainer:Hide()
+        valueBtn:Show()
+    end)
+
+    editBox:SetScript("OnEscapePressed", function()
+        editContainer:Hide()
+        valueBtn:Show()
+    end)
+
+    editBox:SetScript("OnEditFocusLost", function()
+        editContainer:Hide()
+        valueBtn:Show()
+    end)
+
+    -- Track editbox for focus cleanup on panel hide
+    if panelEditBoxes then
+        table.insert(panelEditBoxes, editBox)
+    end
+
+    valueBtn:SetScript("OnClick", function()
+        if not isEnabled then
+            return
+        end
+        valueBtn:Hide()
+        editBox:SetText(tostring(math.floor(currentValue)))
+        editContainer:Show()
+        editBox:SetFocus()
+        editBox:HighlightText()
+    end)
+    SetupTooltip(valueBtn, "Click to type a value", nil, "ANCHOR_TOP")
+
+    -- Hover effects (skip if button is at its limit)
+    local function IsBtnAtLimit(btn)
+        if btn == minusBtn then
+            return currentValue <= (config.min or 0)
+        end
+        return currentValue >= (config.max or 100)
+    end
+
+    for _, btn in ipairs({ minusBtn, plusBtn }) do
+        btn:SetScript("OnEnter", function(self)
+            if isEnabled and not IsBtnAtLimit(self) then
+                self:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+                self:SetBackdropColor(0.25, 0.25, 0.25, 1)
+            end
+        end)
+        btn:SetScript("OnLeave", function()
+            UpdateButtonStates()
+        end)
+    end
+
+    minusBtn:SetScript("OnClick", function()
+        if isEnabled then
+            ClampAndSet(currentValue - step)
+        end
+    end)
+    plusBtn:SetScript("OnClick", function()
+        if isEnabled then
+            ClampAndSet(currentValue + step)
+        end
+    end)
+
+    -- Mouse wheel on entire holder
+    holder:EnableMouseWheel(true)
+    holder:SetScript("OnMouseWheel", function(_, delta)
+        if isEnabled then
+            ClampAndSet(currentValue + delta * step)
+        end
+    end)
+
+    UpdateValueText()
+
+    -- Public methods
+    function holder:SetValue(val)
+        currentValue = math.max(config.min or 0, math.min(config.max or 100, val))
+        UpdateValueText()
+    end
+
+    function holder:GetValue()
+        return currentValue
+    end
+
+    function holder:SetEnabled(enabled)
+        isEnabled = enabled
+        local color = enabled and 1 or 0.5
+        label:SetTextColor(color, color, color)
+        valueText:SetTextColor(color, color, color)
+        if enabled then
+            UpdateButtonStates()
+        else
+            -- Close edit box if open when disabling
+            editContainer:Hide()
+            valueBtn:Show()
+            minusBtn:SetBackdropColor(0.15, 0.15, 0.15, 1)
+            minusBtn:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
+            plusBtn:SetBackdropColor(0.15, 0.15, 0.15, 1)
+            plusBtn:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
+            minusLabel:SetTextColor(0.5, 0.5, 0.5)
+            plusLabel:SetTextColor(0.5, 0.5, 0.5)
+        end
+    end
+
+    -- Refresh method for OnShow pattern
+    function holder:Refresh()
+        if config.get then
+            currentValue = config.get()
+            UpdateValueText()
+        end
+        if config.enabled then
+            holder:SetEnabled(config.enabled())
+        end
+    end
+
+    -- Auto-register if refreshable
+    if config.get or config.enabled then
+        table.insert(RefreshableComponents, holder)
+    end
+
+    return holder
+end
+
+-- ============================================================================
+-- COLOR SWATCH
+-- ============================================================================
+
+---@class ColorSwatchConfig : ComponentConfig
+---@field label string Display label
+---@field get? fun(): number, number, number, number? Getter returning r, g, b [, a]
+---@field enabled? fun(): boolean Getter for enabled state
+---@field onChange fun(r: number, g: number, b: number, a?: number) Callback when color changes
+---@field hasOpacity? boolean Show opacity/alpha slider (default false)
+---@field labelWidth? number Width of label (default 70)
+
+---Create a small color swatch that opens WoW's ColorPickerFrame on click
+---@param parent table Parent frame
+---@param config ColorSwatchConfig Configuration table
+---@return table holder Frame containing color swatch with .SetColor(r,g,b,a?), .GetColor(), .SetEnabled(bool)
+function Components.ColorSwatch(parent, config)
+    local labelWidth = config.labelWidth or 70
+    local SWATCH_SIZE = 16
+
+    -- Container frame
+    local holder = CreateFrame("Frame", nil, parent)
+    holder:SetSize(labelWidth + SWATCH_SIZE + 50, 20)
+
+    -- Label
+    local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetPoint("LEFT", 0, 0)
+    label:SetWidth(labelWidth)
+    label:SetJustifyH("LEFT")
+    label:SetText(config.label)
+    holder.label = label
+
+    -- Swatch button
+    local swatchBtn = CreateFrame("Button", nil, holder, "BackdropTemplate")
+    swatchBtn:SetSize(SWATCH_SIZE, SWATCH_SIZE)
+    swatchBtn:SetPoint("LEFT", label, "RIGHT", 5, 0)
+    swatchBtn:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    swatchBtn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+
+    -- State
+    local currentR, currentG, currentB, currentA = 1, 1, 1, 1
+    if config.get then
+        local r, g, b, a = config.get()
+        currentR, currentG, currentB = r, g, b
+        currentA = a or 1
+    end
+    local isEnabled = true
+
+    -- Alpha value text (shown when hasOpacity is true)
+    local alphaText
+    if config.hasOpacity then
+        alphaText = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        alphaText:SetPoint("LEFT", swatchBtn, "RIGHT", 4, 0)
+        alphaText:SetText(math.floor(currentA * 100) .. "%")
+    end
+
+    local function UpdateSwatchColor()
+        swatchBtn:SetBackdropColor(currentR, currentG, currentB, 1)
+        if alphaText then
+            alphaText:SetText(math.floor(currentA * 100) .. "%")
+        end
+    end
+    UpdateSwatchColor()
+
+    -- Hover effect
+    swatchBtn:SetScript("OnEnter", function()
+        if isEnabled then
+            swatchBtn:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+        end
+    end)
+    swatchBtn:SetScript("OnLeave", function()
+        if isEnabled then
+            swatchBtn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+        end
+    end)
+
+    -- Click opens color picker
+    swatchBtn:SetScript("OnClick", function()
+        if not isEnabled then
+            return
+        end
+        local prevR, prevG, prevB, prevA = currentR, currentG, currentB, currentA
+        local info = {
+            r = currentR,
+            g = currentG,
+            b = currentB,
+            hasOpacity = config.hasOpacity or false,
+            opacity = config.hasOpacity and currentA or nil,
+            swatchFunc = function()
+                local r, g, b = ColorPickerFrame:GetColorRGB()
+                currentR, currentG, currentB = r, g, b
+                if config.hasOpacity then
+                    currentA = ColorPickerFrame:GetColorAlpha()
+                end
+                UpdateSwatchColor()
+                config.onChange(currentR, currentG, currentB, config.hasOpacity and currentA or nil)
+            end,
+            cancelFunc = function()
+                currentR, currentG, currentB, currentA = prevR, prevG, prevB, prevA
+                UpdateSwatchColor()
+                config.onChange(prevR, prevG, prevB, config.hasOpacity and prevA or nil)
+            end,
+        }
+        ColorPickerFrame:SetupColorPickerAndShow(info)
+    end)
+
+    -- Public methods
+    function holder:SetColor(r, g, b, a)
+        currentR, currentG, currentB = r, g, b
+        if a then
+            currentA = a
+        end
+        UpdateSwatchColor()
+    end
+
+    function holder:GetColor()
+        return currentR, currentG, currentB, currentA
+    end
+
+    function holder:SetEnabled(enabled)
+        isEnabled = enabled
+        local color = enabled and 1 or 0.5
+        label:SetTextColor(color, color, color)
+        if alphaText then
+            alphaText:SetTextColor(color, color, color)
+        end
+        if not enabled then
+            swatchBtn:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
+        else
+            swatchBtn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+        end
+    end
+
+    -- Refresh method for OnShow pattern
+    function holder:Refresh()
+        if config.get then
+            local r, g, b, a = config.get()
+            currentR, currentG, currentB = r, g, b
+            currentA = a or 1
+            UpdateSwatchColor()
+        end
+        if config.enabled then
+            holder:SetEnabled(config.enabled())
+        end
+    end
+
+    -- Auto-register if refreshable
+    if config.get or config.enabled then
+        table.insert(RefreshableComponents, holder)
+    end
+
+    return holder
+end
+
 -- Modern scrollbar colors (defined early for use by TextArea and ScrollableContainer)
 local ScrollbarColors = {
     track = { 0.12, 0.12, 0.12, 1 },

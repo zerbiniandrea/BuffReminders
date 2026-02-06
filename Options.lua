@@ -594,6 +594,9 @@ local function CreateOptionsPanel()
     defNote:SetText("(All categories inherit these unless overridden)")
     appY = appY - 16
 
+    -- Fixed column layout: all sliders use default labelWidth (70)
+    local DEF_COL2 = 260 -- labelWidth(70) + sliderWidth(100) + value(60) + gap(30)
+
     local defSizeHolder = Components.Slider(appearanceContent, {
         label = "Icon Size",
         min = 16,
@@ -607,21 +610,6 @@ local function CreateOptionsPanel()
     })
     defSizeHolder:SetPoint("TOPLEFT", appX, appY)
 
-    local defSpacingHolder = Components.Slider(appearanceContent, {
-        label = "Spacing",
-        min = 0,
-        max = 50,
-        get = function()
-            return math.floor((BuffRemindersDB.defaults and BuffRemindersDB.defaults.spacing or 0.2) * 100)
-        end,
-        suffix = "%",
-        onChange = function(val)
-            BR.Config.Set("defaults.spacing", val / 100)
-        end,
-    })
-    defSpacingHolder:SetPoint("LEFT", defSizeHolder, "RIGHT", 30, 0)
-    appY = appY - 24
-
     local defZoomHolder = Components.Slider(appearanceContent, {
         label = "Icon Zoom",
         min = 0,
@@ -634,7 +622,8 @@ local function CreateOptionsPanel()
             BR.Config.Set("defaults.iconZoom", val)
         end,
     })
-    defZoomHolder:SetPoint("TOPLEFT", appX, appY)
+    defZoomHolder:SetPoint("TOPLEFT", appX + DEF_COL2, appY)
+    appY = appY - 24
 
     local defBorderHolder = Components.Slider(appearanceContent, {
         label = "Border Size",
@@ -648,7 +637,73 @@ local function CreateOptionsPanel()
             BR.Config.Set("defaults.borderSize", val)
         end,
     })
-    defBorderHolder:SetPoint("LEFT", defZoomHolder, "RIGHT", 30, 0)
+    defBorderHolder:SetPoint("TOPLEFT", appX, appY)
+
+    local defAlphaHolder = Components.Slider(appearanceContent, {
+        label = "Alpha",
+        min = 10,
+        max = 100,
+        get = function()
+            return math.floor((BuffRemindersDB.defaults and BuffRemindersDB.defaults.iconAlpha or 1) * 100)
+        end,
+        suffix = "%",
+        onChange = function(val)
+            BR.Config.Set("defaults.iconAlpha", val / 100)
+        end,
+    })
+    defAlphaHolder:SetPoint("TOPLEFT", appX + DEF_COL2, appY)
+    appY = appY - 24
+
+    local defSpacingHolder = Components.Slider(appearanceContent, {
+        label = "Spacing",
+        min = 0,
+        max = 50,
+        get = function()
+            return math.floor((BuffRemindersDB.defaults and BuffRemindersDB.defaults.spacing or 0.2) * 100)
+        end,
+        suffix = "%",
+        onChange = function(val)
+            BR.Config.Set("defaults.spacing", val / 100)
+        end,
+    })
+    defSpacingHolder:SetPoint("TOPLEFT", appX, appY)
+
+    local defTextSizeHolder = Components.NumericStepper(appearanceContent, {
+        label = "Text Size",
+        min = 6,
+        max = 32,
+        get = function()
+            local db = BuffRemindersDB.defaults
+            if db and db.textSize then
+                return db.textSize
+            end
+            -- Auto: derive from icon size (matches rendering behavior)
+            local iconSize = db and db.iconSize or 64
+            return math.floor(iconSize * 0.32)
+        end,
+        onChange = function(val)
+            BR.Config.Set("defaults.textSize", val)
+        end,
+    })
+    defTextSizeHolder:SetPoint("TOPLEFT", appX + DEF_COL2, appY)
+
+    local defTextColorHolder = Components.ColorSwatch(appearanceContent, {
+        label = "",
+        labelWidth = 0,
+        hasOpacity = true,
+        get = function()
+            local tc = BuffRemindersDB.defaults and BuffRemindersDB.defaults.textColor or { 1, 1, 1 }
+            local ta = BuffRemindersDB.defaults and BuffRemindersDB.defaults.textAlpha or 1
+            return tc[1], tc[2], tc[3], ta
+        end,
+        onChange = function(r, g, b, a)
+            BR.Config.SetMulti({
+                ["defaults.textColor"] = { r, g, b },
+                ["defaults.textAlpha"] = a or 1,
+            })
+        end,
+    })
+    defTextColorHolder:SetPoint("LEFT", defTextSizeHolder, "RIGHT", 12, 0) -- aligns alpha % with slider values
     appY = appY - 24
 
     local defDirHolder = Components.DirectionButtons(appearanceContent, {
@@ -935,6 +990,34 @@ local function CreateOptionsPanel()
                 if not db.categorySettings[category] then
                     db.categorySettings[category] = {}
                 end
+                -- When enabling custom appearance, snapshot current effective values
+                -- so the category starts independent from future Global Defaults changes
+                if checked then
+                    local effective = GetCategorySettings(category)
+                    local cs = db.categorySettings[category]
+                    local appearanceKeys = {
+                        "iconSize",
+                        "spacing",
+                        "iconZoom",
+                        "borderSize",
+                        "iconAlpha",
+                        "textAlpha",
+                    }
+                    for _, key in ipairs(appearanceKeys) do
+                        if cs[key] == nil and effective[key] ~= nil then
+                            cs[key] = effective[key]
+                        end
+                    end
+                    -- textSize: only snapshot if explicitly set (nil = auto-derive from iconSize)
+                    if cs.textSize == nil and effective.textSize ~= nil then
+                        cs.textSize = effective.textSize
+                    end
+                    -- textColor: deep copy (table value)
+                    if cs.textColor == nil and effective.textColor then
+                        local tc = effective.textColor
+                        cs.textColor = { tc[1], tc[2], tc[3] }
+                    end
+                end
                 db.categorySettings[category].useCustomAppearance = checked
                 UpdateVisuals()
                 Components.RefreshAll()
@@ -943,16 +1026,19 @@ local function CreateOptionsPanel()
         useCustomAppHolder:SetPoint("TOPLEFT", 0, catY)
         catY = catY - 22
 
-        -- Appearance controls (2x2 grid)
+        -- Appearance controls (3-row grid with fixed columns)
         local appFrame = CreateFrame("Frame", nil, catContent)
         appFrame:SetSize(380, 50)
         appFrame:SetPoint("TOPLEFT", 10, catY)
+
+        local CAT_LW = 50 -- Shared label width for aligned columns
+        local CAT_COL2 = CAT_LW + 100 + 60 + 10 -- labelWidth + slider + value + gap = 220
 
         local sizeHolder = Components.Slider(appFrame, {
             label = "Size",
             min = 16,
             max = 128,
-            labelWidth = 35,
+            labelWidth = CAT_LW,
             get = function()
                 return BR.Config.GetCategorySetting(category, "iconSize") or 64
             end,
@@ -963,27 +1049,11 @@ local function CreateOptionsPanel()
         })
         sizeHolder:SetPoint("TOPLEFT", 0, 0)
 
-        local spacingHolder = Components.Slider(appFrame, {
-            label = "Spacing",
-            min = 0,
-            max = 50,
-            labelWidth = 50,
-            get = function()
-                return math.floor((BR.Config.GetCategorySetting(category, "spacing") or 0.2) * 100)
-            end,
-            enabled = isCustomAppearanceEnabled,
-            suffix = "%",
-            onChange = function(val)
-                BR.Config.Set("categorySettings." .. category .. ".spacing", val / 100)
-            end,
-        })
-        spacingHolder:SetPoint("LEFT", sizeHolder, "RIGHT", 10, 0)
-
         local zoomHolder = Components.Slider(appFrame, {
             label = "Zoom",
             min = 0,
             max = 15,
-            labelWidth = 35,
+            labelWidth = CAT_LW,
             get = function()
                 return BR.Config.GetCategorySetting(category, "iconZoom") or DEFAULT_ICON_ZOOM
             end,
@@ -993,13 +1063,13 @@ local function CreateOptionsPanel()
                 BR.Config.Set("categorySettings." .. category .. ".iconZoom", val)
             end,
         })
-        zoomHolder:SetPoint("TOPLEFT", 0, -24)
+        zoomHolder:SetPoint("TOPLEFT", CAT_COL2, 0)
 
         local borderHolder = Components.Slider(appFrame, {
             label = "Border",
             min = 0,
             max = 8,
-            labelWidth = 45,
+            labelWidth = CAT_LW,
             get = function()
                 return BR.Config.GetCategorySetting(category, "borderSize") or DEFAULT_BORDER_SIZE
             end,
@@ -1009,9 +1079,81 @@ local function CreateOptionsPanel()
                 BR.Config.Set("categorySettings." .. category .. ".borderSize", val)
             end,
         })
-        borderHolder:SetPoint("LEFT", zoomHolder, "RIGHT", 10, 0)
+        borderHolder:SetPoint("TOPLEFT", 0, -24)
 
-        catY = catY - 52
+        local catAlphaHolder = Components.Slider(appFrame, {
+            label = "Alpha",
+            min = 10,
+            max = 100,
+            labelWidth = CAT_LW,
+            get = function()
+                return math.floor((BR.Config.GetCategorySetting(category, "iconAlpha") or 1) * 100)
+            end,
+            enabled = isCustomAppearanceEnabled,
+            suffix = "%",
+            onChange = function(val)
+                BR.Config.Set("categorySettings." .. category .. ".iconAlpha", val / 100)
+            end,
+        })
+        catAlphaHolder:SetPoint("TOPLEFT", CAT_COL2, -24)
+
+        local spacingHolder = Components.Slider(appFrame, {
+            label = "Spacing",
+            min = 0,
+            max = 50,
+            labelWidth = CAT_LW,
+            get = function()
+                return math.floor((BR.Config.GetCategorySetting(category, "spacing") or 0.2) * 100)
+            end,
+            enabled = isCustomAppearanceEnabled,
+            suffix = "%",
+            onChange = function(val)
+                BR.Config.Set("categorySettings." .. category .. ".spacing", val / 100)
+            end,
+        })
+        spacingHolder:SetPoint("TOPLEFT", 0, -48)
+
+        local catTextSizeHolder = Components.NumericStepper(appFrame, {
+            label = "Text",
+            labelWidth = CAT_LW,
+            min = 6,
+            max = 32,
+            get = function()
+                local textSize = BR.Config.GetCategorySetting(category, "textSize")
+                if textSize then
+                    return textSize
+                end
+                -- Auto: derive from icon size
+                local iconSize = BR.Config.GetCategorySetting(category, "iconSize") or 64
+                return math.floor(iconSize * 0.32)
+            end,
+            enabled = isCustomAppearanceEnabled,
+            onChange = function(val)
+                BR.Config.Set("categorySettings." .. category .. ".textSize", val)
+            end,
+        })
+        catTextSizeHolder:SetPoint("TOPLEFT", CAT_COL2, -48)
+
+        local catTextColorHolder = Components.ColorSwatch(appFrame, {
+            label = "",
+            labelWidth = 0,
+            hasOpacity = true,
+            get = function()
+                local tc = BR.Config.GetCategorySetting(category, "textColor") or { 1, 1, 1 }
+                local ta = BR.Config.GetCategorySetting(category, "textAlpha") or 1
+                return tc[1], tc[2], tc[3], ta
+            end,
+            enabled = isCustomAppearanceEnabled,
+            onChange = function(r, g, b, a)
+                BR.Config.SetMulti({
+                    ["categorySettings." .. category .. ".textColor"] = { r, g, b },
+                    ["categorySettings." .. category .. ".textAlpha"] = a or 1,
+                })
+            end,
+        })
+        catTextColorHolder:SetPoint("LEFT", catTextSizeHolder, "RIGHT", 12, 0) -- aligns alpha % with slider values
+
+        catY = catY - 76
 
         section:SetContentHeight(math.abs(catY) + 10)
         table.insert(categorySections, section)

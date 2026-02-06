@@ -91,7 +91,10 @@ local defaults = {
     defaults = {
         -- Appearance
         iconSize = 64,
-        textSize = 12,
+        -- textSize: nil = auto (derived from iconSize * 0.32). Only set when user explicitly overrides.
+        iconAlpha = 1,
+        textAlpha = 1,
+        textColor = { 1, 1, 1 },
         spacing = 0.2, -- multiplier of iconSize
         iconZoom = 8, -- percentage
         borderSize = 2,
@@ -236,7 +239,10 @@ local function GetCategorySettings(category)
         return {
             position = catSettings and catSettings.position or { point = "CENTER", x = 0, y = 0 },
             iconSize = globalDefaults.iconSize or 64,
-            textSize = globalDefaults.textSize or 12,
+            textSize = globalDefaults.textSize, -- nil = auto (derived from iconSize)
+            iconAlpha = globalDefaults.iconAlpha or 1,
+            textAlpha = globalDefaults.textAlpha or 1,
+            textColor = globalDefaults.textColor or { 1, 1, 1 },
             spacing = globalDefaults.spacing or 0.2,
             iconZoom = globalDefaults.iconZoom or 8,
             borderSize = globalDefaults.borderSize or 2,
@@ -261,14 +267,23 @@ local function GetCategorySettings(category)
     -- Appearance: inherit from defaults unless useCustomAppearance is true
     local useCustomAppearance = catSettings and catSettings.useCustomAppearance
     if useCustomAppearance then
-        result.iconSize = (catSettings and catSettings.iconSize) or globalDefaults.iconSize or 64
-        result.textSize = (catSettings and catSettings.textSize) or globalDefaults.textSize or 12
-        result.spacing = (catSettings and catSettings.spacing) or globalDefaults.spacing or 0.2
-        result.iconZoom = (catSettings and catSettings.iconZoom) or globalDefaults.iconZoom or 8
-        result.borderSize = (catSettings and catSettings.borderSize) or globalDefaults.borderSize or 2
+        -- Custom appearance: use category values, fall back to code defaults (NOT user's global defaults)
+        -- This ensures custom-appearance categories are fully independent from Global Defaults changes.
+        -- Values are snapshotted from current defaults when useCustomAppearance is first enabled.
+        result.iconSize = (catSettings and catSettings.iconSize) or 64
+        result.textSize = (catSettings and catSettings.textSize) -- nil = auto
+        result.iconAlpha = (catSettings and catSettings.iconAlpha) or 1
+        result.textAlpha = (catSettings and catSettings.textAlpha) or 1
+        result.textColor = (catSettings and catSettings.textColor) or { 1, 1, 1 }
+        result.spacing = (catSettings and catSettings.spacing) or 0.2
+        result.iconZoom = (catSettings and catSettings.iconZoom) or 8
+        result.borderSize = (catSettings and catSettings.borderSize) or 2
     else
         result.iconSize = globalDefaults.iconSize or 64
-        result.textSize = globalDefaults.textSize or 12
+        result.textSize = globalDefaults.textSize -- nil = auto
+        result.iconAlpha = globalDefaults.iconAlpha or 1
+        result.textAlpha = globalDefaults.textAlpha or 1
+        result.textColor = globalDefaults.textColor or { 1, 1, 1 }
         result.spacing = globalDefaults.spacing or 0.2
         result.iconZoom = globalDefaults.iconZoom or 8
         result.borderSize = globalDefaults.borderSize or 2
@@ -306,18 +321,17 @@ local function GetEffectiveCategory(frame)
     return "main"
 end
 
--- Fixed text scale ratio (font size = iconSize * TEXT_SCALE_RATIO)
+-- Fallback text scale ratio (used when textSize is not set)
 local TEXT_SCALE_RATIO = 0.32
 
----Calculate font size based on icon size, with optional scale multiplier
+---Calculate font size, preferring explicit textSize over iconSize-derived
 ---@param scale? number
----@param iconSizeOverride? number
+---@param textSize? number
+---@param iconSize? number
 ---@return number
-local function GetFontSize(scale, iconSizeOverride)
-    local mainSettings = GetCategorySettings("main")
-    local iconSize = iconSizeOverride or mainSettings.iconSize or 64
-    local baseSize = iconSize * TEXT_SCALE_RATIO
-    return math.floor(baseSize * (scale or 1))
+local function GetFontSize(scale, textSize, iconSize)
+    local baseSize = textSize or math.floor((iconSize or 64) * TEXT_SCALE_RATIO)
+    return math.max(6, math.floor(baseSize * (scale or 1)))
 end
 
 ---Get font size for a specific frame based on its effective category
@@ -327,8 +341,7 @@ end
 local function GetFrameFontSize(frame, scale)
     local effectiveCat = GetEffectiveCategory(frame)
     local catSettings = GetCategorySettings(effectiveCat)
-    local iconSize = catSettings.iconSize or 64
-    return GetFontSize(scale, iconSize)
+    return GetFontSize(scale, catSettings.textSize, catSettings.iconSize)
 end
 
 -- Use functions from State.lua
@@ -780,18 +793,27 @@ local function CreateBuffFrame(buff, category)
     ApplyIconStyling(frame, catSettings, texture)
 
     -- Count text (font size scales with icon size, updated in UpdateVisuals)
+    local textColor = catSettings.textColor or { 1, 1, 1 }
+    local textAlpha = catSettings.textAlpha or 1
     frame.count = frame:CreateFontString(nil, "OVERLAY", "NumberFontNormalLarge")
     frame.count:SetPoint("CENTER", 0, 0)
-    frame.count:SetTextColor(1, 1, 1, 1)
-    frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(1), "OUTLINE")
+    frame.count:SetTextColor(textColor[1], textColor[2], textColor[3], textAlpha)
+    frame.count:SetFont(STANDARD_TEXT_FONT, GetFontSize(1, catSettings.textSize, catSettings.iconSize), "OUTLINE")
+
+    -- Frame alpha
+    frame:SetAlpha(catSettings.iconAlpha or 1)
 
     -- "BUFF!" text for the class that provides this buff (raid buffs only)
     frame.isPlayerBuff = (playerClass == buff.class)
     if frame.isPlayerBuff and category == "raid" then
         frame.buffText = frame:CreateFontString(nil, "OVERLAY")
         frame.buffText:SetPoint("TOP", frame, "BOTTOM", 0, -6)
-        frame.buffText:SetFont(STANDARD_TEXT_FONT, GetFontSize(0.8), "OUTLINE")
-        frame.buffText:SetTextColor(1, 1, 1, 1)
+        frame.buffText:SetFont(
+            STANDARD_TEXT_FONT,
+            GetFontSize(0.8, catSettings.textSize, catSettings.iconSize),
+            "OUTLINE"
+        )
+        frame.buffText:SetTextColor(textColor[1], textColor[2], textColor[3], textAlpha)
         frame.buffText:SetText("BUFF!")
         local raidCs = db.categorySettings and db.categorySettings.raid
         if raidCs and raidCs.showBuffReminder == false then
@@ -802,7 +824,7 @@ local function CreateBuffFrame(buff, category)
     -- "TEST" text (shown above icon in test mode)
     frame.testText = frame:CreateFontString(nil, "OVERLAY")
     frame.testText:SetPoint("BOTTOM", frame, "TOP", 0, 25)
-    frame.testText:SetFont(STANDARD_TEXT_FONT, GetFontSize(0.6), "OUTLINE")
+    frame.testText:SetFont(STANDARD_TEXT_FONT, GetFontSize(0.6, catSettings.textSize, catSettings.iconSize), "OUTLINE")
     frame.testText:SetTextColor(1, 0.8, 0, 1)
     frame.testText:SetText("TEST")
     frame.testText:Hide()
@@ -1682,8 +1704,18 @@ local function UpdateVisuals()
         local size = catSettings.iconSize or 64
         frame:SetSize(size, size)
         frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, 1), "OUTLINE")
+
+        -- Text color and alpha
+        local tc = catSettings.textColor or { 1, 1, 1 }
+        local ta = catSettings.textAlpha or 1
+        frame.count:SetTextColor(tc[1], tc[2], tc[3], ta)
+
+        -- Frame alpha
+        frame:SetAlpha(catSettings.iconAlpha or 1)
+
         if frame.buffText then
             frame.buffText:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, 0.8), "OUTLINE")
+            frame.buffText:SetTextColor(tc[1], tc[2], tc[3], ta)
             -- BUFF! text: use buff's actual category (raid only)
             local buffCat = frame.buffCategory
             local showReminder = false
@@ -2162,6 +2194,13 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 
         -- Deep copy defaults for non-defaults tables
         DeepCopyDefault(defaults, db)
+
+        -- Migration: textSize was 12 in defaults but never used (font size was derived from
+        -- iconSize * 0.32). Now nil means "auto-derive from iconSize". Clean up the old value
+        -- so users get the auto behavior instead of a hardcoded 12.
+        if db.defaults and db.defaults.textSize == 12 then
+            db.defaults.textSize = nil
+        end
 
         -- Initialize custom buffs storage
         if not db.customBuffs then

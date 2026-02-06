@@ -76,6 +76,9 @@ local CategorySettingKeys = {
     iconZoom = "VisualsRefresh",
     borderSize = "VisualsRefresh",
     textSize = "VisualsRefresh",
+    iconAlpha = "VisualsRefresh",
+    textAlpha = "VisualsRefresh",
+    textColor = "VisualsRefresh",
     spacing = "LayoutRefresh",
     growDirection = "LayoutRefresh",
     -- Behavior
@@ -92,6 +95,9 @@ local DefaultSettingKeys = {
     iconZoom = "VisualsRefresh",
     borderSize = "VisualsRefresh",
     textSize = "VisualsRefresh",
+    iconAlpha = "VisualsRefresh",
+    textAlpha = "VisualsRefresh",
+    textColor = "VisualsRefresh",
     spacing = "LayoutRefresh",
     growDirection = "LayoutRefresh",
     -- Behavior (glow is global-only, lives under defaults)
@@ -187,6 +193,9 @@ local function ValidatePath(segments)
                 "iconZoom",
                 "borderSize",
                 "textSize",
+                "iconAlpha",
+                "textAlpha",
+                "textColor",
                 "spacing",
                 "growDirection",
                 "showBuffReminder",
@@ -400,6 +409,9 @@ end
 local AppearanceKeys = {
     iconSize = true,
     textSize = true,
+    iconAlpha = true,
+    textAlpha = true,
+    textColor = true,
     spacing = true,
     iconZoom = true,
     borderSize = true,
@@ -423,13 +435,15 @@ function BR.Config.GetCategorySetting(category, key)
 
     -- Check if this key uses inheritance
     if AppearanceKeys[key] then
-        -- Appearance: use custom value only if useCustomAppearance is true
         if not catSettings.useCustomAppearance then
+            -- No custom appearance: always inherit from defaults
             return db.defaults and db.defaults[key]
         end
+        -- Custom appearance: use category value only (independent from defaults)
+        return catSettings[key]
     end
 
-    -- Use category-specific value if set, otherwise fall back to defaults
+    -- Non-appearance keys: use category value if set, otherwise fall back to defaults
     local value = catSettings[key]
     if value ~= nil then
         return value

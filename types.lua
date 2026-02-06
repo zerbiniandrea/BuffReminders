@@ -126,7 +126,10 @@
 
 ---@class DefaultSettings
 ---@field iconSize number
----@field textSize number
+---@field textSize? number
+---@field iconAlpha number
+---@field textAlpha number
+---@field textColor number[]
 ---@field spacing number
 ---@field iconZoom number
 ---@field borderSize number
@@ -139,6 +142,9 @@
 ---@field position CategoryPosition
 ---@field iconSize? number
 ---@field textSize? number
+---@field iconAlpha? number
+---@field textAlpha? number
+---@field textColor? number[]
 ---@field spacing? number
 ---@field growDirection? string
 ---@field iconZoom? number
