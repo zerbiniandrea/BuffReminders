@@ -494,7 +494,7 @@ function Components.Slider(parent, config)
         editBox:SetFocus()
         editBox:HighlightText()
     end)
-    SetupTooltip(valueBtn, "Click to type a value", nil, "ANCHOR_TOP")
+    SetupTooltip(valueBtn, "Adjust value", "Click to type or use mouse wheel", "ANCHOR_TOP")
 
     -- Mouse wheel support
     holder:EnableMouseWheel(true)
@@ -510,6 +510,7 @@ function Components.Slider(parent, config)
     end)
 
     -- Hover tooltip (on all interactive children, chained with existing scripts)
+    local wheelHint = "Use mouse wheel to adjust"
     if config.tooltip then
         local title, desc
         if type(config.tooltip) == "table" then
@@ -518,9 +519,10 @@ function Components.Slider(parent, config)
         else
             title = config.tooltip --[[@as string]]
         end
+        local fullDesc = desc and (desc .. "\n\n" .. wheelHint) or wheelHint
         holder:EnableMouse(true)
         local function showTip()
-            ShowTooltip(holder, title, desc, "ANCHOR_TOP")
+            ShowTooltip(holder, title, fullDesc, "ANCHOR_TOP")
         end
         local function hideTip()
             HideTooltip()
@@ -533,6 +535,14 @@ function Components.Slider(parent, config)
         sliderFrame:HookScript("OnLeave", hideTip)
         valueBtn:HookScript("OnEnter", showTip)
         valueBtn:HookScript("OnLeave", hideTip)
+    else
+        local function showHint()
+            ShowTooltip(holder, wheelHint, nil, "ANCHOR_TOP")
+        end
+        thumb:HookScript("OnEnter", showHint)
+        thumb:HookScript("OnLeave", HideTooltip)
+        sliderFrame:SetScript("OnEnter", showHint)
+        sliderFrame:SetScript("OnLeave", HideTooltip)
     end
 
     -- Initial visual
@@ -1738,7 +1748,7 @@ function Components.NumericStepper(parent, config)
         editBox:SetFocus()
         editBox:HighlightText()
     end)
-    SetupTooltip(valueBtn, "Click to type a value", nil, "ANCHOR_TOP")
+    SetupTooltip(valueBtn, "Adjust value", "Click to type or use mouse wheel", "ANCHOR_TOP")
 
     -- Hover effects (skip if button is at its limit)
     local function IsBtnAtLimit(btn)
