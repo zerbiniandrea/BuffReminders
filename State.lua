@@ -16,6 +16,7 @@ local RaidBuffs = BUFF_TABLES.raid
 local PresenceBuffs = BUFF_TABLES.presence
 local TargetedBuffs = BUFF_TABLES.targeted
 local SelfBuffs = BUFF_TABLES.self
+local PetBuffs = BUFF_TABLES.pet
 local Consumables = BUFF_TABLES.consumable
 
 -- ============================================================================
@@ -46,6 +47,9 @@ local cachedContentType = nil
 -- Talent/spell knowledge cache (invalidated on PLAYER_SPECIALIZATION_CHANGED)
 local cachedSpellKnowledge = {}
 
+-- Spec ID cache (invalidated on PLAYER_SPECIALIZATION_CHANGED)
+local cachedSpecId = nil
+
 -- Weapon enchant info for current refresh cycle (set once per BuffState.Refresh())
 local currentWeaponEnchants = {
     hasMainHand = false,
@@ -62,6 +66,19 @@ local currentValidUnits = {}
 -- Max level per class for current refresh cycle (players only, for caster availability checks)
 ---@type table<ClassName, number>
 local classMaxLevels = {}
+
+---Get the player's current spec ID (cached)
+---@return number?
+local function GetPlayerSpecId()
+    if cachedSpecId then
+        return cachedSpecId
+    end
+    local specIndex = GetSpecialization()
+    if specIndex then
+        cachedSpecId = GetSpecializationInfo(specIndex)
+    end
+    return cachedSpecId
+end
 
 ---Check if player knows a spell (cached version of IsPlayerSpell)
 ---@param spellID number
@@ -420,6 +437,7 @@ end
 ---@param excludeTalent? number Hide if player HAS this talent
 ---@param buffIdOverride? number Separate buff ID to check (if different from spellID)
 ---@param customCheck? fun(): boolean? Custom check function for complex buff logic
+---@param requireSpecId? number Only show if player's current spec matches (WoW spec ID)
 ---@return boolean? Returns nil if player can't/shouldn't use this buff
 local function ShouldShowSelfBuff(
     spellID,
@@ -428,9 +446,13 @@ local function ShouldShowSelfBuff(
     requiresTalent,
     excludeTalent,
     buffIdOverride,
-    customCheck
+    customCheck,
+    requireSpecId
 )
-    if playerClass ~= requiredClass then
+    if requiredClass and playerClass ~= requiredClass then
+        return nil
+    end
+    if requireSpecId and GetPlayerSpecId() ~= requireSpecId then
         return nil
     end
 
@@ -773,7 +795,37 @@ function BuffState.Refresh()
                 buff.requiresTalentSpellID,
                 buff.excludeTalentSpellID,
                 buff.buffIdOverride,
-                buff.customCheck
+                buff.customCheck,
+                buff.requireSpecId
+            )
+            if shouldShow then
+                entry.visible = true
+                entry.displayType = "missing"
+                entry.missingText = buff.missingText
+                entry.iconByRole = buff.iconByRole
+            end
+        end
+    end
+
+    -- Process pet buffs (pet summon reminders)
+    local petVisible = IsCategoryVisibleForContent("pet")
+    if BuffRemindersDB.hidePetWhileMounted ~= false and IsMounted() then
+        petVisible = false
+    end
+    for _, buff in ipairs(PetBuffs) do
+        local entry = GetOrCreateEntry(buff.key, "pet")
+        local settingKey = buff.groupId or buff.key
+
+        if IsBuffEnabled(settingKey) and petVisible then
+            local shouldShow = ShouldShowSelfBuff(
+                buff.spellID,
+                buff.class,
+                buff.enchantID,
+                buff.requiresTalentSpellID,
+                buff.excludeTalentSpellID,
+                buff.buffIdOverride,
+                buff.customCheck,
+                buff.requireSpecId
             )
             if shouldShow then
                 entry.visible = true
@@ -855,10 +907,12 @@ end
 ---Invalidate spell knowledge cache (call on PLAYER_SPECIALIZATION_CHANGED)
 function BuffState.InvalidateSpellCache()
     cachedSpellKnowledge = {}
+    cachedSpecId = nil
 end
 
 -- Export utility functions that display layer still needs
 BR.StateHelpers = {
+    GetPlayerSpecId = GetPlayerSpecId,
     UnitHasBuff = UnitHasBuff,
     GetGroupClasses = GetGroupClasses,
     IterateGroupMembers = IterateGroupMembers,

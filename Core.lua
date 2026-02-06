@@ -260,6 +260,7 @@ local ValidCategories = {
     presence = true,
     targeted = true,
     self = true,
+    pet = true,
     consumable = true,
     custom = true,
 }

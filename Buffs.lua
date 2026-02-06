@@ -6,6 +6,21 @@ local _, BR = ...
 -- This file contains all buff definition tables.
 -- Loaded after Core.lua so BR namespace is available.
 
+---Check if the player's pet is on passive stance
+---@return boolean? true if pet exists and is on passive, nil otherwise
+local function IsPetOnPassive()
+    if not UnitExists("pet") then
+        return nil
+    end
+    for i = 1, NUM_PET_ACTION_SLOTS do
+        local name, _, _, isActive = GetPetActionInfo(i)
+        if name == "PET_MODE_PASSIVE" and isActive then
+            return true
+        end
+    end
+    return nil
+end
+
 ---@type table<string, RaidBuff[]|PresenceBuff[]|TargetedBuff[]|SelfBuff[]|ConsumableBuff[]>
 BR.BUFF_TABLES = {
     ---@type RaidBuff[]
@@ -265,6 +280,73 @@ BR.BUFF_TABLES = {
             iconByRole = { HEALER = 52127, DAMAGER = 192106, TANK = 192106 },
         },
     },
+    ---@type SelfBuff[]
+    pet = {
+        -- Pet reminders (alphabetical: Frost Mage, Hunter, Passive, Unholy DK, Warlock)
+        {
+            spellID = 31687, -- Summon Water Elemental (for icon)
+            key = "frostMagePet",
+            name = "Water Elemental",
+            class = "MAGE",
+            missingText = "NO\nPET",
+            requireSpecId = 64, -- Frost
+            requiresTalentSpellID = 31687,
+            groupId = "pets",
+            customCheck = function()
+                return not UnitExists("pet")
+            end,
+        },
+        {
+            spellID = 883, -- Call Pet 1 (unused: customCheck bypasses spell check, iconOverride bypasses icon)
+            key = "hunterPet",
+            name = "Hunter Pet",
+            class = "HUNTER",
+            missingText = "NO\nPET",
+            iconOverride = 132161,
+            groupId = "pets",
+            customCheck = function()
+                -- MM Hunters don't use pets unless they have Unbreakable Bond
+                if BR.StateHelpers.GetPlayerSpecId() == 254 and not IsPlayerSpell(1223323) then
+                    return nil
+                end
+                return not UnitExists("pet")
+            end,
+        },
+        {
+            spellID = 0, -- No spell needed (customCheck + iconOverride)
+            key = "petPassive",
+            name = "Pet Passive",
+            -- No class: applies to any class with a pet
+            missingText = "PASSIVE\nPET",
+            iconOverride = 132311,
+            customCheck = IsPetOnPassive,
+        },
+        {
+            spellID = 46584, -- Raise Dead (for icon)
+            key = "unholyPet",
+            name = "Unholy Ghoul",
+            class = "DEATHKNIGHT",
+            missingText = "NO\nPET",
+            requireSpecId = 252, -- Unholy
+            groupId = "pets",
+            customCheck = function()
+                return not UnitExists("pet")
+            end,
+        },
+        {
+            spellID = 688, -- Summon Imp (unused: customCheck bypasses spell check, iconOverride bypasses icon)
+            key = "warlockPet",
+            name = "Warlock Demon",
+            class = "WARLOCK",
+            missingText = "NO\nPET",
+            iconOverride = 136082, -- Summon Demon flyout icon
+            excludeTalentSpellID = 108503, -- Grimoire of Sacrifice: pet intentionally sacrificed
+            groupId = "pets",
+            customCheck = function()
+                return not UnitExists("pet")
+            end,
+        },
+    },
     ---@type ConsumableBuff[]
     consumable = {
         -- Augment Rune (The War Within + Midnight)
@@ -355,6 +437,7 @@ BR.BuffGroups = {
     beacons = { displayName = "Beacons", missingText = "NO\nBEACONS" },
     shamanImbues = { displayName = "Shaman Imbues" },
     paladinRites = { displayName = "Paladin Rites" },
+    pets = { displayName = "Pets" },
     shamanShields = { displayName = "Shaman Shields" },
     -- Consumable groups
     flask = { displayName = "Flask" },

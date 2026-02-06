@@ -57,16 +57,17 @@
 ---@field infoTooltip? string
 
 ---@class SelfBuff
----@field spellID SpellID
+---@field spellID SpellID -- TODO: make optional (entries with customCheck + iconOverride don't need it)
 ---@field key string
 ---@field name string
----@field class ClassName
+---@field class? ClassName
 ---@field missingText string
 ---@field groupId? string
 ---@field enchantID? number
 ---@field buffIdOverride? number
----@field requiresTalentSpellID? number
----@field excludeTalentSpellID? number
+---@field requireSpecId? number        -- Only show if player's current spec matches (WoW spec ID)
+---@field requiresTalentSpellID? number -- TODO: rename to requiresSpellID (also used for baseline spec abilities, not just talents)
+---@field excludeTalentSpellID? number -- TODO: rename to excludeSpellID
 ---@field iconOverride? number
 ---@field iconByRole? table<RoleType, number>
 ---@field infoTooltip? string
@@ -114,7 +115,7 @@
 ---@field glowShowing? boolean
 ---@field currentGlowStyle? number
 
----@alias CategoryName "raid"|"presence"|"targeted"|"self"|"consumable"|"custom"
+---@alias CategoryName "raid"|"presence"|"targeted"|"self"|"pet"|"consumable"|"custom"
 
 ---@class CategoryPosition
 ---@field point string
@@ -174,7 +175,7 @@
 
 ---@class BuffStateEntry
 ---@field key string                         -- "intellect", "devotionAura", etc.
----@field category CategoryName              -- "raid", "presence", "targeted", "self", "consumable", "custom"
+---@field category CategoryName              -- "raid", "presence", "targeted", "self", "pet", "consumable", "custom"
 ---@field visible boolean                    -- Should show?
 ---@field displayType "count"|"missing"|"expiring"
 ---@field countText string?                  -- "17/20" for raid buffs

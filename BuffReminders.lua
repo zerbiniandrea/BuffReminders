@@ -17,11 +17,12 @@ local RaidBuffs = BUFF_TABLES.raid
 local PresenceBuffs = BUFF_TABLES.presence
 local TargetedBuffs = BUFF_TABLES.targeted
 local SelfBuffs = BUFF_TABLES.self
+local PetBuffs = BUFF_TABLES.pet
 local Consumables = BUFF_TABLES.consumable
 
 -- Build icon override lookup table (for spells replaced by talents)
 local IconOverrides = {} ---@type table<number, number>
-for _, buffArray in ipairs({ PresenceBuffs, TargetedBuffs, SelfBuffs }) do
+for _, buffArray in ipairs({ PresenceBuffs, TargetedBuffs, SelfBuffs, PetBuffs }) do
     for _, buff in ipairs(buffArray) do
         if buff.iconOverride then
             local spellList = (type(buff.spellID) == "table" and buff.spellID or { buff.spellID }) --[[@as number[] ]]
@@ -79,6 +80,7 @@ local defaults = {
     showOnlyPlayerClassBuff = false,
     showOnlyPlayerMissing = false,
     showOnlyOnReadyCheck = false,
+    hidePetWhileMounted = true,
     readyCheckDuration = 15, -- seconds
     useGlowFallback = false, -- EXPERIMENTAL: Show own raid buff via action bar glow during M+
     optionsPanelScale = 1.2, -- base scale (displayed as 100%)
@@ -106,6 +108,7 @@ local defaults = {
         presence = { openWorld = true, dungeon = true, scenario = true, raid = true },
         targeted = { openWorld = false, dungeon = true, scenario = true, raid = true },
         self = { openWorld = true, dungeon = true, scenario = true, raid = true },
+        pet = { openWorld = true, dungeon = true, scenario = true, raid = true },
         consumable = { openWorld = false, dungeon = true, scenario = true, raid = true },
         custom = { openWorld = true, dungeon = true, scenario = true, raid = true },
     },
@@ -137,13 +140,18 @@ local defaults = {
             useCustomAppearance = false,
             split = false,
         },
-        consumable = {
+        pet = {
             position = { point = "CENTER", x = 0, y = -100 },
             useCustomAppearance = false,
             split = false,
         },
-        custom = {
+        consumable = {
             position = { point = "CENTER", x = 0, y = -140 },
+            useCustomAppearance = false,
+            split = false,
+        },
+        custom = {
+            position = { point = "CENTER", x = 0, y = -180 },
             useCustomAppearance = false,
             split = false,
         },
@@ -173,12 +181,13 @@ local inCombat = false
 
 -- Category frame system
 local categoryFrames = {}
-local CATEGORIES = { "raid", "presence", "targeted", "self", "consumable", "custom" }
+local CATEGORIES = { "raid", "presence", "targeted", "self", "pet", "consumable", "custom" }
 local CATEGORY_LABELS = {
     raid = "Raid",
     presence = "Presence",
     targeted = "Targeted",
     self = "Self",
+    pet = "Pet",
     consumable = "Consumable",
     custom = "Custom",
 }
@@ -880,6 +889,7 @@ local function PositionBuffFramesWithSplits()
         presence = {},
         targeted = {},
         self = {},
+        pet = {},
         consumable = {},
         custom = {},
     }
@@ -1111,6 +1121,20 @@ RefreshTestDisplay = function()
         end
     end
 
+    -- Show ALL pet buffs
+    for _, buff in ipairs(PetBuffs) do
+        local frame = buffFrames[buff.key]
+        if frame then
+            frame.count:SetText(buff.missingText or "")
+            frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
+            if frame.testText and testModeData.showLabels then
+                frame.testText:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame, 0.6), "OUTLINE")
+                frame.testText:Show()
+            end
+            frame:Show()
+        end
+    end
+
     -- Show ALL consumable buffs
     for _, buff in ipairs(Consumables) do
         local frame = buffFrames[buff.key]
@@ -1225,9 +1249,32 @@ UpdateFallbackDisplay = function()
     -- No else branch - HideAllDisplayFrames was already called by caller
 end
 
+-- Render a single visible entry into its frame using the appropriate display type
+local function RenderVisibleEntry(frame, entry)
+    if entry.displayType == "count" then
+        frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame), "OUTLINE")
+        frame.count:SetText(entry.countText or "")
+        frame:Show()
+        SetExpirationGlow(frame, entry.shouldGlow)
+    elseif entry.displayType == "expiring" then
+        frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame), "OUTLINE")
+        frame.count:SetText(entry.countText or "")
+        frame:Show()
+        SetExpirationGlow(frame, true)
+    else -- "missing"
+        if entry.iconByRole then
+            local texture = GetBuffTexture(frame.spellIDs, entry.iconByRole)
+            if texture then
+                frame.icon:SetTexture(texture)
+            end
+        end
+        ShowMissingFrame(frame, entry.missingText)
+    end
+end
+
 -- Update the display
 UpdateDisplay = function()
-    if testMode then
+    if not mainFrame or testMode then
         return
     end
 
@@ -1246,12 +1293,37 @@ UpdateDisplay = function()
     -- Use both our event-tracked flag AND the API (event fires before API updates)
     local combatCheck = inCombat or InCombatLockdown()
 
-    if isDead or combatCheck or inMythicPlus or inHousing or instanceType == "pvp" or instanceType == "arena" then
+    -- Absolute exit conditions (can never show anything)
+    if isDead or inMythicPlus or inHousing or instanceType == "pvp" or instanceType == "arena" then
         HideAllDisplayFrames()
-        -- Fallback only when alive (dead players can't cast)
         if not isDead then
             UpdateFallbackDisplay()
         end
+        return
+    end
+
+    -- Combat: only show pet reminders (pets can be summoned in combat)
+    if combatCheck then
+        BR.BuffState.Refresh()
+        local anyPetVisible = false
+        for key, entry in pairs(BR.BuffState.entries) do
+            local frame = buffFrames[key]
+            if frame then
+                if entry.visible and not entry.groupMerged and entry.category == "pet" then
+                    RenderVisibleEntry(frame, entry)
+                    anyPetVisible = true
+                else
+                    HideFrame(frame)
+                end
+            end
+        end
+        if anyPetVisible then
+            PositionBuffFramesWithSplits()
+            UpdateAnchor()
+        else
+            HideAllDisplayFrames()
+        end
+        UpdateFallbackDisplay()
         return
     end
 
@@ -1278,27 +1350,7 @@ UpdateDisplay = function()
         local frame = buffFrames[key]
         if frame then
             if entry.visible and not entry.groupMerged then
-                -- Apply display based on entry.displayType
-                if entry.displayType == "count" then
-                    frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame), "OUTLINE")
-                    frame.count:SetText(entry.countText or "")
-                    frame:Show()
-                    SetExpirationGlow(frame, entry.shouldGlow)
-                elseif entry.displayType == "expiring" then
-                    frame.count:SetFont(STANDARD_TEXT_FONT, GetFrameFontSize(frame), "OUTLINE")
-                    frame.count:SetText(entry.countText or "")
-                    frame:Show()
-                    SetExpirationGlow(frame, true)
-                else -- "missing"
-                    -- Update icon based on current role (for role-dependent buffs like shields)
-                    if entry.iconByRole then
-                        local texture = GetBuffTexture(frame.spellIDs, entry.iconByRole)
-                        if texture then
-                            frame.icon:SetTexture(texture)
-                        end
-                    end
-                    ShowMissingFrame(frame, entry.missingText)
-                end
+                RenderVisibleEntry(frame, entry)
                 anyVisible = true
             else
                 HideFrame(frame)
@@ -1877,6 +1929,9 @@ eventFrame:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
 eventFrame:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
 eventFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 eventFrame:RegisterEvent("TRAIT_CONFIG_UPDATED")
+eventFrame:RegisterEvent("UNIT_PET")
+eventFrame:RegisterEvent("PET_BAR_UPDATE")
+eventFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 
 eventFrame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == addonName then
@@ -1934,7 +1989,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
         -- ====================================================================
         -- Versioned migrations — each runs exactly once, tracked by dbVersion
         -- ====================================================================
-        local DB_VERSION = 2
+        local DB_VERSION = 3
 
         local migrations = {
             -- [1] Consolidate all pre-versioning migrations (v2.8 → v3.x)
@@ -2064,6 +2119,29 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
                     end
                 end
             end,
+
+            -- [3] Add pet category (new first-class category for pet summon reminders)
+            [3] = function()
+                -- Ensure categorySettings.pet exists with defaults
+                if not db.categorySettings then
+                    db.categorySettings = {}
+                end
+                if not db.categorySettings.pet then
+                    db.categorySettings.pet = {}
+                end
+                -- Ensure categoryVisibility.pet exists
+                if not db.categoryVisibility then
+                    db.categoryVisibility = {}
+                end
+                if not db.categoryVisibility.pet then
+                    db.categoryVisibility.pet = {
+                        openWorld = true,
+                        dungeon = true,
+                        scenario = true,
+                        raid = true,
+                    }
+                end
+            end,
         }
 
         -- Run pending migrations
@@ -2178,6 +2256,14 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
             end
             -- else: throttled, 1s ticker will catch it
         end
+    elseif event == "UNIT_PET" then
+        if arg1 == "player" then
+            UpdateDisplay()
+        end
+    elseif event == "PET_BAR_UPDATE" then
+        UpdateDisplay()
+    elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED" then
+        UpdateDisplay()
     elseif event == "READY_CHECK" then
         -- Cancel any existing timer
         if readyCheckTimer then

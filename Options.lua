@@ -27,6 +27,7 @@ local RaidBuffs = BUFF_TABLES.raid
 local PresenceBuffs = BUFF_TABLES.presence
 local TargetedBuffs = BUFF_TABLES.targeted
 local SelfBuffs = BUFF_TABLES.self
+local PetBuffs = BUFF_TABLES.pet
 local Consumables = BUFF_TABLES.consumable
 
 -- Glow styles (for ShowGlowDemo)
@@ -78,12 +79,13 @@ local SECTION_SPACING = 12
 local ITEM_HEIGHT = 22
 local SCROLLBAR_WIDTH = 24
 
-local CATEGORY_ORDER = { "raid", "presence", "targeted", "self", "consumable", "custom" }
+local CATEGORY_ORDER = { "raid", "presence", "targeted", "self", "pet", "consumable", "custom" }
 local CATEGORY_LABELS = {
     raid = "Raid Buffs",
     presence = "Presence Buffs",
     targeted = "Targeted Buffs",
     self = "Self Buffs",
+    pet = "Pet Reminders",
     consumable = "Consumables",
     custom = "Custom Buffs",
 }
@@ -339,8 +341,32 @@ local function CreateOptionsPanel()
                         table.insert(groupDisplaySpells[buff.groupId], id)
                     end
                 end
-                if buff.iconOverride and not groupIconOverrides[buff.groupId] then
-                    groupIconOverrides[buff.groupId] = buff.iconOverride
+                -- Resolve display icon(s) per entry: override > displaySpellIDs > primary spellID
+                if not groupIconOverrides[buff.groupId] then
+                    groupIconOverrides[buff.groupId] = {}
+                end
+                if buff.iconOverride then
+                    local overrides = type(buff.iconOverride) == "table" and buff.iconOverride or { buff.iconOverride }
+                    for _, icon in ipairs(overrides) do
+                        table.insert(groupIconOverrides[buff.groupId], icon)
+                    end
+                elseif buff.displaySpellIDs then
+                    local displayList = type(buff.displaySpellIDs) == "table" and buff.displaySpellIDs
+                        or { buff.displaySpellIDs }
+                    for _, id in ipairs(displayList) do
+                        local texture = GetBuffTexture(id)
+                        if texture then
+                            table.insert(groupIconOverrides[buff.groupId], texture)
+                        end
+                    end
+                elseif buff.spellID then
+                    local primarySpell = type(buff.spellID) == "table" and buff.spellID[1] or buff.spellID
+                    if primarySpell and primarySpell > 0 then
+                        local texture = GetBuffTexture(primarySpell)
+                        if texture then
+                            table.insert(groupIconOverrides[buff.groupId], texture)
+                        end
+                    end
                 end
             end
         end
@@ -352,6 +378,9 @@ local function CreateOptionsPanel()
                     seenGroups[buff.groupId] = true
                     local groupInfo = BuffGroups[buff.groupId]
                     local iconOverride = groupIconOverrides[buff.groupId]
+                    if iconOverride and #iconOverride == 0 then
+                        iconOverride = nil
+                    end
                     local displaySpells = groupDisplaySpells[buff.groupId]
                     local spells = (#displaySpells > 0) and displaySpells or groupSpells[buff.groupId]
                     if #spells == 0 then
@@ -437,6 +466,15 @@ local function CreateOptionsPanel()
     selfNote:SetText("(buffs strictly on yourself)")
     buffsRightY = buffsRightY - 14
     buffsRightY = RenderBuffCheckboxes(buffsContent, buffsRightX, buffsRightY, SelfBuffs)
+    buffsRightY = buffsRightY - SECTION_SPACING
+
+    -- Pet Reminders
+    _, buffsRightY = CreateSectionHeader(buffsContent, "Pet Reminders", buffsRightX, buffsRightY)
+    local petNote = buffsContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    petNote:SetPoint("TOPLEFT", buffsRightX, buffsRightY)
+    petNote:SetText("(pet summon reminders)")
+    buffsRightY = buffsRightY - 14
+    buffsRightY = RenderBuffCheckboxes(buffsContent, buffsRightX, buffsRightY, PetBuffs)
     buffsRightY = buffsRightY - SECTION_SPACING
 
     -- Custom Buffs (right column)
@@ -742,6 +780,22 @@ local function CreateOptionsPanel()
         })
         visToggles:SetPoint("TOPLEFT", 0, catY)
         catY = catY - 20
+
+        -- Hide while mounted (pet only)
+        if category == "pet" then
+            local hideMountHolder = Components.Checkbox(catContent, {
+                label = "Hide while mounted",
+                get = function()
+                    return BuffRemindersDB.hidePetWhileMounted ~= false
+                end,
+                onChange = function(checked)
+                    BuffRemindersDB.hidePetWhileMounted = checked
+                    UpdateDisplay()
+                end,
+            })
+            hideMountHolder:SetPoint("TOPLEFT", 0, catY)
+            catY = catY - 22
+        end
 
         -- "BUFF!" text (raid only)
         if category == "raid" then
