@@ -124,6 +124,34 @@ local function CreateOptionsPanel()
     local addonVersion = C_AddOns.GetAddOnMetadata("BuffReminders", "Version") or ""
     version:SetText(addonVersion)
 
+    -- Discord link (next to version)
+    local discordSep = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    discordSep:SetPoint("LEFT", version, "RIGHT", 6, 0)
+    discordSep:SetText("|cff555555·|r")
+
+    local discordLink = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    discordLink:SetPoint("LEFT", discordSep, "RIGHT", 6, 0)
+    discordLink:SetText("|cff7289daJoin Discord|r")
+
+    local discordHit = CreateFrame("Button", nil, panel)
+    discordHit:SetAllPoints(discordLink)
+    discordHit:SetScript("OnClick", function()
+        StaticPopup_Show("BUFFREMINDERS_DISCORD_URL")
+    end)
+    discordHit:SetScript("OnEnter", function()
+        discordLink:SetText("|cff99aaffJoin Discord|r")
+        BR.ShowTooltip(
+            discordHit,
+            "Click for invite link",
+            "Got feedback, feature requests, or bug reports?\nJoin the Discord!",
+            "ANCHOR_BOTTOM"
+        )
+    end)
+    discordHit:SetScript("OnLeave", function()
+        discordLink:SetText("|cff7289daJoin Discord|r")
+        BR.HideTooltip()
+    end)
+
     -- Scale controls (top right area) - text link style: < 100% >
     local BASE_SCALE = OPTIONS_BASE_SCALE
     local MIN_PCT, MAX_PCT = 80, 150
@@ -1348,6 +1376,25 @@ StaticPopupDialogs["BUFFREMINDERS_RELOAD_UI"] = {
     button2 = "Cancel",
     OnAccept = function()
         ReloadUI()
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
+StaticPopupDialogs["BUFFREMINDERS_DISCORD_URL"] = {
+    text = "Join the BuffReminders Discord!\nCopy the URL below (Ctrl+C):",
+    button1 = "Close",
+    hasEditBox = true,
+    editBoxWidth = 250,
+    OnShow = function(self)
+        self.EditBox:SetText("https://discord.gg/qezQ2hXJJ7")
+        self.EditBox:HighlightText()
+        self.EditBox:SetFocus()
+    end,
+    EditBoxOnEscapePressed = function(self)
+        self:GetParent():Hide()
     end,
     timeout = 0,
     whileDead = true,
