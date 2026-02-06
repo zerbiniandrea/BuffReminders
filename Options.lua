@@ -752,10 +752,15 @@ local function CreateOptionsPanel()
         end,
         onChange = function(checked)
             BR.Config.Set("defaults.showExpirationGlow", checked)
+            Components.RefreshAll()
         end,
     })
     defGlowHolder:SetPoint("TOPLEFT", appX, appY)
     appY = appY - 22
+
+    local function isExpirationGlowEnabled()
+        return BuffRemindersDB.defaults and BuffRemindersDB.defaults.showExpirationGlow ~= false
+    end
 
     local defThresholdHolder = Components.Slider(appearanceContent, {
         label = "Threshold",
@@ -764,6 +769,7 @@ local function CreateOptionsPanel()
         get = function()
             return BuffRemindersDB.defaults and BuffRemindersDB.defaults.expirationThreshold or 15
         end,
+        enabled = isExpirationGlowEnabled,
         suffix = " min",
         onChange = function(val)
             BR.Config.Set("defaults.expirationThreshold", val)
@@ -784,6 +790,7 @@ local function CreateOptionsPanel()
         get = function()
             return BuffRemindersDB.defaults and BuffRemindersDB.defaults.glowStyle or 1
         end,
+        enabled = isExpirationGlowEnabled,
         width = 100,
         onChange = function(val)
             BR.Config.Set("defaults.glowStyle", val)
@@ -1055,6 +1062,18 @@ local function CreateOptionsPanel()
         appFrame:SetSize(380, 50)
         appFrame:SetPoint("TOPLEFT", 10, catY)
 
+        -- Read the category's own saved value, falling back to defaults only if no value was saved.
+        -- This avoids showing inherited defaults when useCustomAppearance is off, so toggling
+        -- custom appearance off/on preserves the user's previously configured values.
+        local function getCatOwnValue(key, default)
+            local catSettings = db.categorySettings and db.categorySettings[category]
+            local val = catSettings and catSettings[key]
+            if val ~= nil then
+                return val
+            end
+            return db.defaults and db.defaults[key] or default
+        end
+
         local CAT_LW = 50 -- Shared label width for aligned columns
         local CAT_COL2 = CAT_LW + 100 + 60 + 10 -- labelWidth + slider + value + gap = 220
 
@@ -1064,7 +1083,7 @@ local function CreateOptionsPanel()
             max = 128,
             labelWidth = CAT_LW,
             get = function()
-                return BR.Config.GetCategorySetting(category, "iconSize") or 64
+                return getCatOwnValue("iconSize", 64)
             end,
             enabled = isCustomAppearanceEnabled,
             onChange = function(val)
@@ -1079,7 +1098,7 @@ local function CreateOptionsPanel()
             max = 15,
             labelWidth = CAT_LW,
             get = function()
-                return BR.Config.GetCategorySetting(category, "iconZoom") or DEFAULT_ICON_ZOOM
+                return getCatOwnValue("iconZoom", DEFAULT_ICON_ZOOM)
             end,
             enabled = isCustomAppearanceEnabled,
             suffix = "%",
@@ -1095,7 +1114,7 @@ local function CreateOptionsPanel()
             max = 8,
             labelWidth = CAT_LW,
             get = function()
-                return BR.Config.GetCategorySetting(category, "borderSize") or DEFAULT_BORDER_SIZE
+                return getCatOwnValue("borderSize", DEFAULT_BORDER_SIZE)
             end,
             enabled = isCustomAppearanceEnabled,
             suffix = "px",
@@ -1111,7 +1130,7 @@ local function CreateOptionsPanel()
             max = 100,
             labelWidth = CAT_LW,
             get = function()
-                return math.floor((BR.Config.GetCategorySetting(category, "iconAlpha") or 1) * 100)
+                return math.floor((getCatOwnValue("iconAlpha", 1)) * 100)
             end,
             enabled = isCustomAppearanceEnabled,
             suffix = "%",
@@ -1127,7 +1146,7 @@ local function CreateOptionsPanel()
             max = 50,
             labelWidth = CAT_LW,
             get = function()
-                return math.floor((BR.Config.GetCategorySetting(category, "spacing") or 0.2) * 100)
+                return math.floor((getCatOwnValue("spacing", 0.2)) * 100)
             end,
             enabled = isCustomAppearanceEnabled,
             suffix = "%",
@@ -1143,12 +1162,12 @@ local function CreateOptionsPanel()
             min = 6,
             max = 32,
             get = function()
-                local textSize = BR.Config.GetCategorySetting(category, "textSize")
+                local textSize = getCatOwnValue("textSize", nil)
                 if textSize then
                     return textSize
                 end
                 -- Auto: derive from icon size
-                local iconSize = BR.Config.GetCategorySetting(category, "iconSize") or 64
+                local iconSize = getCatOwnValue("iconSize", 64)
                 return math.floor(iconSize * 0.32)
             end,
             enabled = isCustomAppearanceEnabled,
@@ -1163,8 +1182,8 @@ local function CreateOptionsPanel()
             labelWidth = 0,
             hasOpacity = true,
             get = function()
-                local tc = BR.Config.GetCategorySetting(category, "textColor") or { 1, 1, 1 }
-                local ta = BR.Config.GetCategorySetting(category, "textAlpha") or 1
+                local tc = getCatOwnValue("textColor", { 1, 1, 1 })
+                local ta = getCatOwnValue("textAlpha", 1)
                 return tc[1], tc[2], tc[3], ta
             end,
             enabled = isCustomAppearanceEnabled,
