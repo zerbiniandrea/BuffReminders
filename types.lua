@@ -19,6 +19,8 @@
 ---@class FontString
 ---@field SetFont fun(self: FontString, font: string, size: number, flags?: string)
 ---@field SetText fun(self: FontString, text: string)
+---@field Show fun(self: FontString)
+---@field Hide fun(self: FontString)
 
 ---@class AnimationGroup
 
