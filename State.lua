@@ -842,7 +842,8 @@ function BuffState.Refresh()
         local entry = GetOrCreateEntry(buff.key, "consumable")
         local settingKey = buff.groupId or buff.key
 
-        if IsBuffEnabled(settingKey) and consumableVisible and PassesPreChecks(buff, nil, db) then
+        local hasCaster = not buff.class or HasCasterForBuff(buff.class, buff.levelRequired)
+        if IsBuffEnabled(settingKey) and consumableVisible and hasCaster and PassesPreChecks(buff, nil, db) then
             local shouldShow =
                 ShouldShowConsumableBuff(buff.spellID, buff.buffIconID, buff.checkWeaponEnchant, buff.itemID)
             if shouldShow then

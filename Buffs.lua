@@ -423,6 +423,7 @@ BR.BUFF_TABLES = {
             itemID = { 5512, 224464 }, -- Healthstone, Demonic Healthstone
             key = "healthstone",
             name = "Healthstone",
+            class = "WARLOCK",
             missingText = "NO\nSTONE",
             groupId = "healthstone",
             iconOverride = 538745, -- Healthstone icon
