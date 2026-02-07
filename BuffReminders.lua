@@ -30,7 +30,6 @@ local EXPORT_PREFIX = "!BR_"
 
 -- Buff tables from Buffs.lua (via BR namespace)
 local BUFF_TABLES = BR.BUFF_TABLES
-local BuffGroups = BR.BuffGroups
 
 -- Local aliases for direct access
 local RaidBuffs = BUFF_TABLES.raid
@@ -1082,28 +1081,17 @@ RefreshTestDisplay = function()
         end
     end
 
-    -- Show ALL targeted buffs (one per group)
-    local seenGroups = {}
+    -- Show ALL targeted buffs
     for _, buff in ipairs(TargetedBuffs) do
         local frame = buffFrames[buff.key]
         if frame then
-            if buff.groupId and seenGroups[buff.groupId] then
-                frame:Hide()
-            else
-                if buff.groupId then
-                    seenGroups[buff.groupId] = true
-                    local groupInfo = BuffGroups[buff.groupId]
-                    frame.count:SetText(groupInfo and groupInfo.missingText)
-                else
-                    frame.count:SetText(buff.missingText)
-                end
-                frame.count:SetFont(fontPath, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
-                if frame.testText and testModeData.showLabels then
-                    frame.testText:SetFont(fontPath, GetFrameFontSize(frame, 0.6), "OUTLINE")
-                    frame.testText:Show()
-                end
-                frame:Show()
+            frame.count:SetText(buff.missingText)
+            frame.count:SetFont(fontPath, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
+            if frame.testText and testModeData.showLabels then
+                frame.testText:SetFont(fontPath, GetFrameFontSize(frame, 0.6), "OUTLINE")
+                frame.testText:Show()
             end
+            frame:Show()
         end
     end
 

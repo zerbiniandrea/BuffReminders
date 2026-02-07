@@ -94,7 +94,6 @@
 
 ---@class BuffGroup
 ---@field displayName string
----@field missingText? string
 
 ---@class CustomBuff
 ---@field spellID SpellID
@@ -197,8 +196,6 @@
 ---@field missingText string?                -- "NO\nAURA" for non-raid
 ---@field expiringTime number?               -- Seconds remaining if expiring
 ---@field shouldGlow boolean                 -- Expiration glow?
----@field groupId string?                    -- For merged buffs (beacons)
----@field groupMerged boolean?               -- Hidden, merged into group primary
 ---@field iconByRole table<RoleType,number>? -- Role-based icon override
 
 ---@class BuffRemindersDB

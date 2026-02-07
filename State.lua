@@ -8,7 +8,6 @@ local _, BR = ...
 
 -- Buff tables from Buffs.lua (via BR namespace)
 local BUFF_TABLES = BR.BUFF_TABLES
-local BuffGroups = BR.BuffGroups
 local BuffBeneficiaries = BR.BuffBeneficiaries
 
 -- Local aliases
@@ -643,7 +642,6 @@ function BuffState.Refresh()
     for _, entry in pairs(BuffState.entries) do
         entry.visible = false
         entry.shouldGlow = false
-        entry.groupMerged = false
         entry.countText = nil
         entry.missingText = nil
         entry.expiringTime = nil
@@ -730,7 +728,6 @@ function BuffState.Refresh()
 
     -- Process targeted buffs (player's own buff responsibility)
     local targetedVisible = IsCategoryVisibleForContent("targeted")
-    local visibleGroups = {} -- Track visible buffs by groupId for merging
     for i, buff in ipairs(TargetedBuffs) do
         local entry = GetOrCreateEntry(buff.key, "targeted", i)
         local settingKey = GetBuffSettingKey(buff)
@@ -741,24 +738,6 @@ function BuffState.Refresh()
                 entry.visible = true
                 entry.displayType = "missing"
                 entry.missingText = buff.missingText
-                entry.groupId = buff.groupId
-                -- Track for group merging
-                if buff.groupId then
-                    visibleGroups[buff.groupId] = visibleGroups[buff.groupId] or {}
-                    table.insert(visibleGroups[buff.groupId], entry)
-                end
-            end
-        end
-    end
-
-    -- Merge grouped targeted buffs that are both visible
-    for groupId, group in pairs(visibleGroups) do
-        if #group >= 2 then
-            local groupInfo = BuffGroups[groupId]
-            -- First entry gets the group text, others are marked as merged
-            group[1].missingText = groupInfo and groupInfo.missingText or group[1].missingText
-            for i = 2, #group do
-                group[i].groupMerged = true
             end
         end
     end
@@ -866,7 +845,7 @@ function BuffState.Refresh()
     -- Build visibleByCategory in one pass from entries
     BuffState.visibleByCategory = {}
     for _, entry in pairs(BuffState.entries) do
-        if entry.visible and not entry.groupMerged then
+        if entry.visible then
             local cat = entry.category
             if not BuffState.visibleByCategory[cat] then
                 BuffState.visibleByCategory[cat] = {}
