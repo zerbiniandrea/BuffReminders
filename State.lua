@@ -867,7 +867,7 @@ function BuffState.Refresh()
                 if not hasBuff then
                     entry.visible = true
                     entry.displayType = "missing"
-                    entry.missingText = customBuff.missingText or "NO\nBUFF"
+                    entry.missingText = customBuff.missingText
                 end
             end
         end

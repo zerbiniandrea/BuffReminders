@@ -660,8 +660,13 @@ end
 ---@param missingText? string
 ---@return boolean true (for anyVisible chaining)
 local function ShowMissingFrame(frame, missingText)
-    frame.count:SetFont(fontPath, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
-    frame.count:SetText(missingText or "")
+    if missingText then
+        frame.count:SetFont(fontPath, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
+        frame.count:SetText(missingText)
+        frame.count:Show()
+    else
+        frame.count:Hide()
+    end
     frame:Show()
     SetExpirationGlow(frame, false)
     return true
@@ -1148,7 +1153,7 @@ RefreshTestDisplay = function()
         local frame = buffFrames[buff.key]
         if frame then
             frame.count:SetFont(fontPath, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
-            frame.count:SetText(buff.missingText or "")
+            frame.count:SetText(buff.missingText)
             if frame.testText and testModeData.showLabels then
                 frame.testText:SetFont(fontPath, GetFrameFontSize(frame, 0.6), "OUTLINE")
                 frame.testText:Show()
@@ -1168,9 +1173,9 @@ RefreshTestDisplay = function()
                 if buff.groupId then
                     seenGroups[buff.groupId] = true
                     local groupInfo = BuffGroups[buff.groupId]
-                    frame.count:SetText(groupInfo and groupInfo.missingText or "")
+                    frame.count:SetText(groupInfo and groupInfo.missingText)
                 else
-                    frame.count:SetText(buff.missingText or "")
+                    frame.count:SetText(buff.missingText)
                 end
                 frame.count:SetFont(fontPath, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
                 if frame.testText and testModeData.showLabels then
@@ -1186,7 +1191,7 @@ RefreshTestDisplay = function()
     for _, buff in ipairs(SelfBuffs) do
         local frame = buffFrames[buff.key]
         if frame then
-            frame.count:SetText(buff.missingText or "")
+            frame.count:SetText(buff.missingText)
             frame.count:SetFont(fontPath, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
             if frame.testText and testModeData.showLabels then
                 frame.testText:SetFont(fontPath, GetFrameFontSize(frame, 0.6), "OUTLINE")
@@ -1200,7 +1205,7 @@ RefreshTestDisplay = function()
     for _, buff in ipairs(PetBuffs) do
         local frame = buffFrames[buff.key]
         if frame then
-            frame.count:SetText(buff.missingText or "")
+            frame.count:SetText(buff.missingText)
             frame.count:SetFont(fontPath, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
             if frame.testText and testModeData.showLabels then
                 frame.testText:SetFont(fontPath, GetFrameFontSize(frame, 0.6), "OUTLINE")
@@ -1229,8 +1234,13 @@ RefreshTestDisplay = function()
         for _, customBuff in pairs(db.customBuffs) do
             local frame = buffFrames[customBuff.key]
             if frame then
-                frame.count:SetFont(fontPath, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
-                frame.count:SetText(customBuff.missingText or "NO\nBUFF")
+                if customBuff.missingText then
+                    frame.count:SetFont(fontPath, GetFrameFontSize(frame, MISSING_TEXT_SCALE), "OUTLINE")
+                    frame.count:SetText(customBuff.missingText)
+                    frame.count:Show()
+                else
+                    frame.count:Hide()
+                end
                 if frame.testText and testModeData.showLabels then
                     frame.testText:SetFont(fontPath, GetFrameFontSize(frame, 0.6), "OUTLINE")
                     frame.testText:Show()
@@ -1329,11 +1339,13 @@ local function RenderVisibleEntry(frame, entry)
     if entry.displayType == "count" then
         frame.count:SetFont(fontPath, GetFrameFontSize(frame), "OUTLINE")
         frame.count:SetText(entry.countText or "")
+        frame.count:Show()
         frame:Show()
         SetExpirationGlow(frame, entry.shouldGlow)
     elseif entry.displayType == "expiring" then
         frame.count:SetFont(fontPath, GetFrameFontSize(frame), "OUTLINE")
         frame.count:SetText(entry.countText or "")
+        frame.count:Show()
         frame:Show()
         SetExpirationGlow(frame, true)
     else -- "missing"
