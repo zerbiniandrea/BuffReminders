@@ -189,6 +189,7 @@
 ---@class BuffStateEntry
 ---@field key string                         -- "intellect", "devotionAura", etc.
 ---@field category CategoryName              -- "raid", "presence", "targeted", "self", "pet", "consumable", "custom"
+---@field sortOrder number                   -- Position within category for display ordering
 ---@field visible boolean                    -- Should show?
 ---@field displayType "count"|"missing"|"expiring"
 ---@field countText string?                  -- "17/20" for raid buffs

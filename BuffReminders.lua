@@ -937,56 +937,14 @@ local function PositionFramesInContainer(container, frames, iconSize, spacing, d
     end
 end
 
--- Position buff frames with split category support
--- Handles mixed mode: some categories in mainFrame, some split into their own frames
-local function PositionBuffFramesWithSplits()
-    -- Skip repositioning if any frame is currently being dragged
-    if isDraggingFrame then
-        return
-    end
-
+-- Build a sorted category list by priority
+local function GetSortedCategories()
     local db = BuffRemindersDB
-
-    -- Collect visible frames by category
-    local framesByCategory = {
-        raid = {},
-        presence = {},
-        targeted = {},
-        self = {},
-        pet = {},
-        consumable = {},
-        custom = {},
-    }
-
-    for category, buffArray in pairs(BUFF_TABLES) do
-        for _, buff in ipairs(buffArray) do
-            local frame = buffFrames[buff.key]
-            if frame and frame:IsShown() then
-                table.insert(framesByCategory[category], frame)
-            end
-        end
-    end
-
-    -- Custom buffs (sorted by key for consistent order)
-    local customBuffs = db.customBuffs or {}
-    local sortedCustomKeys = {}
-    for key in pairs(customBuffs) do
-        table.insert(sortedCustomKeys, key)
-    end
-    table.sort(sortedCustomKeys)
-    for _, key in ipairs(sortedCustomKeys) do
-        local frame = buffFrames[key]
-        if frame and frame:IsShown() then
-            table.insert(framesByCategory.custom, frame)
-        end
-    end
-
-    -- Build sorted category list by priority for non-split ordering
-    local sortedCategories = {}
+    local sorted = {}
     for i, category in ipairs(CATEGORIES) do
-        table.insert(sortedCategories, { name = category, index = i })
+        sorted[#sorted + 1] = { name = category, index = i }
     end
-    table.sort(sortedCategories, function(a, b)
+    table.sort(sorted, function(a, b)
         local aPri = db.categorySettings and db.categorySettings[a.name] and db.categorySettings[a.name].priority
             or defaults.categorySettings[a.name].priority
         local bPri = db.categorySettings and db.categorySettings[b.name] and db.categorySettings[b.name].priority
@@ -996,18 +954,13 @@ local function PositionBuffFramesWithSplits()
         end
         return aPri < bPri
     end)
+    return sorted
+end
 
-    -- Collect frames for mainFrame (non-split categories) in priority order
-    local mainFrameBuffs = {}
-    for _, entry in ipairs(sortedCategories) do
-        if not IsCategorySplit(entry.name) then
-            for _, frame in ipairs(framesByCategory[entry.name]) do
-                table.insert(mainFrameBuffs, frame)
-            end
-        end
-    end
+-- Position and size the main container frame with the given buff frames
+local function PositionMainContainer(mainFrameBuffs)
+    local db = BuffRemindersDB
 
-    -- Position and size mainFrame
     if #mainFrameBuffs > 0 then
         local mainSettings = GetCategorySettings("main")
         local iconSize = mainSettings.iconSize or 64
@@ -1029,7 +982,6 @@ local function PositionBuffFramesWithSplits()
         end
 
         -- Re-anchor based on growth direction so first icon stays at anchor position
-        -- pos is already the anchor position relative to UIParent CENTER
         local anchor = DIRECTION_ANCHORS[direction] or "CENTER"
         local pos = db.position
         mainFrame:ClearAllPoints()
@@ -1045,65 +997,77 @@ local function PositionBuffFramesWithSplits()
         local anchor = DIRECTION_ANCHORS[direction] or "CENTER"
         local pos = db.position
         mainFrame:SetSize(iconSize, iconSize)
-        -- pos is already the anchor position relative to UIParent CENTER
         mainFrame:ClearAllPoints()
         mainFrame:SetPoint(anchor, UIParent, "CENTER", pos.x or 0, pos.y or 0)
         mainFrame:Show()
     else
         mainFrame:Hide()
     end
+end
 
-    -- Position frames within each split category
+-- Position and size a split category frame with the given buff frames
+local function PositionSplitCategory(category, frames)
+    local db = BuffRemindersDB
+    local catFrame = categoryFrames[category]
+    if not catFrame then
+        return
+    end
+
+    local catSettings = GetCategorySettings(category)
+    local direction = catSettings.growDirection or "CENTER"
+    local anchor = DIRECTION_ANCHORS[direction] or "CENTER"
+    local pos = catSettings.position or { point = "CENTER", x = 0, y = 0 }
+
+    if #frames > 0 then
+        local iconSize = catSettings.iconSize or 64
+        local spacing = math.floor(iconSize * (catSettings.spacing or 0.2))
+
+        -- Resize individual buff frames to category's icon size
+        for _, frame in ipairs(frames) do
+            frame:SetSize(iconSize, iconSize)
+        end
+
+        -- Size category frame to fit contents
+        local isVertical = direction == "UP" or direction == "DOWN"
+        local totalSize = #frames * iconSize + (#frames - 1) * spacing
+        if isVertical then
+            catFrame:SetSize(iconSize, math.max(totalSize, iconSize))
+        else
+            catFrame:SetSize(math.max(totalSize, iconSize), iconSize)
+        end
+
+        catFrame:ClearAllPoints()
+        catFrame:SetPoint(anchor, UIParent, "CENTER", pos.x or 0, pos.y or 0)
+
+        PositionFramesInContainer(catFrame, frames, iconSize, spacing, direction)
+        catFrame:Show()
+    elseif not db.locked then
+        -- Keep split frame visible when unlocked for positioning
+        local iconSize = catSettings.iconSize or 64
+        catFrame:SetSize(iconSize, iconSize)
+        catFrame:ClearAllPoints()
+        catFrame:SetPoint(anchor, UIParent, "CENTER", pos.x or 0, pos.y or 0)
+        catFrame:Show()
+    else
+        catFrame:Hide()
+    end
+end
+
+-- Hide split category frames that have no visible buffs, and hide non-split category frames
+local function PositionSplitCategories(visibleByCategory)
     for _, category in ipairs(CATEGORIES) do
         local catFrame = categoryFrames[category]
-        local frames = framesByCategory[category]
-        local isSplit = IsCategorySplit(category)
-
-        if catFrame and isSplit then
-            local catSettings = GetCategorySettings(category)
-            local direction = catSettings.growDirection or "CENTER"
-            local anchor = DIRECTION_ANCHORS[direction] or "CENTER"
-            local pos = catSettings.position or { point = "CENTER", x = 0, y = 0 }
-
-            if #frames > 0 then
-                local iconSize = catSettings.iconSize or 64
-                local spacing = math.floor(iconSize * (catSettings.spacing or 0.2))
-
-                -- Resize individual buff frames to category's icon size
-                for _, frame in ipairs(frames) do
-                    frame:SetSize(iconSize, iconSize)
+        if catFrame then
+            if IsCategorySplit(category) then
+                local entries = visibleByCategory[category]
+                if not entries or #entries == 0 then
+                    -- No visible buffs: show empty frame when unlocked, hide when locked
+                    PositionSplitCategory(category, {})
                 end
-
-                -- Size category frame to fit contents
-                local isVertical = direction == "UP" or direction == "DOWN"
-                local totalSize = #frames * iconSize + (#frames - 1) * spacing
-                if isVertical then
-                    catFrame:SetSize(iconSize, math.max(totalSize, iconSize))
-                else
-                    catFrame:SetSize(math.max(totalSize, iconSize), iconSize)
-                end
-
-                -- Re-anchor based on growth direction so first icon stays at anchor position
-                -- pos is already the anchor position relative to UIParent CENTER
-                catFrame:ClearAllPoints()
-                catFrame:SetPoint(anchor, UIParent, "CENTER", pos.x or 0, pos.y or 0)
-
-                PositionFramesInContainer(catFrame, frames, iconSize, spacing, direction)
-                catFrame:Show()
-            elseif not db.locked then
-                -- Keep split frame visible when unlocked for positioning
-                local iconSize = catSettings.iconSize or 64
-                catFrame:SetSize(iconSize, iconSize)
-                -- pos is already the anchor position relative to UIParent CENTER
-                catFrame:ClearAllPoints()
-                catFrame:SetPoint(anchor, UIParent, "CENTER", pos.x or 0, pos.y or 0)
-                catFrame:Show()
             else
+                -- Not split - hide category frame
                 catFrame:Hide()
             end
-        elseif catFrame then
-            -- Not split - hide category frame
-            catFrame:Hide()
         end
     end
 end
@@ -1250,8 +1214,37 @@ RefreshTestDisplay = function()
         end
     end
 
-    -- Position and show appropriate frame(s)
-    PositionBuffFramesWithSplits()
+    -- Position using category-first helpers
+    local sortedCategories = GetSortedCategories()
+    local mainFrameBuffs = {}
+
+    -- Collect shown frames by category for positioning
+    local shownByCategory = {}
+    for _, frame in pairs(buffFrames) do
+        if frame:IsShown() and frame.buffCategory then
+            local cat = frame.buffCategory
+            if not shownByCategory[cat] then
+                shownByCategory[cat] = {}
+            end
+            table.insert(shownByCategory[cat], frame)
+        end
+    end
+
+    for _, catEntry in ipairs(sortedCategories) do
+        local category = catEntry.name
+        local frames = shownByCategory[category] or {}
+
+        if #frames > 0 and IsCategorySplit(category) then
+            PositionSplitCategory(category, frames)
+        elseif not IsCategorySplit(category) then
+            for _, frame in ipairs(frames) do
+                table.insert(mainFrameBuffs, frame)
+            end
+        end
+    end
+
+    PositionMainContainer(mainFrameBuffs)
+    PositionSplitCategories(shownByCategory)
     UpdateAnchor()
 end
 
@@ -1328,7 +1321,13 @@ UpdateFallbackDisplay = function()
 
     if IsSpellGlowing(playerBuff.spellID) then
         ShowMissingFrame(frame, "NO\nBUFF!")
-        PositionBuffFramesWithSplits()
+        -- Position this single frame in its container
+        local category = frame.buffCategory
+        if category and IsCategorySplit(category) then
+            PositionSplitCategory(category, { frame })
+        else
+            PositionMainContainer({ frame })
+        end
         UpdateAnchor() -- Ensure edit mode visuals are updated
     end
     -- No else branch - HideAllDisplayFrames was already called by caller
@@ -1392,21 +1391,35 @@ UpdateDisplay = function()
     -- Combat: only show pet reminders (pets can be summoned in combat)
     if combatCheck then
         BR.BuffState.Refresh()
-        local anyPetVisible = false
-        for key, entry in pairs(BR.BuffState.entries) do
-            local frame = buffFrames[key]
-            if frame then
-                if entry.visible and not entry.groupMerged and entry.category == "pet" then
+
+        -- Hide all frames first
+        for _, frame in pairs(buffFrames) do
+            HideFrame(frame)
+        end
+
+        local petEntries = BR.BuffState.visibleByCategory.pet
+        if petEntries and #petEntries > 0 then
+            table.sort(petEntries, function(a, b)
+                return a.sortOrder < b.sortOrder
+            end)
+            local petFrames = {}
+            for _, entry in ipairs(petEntries) do
+                local frame = buffFrames[entry.key]
+                if frame then
                     RenderVisibleEntry(frame, entry)
-                    anyPetVisible = true
-                else
-                    HideFrame(frame)
+                    petFrames[#petFrames + 1] = frame
                 end
             end
-        end
-        if anyPetVisible then
-            PositionBuffFramesWithSplits()
-            UpdateAnchor()
+            if #petFrames > 0 then
+                if IsCategorySplit("pet") then
+                    PositionSplitCategory("pet", petFrames)
+                else
+                    PositionMainContainer(petFrames)
+                end
+                UpdateAnchor()
+            else
+                HideAllDisplayFrames()
+            end
         else
             HideAllDisplayFrames()
         end
@@ -1430,30 +1443,64 @@ UpdateDisplay = function()
     -- Refresh buff state
     BR.BuffState.Refresh()
 
+    -- Hide all frames first
+    for _, frame in pairs(buffFrames) do
+        HideFrame(frame)
+    end
+
+    local visibleByCategory = BR.BuffState.visibleByCategory
     local anyVisible = false
 
-    -- Render from BR.BuffState.entries
-    for key, entry in pairs(BR.BuffState.entries) do
-        local frame = buffFrames[key]
-        if frame then
-            if entry.visible and not entry.groupMerged then
-                RenderVisibleEntry(frame, entry)
-                anyVisible = true
+    -- Build sorted category list by priority
+    local sortedCategories = GetSortedCategories()
+
+    -- Collect frames for main container (non-split) in priority order
+    local mainFrameBuffs = {}
+
+    for _, catEntry in ipairs(sortedCategories) do
+        local category = catEntry.name
+        local entries = visibleByCategory[category]
+
+        if entries and #entries > 0 then
+            table.sort(entries, function(a, b)
+                return a.sortOrder < b.sortOrder
+            end)
+            anyVisible = true
+
+            if IsCategorySplit(category) then
+                -- Render + position this split category directly
+                local frames = {}
+                for _, entry in ipairs(entries) do
+                    local frame = buffFrames[entry.key]
+                    if frame then
+                        RenderVisibleEntry(frame, entry)
+                        frames[#frames + 1] = frame
+                    end
+                end
+                PositionSplitCategory(category, frames)
             else
-                HideFrame(frame)
+                -- Render, collect for main container
+                for _, entry in ipairs(entries) do
+                    local frame = buffFrames[entry.key]
+                    if frame then
+                        RenderVisibleEntry(frame, entry)
+                        mainFrameBuffs[#mainFrameBuffs + 1] = frame
+                    end
+                end
             end
         end
     end
 
-    if anyVisible or not db.locked then
-        -- Use split-aware positioning (handles both main and split categories)
-        PositionBuffFramesWithSplits()
-        UpdateAnchor()
-    else
-        -- Hide everything when locked and no buffs visible
+    -- Position main container
+    PositionMainContainer(mainFrameBuffs)
+
+    -- Handle split category frames with no visible buffs (show empty when unlocked)
+    PositionSplitCategories(visibleByCategory)
+
+    if not anyVisible and db.locked then
         HideAllDisplayFrames()
-        UpdateAnchor() -- Ensure edit mode visuals are cleared
     end
+    UpdateAnchor()
 end
 
 -- Start update ticker
@@ -1708,7 +1755,7 @@ UpdateAnchor = function()
         mainFrame.anchorFrame:Hide()
     end
 
-    -- Update mainFrame edit mode visuals (frame visibility is handled by PositionBuffFramesWithSplits)
+    -- Update mainFrame edit mode visuals (frame visibility is handled by positioning helpers)
     local allSplit = AreAllCategoriesSplit()
     if unlocked and not allSplit and mainFrame:IsShown() then
         SetEditModeVisuals(mainFrame, true, GetMainFrameLabel())
@@ -1716,7 +1763,7 @@ UpdateAnchor = function()
         SetEditModeVisuals(mainFrame, false)
     end
 
-    -- Update edit mode visuals for split category frames (frame visibility is handled by PositionBuffFramesWithSplits)
+    -- Update edit mode visuals for split category frames (frame visibility is handled by positioning helpers)
     for _, category in ipairs(CATEGORIES) do
         local catFrame = categoryFrames[category]
         if catFrame then

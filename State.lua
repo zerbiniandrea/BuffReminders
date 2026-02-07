@@ -608,40 +608,22 @@ function BuffState.GetEntry(key)
     return BuffState.entries[key]
 end
 
----Get all visible entries for a category
----@param category CategoryName
----@return BuffStateEntry[]
-function BuffState.GetVisibleByCategory(category)
-    local result = {}
-    for _, entry in pairs(BuffState.entries) do
-        if entry.visible and not entry.groupMerged and entry.category == category then
-            table.insert(result, entry)
-        end
-    end
-    return result
-end
-
----Check if there are any visible buffs
----@return boolean
-function BuffState.HasVisibleBuffs()
-    for _, entry in pairs(BuffState.entries) do
-        if entry.visible and not entry.groupMerged then
-            return true
-        end
-    end
-    return false
-end
+---Pre-built per-category lists of visible entries (populated by Refresh)
+---@type table<CategoryName, BuffStateEntry[]>
+BuffState.visibleByCategory = {}
 
 ---Create or update an entry
 ---@param key string
 ---@param category CategoryName
+---@param sortOrder? number Position within category for display ordering
 ---@return BuffStateEntry
-local function GetOrCreateEntry(key, category)
+local function GetOrCreateEntry(key, category, sortOrder)
     if not BuffState.entries[key] then
         ---@type BuffStateEntry
         BuffState.entries[key] = {
             key = key,
             category = category,
+            sortOrder = sortOrder or 0,
             visible = false,
             displayType = "missing",
             shouldGlow = false,
@@ -686,8 +668,8 @@ function BuffState.Refresh()
 
     -- Process raid buffs (coverage - need everyone to have them)
     local raidVisible = IsCategoryVisibleForContent("raid")
-    for _, buff in ipairs(RaidBuffs) do
-        local entry = GetOrCreateEntry(buff.key, "raid")
+    for i, buff in ipairs(RaidBuffs) do
+        local entry = GetOrCreateEntry(buff.key, "raid", i)
         local hasCaster = HasCasterForBuff(buff.class, buff.levelRequired)
         local showBuff = raidVisible and (not db.showOnlyPlayerClassBuff or buff.class == playerClass) and hasCaster
 
@@ -716,8 +698,8 @@ function BuffState.Refresh()
 
     -- Process presence buffs (need at least 1 person to have them)
     local presenceVisible = IsCategoryVisibleForContent("presence")
-    for _, buff in ipairs(PresenceBuffs) do
-        local entry = GetOrCreateEntry(buff.key, "presence")
+    for i, buff in ipairs(PresenceBuffs) do
+        local entry = GetOrCreateEntry(buff.key, "presence", i)
         local readyCheckOnly = buff.infoTooltip and buff.infoTooltip:match("^Ready Check Only")
         local hasCaster = HasCasterForBuff(buff.class, buff.levelRequired)
         local showBuff = presenceVisible
@@ -749,8 +731,8 @@ function BuffState.Refresh()
     -- Process targeted buffs (player's own buff responsibility)
     local targetedVisible = IsCategoryVisibleForContent("targeted")
     local visibleGroups = {} -- Track visible buffs by groupId for merging
-    for _, buff in ipairs(TargetedBuffs) do
-        local entry = GetOrCreateEntry(buff.key, "targeted")
+    for i, buff in ipairs(TargetedBuffs) do
+        local entry = GetOrCreateEntry(buff.key, "targeted", i)
         local settingKey = GetBuffSettingKey(buff)
 
         if IsBuffEnabled(settingKey) and targetedVisible and PassesPreChecks(buff, nil, db) then
@@ -783,8 +765,8 @@ function BuffState.Refresh()
 
     -- Process self buffs (player's own buff on themselves, including weapon imbues)
     local selfVisible = IsCategoryVisibleForContent("self")
-    for _, buff in ipairs(SelfBuffs) do
-        local entry = GetOrCreateEntry(buff.key, "self")
+    for i, buff in ipairs(SelfBuffs) do
+        local entry = GetOrCreateEntry(buff.key, "self", i)
         local settingKey = buff.groupId or buff.key
 
         if IsBuffEnabled(settingKey) and selfVisible then
@@ -812,8 +794,8 @@ function BuffState.Refresh()
     if BuffRemindersDB.hidePetWhileMounted ~= false and IsMounted() then
         petVisible = false
     end
-    for _, buff in ipairs(PetBuffs) do
-        local entry = GetOrCreateEntry(buff.key, "pet")
+    for i, buff in ipairs(PetBuffs) do
+        local entry = GetOrCreateEntry(buff.key, "pet", i)
         local settingKey = buff.groupId or buff.key
 
         if IsBuffEnabled(settingKey) and petVisible then
@@ -838,8 +820,8 @@ function BuffState.Refresh()
 
     -- Process consumable buffs
     local consumableVisible = IsCategoryVisibleForContent("consumable")
-    for _, buff in ipairs(Consumables) do
-        local entry = GetOrCreateEntry(buff.key, "consumable")
+    for i, buff in ipairs(Consumables) do
+        local entry = GetOrCreateEntry(buff.key, "consumable", i)
         local settingKey = buff.groupId or buff.key
 
         local hasCaster = not buff.class or HasCasterForBuff(buff.class, buff.levelRequired)
@@ -857,8 +839,16 @@ function BuffState.Refresh()
     -- Process custom buffs
     local customVisible = IsCategoryVisibleForContent("custom")
     if db.customBuffs then
-        for _, customBuff in pairs(db.customBuffs) do
-            local entry = GetOrCreateEntry(customBuff.key, "custom")
+        -- Sort keys for stable ordering (pairs() has no guaranteed order)
+        local sortedKeys = {}
+        for k in pairs(db.customBuffs) do
+            sortedKeys[#sortedKeys + 1] = k
+        end
+        table.sort(sortedKeys)
+
+        for i, k in ipairs(sortedKeys) do
+            local customBuff = db.customBuffs[k]
+            local entry = GetOrCreateEntry(customBuff.key, "custom", i)
             local classMatch = not customBuff.class or customBuff.class == playerClass
             local specMatch = not customBuff.specId or customBuff.specId == GetPlayerSpecId()
 
@@ -870,6 +860,18 @@ function BuffState.Refresh()
                     entry.missingText = customBuff.missingText
                 end
             end
+        end
+    end
+
+    -- Build visibleByCategory in one pass from entries
+    BuffState.visibleByCategory = {}
+    for _, entry in pairs(BuffState.entries) do
+        if entry.visible and not entry.groupMerged then
+            local cat = entry.category
+            if not BuffState.visibleByCategory[cat] then
+                BuffState.visibleByCategory[cat] = {}
+            end
+            table.insert(BuffState.visibleByCategory[cat], entry)
         end
     end
 
