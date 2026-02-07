@@ -49,7 +49,7 @@ Configure when and how the addon displays. Control visibility (group only, insta
 
 ## Limitations
 
-- **Combat/M+/PvP** - Blizzard restricts buff API access during combat, M+ keystones, and instanced PvP. Full group tracking is only available out of combat. However, with "Glow Fallback" enabled (Settings tab), the addon detects when your own raid buff is missing by monitoring action bar spell glows - this works in M+.
+- **Combat/M+/PvP** - Blizzard restricts buff API access during combat, M+ keystones, and instanced PvP. Full group tracking is only available out of combat. In M+, the addon automatically detects when your own raid buff is missing by monitoring action bar spell glows (requires the spell to be on your action bars).
 - **Buff counting restrictions** - Both buff counts and buff providers (who can cast buffs) are tracked only for group members who are alive, connected, visible (not phased), and allied. This means:
   - Dead, offline, or phased players are excluded from totals
   - Raid buff providers (e.g., mages for Arcane Intellect) are only detected if they meet these conditions

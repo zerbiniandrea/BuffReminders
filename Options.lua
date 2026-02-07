@@ -51,7 +51,6 @@ local RefreshTestDisplay = BR.Display.RefreshTest
 local ToggleTestMode = BR.Display.ToggleTestMode
 local UpdateVisuals = BR.Display.UpdateVisuals
 local ResetCategoryFramePosition = BR.Display.ResetCategoryFramePosition
-local UpdateFallbackDisplay = BR.Display.UpdateFallback or function() end
 local ReparentBuffFrames = BR.CallbackRegistry.TriggerEvent
         and function()
             BR.CallbackRegistry:TriggerEvent("FramesReparent")
@@ -1348,22 +1347,6 @@ local function CreateOptionsPanel()
         end,
     })
     setLayout:Add(playerMissingHolder, nil, COMPONENT_GAP)
-
-    local glowFallbackHolder = Components.Checkbox(settingsContent, {
-        label = "|cffff8800EXPERIMENTAL|r Show own raid buff during M+",
-        get = function()
-            return BuffRemindersDB.useGlowFallback == true
-        end,
-        tooltip = {
-            title = "Show own raid buff during M+",
-            desc = "Uses WoW's action bar glow to detect when someone needs your raid buff, in Mythic+ where normal tracking is disabled.\n\nRequires the spell to be on your action bars.",
-        },
-        onChange = function(checked)
-            BuffRemindersDB.useGlowFallback = checked
-            UpdateFallbackDisplay()
-        end,
-    })
-    setLayout:Add(glowFallbackHolder, nil, COMPONENT_GAP)
 
     local loginMsgHolder = Components.Checkbox(settingsContent, {
         label = "Show login messages",

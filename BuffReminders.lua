@@ -102,7 +102,6 @@ local defaults = {
     showOnlyOnReadyCheck = false,
     hidePetWhileMounted = true,
     readyCheckDuration = 15, -- seconds
-    useGlowFallback = false, -- EXPERIMENTAL: Show own raid buff via action bar glow during M+
     optionsPanelScale = 1.2, -- base scale (displayed as 100%)
     showLoginMessages = true,
 
@@ -1316,7 +1315,7 @@ end
 -- Update the fallback display (shows player's own raid buff via glow during M+/PvP)
 -- Assumes caller has already determined we're in restricted mode and called HideAllDisplayFrames()
 UpdateFallbackDisplay = function()
-    if not mainFrame or not BuffRemindersDB.useGlowFallback then
+    if not mainFrame then
         return
     end
 
@@ -2151,7 +2150,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
         -- ====================================================================
         -- Versioned migrations — each runs exactly once, tracked by dbVersion
         -- ====================================================================
-        local DB_VERSION = 3
+        local DB_VERSION = 4
 
         local migrations = {
             -- [1] Consolidate all pre-versioning migrations (v2.8 → v3.x)
@@ -2303,6 +2302,11 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
                         raid = true,
                     }
                 end
+            end,
+
+            -- [4] Remove useGlowFallback (glow fallback is now always enabled)
+            [4] = function()
+                db.useGlowFallback = nil
             end,
         }
 
