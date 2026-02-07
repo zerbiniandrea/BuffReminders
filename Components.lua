@@ -919,9 +919,11 @@ local function CreateDropdownCore(parent, width, options, initialValue, onChange
     buttonText:SetJustifyH("LEFT")
     buttonText:SetText(currentLabel)
 
-    local arrow = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local arrow = button:CreateTexture(nil, "OVERLAY")
+    arrow:SetSize(12, 12)
     arrow:SetPoint("RIGHT", -6, 0)
-    arrow:SetText("\226\150\188") -- ▼
+    arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
+    arrow:SetRotation(math.rad(-90)) -- points down
 
     -- ==================== MENU ====================
     -- Parent to UIParent for proper strata handling
@@ -972,17 +974,17 @@ local function CreateDropdownCore(parent, width, options, initialValue, onChange
             button:SetBackdropColor(unpack(colors.bgDisabled))
             button:SetBackdropBorderColor(unpack(colors.borderDisabled))
             buttonText:SetTextColor(unpack(colors.textDisabled))
-            arrow:SetTextColor(unpack(colors.arrowDisabled))
+            arrow:SetVertexColor(unpack(colors.arrowDisabled))
         elseif isHovered or isOpen then
             button:SetBackdropColor(unpack(colors.bgHover))
             button:SetBackdropBorderColor(unpack(colors.borderHover))
             buttonText:SetTextColor(unpack(colors.text))
-            arrow:SetTextColor(unpack(colors.arrowHover))
+            arrow:SetVertexColor(unpack(colors.arrowHover))
         else
             button:SetBackdropColor(unpack(colors.bg))
             button:SetBackdropBorderColor(unpack(colors.border))
             buttonText:SetTextColor(unpack(colors.text))
-            arrow:SetTextColor(unpack(colors.arrow))
+            arrow:SetVertexColor(unpack(colors.arrow))
         end
     end
 
@@ -2431,10 +2433,11 @@ function Components.CollapsibleSection(parent, config)
     headerBg:SetColorTexture(0.18, 0.18, 0.18, 1)
 
     -- Collapse indicator (chevron style)
-    local indicator = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local indicator = header:CreateTexture(nil, "OVERLAY")
+    indicator:SetSize(12, 12)
     indicator:SetPoint("LEFT", 10, 0)
-    indicator:SetText("\226\150\182") -- ▶ triangle
-    indicator:SetTextColor(0.6, 0.6, 0.6)
+    indicator:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
+    indicator:SetVertexColor(0.6, 0.6, 0.6)
 
     -- Title
     local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -2473,11 +2476,11 @@ function Components.CollapsibleSection(parent, config)
     -- Update visual state
     local function UpdateVisual()
         if isCollapsed then
-            indicator:SetText("\226\150\182") -- ▶
+            indicator:SetRotation(0) -- points right (native orientation)
             contentBg:Hide()
             holder:SetHeight(HEADER_HEIGHT)
         else
-            indicator:SetText("\226\150\188") -- ▼
+            indicator:SetRotation(math.rad(-90)) -- points down
             contentBg:Show()
             holder:SetHeight(HEADER_HEIGHT + contentHeight + CONTENT_PADDING * 2)
         end
@@ -2490,11 +2493,11 @@ function Components.CollapsibleSection(parent, config)
     -- Hover effect
     header:SetScript("OnEnter", function()
         headerBg:SetColorTexture(0.22, 0.22, 0.22, 1)
-        indicator:SetTextColor(0.8, 0.8, 0.8)
+        indicator:SetVertexColor(0.8, 0.8, 0.8)
     end)
     header:SetScript("OnLeave", function()
         headerBg:SetColorTexture(0.18, 0.18, 0.18, 1)
-        indicator:SetTextColor(0.6, 0.6, 0.6)
+        indicator:SetVertexColor(0.6, 0.6, 0.6)
     end)
 
     -- Click to toggle
