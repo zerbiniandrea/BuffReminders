@@ -173,8 +173,15 @@ local function CreateOptionsPanel()
     local currentScale = BuffRemindersDB.optionsPanelScale or BASE_SCALE
     local currentPct = math.floor(currentScale / BASE_SCALE * 100 + 0.5)
 
+    -- Close button
+    local closeBtn = CreateButton(panel, "x", function()
+        panel:Hide()
+    end)
+    closeBtn:SetSize(22, 22)
+    closeBtn:SetPoint("TOPRIGHT", -5, -5)
+
     local scaleHolder = CreateFrame("Frame", nil, panel)
-    scaleHolder:SetPoint("TOPRIGHT", -48, -8)
+    scaleHolder:SetPoint("RIGHT", closeBtn, "LEFT", -8, 0)
     scaleHolder:SetSize(60, 16)
 
     local scaleDown = scaleHolder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -240,13 +247,6 @@ local function CreateOptionsPanel()
     if BuffRemindersDB.optionsPanelScale then
         panel:SetScale(BuffRemindersDB.optionsPanelScale)
     end
-
-    -- Close button
-    local closeBtn = CreateButton(panel, "x", function()
-        panel:Hide()
-    end)
-    closeBtn:SetSize(22, 22)
-    closeBtn:SetPoint("LEFT", scaleUp, "RIGHT", 8, 0)
 
     -- ========== TABS ==========
     local tabButtons = {}
