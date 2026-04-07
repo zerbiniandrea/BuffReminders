@@ -3504,6 +3504,7 @@ eventFrame:RegisterEvent("PLAYER_UNGHOST")
 eventFrame:RegisterEvent("UNIT_AURA")
 eventFrame:RegisterEvent("UNIT_FLAGS")
 eventFrame:RegisterEvent("UNIT_CONNECTION")
+eventFrame:RegisterEvent("UNIT_PHASE")
 eventFrame:RegisterEvent("READY_CHECK")
 eventFrame:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
 eventFrame:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
@@ -4627,7 +4628,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
         else
             SetDirty("group")
         end
-    elseif event == "UNIT_FLAGS" or event == "UNIT_CONNECTION" then
+    elseif event == "UNIT_FLAGS" or event == "UNIT_CONNECTION" or event == "UNIT_PHASE" then
         if IsTrackedDisplayUnit(arg1) then
             if arg1 == "player" or arg1 == "pet" then
                 SetDirty("full")

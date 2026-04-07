@@ -433,7 +433,8 @@ end
 -- ============================================================================
 
 ---Check if a unit is a valid group member for buff tracking
----Excludes: non-existent, dead/ghost, disconnected, hostile (cross-faction in open world)
+---Excludes: non-existent, dead/ghost, disconnected, hostile (cross-faction in open world),
+---and units phased away from the player.
 ---@param unit string
 ---@return boolean
 local function IsValidGroupMember(unit)
@@ -442,6 +443,7 @@ local function IsValidGroupMember(unit)
         and UnitIsConnected(unit)
         and UnitCanAssist("player", unit)
         and UnitIsVisible(unit)
+        and UnitPhaseReason(unit) == nil
 end
 
 ---Check if a unit benefits from a buff using spec (preferred) or class (fallback)
