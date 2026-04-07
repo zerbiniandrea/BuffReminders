@@ -604,6 +604,20 @@ local function SetDirty()
     dirty = true
 end
 
+-- Buff state only depends on the player, their pet, and real group-member units.
+-- Ignore raidpet/partypet/nameplate aura traffic; pet-heavy specs can generate a lot of it.
+---@param unit string?
+---@return boolean
+local function IsTrackedDisplayUnit(unit)
+    if not unit then
+        return false
+    end
+    return unit == "player"
+        or unit == "pet"
+        or unit:match("^party%d+$") ~= nil
+        or unit:match("^raid%d+$") ~= nil
+end
+
 -- Track combat state via events (InCombatLockdown() can lag behind PLAYER_REGEN_DISABLED)
 -- inCombat reflects both player regen AND boss encounter state for early detection
 local inCombat = false
@@ -3475,6 +3489,8 @@ eventFrame:RegisterEvent("ENCOUNTER_END")
 eventFrame:RegisterEvent("PLAYER_DEAD")
 eventFrame:RegisterEvent("PLAYER_UNGHOST")
 eventFrame:RegisterEvent("UNIT_AURA")
+eventFrame:RegisterEvent("UNIT_FLAGS")
+eventFrame:RegisterEvent("UNIT_CONNECTION")
 eventFrame:RegisterEvent("READY_CHECK")
 eventFrame:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
 eventFrame:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
@@ -4587,10 +4603,17 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
     elseif event == "PLAYER_UNGHOST" then
         SetDirty()
     elseif event == "UNIT_AURA" then
+        if not IsTrackedDisplayUnit(arg1) then
+            return
+        end
         if arg1 == "player" then
             BR.StateHelpers.UpdateEatingState(arg2)
         end
         SetDirty()
+    elseif event == "UNIT_FLAGS" or event == "UNIT_CONNECTION" then
+        if IsTrackedDisplayUnit(arg1) then
+            SetDirty()
+        end
     elseif event == "UNIT_PET" then
         if arg1 == "player" then
             SetDirty()
