@@ -597,11 +597,16 @@ local glowingSpells = {} -- Track which spell IDs are currently glowing (for act
 
 -- Dirty flag system: events set dirty=true, OnUpdate checks flag with throttle
 local dirty = false
+local dirtyMode = "full"
 local lastUpdateTime = 0
 local MIN_UPDATE_INTERVAL = 0.5 -- seconds between actual updates
 
-local function SetDirty()
+---@param mode? "full"|"group"
+local function SetDirty(mode)
     dirty = true
+    if mode == "full" or dirtyMode ~= "full" then
+        dirtyMode = mode or "full"
+    end
 end
 
 -- Buff state only depends on the player, their pet, and real group-member units.
@@ -2687,18 +2692,23 @@ local function TryPlayBuffSound(key, buffSounds)
 end
 
 -- Update the display
-UpdateDisplay = function()
+---@param refreshMode? "full"|"group"
+UpdateDisplay = function(refreshMode)
     if not mainFrame then
         return
     end
+    refreshMode = refreshMode or "full"
+    local groupOnly = refreshMode == "group"
 
     -- Clear per-cycle caches (before early exits — fallback paths also use these)
-    wipe(expiringGlowCache)
-    wipe(missingGlowCache)
-    for key in pairs(BUFF_KEY_TO_CATEGORY) do
-        local frame = buffFrames[key]
-        if frame then
-            frame._cachedItems = nil
+    if not groupOnly then
+        wipe(expiringGlowCache)
+        wipe(missingGlowCache)
+        for key in pairs(BUFF_KEY_TO_CATEGORY) do
+            local frame = buffFrames[key]
+            if frame then
+                frame._cachedItems = nil
+            end
         end
     end
 
@@ -2753,7 +2763,7 @@ UpdateDisplay = function()
         -- (State.lua treats PvP the same as M+ for aura restriction purposes)
 
         -- Refresh buff state
-        BR.BuffState.Refresh()
+        BR.BuffState.Refresh(refreshMode)
     end
 
     local visibleByCategory = BR.BuffState.visibleByCategory
@@ -2921,7 +2931,7 @@ UpdateDisplay = function()
 
         -- Sync click overlays on expanded extra frames (they are created above but
         -- UpdateActionButtons is the only place that wires up their click overlays).
-        if not InCombatLockdown() then
+        if not groupOnly and not InCombatLockdown() then
             local displayMode = (BR.profile.defaults or {}).consumableDisplayMode
             if displayMode == "expanded" then
                 BR.SecureButtons.UpdateActionButtons("consumable")
@@ -2948,14 +2958,17 @@ local function StartUpdates()
         if now - lastUpdateTime < MIN_UPDATE_INTERVAL then
             return
         end
+        local refreshMode = dirtyMode
         dirty = false
+        dirtyMode = "full"
         lastUpdateTime = now
-        UpdateDisplay()
+        UpdateDisplay(refreshMode)
     end)
     -- Immediate first update
     dirty = false
+    dirtyMode = "full"
     lastUpdateTime = GetTime()
-    UpdateDisplay()
+    UpdateDisplay("full")
 end
 
 -- Stop update ticker (preserved for easy revert when Blizzard re-protects spells)
@@ -4575,7 +4588,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
             end
         end)
     elseif event == "GROUP_ROSTER_UPDATE" then
-        SetDirty()
+        SetDirty("group")
     elseif event == "PLAYER_REGEN_ENABLED" then
         inCombat = inEncounter
         BR.BuffState.SetInCombat(inCombat)
@@ -4601,22 +4614,30 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
     elseif event == "PLAYER_DEAD" then
         HideAllDisplayFrames()
     elseif event == "PLAYER_UNGHOST" then
-        SetDirty()
+        SetDirty("full")
     elseif event == "UNIT_AURA" then
         if not IsTrackedDisplayUnit(arg1) then
             return
         end
         if arg1 == "player" then
             BR.StateHelpers.UpdateEatingState(arg2)
+            SetDirty("full")
+        elseif arg1 == "pet" then
+            SetDirty("full")
+        else
+            SetDirty("group")
         end
-        SetDirty()
     elseif event == "UNIT_FLAGS" or event == "UNIT_CONNECTION" then
         if IsTrackedDisplayUnit(arg1) then
-            SetDirty()
+            if arg1 == "player" or arg1 == "pet" then
+                SetDirty("full")
+            else
+                SetDirty("group")
+            end
         end
     elseif event == "UNIT_PET" then
         if arg1 == "player" then
-            SetDirty()
+            SetDirty("full")
         end
     elseif event == "PET_BAR_UPDATE" then
         SetDirty()
