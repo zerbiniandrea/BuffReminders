@@ -23,7 +23,7 @@ errors=0
 
 # --- enUS <-> source sync (always checked, always errors) --------------------
 missing_src=$(comm -23 <(echo "$used") <(echo "$defined"))
-unused_src=$(comm -13 <(echo "$used") <(echo "$defined"))
+unused_src=$(comm -13 <(echo "$used") <(echo "$defined") | grep -v '^ChatRequest\.' || true)
 
 if [ -n "$missing_src" ]; then
     echo "ERROR  Used in source but not defined in enUS.lua:"
@@ -36,6 +36,23 @@ if [ -n "$unused_src" ]; then
     echo "$unused_src" | sed 's/^/  /'
     errors=1
 fi
+
+# --- ChatRequest.* restricted to Asian locales only --------------------------
+asian_locales="zhCN zhTW koKR"
+for file in "$LOCALES_DIR"/*.lua; do
+    locale=$(basename "$file" .lua)
+    [ "$locale" = "enUS" ] && continue
+    # Skip Asian locales — they're allowed to translate ChatRequest keys
+    case " $asian_locales " in
+        *" $locale "*) continue ;;
+    esac
+    chat_keys=$(grep -v '^\s*--' "$file" | grep -oP 'L\["ChatRequest\.[^"]+"\]' 2>/dev/null || true)
+    if [ -n "$chat_keys" ]; then
+        echo "ERROR  $locale.lua must not translate ChatRequest.* keys (chat messages stay in English on non-Asian servers):"
+        echo "$chat_keys" | sed 's/^/  /'
+        errors=1
+    fi
+done
 
 # --- Helpers -----------------------------------------------------------------
 get_locale_keys() {

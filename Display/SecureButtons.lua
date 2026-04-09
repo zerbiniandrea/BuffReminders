@@ -16,6 +16,24 @@ local _, playerClass = UnitClass("player")
 local GetCategorySettings = BR.Helpers.GetCategorySettings
 local IsCategorySplit = BR.Helpers.IsCategorySplit
 
+-- Chat request: categories that support "request buff in chat" on click
+local chatRequestableCategories = { raid = true, presence = true }
+local requestOnCooldown = {}
+local REQUEST_COOLDOWN = 30
+
+local function GetRequestChannel()
+    if IsInGroup(2) then -- 2 = instance group
+        return "INSTANCE_CHAT"
+    end
+    if IsInRaid() then
+        return "RAID"
+    end
+    if IsInGroup() then
+        return "PARTY"
+    end
+    return "SAY"
+end
+
 -- ============================================================================
 -- SPELL HELPERS
 -- ============================================================================
@@ -215,6 +233,17 @@ local function CreateClickOverlay(frame)
         end
     end)
     overlay:SetScript("PostClick", function(self)
+        if self._br_chatRequestKey then
+            local key = self._br_chatRequestKey
+            if not requestOnCooldown[key] and IsInGroup() then
+                requestOnCooldown[key] = true
+                C_Timer.After(REQUEST_COOLDOWN, function()
+                    requestOnCooldown[key] = nil
+                end)
+                SendChatMessage(self._br_chatRequestMsg, GetRequestChannel())
+            end
+            return
+        end
         BR.ConsumableMemory.RememberChoice(self.itemID, frame)
         C_Timer.After(0.3, function()
             if not InCombatLockdown() then
@@ -957,12 +986,36 @@ local function GetWeaponSlot(frame)
     return nil
 end
 
+---Set up a click overlay as a chat-request button for buffs the player can't cast.
+---@param frame table The buff frame
+---@param showHighlight boolean Whether to show the hover highlight
+local function SetupChatRequestOverlay(frame, showHighlight)
+    if not frame.clickOverlay then
+        CreateClickOverlay(frame)
+    end
+    local overlay = frame.clickOverlay
+    overlay._br_has_action = true
+    overlay._br_clickMacroFn = nil
+    overlay._br_clickMacroSpellID = nil
+    overlay.itemID = nil
+    overlay._br_chatRequestKey = frame.key
+    overlay._br_chatRequestMsg = L["ChatRequest." .. frame.key] or frame.displayName
+    overlay:SetAttribute("type", "macro")
+    overlay:SetAttribute("macrotext", "")
+    overlay:EnableMouse(true)
+    if overlay.highlight then
+        overlay.highlight:SetShown(showHighlight)
+    end
+end
+
 ---Disable a click overlay: mark inactive, disable mouse, hide, clear position cache.
 ---@param overlay table SecureActionButton overlay
 local function DisableOverlay(overlay)
     overlay._br_has_action = false
     overlay._br_clickMacroFn = nil
     overlay._br_clickMacroSpellID = nil
+    overlay._br_chatRequestKey = nil
+    overlay._br_chatRequestMsg = nil
     overlay.itemID = nil
     overlay:EnableMouse(false)
     overlay:Hide()
@@ -1296,6 +1349,8 @@ local function UpdateActionButtons(category)
                         if frame._br_pet_spec_icon then
                             HookPetSpecIconHover(overlay, frame)
                         end
+                    elseif db.requestBuffInChat and chatRequestableCategories[category] and not frame.isPlayerBuff then
+                        SetupChatRequestOverlay(frame, frameHighlight)
                     elseif frame.clickOverlay then
                         DisableOverlay(frame.clickOverlay)
                     end

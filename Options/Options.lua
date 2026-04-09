@@ -2434,6 +2434,25 @@ local function CreateOptionsPanel()
     })
     setLayout:Add(minimapHolder, nil, COMPONENT_GAP)
 
+    LayoutSectionHeader(setLayout, settingsContent, L["Options.ChatRequests"])
+
+    local requestBuffHolder = Components.Checkbox(settingsContent, {
+        label = L["Options.RequestBuffInChat"],
+        get = function()
+            return BR.profile.requestBuffInChat == true
+        end,
+        tooltip = {
+            title = L["Options.RequestBuffInChat"],
+            desc = L["Options.RequestBuffInChat.Desc"],
+        },
+        onChange = function(checked)
+            BR.profile.requestBuffInChat = checked
+            BR.Display.UpdateActionButtons("raid")
+            BR.Display.UpdateActionButtons("presence")
+        end,
+    })
+    setLayout:Add(requestBuffHolder, nil, COMPONENT_GAP)
+
     -- General Settings section
     LayoutSectionHeader(setLayout, settingsContent, L["Options.Visibility"])
 

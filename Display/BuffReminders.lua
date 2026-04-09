@@ -351,6 +351,7 @@ local defaults = {
     bronzeHideInCombat = false,
     optionsPanelScale = 1.2, -- base scale (displayed as 100%)
     showLoginMessages = true,
+    requestBuffInChat = false,
 
     -- DK runeforge preferences: [specId] = { mainhand, dw_mainhand, dw_offhand }
     -- No runes selected = no reminder for that spec (implicit disable)

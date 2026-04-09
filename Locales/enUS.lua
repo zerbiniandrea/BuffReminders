@@ -398,6 +398,22 @@ english["Options.ClickToCast.DescFull"] =
     "Make buff icons clickable to cast the corresponding spell (out of combat only). Only works for spells your character can cast."
 english["Options.HoverHighlight"] = "Hover highlight"
 english["Options.HoverHighlight.Desc"] = "Show a subtle highlight when hovering over clickable buff icons."
+english["Options.ChatRequests"] = "Chat Requests"
+english["Options.RequestBuffInChat"] = "Request missing buffs in chat"
+english["Options.RequestBuffInChat.Desc"] =
+    "Click a missing buff your class cannot provide to request it in chat. Auto-detects channel (instance/raid/party/say). 30-second cooldown per buff."
+-- Chat request messages (keyed by buff.key, sent as-is via SendChatMessage)
+-- EU/US translators: leave untranslated so chat messages stay in English.
+-- Asian translators: translate these so chat messages match your locale.
+english["ChatRequest.intellect"] = "Arcane Intellect buff pls"
+english["ChatRequest.attackPower"] = "Battle Shout buff pls"
+english["ChatRequest.bronze"] = "Blessing of the Bronze buff pls"
+english["ChatRequest.versatility"] = "Mark of the Wild buff pls"
+english["ChatRequest.stamina"] = "Power Word: Fortitude buff pls"
+english["ChatRequest.skyfury"] = "Skyfury buff pls"
+english["ChatRequest.atrophicNumbingPoison"] = "Atrophic/Numbing Poison pls"
+english["ChatRequest.devotionAura"] = "Devotion Aura pls"
+english["ChatRequest.soulstone"] = "Soulstone pls"
 
 -- ============================================================================
 -- OPTIONS: PET
