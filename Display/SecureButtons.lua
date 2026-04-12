@@ -1012,7 +1012,10 @@ local function SetupChatRequestOverlay(frame, showHighlight)
     overlay._br_clickMacroSpellID = nil
     overlay.itemID = nil
     overlay._br_chatRequestKey = frame.key
-    overlay._br_chatRequestMsg = L["ChatRequest." .. frame.key] or frame.displayName
+    local customMsg = (BR.profile.chatRequestMessages or {})[frame.key]
+    overlay._br_chatRequestMsg = (customMsg and customMsg ~= "") and customMsg
+        or L["ChatRequest." .. frame.key]
+        or frame.displayName
     requestOnCooldown[frame.key] = nil -- Clear stale cooldown from prior setup
     overlay:SetAttribute("type", "macro")
     overlay:SetAttribute("macrotext", GetChatRequestPrefix() .. overlay._br_chatRequestMsg)

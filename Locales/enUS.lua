@@ -403,6 +403,10 @@ english["Options.ChatRequests"] = "Chat Requests"
 english["Options.RequestBuffInChat"] = "Request missing buffs in chat"
 english["Options.RequestBuffInChat.Desc"] =
     "Click a missing buff your class cannot provide to request it in chat. Auto-detects channel (instance/raid/party/say). 30-second cooldown per buff."
+english["Options.CustomizeChatMessages"] = "Customize Messages"
+english["Options.ChatRequestModal.Title"] = "Chat Request Messages"
+english["Options.ChatRequestModal.Desc"] = "Customize the message sent for each buff. Leave blank to use the default."
+english["Options.ChatRequestModal.ResetAll"] = "Reset All"
 -- Chat request messages (keyed by buff.key, sent as-is via SendChatMessage)
 -- EU/US translators: leave untranslated so chat messages stay in English.
 -- Asian translators: translate these so chat messages match your locale.
