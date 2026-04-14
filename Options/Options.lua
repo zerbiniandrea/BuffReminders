@@ -3957,8 +3957,10 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
         customBuffModal:Hide()
     end
 
-    local MODAL_WIDTH = 460
-    local BASE_HEIGHT = 636
+    local MODAL_WIDTH = 520
+    local DROPDOWN_LABEL_W = 80
+    local DROPDOWN_W = 150
+    local BASE_HEIGHT = 706
     local ROW_HEIGHT = 26
     local CONTENT_LEFT = 20
     local ROWS_START_Y = -60
@@ -4156,7 +4158,7 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
 
     -- Sections frame (always visible, below add-spell button)
     sectionsFrame = CreateFrame("Frame", nil, modal)
-    sectionsFrame:SetSize(MODAL_WIDTH - 40, 456)
+    sectionsFrame:SetSize(MODAL_WIDTH - 40, 526)
 
     local secLayout = Components.VerticalLayout(sectionsFrame, { x = 0, y = 0 })
 
@@ -4177,7 +4179,7 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     local nameHolder = Components.TextInput(sectionsFrame, {
         label = L["CustomBuff.Name"],
         value = editingBuff and editingBuff.name or "",
-        width = 250,
+        width = 280,
         labelWidth = 50,
     })
     secLayout:Add(nameHolder, 20, COMPONENT_GAP)
@@ -4186,7 +4188,7 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     local overlayHolder = Components.TextInput(sectionsFrame, {
         label = L["CustomBuff.Text"],
         value = editingBuff and editingBuff.overlayText and editingBuff.overlayText:gsub("\n", "\\n") or "",
-        width = 250,
+        width = 280,
         labelWidth = 50,
     })
     secLayout:Add(overlayHolder, 20, SECTION_GAP)
@@ -4194,29 +4196,15 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
 
     local overlayHint = sectionsFrame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     overlayHint:SetPoint("LEFT", overlayHolder, "RIGHT", 5, 0)
+    overlayHint:SetPoint("RIGHT", sectionsFrame, "RIGHT", 0, 0)
+    overlayHint:SetWordWrap(false)
     overlayHint:SetText(L["CustomBuff.LineBreakHint"])
 
-    -- Conditions section (merges restrictions, visibility, advanced)
+    -- Buff tracking section
+    secLayout:Space(SECTION_GAP)
     LayoutSeparator()
     secLayout:Space(8)
-    LayoutSectionHeader(secLayout, sectionsFrame, L["CustomBuff.Conditions"])
-
-    local classOptions = {
-        { value = nil, label = L["Class.Any"] },
-        { value = "DEATHKNIGHT", label = L["Class.DeathKnight"] },
-        { value = "DEMONHUNTER", label = L["Class.DemonHunter"] },
-        { value = "DRUID", label = L["Class.Druid"] },
-        { value = "EVOKER", label = L["Class.Evoker"] },
-        { value = "HUNTER", label = L["Class.Hunter"] },
-        { value = "MAGE", label = L["Class.Mage"] },
-        { value = "MONK", label = L["Class.Monk"] },
-        { value = "PALADIN", label = L["Class.Paladin"] },
-        { value = "PRIEST", label = L["Class.Priest"] },
-        { value = "ROGUE", label = L["Class.Rogue"] },
-        { value = "SHAMAN", label = L["Class.Shaman"] },
-        { value = "WARLOCK", label = L["Class.Warlock"] },
-        { value = "WARRIOR", label = L["Class.Warrior"] },
-    }
+    LayoutSectionHeader(secLayout, sectionsFrame, L["CustomBuff.BuffTracking"])
 
     showIconToggle = Components.Toggle(sectionsFrame, {
         label = editingBuff and editingBuff.showWhenPresent and L["CustomBuff.WhenActive"]
@@ -4231,16 +4219,11 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
             Components.RefreshAll()
         end,
     })
-
-    requireSpellKnownToggle = Components.Toggle(sectionsFrame, {
-        label = L["CustomBuff.OnlyIfSpellKnown"],
-        checked = editingBuff and editingBuff.requireSpellKnown or false,
-        onChange = noop,
-    })
-    secLayout:AddRow({ { showIconToggle, 0 }, { requireSpellKnownToggle, 210 } }, COMPONENT_GAP)
+    secLayout:Add(showIconToggle, nil, COMPONENT_GAP)
 
     local expirationThresholdHolder = Components.Slider(sectionsFrame, {
         label = L["Options.Expiration"],
+        labelWidth = DROPDOWN_LABEL_W,
         min = 0,
         max = 45,
         step = 5,
@@ -4260,6 +4243,29 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     })
     secLayout:Add(expirationThresholdHolder, nil, COMPONENT_GAP)
 
+    -- Requirements section
+    secLayout:Space(SECTION_GAP)
+    LayoutSeparator()
+    secLayout:Space(8)
+    LayoutSectionHeader(secLayout, sectionsFrame, L["CustomBuff.Requirements"])
+
+    local classOptions = {
+        { value = nil, label = L["Class.Any"] },
+        { value = "DEATHKNIGHT", label = L["Class.DeathKnight"] },
+        { value = "DEMONHUNTER", label = L["Class.DemonHunter"] },
+        { value = "DRUID", label = L["Class.Druid"] },
+        { value = "EVOKER", label = L["Class.Evoker"] },
+        { value = "HUNTER", label = L["Class.Hunter"] },
+        { value = "MAGE", label = L["Class.Mage"] },
+        { value = "MONK", label = L["Class.Monk"] },
+        { value = "PALADIN", label = L["Class.Paladin"] },
+        { value = "PRIEST", label = L["Class.Priest"] },
+        { value = "ROGUE", label = L["Class.Rogue"] },
+        { value = "SHAMAN", label = L["Class.Shaman"] },
+        { value = "WARLOCK", label = L["Class.Warlock"] },
+        { value = "WARRIOR", label = L["Class.Warrior"] },
+    }
+
     local classRowY = secLayout:GetY()
 
     local function CreateSpecDropdown(classToken, selectedSpecId)
@@ -4278,19 +4284,19 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
             label = L["CustomBuff.Spec"],
             options = specOptions,
             selected = selectedSpecId,
-            width = 130,
-            labelWidth = 70,
+            width = DROPDOWN_W,
+            labelWidth = 50,
             onChange = noop,
         })
-        specDropdownHolder:SetPoint("TOPLEFT", sectionsFrame, "TOPLEFT", 210, classRowY)
+        specDropdownHolder:SetPoint("TOPLEFT", sectionsFrame, "TOPLEFT", 250, classRowY)
     end
 
     classDropdownHolder = Components.Dropdown(sectionsFrame, {
         label = L["CustomBuff.Class"],
         options = classOptions,
         selected = editingBuff and editingBuff.class or nil,
-        width = 130,
-        labelWidth = 70,
+        width = DROPDOWN_W,
+        labelWidth = DROPDOWN_LABEL_W,
         maxItems = 10,
         onChange = function(value)
             CreateSpecDropdown(value, nil)
@@ -4303,10 +4309,17 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
         CreateSpecDropdown(editingBuff.class, editingBuff.requireSpecId)
     end
 
+    requireSpellKnownToggle = Components.Toggle(sectionsFrame, {
+        label = L["CustomBuff.OnlyIfSpellKnown"],
+        checked = editingBuff and editingBuff.requireSpellKnown or false,
+        onChange = noop,
+    })
+    secLayout:Add(requireSpellKnownToggle, nil, COMPONENT_GAP)
+
     -- Require item (item gate)
     local requireItemLabel = sectionsFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     requireItemLabel:SetText(L["CustomBuff.RequireItem"])
-    requireItemLabel:SetWidth(70)
+    requireItemLabel:SetWidth(DROPDOWN_LABEL_W)
     requireItemLabel:SetJustifyH("LEFT")
     secLayout:AddText(requireItemLabel, 14, COMPONENT_GAP)
 
@@ -4331,13 +4344,15 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
         labelWidth = 0,
         options = requireItemModeOptions,
         selected = currentRequireItemMode,
-        width = 120,
+        width = DROPDOWN_W,
         onChange = noop,
     })
     requireItemModeDropdown:SetPoint("LEFT", requireItemContainer, "RIGHT", 5, 0)
 
     local requireItemHint = sectionsFrame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     requireItemHint:SetPoint("LEFT", requireItemModeDropdown, "RIGHT", 5, 0)
+    requireItemHint:SetPoint("RIGHT", sectionsFrame, "RIGHT", 0, 0)
+    requireItemHint:SetWordWrap(false)
     requireItemHint:SetText(L["CustomBuff.RequireItem.Hint"])
 
     local itemCooldownOptions = {
@@ -4348,25 +4363,29 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     local currentItemCooldown = editingBuff and editingBuff.itemCooldownCondition or nil
     local itemCooldownDropdown = Components.Dropdown(sectionsFrame, {
         label = L["CustomBuff.ItemCooldown"],
-        labelWidth = 70,
+        labelWidth = DROPDOWN_LABEL_W,
         options = itemCooldownOptions,
         selected = currentItemCooldown,
-        width = 120,
+        width = DROPDOWN_W,
         onChange = noop,
     })
     secLayout:Add(itemCooldownDropdown, nil, COMPONENT_GAP)
 
-    local function UpdateCooldownVisibility()
+    local function UpdateItemFieldsVisibility()
         local hasItem = requireItemEditBox:GetText() ~= ""
         if hasItem then
+            requireItemModeDropdown:Show()
+            requireItemHint:Show()
             itemCooldownDropdown:Show()
         else
+            requireItemModeDropdown:Hide()
+            requireItemHint:Hide()
             itemCooldownDropdown:Hide()
         end
     end
-    UpdateCooldownVisibility()
+    UpdateItemFieldsVisibility()
     requireItemEditBox:HookScript("OnTextChanged", function()
-        UpdateCooldownVisibility()
+        UpdateItemFieldsVisibility()
     end)
 
     local glowModeOptions = {
@@ -4377,9 +4396,10 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     local currentGlowMode = editingBuff and editingBuff.glowMode or "disabled"
     glowModeDropdown = Components.Dropdown(sectionsFrame, {
         label = L["CustomBuff.BarGlow"],
+        labelWidth = DROPDOWN_LABEL_W,
         options = glowModeOptions,
         selected = currentGlowMode,
-        width = 175,
+        width = DROPDOWN_W,
         tooltip = {
             title = L["CustomBuff.BarGlow.Title"],
             desc = L["CustomBuff.BarGlow.Desc"],
@@ -4388,7 +4408,7 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     })
     secLayout:Add(glowModeDropdown, nil, COMPONENT_GAP)
 
-    -- Load conditions section (per-buff content visibility)
+    -- Show In section (per-buff content visibility)
     secLayout:Space(SECTION_GAP)
     LayoutSeparator()
     secLayout:Space(8)
@@ -4453,8 +4473,8 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     -- Level filter dropdown
     local levelFilterHolder = Components.Dropdown(sectionsFrame, {
         label = L["CustomBuff.Level"],
-        labelWidth = 70,
-        width = 150,
+        labelWidth = DROPDOWN_LABEL_W,
+        width = DROPDOWN_W,
         options = {
             { value = "any", label = L["CustomBuff.Level.Any"] },
             { value = "maxLevel", label = L["CustomBuff.Level.Max"] },
@@ -4648,9 +4668,10 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     }
     actionTypeDropdown = Components.Dropdown(sectionsFrame, {
         label = L["CustomBuff.Action.OnClick"],
+        labelWidth = DROPDOWN_LABEL_W,
         options = actionTypeOptions,
         selected = existingActionType,
-        width = 120,
+        width = DROPDOWN_W,
         tooltip = {
             title = L["CustomBuff.Action.Title"],
             desc = L["CustomBuff.Action.Desc"],
