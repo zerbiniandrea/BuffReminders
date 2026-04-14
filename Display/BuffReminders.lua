@@ -3658,7 +3658,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
         -- ====================================================================
         -- Versioned migrations — each runs exactly once, tracked by dbVersion
         -- ====================================================================
-        local DB_VERSION = 38
+        local DB_VERSION = 39
 
         local migrations = {
             -- [1] Consolidate all pre-versioning migrations (v2.8 → v3.x)
@@ -4396,6 +4396,32 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
                 end
                 db.defaults.showConsumablesWithoutItems = true
                 db.defaults.showWithoutItemsOnlyOnReadyCheck = true
+            end,
+
+            [39] = function()
+                -- Migrate custom buff expiration from category-level to per-buff
+                -- Resolve effective threshold: category override > global default > code default (15)
+                local catThreshold = 15
+                if db.defaults and db.defaults.expirationThreshold then
+                    catThreshold = db.defaults.expirationThreshold
+                end
+                if db.categorySettings and db.categorySettings.custom then
+                    local catCustom = db.categorySettings.custom
+                    if catCustom.expirationThreshold ~= nil then
+                        catThreshold = catCustom.expirationThreshold
+                    end
+                    -- Clean up category-level expiration keys (no longer used for custom)
+                    catCustom.expirationThreshold = nil
+                    catCustom.showExpirationGlow = nil
+                end
+                -- Copy threshold to each existing custom buff that doesn't have one
+                if db.customBuffs then
+                    for _, buff in pairs(db.customBuffs) do
+                        if buff.expirationThreshold == nil then
+                            buff.expirationThreshold = catThreshold
+                        end
+                    end
+                end
             end,
         }
 

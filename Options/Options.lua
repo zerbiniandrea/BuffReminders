@@ -2280,6 +2280,58 @@ local function CreateOptionsPanel()
             tinsert(BR.RefreshableComponents, { Refresh = updatePetGlowBtnEnabled })
 
             gridHeight = catGrid.height + 48
+        elseif category == "custom" then
+            -- Custom buffs: expiration is per-buff (in each buff's edit menu), only missing glow here
+            local catCustomMissGlowHolder = Components.Checkbox(appFrame, {
+                label = L["Options.Glow"],
+                get = function()
+                    return getCatOwnValue("showMissingGlow", true) ~= false
+                end,
+                enabled = isCustomAppearanceEnabled,
+                onChange = function(checked)
+                    BR.Config.Set("categorySettings." .. category .. ".showMissingGlow", checked)
+                    Components.RefreshAll()
+                end,
+            })
+            catCustomMissGlowHolder:SetPoint("TOPLEFT", 0, glowRowY)
+
+            -- Per-category custom glow style
+            local catCustomGlowStyleHolder = Components.Checkbox(appFrame, {
+                label = L["Options.CustomGlowStyle"],
+                get = function()
+                    return isCustomGlowEnabled()
+                end,
+                enabled = isCustomAppearanceEnabled,
+                onChange = function(checked)
+                    if checked then
+                        SnapshotGlowDefaults()
+                    end
+                    BR.Config.Set("categorySettings." .. category .. ".useCustomGlow", checked)
+                    Components.RefreshAll()
+                end,
+            })
+            catCustomGlowStyleHolder:SetPoint("TOPLEFT", 0, glowRowY - 24)
+
+            local catCustomGlowBtn = CreateButton(appFrame, L["Options.Customize"], function()
+                ShowGlowAdvanced(category)
+            end)
+            catCustomGlowBtn:SetPoint("LEFT", catCustomGlowStyleHolder.label, "RIGHT", 8, 0)
+            catCustomGlowBtn:SetFrameLevel(catCustomGlowStyleHolder:GetFrameLevel() + 5)
+
+            local function updateCustomGlowBtnEnabled()
+                local enabled = isCustomGlowEnabled()
+                if enabled then
+                    catCustomGlowBtn:Enable()
+                    catCustomGlowBtn:SetAlpha(1)
+                else
+                    catCustomGlowBtn:Disable()
+                    catCustomGlowBtn:SetAlpha(0.4)
+                end
+            end
+            updateCustomGlowBtnEnabled()
+            tinsert(BR.RefreshableComponents, { Refresh = updateCustomGlowBtnEnabled })
+
+            gridHeight = catGrid.height + 48
         else
             local catThresholdHolder = Components.Slider(appFrame, {
                 label = L["Options.Expiration"],
@@ -4176,6 +4228,7 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
             else
                 showIconToggle.label:SetText(L["CustomBuff.WhenMissing"])
             end
+            Components.RefreshAll()
         end,
     })
 
@@ -4185,6 +4238,27 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
         onChange = noop,
     })
     secLayout:AddRow({ { showIconToggle, 0 }, { requireSpellKnownToggle, 210 } }, COMPONENT_GAP)
+
+    local expirationThresholdHolder = Components.Slider(sectionsFrame, {
+        label = L["Options.Expiration"],
+        min = 0,
+        max = 45,
+        step = 5,
+        get = function()
+            if editingBuff and editingBuff.expirationThreshold then
+                return editingBuff.expirationThreshold
+            end
+            return 15
+        end,
+        formatValue = function(val)
+            return val == 0 and L["Options.Off"] or (val .. " " .. L["Options.Min"])
+        end,
+        enabled = function()
+            return not showIconToggle:GetChecked()
+        end,
+        onChange = noop,
+    })
+    secLayout:Add(expirationThresholdHolder, nil, COMPONENT_GAP)
 
     local classRowY = secLayout:GetY()
 
@@ -4679,6 +4753,7 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
             showWhenPresent = showIconToggle:GetChecked() or nil,
             requireSpellKnown = requireSpellKnownToggle:GetChecked() or nil,
             glowMode = glowModeDropdown:GetValue() ~= "disabled" and glowModeDropdown:GetValue() or nil,
+            expirationThreshold = not showIconToggle:GetChecked() and expirationThresholdHolder:GetValue() or 0,
             castSpellID = castSpellIDValue,
             castItemID = castItemIDValue,
             castMacro = castMacroValue,

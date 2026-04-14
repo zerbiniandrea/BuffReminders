@@ -2041,7 +2041,7 @@ function BuffState.Refresh(refreshMode)
 
     -- Process custom buffs (user-defined, flows through ShouldShowSelfBuff like self/pet)
     if not groupOnly then
-        local customExGlow, customMissGlow, customThreshold = GetCategoryGlowSettings("custom")
+        local _, customMissGlow = GetCategoryGlowSettings("custom")
         local skipSpellKnown = SKIP_SPELL_KNOWN_CATEGORIES["custom"]
         for i, buff in ipairs(CustomBuffs) do
             local entry = GetOrCreateEntry(buff.key, "custom", i)
@@ -2102,15 +2102,16 @@ function BuffState.Refresh(refreshMode)
                 if show then
                     SetEntryText(entry, buff.overlayText, customMissGlow)
                 elseif
-                    not show
-                    and shouldShow ~= nil
+                    shouldShow == false
+                    and buff.expirationThreshold
+                    and buff.expirationThreshold > 0
                     and not buff.enchantID
                     and not hideExpiring
                     and (buff.buffIdOverride or buff.spellID)
                 then
-                    -- Buff is present (not missing), check if expiring
+                    -- Buff is present (not missing), check if expiring (per-buff threshold)
                     local _, remaining = UnitHasBuff("player", buff.buffIdOverride or buff.spellID)
-                    TrySetEntryExpiring(entry, remaining, customThreshold, customExGlow)
+                    TrySetEntryExpiring(entry, remaining, buff.expirationThreshold * 60, true)
                 end
             end
         end

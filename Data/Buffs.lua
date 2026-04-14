@@ -157,6 +157,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field castMacro? string         -- Raw macro text for click action
 ---@field requireItemID? number    -- Only show if this item is owned/equipped/in bags (see requireItemMode)
 ---@field requireItemMode? "owned"|"equipped"|"bags" -- How to check requireItemID: "owned" (default) = bags or equipped, "equipped" = equipped only, "bags" = bags only
+---@field expirationThreshold? number  -- Per-buff expiration threshold in minutes (0 = off)
 ---@field loadConditions? LoadConditions  -- Per-buff content visibility (nil = show everywhere)
 
 ---Check if the player is NOT an Earthen dwarf (they have permanent Well Fed from Ingest Minerals)
