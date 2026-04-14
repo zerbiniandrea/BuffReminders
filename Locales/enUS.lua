@@ -696,6 +696,10 @@ english["CustomBuff.RequireItem.EquippedBags"] = "Equipped/Bags"
 english["CustomBuff.RequireItem.Equipped"] = "Equipped"
 english["CustomBuff.RequireItem.InBags"] = "In bags"
 english["CustomBuff.RequireItem.Hint"] = "item ID — hide if not found"
+english["CustomBuff.ItemCooldown"] = "Cooldown:"
+english["CustomBuff.ItemCooldown.Any"] = "Any"
+english["CustomBuff.ItemCooldown.OffCooldown"] = "Off cooldown"
+english["CustomBuff.ItemCooldown.OnCooldown"] = "On cooldown"
 
 -- Bar glow options
 english["CustomBuff.BarGlow.WhenGlowing"] = "Detect when glowing"

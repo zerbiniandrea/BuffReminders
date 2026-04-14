@@ -4340,6 +4340,35 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
     requireItemHint:SetPoint("LEFT", requireItemModeDropdown, "RIGHT", 5, 0)
     requireItemHint:SetText(L["CustomBuff.RequireItem.Hint"])
 
+    local itemCooldownOptions = {
+        { value = nil, label = L["CustomBuff.ItemCooldown.Any"] },
+        { value = "offCooldown", label = L["CustomBuff.ItemCooldown.OffCooldown"] },
+        { value = "onCooldown", label = L["CustomBuff.ItemCooldown.OnCooldown"] },
+    }
+    local currentItemCooldown = editingBuff and editingBuff.itemCooldownCondition or nil
+    local itemCooldownDropdown = Components.Dropdown(sectionsFrame, {
+        label = L["CustomBuff.ItemCooldown"],
+        labelWidth = 70,
+        options = itemCooldownOptions,
+        selected = currentItemCooldown,
+        width = 120,
+        onChange = noop,
+    })
+    secLayout:Add(itemCooldownDropdown, nil, COMPONENT_GAP)
+
+    local function UpdateCooldownVisibility()
+        local hasItem = requireItemEditBox:GetText() ~= ""
+        if hasItem then
+            itemCooldownDropdown:Show()
+        else
+            itemCooldownDropdown:Hide()
+        end
+    end
+    UpdateCooldownVisibility()
+    requireItemEditBox:HookScript("OnTextChanged", function()
+        UpdateCooldownVisibility()
+    end)
+
     local glowModeOptions = {
         { value = "whenGlowing", label = L["CustomBuff.BarGlow.WhenGlowing"] },
         { value = "whenNotGlowing", label = L["CustomBuff.BarGlow.WhenNotGlowing"] },
@@ -4759,6 +4788,8 @@ ShowCustomBuffModal = function(existingKey, refreshPanelCallback)
             castMacro = castMacroValue,
             requireItemID = tonumber(strtrim(requireItemEditBox:GetText())) or nil,
             requireItemMode = requireItemModeDropdown:GetValue() ~= "owned" and requireItemModeDropdown:GetValue()
+                or nil,
+            itemCooldownCondition = tonumber(strtrim(requireItemEditBox:GetText())) and itemCooldownDropdown:GetValue()
                 or nil,
             loadConditions = savedLoadConditions,
         }
