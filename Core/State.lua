@@ -2087,9 +2087,9 @@ function BuffState.Refresh(refreshMode)
                     shouldProcess = false
                 end
                 if shouldProcess and gateItemID and buff.itemCooldownCondition then
-                    local ok, info = pcall(C_Item.GetItemCooldown, gateItemID)
-                    if ok and info then
-                        local isReady = info.duration == 0
+                    local ok, _startTime, duration = pcall(C_Item.GetItemCooldown, gateItemID)
+                    if ok and duration then
+                        local isReady = duration == 0
                         if
                             (buff.itemCooldownCondition == "offCooldown" and not isReady)
                             or (buff.itemCooldownCondition == "onCooldown" and isReady)
