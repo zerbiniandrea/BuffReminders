@@ -21,6 +21,14 @@ local chatRequestableCategories = { raid = true, presence = true }
 local requestOnCooldown = {}
 local REQUEST_COOLDOWN = 5
 
+-- Temporary: toggle to diagnose non-working chat-request clicks
+local CHAT_REQUEST_DEBUG = true
+local function dprint(...)
+    if CHAT_REQUEST_DEBUG then
+        print("|cff00ccff[BR chat-req]|r", ...)
+    end
+end
+
 --- Returns the macro slash command prefix for the current group type.
 local function GetChatRequestPrefix()
     if IsInGroup(2) then -- instance group
@@ -228,17 +236,38 @@ local function CreateClickOverlay(frame)
     end)
     -- Re-evaluate dynamic macros before each click, refresh display after
     overlay:SetScript("PreClick", function(self)
+        if self._br_chatRequestKey then
+            local onCd = requestOnCooldown[self._br_chatRequestKey] and true or false
+            dprint(
+                "PreClick key=" .. tostring(self._br_chatRequestKey),
+                "onCooldown=" .. tostring(onCd),
+                "msg=" .. tostring(self._br_chatRequestMsg),
+                "combat=" .. tostring(InCombatLockdown()),
+                "inGroup=" .. tostring(IsInGroup()),
+                "inInstance=" .. tostring(IsInGroup(2)),
+                "inRaid=" .. tostring(IsInRaid())
+            )
+        end
         if self._br_chatRequestKey and not requestOnCooldown[self._br_chatRequestKey] then
             -- Rebuild macro each click to pick up current group type (party→raid).
             -- Safe outside combat (overlay hidden via state driver in combat).
-            self:SetAttribute("macrotext", GetChatRequestPrefix() .. self._br_chatRequestMsg)
+            local newMacro = GetChatRequestPrefix() .. self._br_chatRequestMsg
+            self:SetAttribute("macrotext", newMacro)
+            dprint("  set macrotext=", newMacro)
         elseif self._br_clickMacroFn then
             self:SetAttribute("macrotext", self._br_clickMacroFn(self._br_clickMacroSpellID))
         end
     end)
-    overlay:SetScript("PostClick", function(self)
+    overlay:SetScript("PostClick", function(self, button)
         if self._br_chatRequestKey then
             local key = self._br_chatRequestKey
+            dprint(
+                "PostClick key=" .. tostring(key),
+                "button=" .. tostring(button),
+                "inGroup=" .. tostring(IsInGroup()),
+                "onCooldown=" .. tostring(requestOnCooldown[key] and true or false),
+                "currentMacrotext=" .. tostring(self:GetAttribute("macrotext"))
+            )
             if not requestOnCooldown[key] and IsInGroup() then
                 requestOnCooldown[key] = true
                 -- Blank the macro to prevent spamming; restore after cooldown.
@@ -1029,6 +1058,12 @@ local function SetupChatRequestOverlay(frame, showHighlight)
     if overlay.highlight then
         overlay.highlight:SetShown(showHighlight)
     end
+    dprint(
+        "Setup key=" .. tostring(frame.key),
+        "msg=" .. tostring(overlay._br_chatRequestMsg),
+        "prefix=" .. tostring(GetChatRequestPrefix()),
+        "category=" .. tostring(frame.buffCategory)
+    )
 end
 
 ---Disable a click overlay: mark inactive, disable mouse, hide, clear position cache.
