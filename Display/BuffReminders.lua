@@ -3530,6 +3530,42 @@ local function SlashHandler(msg)
         BR.Movers.UpdateAnchor()
         BR.Components.RefreshAll()
         print("|cff00ccffBuffReminders:|r " .. L["Display.FramesUnlocked"])
+    elseif cmd == "testchat" then
+        -- Temporary: diagnose why chat-request clicks don't reach raid/party chat.
+        -- Bypasses the secure button entirely and tries RunMacroText and SendChatMessage.
+        local prefix, channel
+        if IsInGroup(2) then
+            prefix, channel = "/instance ", "INSTANCE_CHAT"
+        elseif IsInRaid() then
+            prefix, channel = "/raid ", "RAID"
+        elseif IsInGroup() then
+            prefix, channel = "/party ", "PARTY"
+        else
+            prefix, channel = "/say ", "SAY"
+        end
+        print(
+            "|cff00ccff[BR testchat]|r prefix="
+                .. prefix
+                .. " channel="
+                .. channel
+                .. " combat="
+                .. tostring(InCombatLockdown())
+                .. " inGroup="
+                .. tostring(IsInGroup())
+                .. " inRaid="
+                .. tostring(IsInRaid())
+                .. " inInstance="
+                .. tostring(IsInGroup(2))
+        )
+        print("|cff00ccff[BR testchat]|r RunMacroText ref=" .. tostring(RunMacroText))
+        print("|cff00ccff[BR testchat]|r SendChatMessage ref=" .. tostring(SendChatMessage))
+        print("|cff00ccff[BR testchat]|r calling RunMacroText via pcall...")
+        local okMacro, errMacro = pcall(RunMacroText, prefix .. "BR testchat: RunMacroText")
+        print("|cff00ccff[BR testchat]|r RunMacroText ok=" .. tostring(okMacro) .. " err=" .. tostring(errMacro))
+        print("|cff00ccff[BR testchat]|r calling SendChatMessage via pcall...")
+        local okSend, errSend = pcall(SendChatMessage, "BR testchat: SendChatMessage", channel)
+        print("|cff00ccff[BR testchat]|r SendChatMessage ok=" .. tostring(okSend) .. " err=" .. tostring(errSend))
+        print("|cff00ccff[BR testchat]|r done — check if the two messages appear in the channel above")
     elseif cmd == "minimap" then
         BR.aceDB.global.minimap.hide = not BR.aceDB.global.minimap.hide
         if BR.MinimapButton then
