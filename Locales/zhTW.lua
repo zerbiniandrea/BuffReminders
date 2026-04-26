@@ -69,6 +69,8 @@ L["Overlay.NoPet"] = "沒有\n寵物"
 L["Overlay.PassivePet"] = "寵物\n被動"
 L["Overlay.WrongPet"] = "寵物\n錯誤"
 L["Overlay.NoRune"] = "沒有\n符文"
+L["Overlay.WrongStance"] = "錯誤\n姿態"
+L["Overlay.WrongForm"] = "錯誤\n形態"
 L["Overlay.DKWrongRune"] = "符文\n錯誤"
 L["Overlay.DKWrongRuneOH"] = "副手\n符文\n錯誤"
 L["Overlay.NoFlask"] = "沒有\n精鍊"
@@ -140,6 +142,7 @@ L["Buff.Timelessness"] = "永恆不朽"
 L["Buff.ArcaneFamiliar"] = "秘法魔寵"
 L["Buff.Attunement"] = "黑曜同調"
 L["Buff.CreateSoulwell"] = "製造靈魂之井"
+L["Buff.DruidForm"] = "德魯伊形態"
 L["Buff.GrimoireOfSacrifice"] = "犧牲魔典"
 L["Buff.BurningRush"] = "燃燒狂奔"
 L["Buff.RiteOfAdjuration"] = "裁決儀式"
@@ -162,6 +165,7 @@ L["Buff.UnholyGhoul"] = "穢邪食屍鬼"
 L["Buff.WarlockDemon"] = "術士惡魔"
 L["Buff.WaterElemental"] = "水元素"
 L["Buff.WrongDemon"] = "錯誤惡魔"
+L["Buff.WarriorStance"] = "戰士姿態"
 -- Consumable
 L["Buff.AugmentRune"] = "增強符文"
 L["Buff.Flask"] = "精鍊"
@@ -246,6 +250,8 @@ L["Display.DismissConsumables"] = "在下一次載入畫面前隱藏消耗品提
 L["Display.DismissConsumablesChat"] = "在下一次載入畫面前消耗品提示將隱藏。"
 L["Display.LoginFirstInstall"] =
     "感謝安裝！輸入 |cFFFFD100/br unlock|r 來移動增益顯示，或者使用 |cFFFFD100/br|r 選項面板底部的按鈕。"
+L["Display.LoginLegacyConsumables"] =
+    "以前的資料片中的消耗品現在預設隱藏。如果您仍然使用較舊的精鍊或符文，請在消耗品類別選項中切換|cFFFFD100隱藏舊版消耗品|r。"
 
 -- ============================================================================
 -- OPTIONS: TAB LABELS
@@ -485,6 +491,10 @@ L["Options.ShowWithoutItemsReadyCheckOnly.Desc"] =
     "當啟用後，不在您背包中的消耗品僅在準備確認時顯示。對於在拉怪前快速提醒補充庫存很有用。"
 L["Options.DelveFoodOnly"] = "在探究中僅顯示探究食物"
 L["Options.DelveFoodOnly.Desc"] = "在探究中隱藏除探究食物外的所有消耗品提示。"
+L["Options.HideLegacyConsumables"] = "隱藏舊版消耗品"
+L["Options.HideLegacyConsumables.Title"] = "隱藏舊版消耗品"
+L["Options.HideLegacyConsumables.Desc"] =
+    "啟用後，先前資料片中的食物、精煉和符文將從動作按鈕中過濾掉。如果您仍然使用舊版消耗品進行時光漫遊、農舊團隊副本或裝備不足的替代品，請停用。"
 
 -- ============================================================================
 -- OPTIONS: DK RUNEFORGE PREFERENCES
