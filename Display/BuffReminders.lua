@@ -3568,6 +3568,17 @@ local function SlashHandler(msg)
             end
         end
         BR.Components.RefreshAll()
+    elseif cmd == "debug" then
+        BR.profile.debugMode = not BR.profile.debugMode
+        if BR.profile.debugMode then
+            print(
+                "|cff00ccffBuffReminders:|r Debug mode ENABLED. "
+                    .. "Click any chat-request buff icon and copy the |cff00ccffBR-debug|r lines to share. "
+                    .. "Run |cFFFFD100/br debug|r again to turn off."
+            )
+        else
+            print("|cff00ccffBuffReminders:|r Debug mode disabled.")
+        end
     else
         BR.Options.Toggle()
     end
