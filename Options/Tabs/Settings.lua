@@ -249,9 +249,28 @@ local function Build(ctx)
         onChange = function(val)
             BR.Config.Set("buffTrackingMode", val)
             UpdateDisplay()
+            Components.RefreshAll()
         end,
     })
     setLayout:Add(trackingModeHolder, nil, COMPONENT_GAP)
+
+    local selfOnlyOutsideHolder = Components.Checkbox(settingsContent, {
+        label = L["Options.BuffTracking.SelfOnlyOutsideInstances"],
+        tooltip = {
+            title = L["Options.BuffTracking.SelfOnlyOutsideInstances"],
+            desc = L["Options.BuffTracking.SelfOnlyOutsideInstances.Desc"],
+        },
+        get = function()
+            return BR.profile.selfOnlyOutsideInstances == true
+        end,
+        enabled = function()
+            return BR.Config.Get("buffTrackingMode", "all") ~= "self_only"
+        end,
+        onChange = function(checked)
+            BR.Config.Set("selfOnlyOutsideInstances", checked)
+        end,
+    })
+    setLayout:Add(selfOnlyOutsideHolder, nil, COMPONENT_GAP)
 
     -- Custom Anchor Frames section
     LayoutSectionHeader(setLayout, settingsContent, L["Options.CustomAnchorFrames"])

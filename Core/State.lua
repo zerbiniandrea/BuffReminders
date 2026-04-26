@@ -914,6 +914,21 @@ local function ModeHidesOtherClasses(trackingMode)
     return trackingMode == "my_buffs" or trackingMode == "self_only"
 end
 
+---Resolve the active tracking mode, applying the "self-only outside instances"
+---override that forces self_only in open world / PvP / scenarios.
+---@param db table
+---@return string
+local function GetEffectiveTrackingMode(db)
+    local mode = db.buffTrackingMode
+    if mode ~= "self_only" and db.selfOnlyOutsideInstances then
+        local ct = GetCurrentContentType()
+        if ct ~= "raid" and ct ~= "dungeon" then
+            return "self_only"
+        end
+    end
+    return mode
+end
+
 ---Determine visibility and scan scope for a buff based on tracking mode.
 ---Raid buffs go on everyone, so "scan group" means showing coverage numbers.
 ---Presence buffs live on the caster, so "scan group" means finding if anyone has the aura.
@@ -1558,7 +1573,7 @@ local function PassesPreChecks(buff, presentClasses, db)
 
     -- Class filtering
     if buff.class then
-        local trackingMode = db.buffTrackingMode
+        local trackingMode = GetEffectiveTrackingMode(db)
         if ModeHidesOtherClasses(trackingMode) and buff.class ~= playerClass then
             return false
         end
@@ -1746,7 +1761,7 @@ function BuffState.Refresh(refreshMode)
         currentWeaponEnchants.permanentOH = ohLink and tonumber(ohLink:match("item:%d+:(%d+)")) or nil
     end
 
-    local trackingMode = db.buffTrackingMode
+    local trackingMode = GetEffectiveTrackingMode(db)
     local missingCountOnly = db.showMissingCountOnly
     -- Aura API is restricted in combat/encounters (inCombat set by Display layer),
     -- during M+ keystones, and in any PvP instance (battlegrounds and arenas, including prep).

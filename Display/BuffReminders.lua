@@ -381,6 +381,7 @@ local defaults = {
     hideInCombat = false,
     hideExpiringInCombat = true,
     buffTrackingMode = "all",
+    selfOnlyOutsideInstances = true,
     hideAllInVehicle = false,
     hideWhileMounted = false,
     hideInLegacyInstances = true,
@@ -4630,6 +4631,9 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
             elseif BR.profile.showLoginMessages ~= false and not BR.aceDB.global.legacyConsumablesNoticeShown then
                 print("|cff00ccffBuffReminders:|r " .. L["Display.LoginLegacyConsumables"])
                 BR.aceDB.global.legacyConsumablesNoticeShown = true
+            elseif BR.profile.showLoginMessages ~= false and not BR.aceDB.global.selfOnlyOutsideNoticeShown then
+                print("|cff00ccffBuffReminders:|r " .. L["Display.LoginSelfOnlyOutside"])
+                BR.aceDB.global.selfOnlyOutsideNoticeShown = true
             end
         end)
     elseif event == "PLAYER_ENTERING_WORLD" then
