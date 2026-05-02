@@ -6,22 +6,106 @@ local CreateButton = BR.CreateButton
 local CreatePanel = BR.CreatePanel
 local Glow = BR.Glow
 local GlowTypes = Glow.Types
+local GlowType = Glow.Type
 
 local TEXCOORD_INSET = BR.TEXCOORD_INSET
 local DEFAULT_BORDER_SIZE = BR.DEFAULT_BORDER_SIZE
 local GetBuffTexture = BR.Helpers.GetBuffTexture
 
-local glowAdvancedPanel = nil
+local LayoutSeparator = BR.Options.Helpers.LayoutSeparator
+
+-- ============================================================================
+-- GLOW PARAMETER SCHEMA
+-- ============================================================================
+-- One row per type-specific control. The runtime iterates this in order to
+-- build the dynamic content area; adding a new param means adding one row.
+-- `kind` switches between Components.Slider and Components.Checkbox; `fmt` is
+-- the optional `formatValue` printf string (omit for integer rendering).
+--
+-- Keys are bare suffixes — they're prefixed with "glow"/"missingGlow" by the
+-- K() closure inside Show, so the same schema drives both glow kinds.
+
+local GLOW_SCHEMA = {
+    [GlowType.Pixel] = {
+        { kind = "slider", labelKey = "Lines", key = "PixelLines", min = 1, max = 20, step = 1, default = 8 },
+        {
+            kind = "slider",
+            labelKey = "Frequency",
+            key = "PixelFrequency",
+            min = 0.01,
+            max = 1,
+            step = 0.01,
+            default = 0.25,
+            fmt = "%.2f",
+        },
+        { kind = "slider", labelKey = "Length", key = "PixelLength", min = 1, max = 20, step = 1, default = 10 },
+    },
+    [GlowType.AutoCast] = {
+        {
+            kind = "slider",
+            labelKey = "Scale",
+            key = "AutocastScale",
+            min = 1,
+            max = 3,
+            step = 0.1,
+            default = 1,
+            fmt = "%.1f",
+        },
+        { kind = "slider", labelKey = "Particles", key = "AutocastParticles", min = 1, max = 8, step = 1, default = 4 },
+        {
+            kind = "slider",
+            labelKey = "Frequency",
+            key = "AutocastFrequency",
+            min = 0.01,
+            max = 1,
+            step = 0.01,
+            default = 0.125,
+            fmt = "%.2f",
+        },
+    },
+    [GlowType.Border] = {
+        {
+            kind = "slider",
+            labelKey = "Speed",
+            key = "BorderFrequency",
+            min = 0.1,
+            max = 2,
+            step = 0.1,
+            default = 0.6,
+            fmt = "%.1f",
+        },
+    },
+    [GlowType.Proc] = {
+        {
+            kind = "slider",
+            labelKey = "Duration",
+            key = "ProcDuration",
+            min = 0.1,
+            max = 3,
+            step = 0.1,
+            default = 1,
+            fmt = "%.1f",
+        },
+        { kind = "checkbox", labelKey = "StartAnimation", key = "ProcStartAnim", default = false },
+    },
+}
+
+-- Offsets are common to every glow type, rendered after the type-specific block.
+local GLOW_COMMON_OFFSETS = {
+    { kind = "slider", labelKey = "XOffset", key = "XOffset", min = -10, max = 10, step = 1, default = 0 },
+    { kind = "slider", labelKey = "YOffset", key = "YOffset", min = -10, max = 10, step = 1, default = 0 },
+}
+
+local glowAdvancedDialog = nil
 
 ---@param targetCategory? string nil = global defaults, string = per-category override
 ---@param glowKind? "expiring"|"missing" Which glow style to edit (default "expiring")
 local function Show(targetCategory, glowKind)
     glowKind = glowKind or "expiring"
-    local GlowType = Glow.Type
 
-    if glowAdvancedPanel then
-        glowAdvancedPanel:Hide()
-        glowAdvancedPanel = nil
+    if glowAdvancedDialog then
+        glowAdvancedDialog:Hide()
+        glowAdvancedDialog = nil
     end
 
     -- Key prefix: "glow" for expiring, "missingGlow" for missing
@@ -40,6 +124,18 @@ local function Show(targetCategory, glowKind)
         end
     end
 
+    -- Schema-driven get/set wired to the per-Show keyPrefix + configPrefix.
+    local function readKey(key, default)
+        local v = getSource()[K(key)]
+        if v == nil then
+            return default
+        end
+        return v
+    end
+    local function writeKey(key, val)
+        BR.Config.Set(configPrefix .. K(key), val)
+    end
+
     local PANEL_W = 440
     local PANEL_H = 460
     local PREVIEW_SIZE = 64
@@ -47,12 +143,12 @@ local function Show(targetCategory, glowKind)
 
     local panel = CreatePanel("BuffRemindersGlowAdvanced", PANEL_W, PANEL_H, {
         strata = "FULLSCREEN",
-        modal = true,
+        dialog = true,
     })
 
     local titleBase = glowKind == "missing" and L["Options.GlowSettings.Missing"] or L["Options.GlowSettings.Expiring"]
     local titleText = targetCategory
-            and (titleBase .. " — " .. targetCategory:sub(1, 1):upper() .. targetCategory:sub(2))
+            and (titleBase .. " - " .. targetCategory:sub(1, 1):upper() .. targetCategory:sub(2))
         or titleBase
     local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -10)
@@ -111,21 +207,16 @@ local function Show(targetCategory, glowKind)
         labelWidth = 40,
         options = typeOptions,
         get = function()
-            return getSource()[K("Type")] or typeFallback
+            return readKey("Type", typeFallback)
         end,
         width = 140,
         onChange = function(val)
-            BR.Config.Set(configPrefix .. K("Type"), val)
+            writeKey("Type", val)
         end,
     }, "BuffRemindersGlowAdvTypeDropdown")
     staticLayout:Add(typeHolder, 30, 4)
 
-    -- Separator
-    local sep = panel:CreateTexture(nil, "ARTWORK")
-    sep:SetHeight(1)
-    sep:SetPoint("TOPLEFT", MARGIN, staticLayout:GetY())
-    sep:SetPoint("RIGHT", panel, "RIGHT", -MARGIN, 0)
-    sep:SetColorTexture(0.3, 0.3, 0.3, 0.8)
+    LayoutSeparator(staticLayout, panel)
     staticLayout:Space(10)
 
     local DYNAMIC_START_Y = staticLayout:GetY()
@@ -163,6 +254,43 @@ local function Show(targetCategory, glowKind)
     local SLIDER_SPACING = 24
     local dynamicLayout
 
+    -- Build a Components.Slider config from one schema row.
+    local function sliderConfigFromSpec(spec)
+        local cfg = {
+            label = L["Options.Glow." .. spec.labelKey],
+            min = spec.min,
+            max = spec.max,
+            step = spec.step,
+            get = function()
+                return readKey(spec.key, spec.default)
+            end,
+            onChange = function(val)
+                writeKey(spec.key, val)
+                RefreshPreview()
+            end,
+        }
+        if spec.fmt then
+            local fmt = spec.fmt
+            cfg.formatValue = function(val)
+                return string.format(fmt, val)
+            end
+        end
+        return cfg
+    end
+
+    local function checkboxConfigFromSpec(spec)
+        return {
+            label = L["Options.Glow." .. spec.labelKey],
+            get = function()
+                return readKey(spec.key, spec.default)
+            end,
+            onChange = function(checked)
+                writeKey(spec.key, checked)
+                RefreshPreview()
+            end,
+        }
+    end
+
     local function AddSlider(config)
         local holder = Components.Slider(panel, config)
         holder:SetPoint("RIGHT", panel, "RIGHT", -MARGIN, 0)
@@ -178,13 +306,13 @@ local function Show(targetCategory, glowKind)
         return holder
     end
 
-    -- Reset keys per glow type (type-specific only)
-    local typeResetKeys = {
-        [GlowType.Pixel] = { K("PixelLines"), K("PixelFrequency"), K("PixelLength") },
-        [GlowType.AutoCast] = { K("AutocastScale"), K("AutocastParticles"), K("AutocastFrequency") },
-        [GlowType.Border] = { K("BorderFrequency") },
-        [GlowType.Proc] = { K("ProcDuration"), K("ProcStartAnim"), K("ProcUseCustomColor") },
-    }
+    local function AddSpec(spec)
+        if spec.kind == "slider" then
+            AddSlider(sliderConfigFromSpec(spec))
+        elseif spec.kind == "checkbox" then
+            AddCheckbox(checkboxConfigFromSpec(spec))
+        end
+    end
 
     local function UnregisterDynamicHolders()
         for _, h in ipairs(dynamicHolders) do
@@ -199,8 +327,7 @@ local function Show(targetCategory, glowKind)
         wipe(dynamicHolders)
         dynamicLayout = Components.VerticalLayout(panel, { x = MARGIN, y = DYNAMIC_START_Y })
 
-        local d = getSource()
-        local typeIdx = d[K("Type")] or typeFallback
+        local typeIdx = readKey("Type", typeFallback)
 
         -- Size + Color row
         local sizeHolder
@@ -212,10 +339,10 @@ local function Show(targetCategory, glowKind)
                 max = 10,
                 step = 1,
                 get = function()
-                    return getSource()[K("Size")] or 2
+                    return readKey("Size", 2)
                 end,
                 onChange = function(val)
-                    BR.Config.Set(configPrefix .. K("Size"), val)
+                    writeKey("Size", val)
                     RefreshPreview()
                 end,
             })
@@ -233,10 +360,10 @@ local function Show(targetCategory, glowKind)
                     desc = L["Options.UseCustomColor.Desc"],
                 },
                 get = function()
-                    return getSource()[K("ProcUseCustomColor")] or false
+                    return readKey("ProcUseCustomColor", false)
                 end,
                 onChange = function(checked)
-                    BR.Config.Set(configPrefix .. K("ProcUseCustomColor"), checked)
+                    writeKey("ProcUseCustomColor", checked)
                     Components.RefreshAll()
                     RefreshPreview()
                 end,
@@ -246,14 +373,14 @@ local function Show(targetCategory, glowKind)
             colorSwatchHolder = Components.ColorSwatch(panel, {
                 hasOpacity = true,
                 enabled = function()
-                    return getSource()[K("ProcUseCustomColor")] or false
+                    return readKey("ProcUseCustomColor", false)
                 end,
                 get = function()
-                    local c = getSource()[K("Color")] or Glow.DEFAULT_COLOR
+                    local c = readKey("Color", Glow.DEFAULT_COLOR)
                     return c[1], c[2], c[3], c[4] or 1
                 end,
                 onChange = function(r, g, b, a)
-                    BR.Config.Set(configPrefix .. K("Color"), { r, g, b, a or 1 })
+                    writeKey("Color", { r, g, b, a or 1 })
                     RefreshPreview()
                 end,
             })
@@ -262,11 +389,11 @@ local function Show(targetCategory, glowKind)
             colorSwatchHolder = Components.ColorSwatch(panel, {
                 hasOpacity = true,
                 get = function()
-                    local c = getSource()[K("Color")] or Glow.DEFAULT_COLOR
+                    local c = readKey("Color", Glow.DEFAULT_COLOR)
                     return c[1], c[2], c[3], c[4] or 1
                 end,
                 onChange = function(r, g, b, a)
-                    BR.Config.Set(configPrefix .. K("Color"), { r, g, b, a or 1 })
+                    writeKey("Color", { r, g, b, a or 1 })
                     RefreshPreview()
                 end,
             })
@@ -287,183 +414,32 @@ local function Show(targetCategory, glowKind)
             colorSwatchHolder:SetPoint("LEFT", procColorCheckbox, "RIGHT", 8, 0)
         end
 
-        -- Type-specific parameters
-        if typeIdx == GlowType.Pixel then
-            -- Pixel
-            AddSlider({
-                label = L["Options.Glow.Lines"],
-                min = 1,
-                max = 20,
-                step = 1,
-                get = function()
-                    return getSource()[K("PixelLines")] or 8
-                end,
-                onChange = function(val)
-                    BR.Config.Set(configPrefix .. K("PixelLines"), val)
-                    RefreshPreview()
-                end,
-            })
-            AddSlider({
-                label = L["Options.Glow.Frequency"],
-                min = 0.01,
-                max = 1,
-                step = 0.01,
-                get = function()
-                    return getSource()[K("PixelFrequency")] or 0.25
-                end,
-                formatValue = function(val)
-                    return string.format("%.2f", val)
-                end,
-                onChange = function(val)
-                    BR.Config.Set(configPrefix .. K("PixelFrequency"), val)
-                    RefreshPreview()
-                end,
-            })
-            AddSlider({
-                label = L["Options.Glow.Length"],
-                min = 1,
-                max = 20,
-                step = 1,
-                get = function()
-                    return getSource()[K("PixelLength")] or 10
-                end,
-                onChange = function(val)
-                    BR.Config.Set(configPrefix .. K("PixelLength"), val)
-                    RefreshPreview()
-                end,
-            })
-        elseif typeIdx == GlowType.AutoCast then
-            -- AutoCast
-            AddSlider({
-                label = L["Options.Glow.Scale"],
-                min = 1,
-                max = 3,
-                step = 0.1,
-                get = function()
-                    return getSource()[K("AutocastScale")] or 1
-                end,
-                formatValue = function(val)
-                    return string.format("%.1f", val)
-                end,
-                onChange = function(val)
-                    BR.Config.Set(configPrefix .. K("AutocastScale"), val)
-                    RefreshPreview()
-                end,
-            })
-            AddSlider({
-                label = L["Options.Glow.Particles"],
-                min = 1,
-                max = 8,
-                step = 1,
-                get = function()
-                    return getSource()[K("AutocastParticles")] or 4
-                end,
-                onChange = function(val)
-                    BR.Config.Set(configPrefix .. K("AutocastParticles"), val)
-                    RefreshPreview()
-                end,
-            })
-            AddSlider({
-                label = L["Options.Glow.Frequency"],
-                min = 0.01,
-                max = 1,
-                step = 0.01,
-                get = function()
-                    return getSource()[K("AutocastFrequency")] or 0.125
-                end,
-                formatValue = function(val)
-                    return string.format("%.2f", val)
-                end,
-                onChange = function(val)
-                    BR.Config.Set(configPrefix .. K("AutocastFrequency"), val)
-                    RefreshPreview()
-                end,
-            })
-        elseif typeIdx == GlowType.Border then
-            -- Border
-            AddSlider({
-                label = L["Options.Glow.Speed"],
-                min = 0.1,
-                max = 2,
-                step = 0.1,
-                get = function()
-                    return getSource()[K("BorderFrequency")] or 0.6
-                end,
-                formatValue = function(val)
-                    return string.format("%.1f", val)
-                end,
-                onChange = function(val)
-                    BR.Config.Set(configPrefix .. K("BorderFrequency"), val)
-                    RefreshPreview()
-                end,
-            })
-        elseif typeIdx == GlowType.Proc then
-            -- Proc
-            AddSlider({
-                label = L["Options.Glow.Duration"],
-                min = 0.1,
-                max = 3,
-                step = 0.1,
-                get = function()
-                    return getSource()[K("ProcDuration")] or 1
-                end,
-                formatValue = function(val)
-                    return string.format("%.1f", val)
-                end,
-                onChange = function(val)
-                    BR.Config.Set(configPrefix .. K("ProcDuration"), val)
-                    RefreshPreview()
-                end,
-            })
-            AddCheckbox({
-                label = L["Options.Glow.StartAnimation"],
-                get = function()
-                    return getSource()[K("ProcStartAnim")] or false
-                end,
-                onChange = function(checked)
-                    BR.Config.Set(configPrefix .. K("ProcStartAnim"), checked)
-                    RefreshPreview()
-                end,
-            })
+        -- Type-specific parameters from schema
+        local typeSpecs = GLOW_SCHEMA[typeIdx]
+        if typeSpecs then
+            for _, spec in ipairs(typeSpecs) do
+                AddSpec(spec)
+            end
         end
 
-        -- Offsets
-        AddSlider({
-            label = L["Options.Glow.XOffset"],
-            min = -10,
-            max = 10,
-            step = 1,
-            get = function()
-                return getSource()[K("XOffset")] or 0
-            end,
-            onChange = function(val)
-                BR.Config.Set(configPrefix .. K("XOffset"), val)
-                RefreshPreview()
-            end,
-        })
-        AddSlider({
-            label = L["Options.Glow.YOffset"],
-            min = -10,
-            max = 10,
-            step = 1,
-            get = function()
-                return getSource()[K("YOffset")] or 0
-            end,
-            onChange = function(val)
-                BR.Config.Set(configPrefix .. K("YOffset"), val)
-                RefreshPreview()
-            end,
-        })
+        -- Common offsets
+        for _, spec in ipairs(GLOW_COMMON_OFFSETS) do
+            AddSpec(spec)
+        end
 
-        -- Reset button (resets current type's params + shared keys)
+        -- Reset button (resets shared keys + every type-specific key from schema).
         dynamicLayout:Space(8)
         local resetBtn = CreateButton(panel, L["Options.ResetToDefaults"], function()
             local keys = { K("Color"), K("Size"), K("XOffset"), K("YOffset") }
-            local typeKeys = typeResetKeys[typeIdx]
-            if typeKeys then
-                for _, k in ipairs(typeKeys) do
-                    keys[#keys + 1] = k
+            if typeSpecs then
+                for _, spec in ipairs(typeSpecs) do
+                    keys[#keys + 1] = K(spec.key)
                 end
+            end
+            -- Proc's optional custom-color toggle isn't in the schema (it sits
+            -- next to the swatch, not in the type rows) so reset it explicitly.
+            if typeIdx == GlowType.Proc then
+                keys[#keys + 1] = K("ProcUseCustomColor")
             end
             for _, key in ipairs(keys) do
                 BR.Config.Set(configPrefix .. key, nil)
@@ -498,7 +474,7 @@ local function Show(targetCategory, glowKind)
         UnregisterDynamicHolders()
     end)
 
-    glowAdvancedPanel = panel
+    glowAdvancedDialog = panel
 end
 
-BR.Options.Modals.Glow = { Show = Show }
+BR.Options.Dialogs.Glow = { Show = Show }

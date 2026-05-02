@@ -43,7 +43,7 @@ local function ResolveChatRequestMsg(frame)
 end
 
 -- Debug print for chat-request click pipeline. Toggled via /br debug.
--- Fires only on user-driven events (clicks, setup, cooldown timer, chat echo) —
+-- Fires only on user-driven events (clicks, setup, cooldown timer, chat echo) -
 -- never on hot loops. Output is plain English (developer-facing diagnostic).
 local format = string.format
 local GetTime = GetTime
@@ -225,7 +225,7 @@ local function NoteChatAttempt(key, msg, prefix)
             format(
                 "|cffff8888BR-debug ChatNotSent:|r no echo within 2s for key=%s prefix=%q msg=%q "
                     .. "playerGUID=%s playerName=%s "
-                    .. "(macro fired but no CHAT_MSG_* came back — chat throttled, hardware-event "
+                    .. "(macro fired but no CHAT_MSG_* came back - chat throttled, hardware-event "
                     .. 'violation, or empty macrotext at click time. Try \'/run SendChatMessage("test", "'
                     .. (prefix == "/instance " and "INSTANCE_CHAT" or prefix == "/raid " and "RAID" or prefix == "/party " and "PARTY" or "SAY")
                     .. "\")' to see if direct chat works.)",
@@ -425,7 +425,7 @@ local function CreateClickOverlay(frame)
     -- Auto-hide in combat (secure state driver), auto-show after
     RegisterStateDriver(overlay, "visibility", "[combat] hide; show")
     -- When state driver re-shows after combat, hide if buff frame isn't visible
-    -- Uses IsVisible() (not IsShown()) to check entire parent chain — the frame's own
+    -- Uses IsVisible() (not IsShown()) to check entire parent chain - the frame's own
     -- shown state can be true while its parent container is hidden.
     overlay:SetScript("OnShow", function(self)
         if not frame:IsVisible() then
@@ -462,7 +462,7 @@ local function CreateClickOverlay(frame)
                     -- Restore macro if overlay is still a chat-request button.
                     -- Read msg fresh from the overlay so a custom-message edit
                     -- during the cooldown window picks up the latest text.
-                    -- If in combat lockdown, skip — SetupChatRequestOverlay will
+                    -- If in combat lockdown, skip - SetupChatRequestOverlay will
                     -- re-set the macro when SyncSecureButtons runs after combat.
                     if self._br_chatRequestKey and self._br_chatRequestMsg and not InCombatLockdown() then
                         self:SetAttribute("macrotext", GetChatRequestPrefix() .. self._br_chatRequestMsg)
@@ -623,7 +623,7 @@ local function CreateActionButton()
     local btn = CreateFrame("Button", nil, UIParent, "SecureActionButtonTemplate")
     btn:RegisterForClicks("AnyDown", "AnyUp")
     btn:Hide()
-    -- Start hidden — state driver activated by SyncSecureButtons() after positioning
+    -- Start hidden - state driver activated by SyncSecureButtons() after positioning
     RegisterStateDriver(btn, "visibility", "hide")
     -- When state driver re-shows after combat, hide if buff frame isn't visible
     -- Uses IsVisible() to check entire parent chain (see CreateClickOverlay comment)
@@ -1493,7 +1493,7 @@ local function UpdateActionButtons(category)
                             overlay.highlight:SetShown(showHighlight)
                         end
                     elseif def and def.clickMacro and (not def.casterClass or def.casterClass == playerClass) then
-                        -- No consumable in bags but has clickMacro — cast the creation spell
+                        -- No consumable in bags but has clickMacro - cast the creation spell
                         if not frame.clickOverlay then
                             CreateClickOverlay(frame)
                         end
@@ -1510,7 +1510,7 @@ local function UpdateActionButtons(category)
                             overlay.highlight:SetShown(showHighlight)
                         end
                     elseif def and def.castSpellID and (not def.casterClass or def.casterClass == playerClass) then
-                        -- No consumable in bags but has castSpellID — cast the creation spell
+                        -- No consumable in bags but has castSpellID - cast the creation spell
                         if not frame.clickOverlay then
                             CreateClickOverlay(frame)
                         end
@@ -1526,7 +1526,7 @@ local function UpdateActionButtons(category)
                             overlay.highlight:SetShown(showHighlight)
                         end
                     elseif frame.clickOverlay then
-                        -- No action resolved; clear fields but don't Hide() — let
+                        -- No action resolved; clear fields but don't Hide() - let
                         -- SyncSecureButtons handle visibility via _br_has_action check.
                         frame.clickOverlay._br_has_action = false
                         frame.clickOverlay._br_clickMacroFn = nil
@@ -1639,7 +1639,7 @@ end
 -- Refresh chat-request overlays to pick up group-type changes (party↔raid,
 -- instance group transitions) and per-profile message changes. Called on
 -- GROUP_ROSTER_UPDATE / GROUP_FORMED / PLAYER_ENTERING_WORLD / profile switch
--- so the macrotext is always current at click time — replacing the old pattern
+-- so the macrotext is always current at click time - replacing the old pattern
 -- of rebuilding inside PreClick, which was subject to secure-dispatcher
 -- hardware-event timing.
 local function RefreshChatRequestMacros()
@@ -1656,7 +1656,7 @@ local function RefreshChatRequestMacros()
             -- have changed chatRequestMessages[key] since setup).
             local msg = ResolveChatRequestMsg(frame)
             overlay._br_chatRequestMsg = msg
-            -- Skip overlays whose macrotext is currently blanked for cooldown —
+            -- Skip overlays whose macrotext is currently blanked for cooldown -
             -- the cooldown timer will restore with the latest prefix/msg when it fires.
             -- Guard against nil msg (frame.displayName fallback may be missing).
             if msg and not requestOnCooldown[overlay._br_chatRequestKey] then

@@ -35,7 +35,7 @@ local tinsert = table.insert
 local tostring = tostring
 
 -- Reusable single-element buffer to avoid { spellID } allocations in hot loops.
--- SAFETY: callers must consume the result immediately — the buffer is overwritten on next call.
+-- SAFETY: callers must consume the result immediately - the buffer is overwritten on next call.
 local singleSpellBuf = {}
 local function AsSpellList(val)
     if type(val) == "table" then
@@ -138,7 +138,7 @@ local consumablesDismissed = false
 -- within State.lua. It covers BOTH combat lockdown AND boss encounters.
 --
 -- Why not just call InCombatLockdown()? Because ENCOUNTER_START fires BEFORE
--- InCombatLockdown() returns true — the player isn't in combat until their first hostile
+-- InCombatLockdown() returns true - the player isn't in combat until their first hostile
 -- action lands on the boss. During that window (potentially hundreds of ms while a spell
 -- is traveling), the aura API is already restricted but InCombatLockdown() still returns
 -- false. Non-whitelisted spells (e.g. Devotion Aura 465) silently return nil from
@@ -159,7 +159,7 @@ local cachedInstanceType = nil -- raw WoW instanceType, stashed alongside conten
 -- Whether we are in the PvP prep phase (before gates open). Used by the
 -- `hideInPvPMatch` visibility setting to gate buff display once the match starts.
 -- Note: aura API is restricted for the entire BG/arena (prep included), so this
--- does NOT affect IsRestricted() — see that function for details.
+-- does NOT affect IsRestricted() - see that function for details.
 local inPvPPrepPhase = false
 
 -- Difficulty cache (invalidated alongside content type)
@@ -217,7 +217,7 @@ local cachedOffHandType = nil -- nil = not yet checked, "weapon" | "shield" | "n
 local cachedItemOwnership = {}
 
 -- Wrong-demon-pet cache. UnitCreatureFamily can return secret-value familyIDs
--- under 12.0.5 taint rules, so the compare is pcall-guarded — a secret value
+-- under 12.0.5 taint rules, so the compare is pcall-guarded - a secret value
 -- becomes "unknown" (not cached, retried) instead of crashing Refresh.
 ---@type boolean|nil
 local cachedWrongPetStatus = nil
@@ -303,7 +303,7 @@ local allySpecCache = {}
 local includeNPCsInCounting = false
 
 -- Note: inCombat (set via SetInCombat) is used by CountMissingBuff to skip NPCs during
--- combat/encounters — NPC buff spell IDs aren't on the Blizzard aura whitelist.
+-- combat/encounters - NPC buff spell IDs aren't on the Blizzard aura whitelist.
 
 -- Aura-safe spell whitelist loaded from Data/AuraWhitelist.lua
 local AURA_WHITELIST = BR.AURA_WHITELIST
@@ -1228,7 +1228,7 @@ local function ShouldShowTargetedBuff(spellIDs, requiredClass, beneficiaryRole, 
                 lastTargets[buffKey] = { name = targetEntry.name, class = targetEntry.class }
             end
         elseif isActive then
-            -- Buff found but only on player — clear last target
+            -- Buff found but only on player - clear last target
             lastTargets[buffKey] = nil
         end
         -- If not active at all, keep old last target so macro still targets them after it falls off
@@ -1817,7 +1817,7 @@ function BuffState.Refresh(refreshMode)
             local settingKey = buff.groupId or buff.key
 
             if buff.showOnInstanceEntry then
-                -- Instance entry only buff (e.g., soulwell reminder) — no normal buff checks
+                -- Instance entry only buff (e.g., soulwell reminder) - no normal buff checks
                 -- Gate on cheap checks first; customCheck (API call) only when everything else passes
                 if
                     inInstanceEntry
@@ -2016,7 +2016,7 @@ function BuffState.Refresh(refreshMode)
         end
     end
 
-    -- Process pet buffs (pet summon reminders — no expiration tracking)
+    -- Process pet buffs (pet summon reminders - no expiration tracking)
     if not groupOnly then
         local petVisible = IsCategoryVisibleForContent("pet")
         if IsMounted() or BR.Display.IsPetDismountSuppressed() then
@@ -2084,7 +2084,7 @@ function BuffState.Refresh(refreshMode)
             local settingKey = buff.groupId or buff.key
 
             if buff.showOnInstanceEntry and (db.defaults and db.defaults.delveFoodTimer) then
-                -- Instance entry only consumable (e.g., delve food) — show for 30s on entry then auto-hide
+                -- Instance entry only consumable (e.g., delve food) - show for 30s on entry then auto-hide
                 -- Combat safety handled by Display layer clearing entry state on PLAYER_REGEN_DISABLED
                 if
                     inDelveEntry
@@ -2426,7 +2426,7 @@ function BuffState.InvalidateContentTypeCache()
     cachedDifficultyKey = nil
     cachedCompetitivePvP = nil
     cachedIsLegacyInstance = nil
-    -- Note: inPvPPrepPhase is NOT reset here — it's managed explicitly by
+    -- Note: inPvPPrepPhase is NOT reset here - it's managed explicitly by
     -- SetPvPPrepPhase() calls from PLAYER_ENTERING_WORLD and PVP_MATCH_STATE_CHANGED.
     -- Resetting it here would clobber the prep state when ZONE_CHANGED_NEW_AREA's
     -- deferred invalidation fires 0.5s after entering a PvP instance.
@@ -2635,7 +2635,7 @@ function BuffState.IsShadowFormActive()
     local activeSpellID = GetActiveStanceSpellID()
     if not activeSpellID then
         -- Form 0 = no shadowform (cache); non-zero with unresolved spell data
-        -- happens transiently on load — return safe default and retry next call.
+        -- happens transiently on load - return safe default and retry next call.
         if GetShapeshiftForm() == 0 then
             cachedShadowFormActive = false
             return false
@@ -2666,7 +2666,7 @@ function BuffState.IsWrongDruidForm()
     local activeSpellID = GetActiveStanceSpellID()
     if not activeSpellID then
         -- Unshifted (form 0) is wrong; non-zero with unresolved spell data is
-        -- a transient load state — return safe default and retry next call.
+        -- a transient load state - return safe default and retry next call.
         if GetShapeshiftForm() == 0 then
             cachedWrongDruidFormStatus = true
             return true

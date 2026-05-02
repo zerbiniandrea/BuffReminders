@@ -272,6 +272,28 @@ english["Tab.Settings"] = "Settings"
 english["Tab.Profiles"] = "Profiles"
 english["Tab.Sounds"] = "Sounds"
 
+-- Sidebar groups
+english["Sidebar.General"] = "General"
+english["Sidebar.Buffs"] = "Buffs"
+english["Sidebar.DisplayBehavior"] = "Display & Behavior"
+english["Sidebar.Profiles"] = "Profiles"
+
+-- Page titles
+english["Page.General"] = "General"
+english["Page.Defaults"] = "Defaults"
+english["Page.Visibility"] = "Visibility"
+english["Page.ChatRequests"] = "Chat Requests"
+english["Page.AnchorFrames"] = "Anchor Frames"
+english["Page.Profiles"] = "Profiles"
+english["Page.AllBuffs"] = "All Buffs"
+english["Page.Sounds"] = "Sounds"
+english["Page.Sounds.Desc"] =
+    "Play a sound when a tracked buff is missing. Alerts apply across all buff categories - assign one per buff."
+
+-- Per-category page section headers
+english["Section.Sounds"] = "Sounds"
+english["Section.Tracking"] = "Tracking"
+
 -- ============================================================================
 -- OPTIONS: SOUND ALERTS
 -- ============================================================================
@@ -309,8 +331,8 @@ english["Options.GlowReminderIcons.Desc"] =
     "Add a glow effect to reminder icons. Customize to configure expiring and missing glows independently."
 english["Options.GlowKind.Expiring"] = "Expiring"
 english["Options.GlowKind.Missing"] = "Missing"
-english["Options.GlowSettings.Expiring"] = "Glow Settings — Expiring"
-english["Options.GlowSettings.Missing"] = "Glow Settings — Missing"
+english["Options.GlowSettings.Expiring"] = "Glow Settings - Expiring"
+english["Options.GlowSettings.Missing"] = "Glow Settings - Missing"
 english["Options.Glow.Enabled"] = "Enabled"
 english["Options.Threshold"] = "Threshold"
 english["Options.GlowMissingPets"] = "Glow missing pets"
@@ -422,10 +444,8 @@ english["Options.ChatRequests"] = "Chat Requests"
 english["Options.RequestBuffInChat"] = "Request missing buffs in chat"
 english["Options.RequestBuffInChat.Desc"] =
     "Click a missing buff your class cannot provide to request it in chat. Auto-detects channel (instance/raid/party/say). 30-second cooldown per buff."
-english["Options.CustomizeChatMessages"] = "Customize Messages"
-english["Options.ChatRequestModal.Title"] = "Chat Request Messages"
-english["Options.ChatRequestModal.Desc"] = "Customize the message sent for each buff. Leave blank to use the default."
-english["Options.ChatRequestModal.ResetAll"] = "Reset All"
+english["Options.ChatRequest.ResetAll"] = "Reset All"
+english["ChatRequests.PerBuffMessages"] = "Per-buff messages"
 -- Chat request messages (keyed by buff.key, sent as-is via SendChatMessage)
 -- EU/US translators: leave untranslated so chat messages stay in English.
 -- Asian translators: translate these so chat messages match your locale.
@@ -583,10 +603,12 @@ english["Options.MasqueNote"] = "Zoom and Border settings are managed by Masque"
 -- ============================================================================
 english["Options.ShowLoginMessages"] = "Show login messages"
 english["Options.ShowMinimapButton"] = "Show minimap button"
-english["Options.ShowOnlyInGroup"] = "Show only in group/raid"
 
 -- Hide when section
-english["Options.HideWhen"] = "Hide when:"
+english["Options.HideWhen"] = "Hide when"
+english["Options.HideWhen.Alone"] = "Alone"
+english["Options.HideWhen.Alone.Title"] = "Hide while alone"
+english["Options.HideWhen.Alone.Desc"] = "Hide all buff reminders while not in a party or raid group"
 english["Options.HideWhen.Resting"] = "Resting"
 english["Options.HideWhen.Resting.Title"] = "Hide while resting"
 english["Options.HideWhen.Resting.Desc"] = "Hide buff reminders while in inns or capital cities"
@@ -698,6 +720,7 @@ english["Options.Unlock"] = "Unlock"
 -- OPTIONS: CUSTOM BUFF MODAL
 -- ============================================================================
 english["CustomBuff.Edit"] = "Edit Custom Buff"
+english["CustomBuff.EditShort"] = "Edit"
 english["CustomBuff.Add"] = "Add Custom Buff"
 english["CustomBuff.AddButton"] = "+ Add Custom Buff"
 english["CustomBuff.SpellIDs"] = "Spell IDs:"
@@ -741,7 +764,7 @@ english["CustomBuff.RequireItem"] = "Require item:"
 english["CustomBuff.RequireItem.EquippedBags"] = "Equipped/Bags"
 english["CustomBuff.RequireItem.Equipped"] = "Equipped"
 english["CustomBuff.RequireItem.InBags"] = "In bags"
-english["CustomBuff.RequireItem.Hint"] = "item ID — hide if not found"
+english["CustomBuff.RequireItem.Hint"] = "item ID - hide if not found"
 english["CustomBuff.ItemCooldown"] = "Cooldown:"
 english["CustomBuff.ItemCooldown.Any"] = "Any"
 english["CustomBuff.ItemCooldown.OffCooldown"] = "Off cooldown"

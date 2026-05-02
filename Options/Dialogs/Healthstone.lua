@@ -2,39 +2,12 @@ local _, BR = ...
 
 local L = BR.L
 local Components = BR.Components
-local CreateButton = BR.CreateButton
-local CreatePanel = BR.CreatePanel
 
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 
-local healthstoneModal = nil
-
-local function Show()
-    if healthstoneModal then
-        Components.RefreshAll()
-        healthstoneModal:Show()
-        return
-    end
-
-    local MODAL_WIDTH = 340
-    local MARGIN = 16
-
-    local modal = CreatePanel("BuffRemindersHealthstoneModal", MODAL_WIDTH, 1, {
-        level = 200,
-        modal = true,
-    })
-
-    local title = modal:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -12)
-    title:SetText(L["Options.HealthstoneSettings"])
-
-    local closeBtn = CreateButton(modal, "x", function()
-        modal:Hide()
-    end)
-    closeBtn:SetSize(22, 22)
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-
-    local layout = Components.VerticalLayout(modal, { x = MARGIN, y = -36 })
+BR.Options.Dialogs.Healthstone = BR.Options.Helpers.SingletonDialog(function()
+    local shell = BR.Options.Helpers.CreateDialogShell("BuffRemindersHealthstoneDialog", "Options.HealthstoneSettings")
+    local dialog, layout = shell.dialog, shell.layout
 
     -- Shared label width so the dropdown and slider line up vertically.
     local labelW = Components.MeasureSharedLabelWidth({
@@ -42,7 +15,7 @@ local function Show()
         L["Options.Healthstone.Threshold"],
     })
 
-    local visHolder = Components.Dropdown(modal, {
+    local visHolder = Components.Dropdown(dialog, {
         label = L["Options.Visibility"],
         labelWidth = labelW,
         width = 200,
@@ -73,7 +46,7 @@ local function Show()
     })
     layout:Add(visHolder, nil, COMPONENT_GAP)
 
-    local lowStockHolder = Components.Checkbox(modal, {
+    local lowStockHolder = Components.Checkbox(dialog, {
         label = L["Options.Healthstone.LowStock"],
         get = function()
             return BR.Config.Get("defaults.healthstoneLowStock", false)
@@ -89,7 +62,7 @@ local function Show()
     })
     layout:Add(lowStockHolder, nil, COMPONENT_GAP)
 
-    local thresholdHolder = Components.Slider(modal, {
+    local thresholdHolder = Components.Slider(dialog, {
         label = L["Options.Healthstone.Threshold"],
         labelWidth = labelW,
         min = 1,
@@ -108,9 +81,6 @@ local function Show()
     })
     layout:Add(thresholdHolder, nil, COMPONENT_GAP)
 
-    modal:SetHeight(math.max(-layout:GetY() + MARGIN, 80))
-    healthstoneModal = modal
-    modal:Show()
-end
-
-BR.Options.Modals.Healthstone = { Show = Show }
+    shell:Finalize()
+    return dialog
+end)

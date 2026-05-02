@@ -25,7 +25,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/) w
 type: <gitmoji> short description
 ```
 
-Pick the commit type (`feat`, `fix`, `refactor`, `perf`, `docs`, `chore`, ...) and pair it with the matching gitmoji from the official list — not a random emoji.
+Pick the commit type (`feat`, `fix`, `refactor`, `perf`, `docs`, `chore`, ...) and pair it with the matching gitmoji from the official list - not a random emoji.
 
 ### Examples
 
@@ -59,7 +59,7 @@ local DoThing = BR.MyModule.DoThing
 
 ### Event-Driven Config
 
-Settings go through the Config API, which fires refresh callbacks automatically. Modules subscribe to the events they care about — options and display never call each other directly. This keeps the codebase decoupled: you can change how a setting is applied without touching the UI that sets it, and vice versa.
+Settings go through the Config API, which fires refresh callbacks automatically. Modules subscribe to the events they care about - options and display never call each other directly. This keeps the codebase decoupled: you can change how a setting is applied without touching the UI that sets it, and vice versa.
 
 ```lua
 -- Options sets a value (triggers the appropriate callback automatically)
@@ -118,7 +118,7 @@ Components.Slider(parent, {
 
 ### SavedVariables Compatibility
 
-`BuffRemindersDB` persists user settings across sessions. Every change must be backwards-compatible with data that's already out in the wild — a bad migration crashes the addon for real users on login.
+`BuffRemindersDB` persists user settings across sessions. Every change must be backwards-compatible with data that's already out in the wild - a bad migration crashes the addon for real users on login.
 
 **Rules:**
 - Never rename or remove a DB key without a migration
@@ -135,7 +135,7 @@ if type(db.showCount) == "boolean" then
 end
 ```
 
-Always check for `nil` before indexing into nested tables — a user's DB may predate the field entirely.
+Always check for `nil` before indexing into nested tables - a user's DB may predate the field entirely.
 
 ### Localization
 
@@ -148,7 +148,7 @@ Keys use PascalCase dot notation (`L["Options.ClickToCast"]`, `L["Overlay.NoFlas
 1. Define it in `Locales/enUS.lua`: `english["Section.Key"] = "English text"`
 2. Add translations to all 10 locale files: `L["Section.Key"] = "Translated text"`
 3. Use `L["Section.Key"]` in the source file
-4. Run `make` — the `locales` target verifies all keys are in sync
+4. Run `make` - the `locales` target verifies all keys are in sync
 
 **Don't localize:** spell names (WoW API handles those), config keys, frame names, internal identifiers.
 

@@ -42,7 +42,7 @@ asian_locales="zhCN zhTW koKR"
 for file in "$LOCALES_DIR"/*.lua; do
     locale=$(basename "$file" .lua)
     [ "$locale" = "enUS" ] && continue
-    # Skip Asian locales — they're allowed to translate ChatRequest keys
+    # Skip Asian locales - they're allowed to translate ChatRequest keys
     case " $asian_locales " in
         *" $locale "*) continue ;;
     esac
@@ -96,7 +96,7 @@ print_locale_detail() {
     local pct=$((count * 100 / enUS_count))
 
     echo ""
-    echo "── $locale ($count/$enUS_count — ${pct}%) ──"
+    echo "── $locale ($count/$enUS_count - ${pct}%) ──"
 
     if [ "$count" -eq "$enUS_count" ]; then
         local extra
@@ -122,7 +122,7 @@ print_locale_detail() {
         echo "  No translations (empty file)"
     fi
 
-    # Extra keys (in this locale but not in enUS — stale/typos)
+    # Extra keys (in this locale but not in enUS - stale/typos)
     if [ -n "$trans_keys" ]; then
         local extra
         extra=$(comm -23 <(echo "$trans_keys") <(echo "$defined"))

@@ -1,11 +1,14 @@
 local _, BR = ...
 
 -- ============================================================================
--- OPTIONS PANEL
+-- OPTIONS PANEL SHELL
 -- ============================================================================
--- Orchestrator: builds the panel chrome (title, version, discord link, scale
--- widget, tab bar, Masque banner, bottom buttons) and delegates each tab's
--- content to its per-file Build(ctx) function.
+-- Builds the panel chrome (title, version, Discord link, scale stepper, close
+-- button, lock + test bar, banners) and a sidebar nav that lazily builds and
+-- swaps page content.
+--
+-- Each page is registered as BR.Options.Pages.<id> = { title, Build = fn(content), showMasqueBanner = bool }.
+-- BR.Options.Groups (in Context.lua) declares sidebar order.
 
 local floor, max, min = math.floor, math.max, math.min
 local tinsert = table.insert
@@ -25,8 +28,13 @@ end
 
 local C = BR.Options.Constants
 local PANEL_WIDTH = C.PANEL_WIDTH
+local PANEL_HEIGHT = C.PANEL_HEIGHT
+local SIDEBAR_WIDTH = C.SIDEBAR_WIDTH
+local SIDEBAR_X = C.SIDEBAR_X
+local CONTENT_TOP_OFFSET = C.CONTENT_TOP_OFFSET
+local BOTTOM_BAR_HEIGHT = C.BOTTOM_BAR_HEIGHT
+local SCROLLBAR_WIDTH = C.SCROLLBAR_WIDTH
 local COL_PADDING = C.COL_PADDING
-local TAB_HEIGHT = C.TAB_HEIGHT
 
 local optionsPanel = nil
 
@@ -118,14 +126,86 @@ StaticPopupDialogs["BUFFREMINDERS_DISCORD_URL"] = {
 }
 
 -- ============================================================================
+-- SIDEBAR BUTTON FACTORY
+-- ============================================================================
+
+local function CreateSidebarGroupHeader(parent, text)
+    local header = CreateFrame("Frame", nil, parent)
+    header:SetSize(SIDEBAR_WIDTH, 22)
+
+    local fs = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    fs:SetPoint("LEFT", 8, 0)
+    fs:SetText("|cffffcc00" .. text:upper() .. "|r")
+    fs:SetJustifyH("LEFT")
+
+    local sep = header:CreateTexture(nil, "ARTWORK")
+    sep:SetHeight(1)
+    sep:SetPoint("BOTTOMLEFT", 4, 1)
+    sep:SetPoint("BOTTOMRIGHT", -4, 1)
+    sep:SetColorTexture(0.4, 0.32, 0.05, 0.6)
+
+    return header
+end
+
+local function CreateSidebarButton(parent, text)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetSize(SIDEBAR_WIDTH, 24)
+
+    local bg = btn:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(1, 1, 1, 0)
+    btn.bg = bg
+
+    local accent = btn:CreateTexture(nil, "ARTWORK")
+    accent:SetSize(2, 18)
+    accent:SetPoint("LEFT", 0, 0)
+    accent:SetColorTexture(1, 0.82, 0, 1)
+    accent:Hide()
+    btn.accent = accent
+
+    local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    fs:SetPoint("LEFT", 14, 0)
+    fs:SetJustifyH("LEFT")
+    fs:SetText(text)
+    btn.label = fs
+
+    btn:SetScript("OnEnter", function(self)
+        if not self.isActive then
+            self.bg:SetColorTexture(1, 1, 1, 0.06)
+        end
+    end)
+    btn:SetScript("OnLeave", function(self)
+        if not self.isActive then
+            self.bg:SetColorTexture(1, 1, 1, 0)
+        end
+    end)
+
+    function btn:SetActive(active)
+        self.isActive = active
+        if active then
+            self.bg:SetColorTexture(1, 0.82, 0, 0.12)
+            self.accent:Show()
+            self.label:SetTextColor(1, 1, 1)
+        else
+            self.bg:SetColorTexture(1, 1, 1, 0)
+            self.accent:Hide()
+            self.label:SetTextColor(0.85, 0.85, 0.85)
+        end
+    end
+
+    btn:SetActive(false)
+    return btn
+end
+
+-- ============================================================================
 -- PANEL BUILDER
 -- ============================================================================
 
 local function CreateOptionsPanel()
-    local panel = CreatePanel("BuffRemindersOptions", PANEL_WIDTH, 640, { escClose = true })
+    local panel = CreatePanel("BuffRemindersOptions", PANEL_WIDTH, PANEL_HEIGHT, { escClose = true })
     panel:Hide()
 
-    -- Track all EditBoxes so we can clear focus when panel hides.
+    -- EditBox tracker so panel-wide hide clears focus.
     local panelEditBoxes = {}
     Components.SetEditBoxesRef(panelEditBoxes)
     panel:SetScript("OnHide", function()
@@ -134,9 +214,11 @@ local function CreateOptionsPanel()
         end
     end)
 
-    -- Title (inline with tab row)
+    -- ====================================================================
+    -- TOP BAR: title + version + Discord
+    -- ====================================================================
     local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", COL_PADDING, -10)
+    title:SetPoint("TOPLEFT", COL_PADDING, -14)
     title:SetText("|cffffffffBuff|r|cffffcc00Reminders|r")
 
     local version = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -166,7 +248,9 @@ local function CreateOptionsPanel()
         BR.HideTooltip()
     end)
 
-    -- Scale controls (top right area)
+    -- ====================================================================
+    -- TOP BAR: scale stepper + close button
+    -- ====================================================================
     local BASE_SCALE = OPTIONS_BASE_SCALE
     local MIN_PCT, MAX_PCT = 80, 150
 
@@ -245,127 +329,203 @@ local function CreateOptionsPanel()
         panel:SetScale(BR.profile.optionsPanelScale)
     end
 
-    -- ========== TABS ==========
-    local tabButtons = {}
-    local contentContainers = {}
-    local activeTabName = "buffs"
+    -- Top + bottom dividers act as the layout primitives: sidebar, contentArea
+    -- and the bottom button row anchor to them, so layout follows the dividers
+    -- automatically and there are no per-element pixel offsets to keep in sync.
+    local headerSep = panel:CreateTexture(nil, "ARTWORK")
+    headerSep:SetHeight(1)
+    headerSep:SetPoint("TOPLEFT", SIDEBAR_X, -CONTENT_TOP_OFFSET + 4)
+    headerSep:SetPoint("TOPRIGHT", -COL_PADDING, -CONTENT_TOP_OFFSET + 4)
+    headerSep:SetColorTexture(0.3, 0.3, 0.3, 1)
+
+    local bottomSep = panel:CreateTexture(nil, "ARTWORK")
+    bottomSep:SetHeight(1)
+    bottomSep:SetPoint("BOTTOMLEFT", SIDEBAR_X, BOTTOM_BAR_HEIGHT - 5)
+    bottomSep:SetPoint("BOTTOMRIGHT", -COL_PADDING, BOTTOM_BAR_HEIGHT - 5)
+    bottomSep:SetColorTexture(0.3, 0.3, 0.3, 1)
+
+    -- ====================================================================
+    -- SIDEBAR
+    -- ====================================================================
+    local sidebar = CreateFrame("Frame", nil, panel)
+    sidebar:SetPoint("TOPLEFT", headerSep, "BOTTOMLEFT", 0, 0)
+    sidebar:SetPoint("BOTTOMLEFT", bottomSep, "TOPLEFT", 0, 0)
+    sidebar:SetWidth(SIDEBAR_WIDTH)
+
+    local sidebarBg = sidebar:CreateTexture(nil, "BACKGROUND")
+    sidebarBg:SetAllPoints()
+    sidebarBg:SetColorTexture(0, 0, 0, 0.25)
+
+    local sidebarBorder = sidebar:CreateTexture(nil, "BORDER")
+    sidebarBorder:SetWidth(1)
+    sidebarBorder:SetPoint("TOPRIGHT", 0, 0)
+    sidebarBorder:SetPoint("BOTTOMRIGHT", 0, 0)
+    sidebarBorder:SetColorTexture(0.3, 0.3, 0.3, 1)
+
+    -- ====================================================================
+    -- CONTENT AREA
+    -- ====================================================================
+    -- Each page registers via BR.Options.Pages.<id>. We create a parent frame
+    -- per page (a ScrollableContainer), build its content lazily on first nav.
+    local contentArea = CreateFrame("Frame", nil, panel)
+    contentArea:SetPoint("TOPLEFT", headerSep, "BOTTOMLEFT", SIDEBAR_WIDTH + 6, 0)
+    contentArea:SetPoint("BOTTOMRIGHT", bottomSep, "TOPRIGHT", 4, 0)
+
+    local pageContainers = {} -- pageId → scrollFrame
+    local pageBuilt = {} -- pageId → bool
+    local activePageId = nil
+
+    -- Banner (Masque) - only visible on pages that flag showMasqueBanner.
     local masqueBanner
     local UpdateBannerLayout
 
-    local function SetActiveTab(tabName)
-        activeTabName = tabName
-        for name, tab in pairs(tabButtons) do
-            tab:SetActive(name == tabName)
+    local function CreatePageContainer(pageId)
+        local scrollFrame, content = Components.ScrollableContainer(contentArea, {
+            contentHeight = 600,
+            scrollbarWidth = SCROLLBAR_WIDTH,
+        })
+        scrollFrame:SetPoint("TOPLEFT", 0, 0)
+        scrollFrame:SetPoint("BOTTOMRIGHT", 0, 0)
+        scrollFrame:Hide()
+        pageContainers[pageId] = scrollFrame
+        scrollFrame.content = content
+        return scrollFrame, content
+    end
+
+    local function GetPage(pageId)
+        return BR.Options.Pages[pageId]
+    end
+
+    local function BuildPageIfNeeded(pageId)
+        if pageBuilt[pageId] then
+            return
         end
-        for name, container in pairs(contentContainers) do
-            if name == tabName then
-                container:Show()
+        local page = GetPage(pageId)
+        local scrollFrame = pageContainers[pageId]
+        if not page or not scrollFrame then
+            return
+        end
+        if page.Build then
+            page.Build(scrollFrame.content, scrollFrame)
+        end
+        pageBuilt[pageId] = true
+    end
+
+    local sidebarButtons = {} -- pageId → button
+
+    local function ActivatePage(pageId)
+        if activePageId == pageId then
+            return
+        end
+        activePageId = pageId
+        for id, scrollFrame in pairs(pageContainers) do
+            if id == pageId then
+                BuildPageIfNeeded(id)
+                scrollFrame:Show()
             else
-                container:Hide()
+                scrollFrame:Hide()
             end
+        end
+        for id, btn in pairs(sidebarButtons) do
+            btn:SetActive(id == pageId)
         end
         if masqueBanner then
             masqueBanner:Refresh()
             UpdateBannerLayout()
         end
+        Components.RefreshAll()
     end
 
-    tabButtons.buffs = Components.Tab(panel, { name = "buffs", label = L["Tab.Buffs"], width = 50 })
-    tabButtons.displayBehavior =
-        Components.Tab(panel, { name = "displayBehavior", label = L["Tab.DisplayBehavior"], width = 110 })
-    tabButtons.sounds = Components.Tab(panel, { name = "sounds", label = L["Tab.Sounds"], width = 60 })
-    tabButtons.settings = Components.Tab(panel, { name = "settings", label = L["Tab.Settings"], width = 65 })
-    tabButtons.profiles = Components.Tab(panel, { name = "profiles", label = L["Tab.Profiles"], width = 65 })
+    -- ====================================================================
+    -- BUILD SIDEBAR FROM GROUPS REGISTRY
+    -- ====================================================================
+    local sidebarY = -8
+    local firstPageId = nil
+    for _, group in ipairs(BR.Options.Groups) do
+        local hasAnyPage = false
+        for _, pageId in ipairs(group.pages) do
+            if BR.Options.Pages[pageId] then
+                hasAnyPage = true
+                break
+            end
+        end
+        if hasAnyPage then
+            local header = CreateSidebarGroupHeader(sidebar, L[group.titleKey] or group.titleKey)
+            header:SetPoint("TOPLEFT", 0, sidebarY)
+            sidebarY = sidebarY - 22
 
-    tabButtons.buffs:SetPoint("TOPLEFT", panel, "TOPLEFT", COL_PADDING, -30)
-    tabButtons.displayBehavior:SetPoint("LEFT", tabButtons.buffs, "RIGHT", 2, 0)
-    tabButtons.sounds:SetPoint("LEFT", tabButtons.displayBehavior, "RIGHT", 2, 0)
-    tabButtons.settings:SetPoint("LEFT", tabButtons.sounds, "RIGHT", 2, 0)
-    tabButtons.profiles:SetPoint("LEFT", tabButtons.settings, "RIGHT", 2, 0)
-
-    for name, tab in pairs(tabButtons) do
-        tab:SetScript("OnClick", function()
-            SetActiveTab(name)
-        end)
+            for _, pageId in ipairs(group.pages) do
+                local page = BR.Options.Pages[pageId]
+                if page then
+                    local btn = CreateSidebarButton(sidebar, page.title or pageId)
+                    btn:SetPoint("TOPLEFT", 0, sidebarY)
+                    btn:SetScript("OnClick", function()
+                        ActivatePage(pageId)
+                    end)
+                    sidebarButtons[pageId] = btn
+                    sidebarY = sidebarY - 24
+                    -- Pre-create the page container so masque banner refresh / page-show events work.
+                    CreatePageContainer(pageId)
+                    if not firstPageId then
+                        firstPageId = pageId
+                    end
+                end
+            end
+            sidebarY = sidebarY - 6 -- group gap
+        end
     end
 
-    local tabSeparator = panel:CreateTexture(nil, "ARTWORK")
-    tabSeparator:SetHeight(1)
-    tabSeparator:SetPoint("TOPLEFT", COL_PADDING, -30 - TAB_HEIGHT)
-    tabSeparator:SetPoint("TOPRIGHT", -COL_PADDING, -30 - TAB_HEIGHT)
-    tabSeparator:SetColorTexture(0.3, 0.3, 0.3, 1)
-
-    -- ========== BANNERS ==========
-    local CONTENT_TOP = -30 - TAB_HEIGHT - 10
-    local BANNER_TOP_GAP = 6
-    local BANNER_BOTTOM_GAP = 0
-
+    -- ====================================================================
+    -- BANNERS (Masque, Anchor unlock)
+    -- ====================================================================
     masqueBanner = Components.Banner(panel, {
         text = L["Options.MasqueNote"],
         icon = "QuestNormal",
         color = "orange",
         visible = function()
-            return IsMasqueActive() and activeTabName == "displayBehavior"
+            if not IsMasqueActive() then
+                return false
+            end
+            local page = activePageId and BR.Options.Pages[activePageId]
+            return page and page.showMasqueBanner == true
         end,
     })
 
-    UpdateBannerLayout = function()
-        local bannerY = -30 - TAB_HEIGHT - BANNER_TOP_GAP
-        local bannerOffset = 0
+    local BANNER_GAP = 6
 
+    UpdateBannerLayout = function()
+        contentArea:ClearAllPoints()
+        contentArea:SetPoint("BOTTOMRIGHT", bottomSep, "TOPRIGHT", 4, 0)
         if masqueBanner:IsShown() then
             masqueBanner:ClearAllPoints()
-            masqueBanner:SetPoint("TOPLEFT", panel, "TOPLEFT", COL_PADDING, bannerY)
-            masqueBanner:SetPoint("RIGHT", panel, "RIGHT", -COL_PADDING, 0)
-            -- Sync height to the wrapped text now that the banner has a width;
-            -- otherwise content below would overlap when the message wraps.
+            masqueBanner:SetPoint("TOPLEFT", headerSep, "BOTTOMLEFT", SIDEBAR_WIDTH + 6, -BANNER_GAP)
+            masqueBanner:SetPoint("RIGHT", panel, "RIGHT", -COL_PADDING + 4, 0)
             masqueBanner:FitHeight()
-            bannerOffset = bannerOffset + masqueBanner:GetHeight() + BANNER_BOTTOM_GAP
-        end
-
-        local newTop = CONTENT_TOP - bannerOffset
-        for _, container in pairs(contentContainers) do
-            container:ClearAllPoints()
-            container:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, newTop)
-            if container.GetContentFrame then
-                container:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", 0, 46)
-            end
+            contentArea:SetPoint("TOPLEFT", masqueBanner, "BOTTOMLEFT", 0, -BANNER_GAP)
+        else
+            contentArea:SetPoint("TOPLEFT", headerSep, "BOTTOMLEFT", SIDEBAR_WIDTH + 6, 0)
         end
     end
 
-    -- Refresh all component values from DB when panel opens (OnShow pattern)
     panel:SetScript("OnShow", function()
         Components.RefreshAll()
+        if masqueBanner then
+            masqueBanner:Refresh()
+        end
         UpdateBannerLayout()
     end)
 
-    -- ========== TABS ==========
-    local ctx = BR.Options.CreateContext(panel, {
-        contentContainers = contentContainers,
-        CONTENT_TOP = CONTENT_TOP,
-        IsMasqueActive = IsMasqueActive,
-    })
-
-    BR.Options.Tabs.Buffs.Build(ctx)
-    BR.Options.Tabs.DisplayBehavior.Build(ctx)
-    BR.Options.Tabs.Sounds.Build(ctx)
-    BR.Options.Tabs.Settings.Build(ctx)
-    BR.Options.Tabs.Profiles.Build(ctx)
-
-    -- ========== BOTTOM BUTTONS ==========
+    -- ====================================================================
+    -- BOTTOM BAR (Lock + Test)
+    -- ====================================================================
     local bottomFrame = CreateFrame("Frame", nil, panel)
     bottomFrame:SetPoint("BOTTOMLEFT", 0, 0)
     bottomFrame:SetPoint("BOTTOMRIGHT", 0, 0)
-    bottomFrame:SetHeight(45)
+    bottomFrame:SetHeight(BOTTOM_BAR_HEIGHT)
     bottomFrame:SetFrameLevel(panel:GetFrameLevel() + 10)
 
-    local separator = bottomFrame:CreateTexture(nil, "ARTWORK")
-    separator:SetSize(PANEL_WIDTH - 40, 1)
-    separator:SetPoint("TOP", 0, -5)
-    separator:SetColorTexture(0.3, 0.3, 0.3, 1)
-
     local btnHolder = CreateFrame("Frame", nil, bottomFrame)
-    btnHolder:SetPoint("TOP", separator, "BOTTOM", 0, -8)
+    btnHolder:SetPoint("TOP", bottomSep, "BOTTOM", 0, -8)
     btnHolder:SetSize(1, 22)
 
     local BTN_WIDTH = 80
@@ -411,7 +571,13 @@ local function CreateOptionsPanel()
     testBtn:SetPoint("LEFT", btnHolder, "CENTER", 4, 0)
     panel.testBtn = testBtn
 
-    SetActiveTab("buffs")
+    -- Activate first available page.
+    if firstPageId then
+        ActivatePage(firstPageId)
+    end
+
+    panel.ActivatePage = ActivatePage
+    BR.Options.ActivatePage = ActivatePage
 
     return panel
 end
@@ -425,9 +591,6 @@ local function ShowOptions()
         optionsPanel = CreateOptionsPanel()
     end
     if not optionsPanel:IsShown() then
-        if optionsPanel.RenderCustomBuffRows then
-            optionsPanel.RenderCustomBuffRows()
-        end
         if BR.Display.IsTestMode() then
             optionsPanel.testBtn.text:SetText(L["Options.StopTest"])
         else

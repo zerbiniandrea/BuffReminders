@@ -117,7 +117,7 @@ end
 -- PUBLIC API (for external addon integration)
 -- ============================================================================
 
---- PUBLIC API — used by Wago UI and other external addons. Do not remove or rename.
+--- PUBLIC API - used by Wago UI and other external addons. Do not remove or rename.
 --- Export settings to a prefixed string that can be imported by other addons.
 --- If profileKey is nil or matches the active profile, exports the active profile.
 --- Otherwise reads from AceDB's raw saved variables.
@@ -155,7 +155,7 @@ function BuffReminders:Export(profileKey)
     return EXPORT_PREFIX .. exportString
 end
 
---- PUBLIC API — used by Wago UI and other external addons. Do not remove or rename.
+--- PUBLIC API - used by Wago UI and other external addons. Do not remove or rename.
 --- Import settings from a prefixed string.
 --- If profileKey is provided, creates or switches to that profile before applying.
 --- @param importString string The encoded settings string (must start with !BR_)
@@ -192,7 +192,7 @@ function BuffReminders:Import(importString, profileKey)
     return true
 end
 
---- PUBLIC API — Decode an import string without applying it.
+--- PUBLIC API - Decode an import string without applying it.
 --- @param importString string The encoded settings string (must start with !BR_)
 --- @return table|nil data Decoded settings table, or nil on error
 --- @return string|nil error Error message if decode failed
@@ -207,7 +207,7 @@ function BuffReminders:DecodeProfileString(importString)
     return DeserializeTable(dataString)
 end
 
---- PUBLIC API — Return all existing profile keys in { [key] = true } format.
+--- PUBLIC API - Return all existing profile keys in { [key] = true } format.
 --- @return table<string, boolean>
 function BuffReminders:GetProfileKeys()
     local result = {}
@@ -217,13 +217,13 @@ function BuffReminders:GetProfileKeys()
     return result
 end
 
---- PUBLIC API — Return the key of the currently active profile.
+--- PUBLIC API - Return the key of the currently active profile.
 --- @return string
 function BuffReminders:GetCurrentProfileKey()
     return BR.Profiles.GetActiveProfileName()
 end
 
---- PUBLIC API — Switch to an existing or new profile by key.
+--- PUBLIC API - Switch to an existing or new profile by key.
 --- @param profileKey string
 function BuffReminders:SetProfile(profileKey)
     if type(profileKey) ~= "string" then

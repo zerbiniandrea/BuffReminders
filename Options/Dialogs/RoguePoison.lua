@@ -10,7 +10,7 @@ local UpdateDisplay = BR.Display.Update
 local tinsert = table.insert
 local tsort = table.sort
 
-local roguePoisonModal = nil
+local roguePoisonDialog = nil
 
 local function EnsureRoguePoisonPrefs()
     local db = BR.profile
@@ -30,53 +30,53 @@ local function EnsureRoguePoisonPrefs()
 end
 
 local function Show()
-    if roguePoisonModal then
+    if roguePoisonDialog then
         EnsureRoguePoisonPrefs()
-        if roguePoisonModal.Rebuild then
-            roguePoisonModal:Rebuild()
+        if roguePoisonDialog.Rebuild then
+            roguePoisonDialog:Rebuild()
         end
         Components.RefreshAll()
-        roguePoisonModal:Show()
+        roguePoisonDialog:Show()
         return
     end
 
-    local MODAL_WIDTH = 520
-    local MODAL_HEIGHT = 290
+    local DIALOG_WIDTH = 520
+    local DIALOG_HEIGHT = 290
     local MARGIN = 16
     local ROW_HEIGHT = 24
     local LABEL_TO_ROW_GAP = 6 -- gap between column label and first row
     local NOTE_TO_LABEL_GAP = 16 -- gap between note text and column label
 
-    local modal = CreatePanel("BuffRemindersRoguePoisonModal", MODAL_WIDTH, MODAL_HEIGHT, {
+    local dialog = CreatePanel("BuffRemindersRoguePoisonDialog", DIALOG_WIDTH, DIALOG_HEIGHT, {
         level = 200,
-        modal = true,
+        dialog = true,
     })
 
-    local title = modal:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -12)
     title:SetText(L["Options.RoguePoisonPreferences"])
 
-    local closeBtn = CreateButton(modal, "x", function()
-        modal:Hide()
+    local closeBtn = CreateButton(dialog, "x", function()
+        dialog:Hide()
     end)
     closeBtn:SetSize(22, 22)
     closeBtn:SetPoint("TOPRIGHT", -5, -5)
 
-    local note = modal:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local note = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     note:SetPoint("TOPLEFT", MARGIN, -36)
     note:SetPoint("TOPRIGHT", -MARGIN, -36)
     note:SetJustifyH("LEFT")
     note:SetText("|cffaaaaaa" .. L["Options.RoguePoisonNote"] .. "|r")
 
-    local colWidth = (MODAL_WIDTH - MARGIN * 2) / 2
+    local colWidth = (DIALOG_WIDTH - MARGIN * 2) / 2
 
     -- Column labels anchor to the note's bottom so the layout self-adjusts if the note
     -- wraps to an extra line in a longer translation.
-    local lethalLabel = modal:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    local lethalLabel = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     lethalLabel:SetPoint("TOPLEFT", note, "BOTTOMLEFT", 0, -NOTE_TO_LABEL_GAP)
     lethalLabel:SetText("|cffffcc00" .. L["Options.PoisonLethal"] .. "|r")
 
-    local nonLethalLabel = modal:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    local nonLethalLabel = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     nonLethalLabel:SetPoint("TOPLEFT", lethalLabel, "TOPLEFT", colWidth, 0)
     nonLethalLabel:SetText("|cffffcc00" .. L["Options.PoisonNonLethal"] .. "|r")
 
@@ -119,7 +119,7 @@ local function Show()
         return nil
     end
 
-    -- Reuse the chevron texture the dropdown uses — rotate 90° for up, -90° for down.
+    -- Reuse the chevron texture the dropdown uses - rotate 90° for up, -90° for down.
     -- Vertex color tracks state (idle / hover / disabled) to match Dropdown styling.
     local ARROW_IDLE = { 0.7, 0.7, 0.7 }
     local ARROW_HOVER = { 1, 0.82, 0 }
@@ -164,12 +164,12 @@ local function Show()
     end
 
     local function CreatePoisonRow(category, entry)
-        local row = CreateFrame("Frame", nil, modal)
+        local row = CreateFrame("Frame", nil, dialog)
         row:SetSize(colWidth - 8, ROW_HEIGHT - 2)
 
         -- Assign to a local first: C_Spell.GetSpellTexture may return multiple values,
         -- and `{ f() }` as the final expression in a table constructor expands ALL of
-        -- them — that would render one icon per returned value.
+        -- them - that would render one icon per returned value.
         local spellIcon = C_Spell.GetSpellTexture(entry.spellID)
         local holder = Components.Checkbox(row, {
             label = BR.GetSpellName(entry.spellID) or tostring(entry.spellID),
@@ -235,7 +235,7 @@ local function Show()
     end
 
     -- Reset: reorder prefs in place and re-enable all, then sync rows to match.
-    -- Does NOT rebuild row frames — avoids the rebuild cost since entry tables
+    -- Does NOT rebuild row frames - avoids the rebuild cost since entry tables
     -- survive tsort and row Checkbox holders can be reused.
     local function ResetToDefaults()
         local prefs = EnsureRoguePoisonPrefs()
@@ -271,16 +271,16 @@ local function Show()
         ApplyChange()
     end
 
-    local resetBtn = CreateButton(modal, L["Options.PoisonReset"], ResetToDefaults)
+    local resetBtn = CreateButton(dialog, L["Options.PoisonReset"], ResetToDefaults)
     resetBtn:SetPoint("BOTTOMLEFT", MARGIN, MARGIN)
 
-    function modal:Rebuild()
+    function dialog:Rebuild()
         BuildRows()
     end
     BuildRows()
 
-    roguePoisonModal = modal
-    modal:Show()
+    roguePoisonDialog = dialog
+    dialog:Show()
 end
 
-BR.Options.Modals.RoguePoison = { Show = Show }
+BR.Options.Dialogs.RoguePoison = { Show = Show }

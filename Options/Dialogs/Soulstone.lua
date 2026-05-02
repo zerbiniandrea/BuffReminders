@@ -2,41 +2,14 @@ local _, BR = ...
 
 local L = BR.L
 local Components = BR.Components
-local CreateButton = BR.CreateButton
-local CreatePanel = BR.CreatePanel
 
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 
-local soulstoneModal = nil
+BR.Options.Dialogs.Soulstone = BR.Options.Helpers.SingletonDialog(function()
+    local shell = BR.Options.Helpers.CreateDialogShell("BuffRemindersSoulstoneDialog", "Options.SoulstoneSettings")
+    local dialog, layout = shell.dialog, shell.layout
 
-local function Show()
-    if soulstoneModal then
-        Components.RefreshAll()
-        soulstoneModal:Show()
-        return
-    end
-
-    local MODAL_WIDTH = 340
-    local MARGIN = 16
-
-    local modal = CreatePanel("BuffRemindersSoulstoneModal", MODAL_WIDTH, 1, {
-        level = 200,
-        modal = true,
-    })
-
-    local title = modal:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -12)
-    title:SetText(L["Options.SoulstoneSettings"])
-
-    local closeBtn = CreateButton(modal, "x", function()
-        modal:Hide()
-    end)
-    closeBtn:SetSize(22, 22)
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-
-    local layout = Components.VerticalLayout(modal, { x = MARGIN, y = -36 })
-
-    local visHolder = Components.Dropdown(modal, {
+    local visHolder = Components.Dropdown(dialog, {
         label = L["Options.Visibility"],
         width = 200,
         get = function()
@@ -62,7 +35,7 @@ local function Show()
     })
     layout:Add(visHolder, nil, COMPONENT_GAP)
 
-    local cdHolder = Components.Checkbox(modal, {
+    local cdHolder = Components.Checkbox(dialog, {
         label = L["Options.Soulstone.HideCooldown"],
         get = function()
             return BR.Config.Get("defaults.soulstoneHideCooldown", false)
@@ -77,9 +50,6 @@ local function Show()
     })
     layout:Add(cdHolder, nil, COMPONENT_GAP)
 
-    modal:SetHeight(math.max(-layout:GetY() + MARGIN, 80))
-    soulstoneModal = modal
-    modal:Show()
-end
-
-BR.Options.Modals.Soulstone = { Show = Show }
+    shell:Finalize()
+    return dialog
+end)

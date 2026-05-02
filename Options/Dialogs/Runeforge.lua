@@ -7,9 +7,9 @@ local CreatePanel = BR.CreatePanel
 
 local UpdateDisplay = BR.Display.Update
 
-local runeforgeModal = nil
+local runeforgeDialog = nil
 
--- Resolve rune icon textures once (cached across modal opens)
+-- Resolve rune icon textures once (cached across dialog opens)
 local cachedRuneIcons = nil
 local function GetRuneIcons()
     if cachedRuneIcons then
@@ -24,30 +24,30 @@ local function GetRuneIcons()
 end
 
 local function Show()
-    if runeforgeModal then
+    if runeforgeDialog then
         Components.RefreshAll()
-        runeforgeModal:Show()
+        runeforgeDialog:Show()
         return
     end
 
-    local MODAL_WIDTH = 560
-    local MODAL_HEIGHT = 280
+    local DIALOG_WIDTH = 560
+    local DIALOG_HEIGHT = 280
     local MARGIN = 16
     local CHECKBOX_HEIGHT = 22
     local CHECKBOX_GAP = 3
     local RUNE_LABEL_FONT = "GameFontHighlight"
 
-    local modal = CreatePanel("BuffRemindersRuneforgeModal", MODAL_WIDTH, MODAL_HEIGHT, {
+    local dialog = CreatePanel("BuffRemindersRuneforgeDialog", DIALOG_WIDTH, DIALOG_HEIGHT, {
         level = 200,
-        modal = true,
+        dialog = true,
     })
 
-    local title = modal:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -12)
     title:SetText(L["Options.RuneforgePreferences"])
 
-    local closeBtn = CreateButton(modal, "x", function()
-        modal:Hide()
+    local closeBtn = CreateButton(dialog, "x", function()
+        dialog:Hide()
     end)
     closeBtn:SetSize(22, 22)
     closeBtn:SetPoint("TOPRIGHT", -5, -5)
@@ -127,15 +127,15 @@ local function Show()
         end
     end
 
-    -- Build tab buttons (evenly distributed across modal width)
+    -- Build tab buttons (evenly distributed across dialog width)
     local tabGap = 2
-    local totalTabWidth = MODAL_WIDTH - MARGIN * 2
+    local totalTabWidth = DIALOG_WIDTH - MARGIN * 2
     local numTabs = #DK_TABS
     local tabWidth = (totalTabWidth - (numTabs - 1) * tabGap) / numTabs
 
     local prevTab = nil
     for _, tabDef in ipairs(DK_TABS) do
-        local tab = Components.Tab(modal, { label = tabDef.label, width = tabWidth })
+        local tab = Components.Tab(dialog, { label = tabDef.label, width = tabWidth })
         if prevTab then
             tab:SetPoint("LEFT", prevTab, "RIGHT", tabGap, 0)
         else
@@ -149,11 +149,11 @@ local function Show()
         prevTab = tab
     end
 
-    local contentWidth = MODAL_WIDTH - MARGIN * 2
+    local contentWidth = DIALOG_WIDTH - MARGIN * 2
 
     -- Build tab content
     for _, tabDef in ipairs(DK_TABS) do
-        local content = CreateFrame("Frame", nil, modal)
+        local content = CreateFrame("Frame", nil, dialog)
         content:SetPoint("TOPLEFT", MARGIN, -60)
         content:SetPoint("BOTTOMRIGHT", -MARGIN, MARGIN)
         content:Hide()
@@ -184,8 +184,8 @@ local function Show()
 
     SetActiveTab("blood")
 
-    runeforgeModal = modal
-    modal:Show()
+    runeforgeDialog = dialog
+    dialog:Show()
 end
 
-BR.Options.Modals.Runeforge = { Show = Show }
+BR.Options.Dialogs.Runeforge = { Show = Show }

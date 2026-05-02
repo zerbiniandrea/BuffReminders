@@ -97,7 +97,7 @@ BR.AURA_WHITELIST = {
     -- LONG-TERM SELF BUFFS
     -- ========================================================================
     -- Note: Rite spell IDs (433568, 433583) are whitelisted by Blizzard, but the addon checks
-    -- buffIdOverride (433550, 433584) which are NOT whitelisted — so Rites are correctly
+    -- buffIdOverride (433550, 433584) which are NOT whitelisted - so Rites are correctly
     -- blocked in restricted contexts via IsAuraTrackable regardless.
     [433568] = true, -- Rite of Sanctification
     [433583] = true, -- Rite of Adjuration

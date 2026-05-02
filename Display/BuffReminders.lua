@@ -215,7 +215,7 @@ local function IsMasqueActive()
     return masqueGroup ~= nil and not masqueGroup.db.Disabled
 end
 
--- Cached font path — resolved once on load and updated when the setting changes (via VisualsRefresh).
+-- Cached font path - resolved once on load and updated when the setting changes (via VisualsRefresh).
 -- All SetFont calls read this local directly instead of calling LSM:Fetch() every time.
 local fontPath = STANDARD_TEXT_FONT
 
@@ -255,7 +255,7 @@ local function ResolveFontPath()
     fontPath = STANDARD_TEXT_FONT
 end
 
--- Cached outline flag — resolved on load and updated when the setting changes (via VisualsRefresh).
+-- Cached outline flag - resolved on load and updated when the setting changes (via VisualsRefresh).
 -- "NONE" in saved settings is translated to "" at the WoW API level.
 local outlineFlag = "OUTLINE"
 
@@ -907,7 +907,7 @@ local GetPlayerRole = BR.BuffState.GetPlayerRole
 local spellTextureCache = {}
 
 -- Reusable single-element buffer to avoid { spellID } allocations in hot loops.
--- SAFETY: callers must consume the result immediately — the buffer is overwritten on next call.
+-- SAFETY: callers must consume the result immediately - the buffer is overwritten on next call.
 local singleSpellBuf = {}
 local function AsSpellList(val)
     if type(val) == "table" then
@@ -923,33 +923,35 @@ end
 ---@param displayIcon? number|number[] -- Explicit icon override (unwraps table automatically)
 ---@return number? textureID
 local function GetBuffTexture(spellIDs, iconByRole, displayIcon)
-    -- Explicit displayIcon takes priority (unwrap table to first element)
+    -- displayIcon override takes priority (unwrap table to first element)
     if type(displayIcon) == "table" then
         return displayIcon[1]
-    elseif displayIcon then
+    end
+    if displayIcon then
         return displayIcon
     end
+
+    -- Resolve a spellID to look up: role override first, then primary spellID
     local id
-    -- Check for role-based icon override
     if iconByRole then
         local role = GetPlayerRole()
-        if role and iconByRole[role] then
-            id = iconByRole[role]
-        end
+        id = role and iconByRole[role]
     end
-    -- Fall back to spellIDs
+    id = id or (type(spellIDs) == "table" and spellIDs[1] or spellIDs)
     if not id then
-        id = type(spellIDs) == "table" and spellIDs[1] or spellIDs
+        return nil
     end
-    -- Check for icon override (for spells replaced by talents)
+
+    -- Talent-replaced texture override
     if IconOverrides[id] then
         return IconOverrides[id]
     end
-    -- Return cached texture or fetch and cache
+
     local cached = spellTextureCache[id]
     if cached ~= nil then
         return cached or nil
     end
+
     local texture
     pcall(function()
         texture = C_Spell.GetSpellTexture(id)
@@ -1149,7 +1151,7 @@ end
 ---@param cachedGlow? {typeIndex: number, color: number[], size: number}
 ---@return boolean true (for anyVisible chaining)
 local function ShowTextFrame(frame, overlayText, shouldGlow, category, cachedGlow)
-    -- Hide stackCount/overlays — ShowTextFrame can be called from fallback paths
+    -- Hide stackCount/overlays - ShowTextFrame can be called from fallback paths
     -- (UpdateFallbackDisplay) that don't go through RenderVisibleEntry's cleanup.
     frame.stackCount:Hide()
     if frame.statLabel then
@@ -1267,7 +1269,7 @@ local function CreateCategoryFrame(category)
     return frame
 end
 
--- Create icon and border textures on a buff frame (no positioning — call UpdateIconStyling after)
+-- Create icon and border textures on a buff frame (no positioning - call UpdateIconStyling after)
 local function CreateIconTextures(frame, texture)
     frame.icon = frame:CreateTexture(nil, "ARTWORK")
     frame.icon:SetAllPoints()
@@ -1369,7 +1371,7 @@ local function CreateBuffFrame(buff, category)
     -- Icon + border textures
     CreateIconTextures(frame, ResolveFrameTexture(frame))
 
-    -- Register with Masque — provide Normal texture so skins like Caith can style it
+    -- Register with Masque - provide Normal texture so skins like Caith can style it
     if masqueGroup then
         masqueGroup:AddButton(frame, {
             Icon = frame.icon,
@@ -1568,7 +1570,7 @@ local function PositionFramesVariable(container, frames, widths, heights, spacin
     end
 
     -- Anchor points place frames at the center of the cross-axis edge,
-    -- so smaller frames are automatically centered — no manual offset needed.
+    -- so smaller frames are automatically centered - no manual offset needed.
     local offset = 0
     local isVertical = direction == "UP" or direction == "DOWN"
     local layout = DIRECTION_LAYOUT[direction]
@@ -2012,7 +2014,7 @@ end
 --         return
 --     end
 --
---     -- Show frames for any glowing spells (skip whenNotGlowing buffs — handled in second pass)
+--     -- Show frames for any glowing spells (skip whenNotGlowing buffs - handled in second pass)
 --     local seenKeys = {}
 --     local GetPlayerSpecId = BR.StateHelpers.GetPlayerSpecId
 --     for spellID, _ in pairs(glowingSpells) do
@@ -2133,7 +2135,7 @@ local function ApplyConsumableOverlays(frame, item, fontSize)
     elseif frame.statLabel then
         frame.statLabel:Hide()
     end
-    -- Quality atlas icon (crafted quality tier) — bottom-left corner
+    -- Quality atlas icon (crafted quality tier) - bottom-left corner
     if item.qualityAtlas then
         if not frame.qualityIcon then
             local holder = CreateFrame("Frame", nil, frame)
@@ -2152,7 +2154,7 @@ local function ApplyConsumableOverlays(frame, item, fontSize)
     elseif frame.qualityIcon then
         frame.qualityIcon:Hide()
     end
-    -- Text badge (e.g. "F" fleeting, "H" hearty) — middle-left
+    -- Text badge (e.g. "F" fleeting, "H" hearty) - middle-left
     if item.badge then
         local bc = BR.SecureButtons.BADGE_COLORS[item.badge]
         if bc then
@@ -2785,7 +2787,7 @@ UpdateDisplay = function(refreshMode)
     refreshMode = refreshMode or "full"
     local groupOnly = refreshMode == "group"
 
-    -- Clear per-cycle caches (before early exits — fallback paths also use these)
+    -- Clear per-cycle caches (before early exits - fallback paths also use these)
     if not groupOnly then
         wipe(expiringGlowCache)
         wipe(missingGlowCache)
@@ -3278,7 +3280,7 @@ BR.CustomBuffs = {
             end
             frame.displayName = displayName
             frame.spellIDs = spellIDValue
-            -- Rebuild array (modal creates a new object for db.customBuffs[key], staling the old ref)
+            -- Rebuild array (dialog creates a new object for db.customBuffs[key], staling the old ref)
             BuildCustomBuffArray()
             local customBuff = BR.profile and BR.profile.customBuffs and BR.profile.customBuffs[key]
             if customBuff then
@@ -3447,7 +3449,7 @@ CallbackRegistry:RegisterCallback("FramesReparent", function()
     UpdateVisuals()
 end)
 
--- Masque skin change callback — restore native styling when Masque is disabled.
+-- Masque skin change callback - restore native styling when Masque is disabled.
 -- Deferred because Masque modifies button regions after firing the callback.
 if masqueGroup then
     masqueGroup:RegisterCallback(function()
@@ -3728,7 +3730,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
         local db = BR.profile
 
         -- ====================================================================
-        -- Versioned migrations — each runs exactly once, tracked by dbVersion
+        -- Versioned migrations - each runs exactly once, tracked by dbVersion
         -- ====================================================================
         local DB_VERSION = 40
 
@@ -4318,7 +4320,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
                         -- Port old overrides into useCustomGlow system
                         catSettings.useCustomGlow = true
                     else
-                        -- No meaningful overrides — clean up stale keys
+                        -- No meaningful overrides - clean up stale keys
                         catSettings.glowType = nil
                         catSettings.glowSize = nil
                         catSettings.glowColor = nil

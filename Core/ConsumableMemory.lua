@@ -6,14 +6,14 @@ local _, BR = ...
 -- Tracks which consumable the player last used per spec, so the display layer
 -- can sort the preferred item first. Three detection paths feed into this module:
 --
--- 1. State.lua (ShouldShowConsumableBuff) — spell-based consumables (flasks, runes, tea)
+-- 1. State.lua (ShouldShowConsumableBuff) - spell-based consumables (flasks, runes, tea)
 --    Calls ConsumableMemory.Remember() with updateOnly=true (refreshes existing preference,
---    never creates new entries — prevents leaking preferences across spec switches).
+--    never creates new entries - prevents leaking preferences across spec switches).
 --
--- 2. PostClick handlers (SecureButtons.lua) — addon click-to-cast
+-- 2. PostClick handlers (SecureButtons.lua) - addon click-to-cast
 --    Calls ConsumableMemory.RememberChoice() when a consumable button is clicked.
 --
--- 3. Count-delta tracking — food and weapon enchants used outside the addon
+-- 3. Count-delta tracking - food and weapon enchants used outside the addon
 --    ConsumableMemory.DetectConsumedItems() compares item counts between bag refreshes.
 
 local GetItemSpell = GetItemSpell
@@ -22,7 +22,7 @@ local GetItemSpell = GetItemSpell
 -- FLEETING FLASK DETECTION
 -- ============================================================================
 -- Fleeting/cauldron flasks sort first by numeric priority and should NOT be
--- remembered — they would overwrite the user's regular flask preference.
+-- remembered - they would overwrite the user's regular flask preference.
 
 ---Check if an item is a fleeting flask.
 ---@param itemID number

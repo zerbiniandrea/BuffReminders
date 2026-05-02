@@ -206,7 +206,7 @@ local GLOW_STOP = {
 -- Deferred-dispatch retry: when Glow.Start is called before the host's rect has
 -- resolved (frame shown but not yet anchored by PositionMainContainer), LCG would
 -- size all glow textures to 0×0. We stash the requested args on the host and let
--- WoW's OnSizeChanged event fire the dispatch the moment the layout pass settles —
+-- WoW's OnSizeChanged event fire the dispatch the moment the layout pass settles -
 -- without waiting on the addon's throttled UpdateDisplay tick. Mirrors the
 -- WeakAuras Glow sub-region pattern (UpdateSize → SetVisible(true)).
 local function FlushPending(host)
@@ -442,7 +442,7 @@ function BR.Glow.SetExpiration(frame, show, category, cachedSettings)
         local xOff = borderOffset + glowXOff
         local yOff = borderOffset + glowYOff
 
-        -- Already glowing with the same type, size, color, and offsets — don't restart (preserves animation state).
+        -- Already glowing with the same type, size, color, and offsets - don't restart (preserves animation state).
         -- state.started gates the short-circuit: a deferred-but-not-yet-dispatched
         -- request keeps started=false so the host's OnSizeChanged retry owns the dispatch.
         if

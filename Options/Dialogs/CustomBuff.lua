@@ -22,7 +22,7 @@ local tremove = table.remove
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local SECTION_GAP = BR.Options.Constants.SECTION_GAP
 
-local customBuffModal = nil
+local customBuffDialog = nil
 
 -- Layout-aware section header (uses VerticalLayout instead of manual Y tracking)
 local function LayoutSectionHeader(layout, parent, text)
@@ -55,11 +55,11 @@ StaticPopupDialogs["BUFFREMINDERS_DELETE_CUSTOM"] = {
 }
 
 local function Show(existingKey, refreshPanelCallback)
-    if customBuffModal then
-        customBuffModal:Hide()
+    if customBuffDialog then
+        customBuffDialog:Hide()
     end
 
-    local MODAL_WIDTH = 520
+    local DIALOG_WIDTH = 520
     local DROPDOWN_LABEL_W = 80
     local DROPDOWN_W = 150
     local BASE_HEIGHT = 706
@@ -80,15 +80,15 @@ local function Show(existingKey, refreshPanelCallback)
         end
     end
 
-    local modal = CreatePanel("BuffRemindersCustomBuffModal", MODAL_WIDTH, BASE_HEIGHT, {
+    local dialog = CreatePanel("BuffRemindersCustomBuffDialog", DIALOG_WIDTH, BASE_HEIGHT, {
         level = 200,
-        modal = true,
+        dialog = true,
     })
 
     local spellRows, nameBox, overlayBox
     local castSpellEditBox, castItemEditBox, macroEditBox, requireItemEditBox, requireItemModeDropdown
 
-    modal:SetScript("OnHide", function()
+    dialog:SetScript("OnHide", function()
         if spellRows then
             for _, rowData in ipairs(spellRows) do
                 if rowData.editBox then
@@ -116,17 +116,17 @@ local function Show(existingKey, refreshPanelCallback)
         end
     end)
 
-    local modalTitle = modal:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    modalTitle:SetPoint("TOP", 0, -12)
-    modalTitle:SetText(editingBuff and L["CustomBuff.Edit"] or L["CustomBuff.Add"])
+    local dialogTitle = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    dialogTitle:SetPoint("TOP", 0, -12)
+    dialogTitle:SetText(editingBuff and L["CustomBuff.Edit"] or L["CustomBuff.Add"])
 
-    local modalCloseBtn = CreateButton(modal, "x", function()
-        modal:Hide()
+    local dialogCloseBtn = CreateButton(dialog, "x", function()
+        dialog:Hide()
     end)
-    modalCloseBtn:SetSize(22, 22)
-    modalCloseBtn:SetPoint("TOPRIGHT", -5, -5)
+    dialogCloseBtn:SetSize(22, 22)
+    dialogCloseBtn:SetPoint("TOPRIGHT", -5, -5)
 
-    local spellIdsLabel = modal:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    local spellIdsLabel = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     spellIdsLabel:SetPoint("TOPLEFT", CONTENT_LEFT, -40)
     spellIdsLabel:SetText(L["CustomBuff.SpellIDs"])
 
@@ -145,7 +145,7 @@ local function Show(existingKey, refreshPanelCallback)
 
         for i, rowData in ipairs(spellRows) do
             rowData.frame:ClearAllPoints()
-            rowData.frame:SetPoint("TOPLEFT", modal, "TOPLEFT", CONTENT_LEFT, ROWS_START_Y - ((i - 1) * ROW_HEIGHT))
+            rowData.frame:SetPoint("TOPLEFT", dialog, "TOPLEFT", CONTENT_LEFT, ROWS_START_Y - ((i - 1) * ROW_HEIGHT))
             if rowCount > 1 then
                 rowData.removeBtn:Show()
             else
@@ -155,18 +155,18 @@ local function Show(existingKey, refreshPanelCallback)
 
         local addBtnY = ROWS_START_Y - (rowCount * ROW_HEIGHT) - 4
         addSpellBtn:ClearAllPoints()
-        addSpellBtn:SetPoint("TOPLEFT", modal, "TOPLEFT", CONTENT_LEFT, addBtnY)
+        addSpellBtn:SetPoint("TOPLEFT", dialog, "TOPLEFT", CONTENT_LEFT, addBtnY)
 
         sectionsFrame:ClearAllPoints()
-        sectionsFrame:SetPoint("TOPLEFT", modal, "TOPLEFT", CONTENT_LEFT, addBtnY - 28)
+        sectionsFrame:SetPoint("TOPLEFT", dialog, "TOPLEFT", CONTENT_LEFT, addBtnY - 28)
 
         local extraRows = math.max(0, rowCount - 1)
-        modal:SetHeight(BASE_HEIGHT + (extraRows * ROW_HEIGHT))
+        dialog:SetHeight(BASE_HEIGHT + (extraRows * ROW_HEIGHT))
     end
 
     local function CreateSpellRow(initialSpellID)
-        local rowFrame = CreateFrame("Frame", nil, modal)
-        rowFrame:SetSize(MODAL_WIDTH - 40, ROW_HEIGHT - 2)
+        local rowFrame = CreateFrame("Frame", nil, dialog)
+        rowFrame:SetSize(DIALOG_WIDTH - 40, ROW_HEIGHT - 2)
 
         local editBox = CreateFrame("EditBox", nil, rowFrame)
         editBox:SetFontObject("GameFontHighlightSmall")
@@ -253,14 +253,14 @@ local function Show(existingKey, refreshPanelCallback)
         return rowData
     end
 
-    addSpellBtn = CreateButton(modal, L["CustomBuff.AddSpellID"], function()
+    addSpellBtn = CreateButton(dialog, L["CustomBuff.AddSpellID"], function()
         CreateSpellRow(nil)
         UpdateLayout()
     end)
 
     -- Sections frame (always visible, below add-spell button)
-    sectionsFrame = CreateFrame("Frame", nil, modal)
-    sectionsFrame:SetSize(MODAL_WIDTH - 40, 526)
+    sectionsFrame = CreateFrame("Frame", nil, dialog)
+    sectionsFrame:SetSize(DIALOG_WIDTH - 40, 526)
 
     local secLayout = Components.VerticalLayout(sectionsFrame, { x = 0, y = 0 })
 
@@ -612,7 +612,7 @@ local function Show(existingKey, refreshPanelCallback)
 
     -- Container for the conditional input (spell/item Lookup or macro text)
     actionInputHolder = CreateFrame("Frame", nil, sectionsFrame)
-    actionInputHolder:SetSize(MODAL_WIDTH - 40, 26)
+    actionInputHolder:SetSize(DIALOG_WIDTH - 40, 26)
 
     -- Spell ID input with Lookup
     castSpellEditBox = CreateFrame("EditBox", nil, actionInputHolder)
@@ -702,7 +702,7 @@ local function Show(existingKey, refreshPanelCallback)
     local macroHolder = Components.TextInput(actionInputHolder, {
         label = "",
         value = editingBuff and editingBuff.castMacro or "",
-        width = MODAL_WIDTH - 80,
+        width = DIALOG_WIDTH - 80,
         labelWidth = 0,
     })
     macroHolder:SetPoint("LEFT", 0, 0)
@@ -788,22 +788,22 @@ local function Show(existingKey, refreshPanelCallback)
     -- Initialize visibility for the current action type
     UpdateActionInputVisibility(existingActionType)
 
-    local saveError = modal:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local saveError = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     saveError:SetPoint("BOTTOMLEFT", 20, 42)
-    saveError:SetWidth(MODAL_WIDTH - 120)
+    saveError:SetWidth(DIALOG_WIDTH - 120)
     saveError:SetJustifyH("LEFT")
     saveError:SetTextColor(1, 0.3, 0.3)
 
-    local cancelBtn = CreateButton(modal, L["Dialog.Cancel"], function()
-        modal:Hide()
+    local cancelBtn = CreateButton(dialog, L["Dialog.Cancel"], function()
+        dialog:Hide()
     end)
     cancelBtn:SetPoint("BOTTOMRIGHT", -20, 15)
 
     -- Delete button (only when editing existing buff)
     if existingKey and editingBuff then
         local buffName = editingBuff.name or existingKey
-        local deleteBtn = CreateButton(modal, L["Options.Delete"], function()
-            modal:Hide()
+        local deleteBtn = CreateButton(dialog, L["Options.Delete"], function()
+            dialog:Hide()
             StaticPopup_Show("BUFFREMINDERS_DELETE_CUSTOM", buffName, nil, {
                 key = existingKey,
                 refreshPanel = refreshPanelCallback,
@@ -812,7 +812,7 @@ local function Show(existingKey, refreshPanelCallback)
         deleteBtn:SetPoint("BOTTOMLEFT", 20, 15)
     end
 
-    local saveBtn = CreateButton(modal, L["CustomBuff.Save"], function()
+    local saveBtn = CreateButton(dialog, L["CustomBuff.Save"], function()
         local validatedIDs = {}
         local firstName = nil
         for _, rowData in ipairs(spellRows) do
@@ -925,7 +925,7 @@ local function Show(existingKey, refreshPanelCallback)
             UpdateCustomBuffFrame(key, spellIDValue, displayName)
         end
 
-        modal:Hide()
+        dialog:Hide()
         -- requireItemMode may have changed; clear cached item ownership so the new mode is evaluated
         BR.BuffState.InvalidateItemCache()
         if refreshPanelCallback then
@@ -945,8 +945,8 @@ local function Show(existingKey, refreshPanelCallback)
 
     UpdateLayout()
 
-    customBuffModal = modal
-    modal:Show()
+    customBuffDialog = dialog
+    dialog:Show()
 end
 
-BR.Options.Modals.CustomBuff = { Show = Show }
+BR.Options.Dialogs.CustomBuff = { Show = Show }

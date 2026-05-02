@@ -36,7 +36,7 @@ Choose which buffs you want to track and how you want them to look.
 ## Limitations
 
 - **Buff counts** only include group members who are alive, connected, visible (not phased), and allied. Dead, offline, or phased players are excluded. In open world, opposing-faction players are not counted.
-- **Spec-aware filtering** — buffs like Intellect and Attack Power are filtered by specialization (e.g., Feral Druids won't be counted as missing Intellect). Spec data is shared between group members via [LibSpecialization](https://www.curseforge.com/wow/addons/libspecialization), which is bundled with BuffReminders and other popular addons like BigWigs, so most of your group likely already has it. When spec info is unavailable (solo play, ally hasn't broadcasted yet, or unknown/starter specs), filtering falls back to class-level.
+- **Spec-aware filtering** - buffs like Intellect and Attack Power are filtered by specialization (e.g., Feral Druids won't be counted as missing Intellect). Spec data is shared between group members via [LibSpecialization](https://www.curseforge.com/wow/addons/libspecialization), which is bundled with BuffReminders and other popular addons like BigWigs, so most of your group likely already has it. When spec info is unavailable (solo play, ally hasn't broadcasted yet, or unknown/starter specs), filtering falls back to class-level.
 
 ## Support
 

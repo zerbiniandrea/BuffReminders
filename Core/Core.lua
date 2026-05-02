@@ -656,13 +656,13 @@ end
 ---@param name string? Frame name (nil for anonymous)
 ---@param width number
 ---@param height number
----@param options? {bgColor?: table, borderColor?: table, strata?: string, level?: number, escClose?: boolean, modal?: boolean}
+---@param options? {bgColor?: table, borderColor?: table, strata?: string, level?: number, escClose?: boolean, dialog?: boolean}
 ---@return table
 function BR.CreatePanel(name, width, height, options)
     options = options or {}
-    local isModal = options.modal
-    local bgColor = options.bgColor or (isModal and { 0.15, 0.15, 0.15, 0.98 } or { 0.1, 0.1, 0.1, 0.95 })
-    local borderColor = options.borderColor or (isModal and { 0.5, 0.5, 0.5, 1 } or { 0.3, 0.3, 0.3, 1 })
+    local isDialog = options.dialog
+    local bgColor = options.bgColor or (isDialog and { 0.13, 0.13, 0.14, 0.99 } or { 0.1, 0.1, 0.1, 0.95 })
+    local borderColor = options.borderColor or (isDialog and { 0.55, 0.45, 0.15, 1 } or { 0.3, 0.3, 0.3, 1 })
 
     local panel = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
     panel:SetSize(width, height)
@@ -683,9 +683,26 @@ function BR.CreatePanel(name, width, height, options)
     if options.level then
         panel:SetFrameLevel(options.level)
     end
-    if isModal then
-        -- Modal panels handle ESC via keyboard input so they close themselves
-        -- without also closing parent panels (unlike UISpecialFrames which closes all)
+    if isDialog then
+        -- Header strip + gold accent line distinguish the dialog window from
+        -- the main options panel sitting beneath it. Title/close anchors at
+        -- y=-10..-12 land on the strip; tabs/content layouts that start at
+        -- y=-32 or lower sit just below the accent.
+        local header = panel:CreateTexture(nil, "BORDER")
+        header:SetPoint("TOPLEFT", 2, -2)
+        header:SetPoint("TOPRIGHT", -2, -2)
+        header:SetHeight(30)
+        header:SetColorTexture(0.08, 0.08, 0.10, 1)
+
+        local accent = panel:CreateTexture(nil, "BORDER", nil, 1)
+        accent:SetPoint("TOPLEFT", 2, -32)
+        accent:SetPoint("TOPRIGHT", -2, -32)
+        accent:SetHeight(1)
+        accent:SetColorTexture(0.85, 0.7, 0.25, 0.9)
+
+        -- Dialogs are modeless: ESC handled via keyboard input so closing this
+        -- dialog doesn't also close the parent options panel (unlike
+        -- UISpecialFrames, which closes every registered frame).
         panel:EnableKeyboard(true)
         panel:SetScript("OnKeyDown", function(self, key)
             if InCombatLockdown() then
@@ -697,6 +714,10 @@ function BR.CreatePanel(name, width, height, options)
             else
                 self:SetPropagateKeyboardInput(true)
             end
+        end)
+
+        panel:HookScript("OnShow", function(self)
+            UIFrameFadeIn(self, 0.12, 0, 1)
         end)
     elseif options.escClose and name then
         tinsert(UISpecialFrames, name)

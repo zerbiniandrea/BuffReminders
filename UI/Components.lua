@@ -54,7 +54,7 @@ local RefreshableComponents = BR.RefreshableComponents
 --
 -- Calls must be synchronous: each Measure* call configures and reads the
 -- shared FontString within one function call. Do NOT save the FontString or
--- defer reads across event boundaries — the next caller will overwrite it.
+-- defer reads across event boundaries - the next caller will overwrite it.
 
 local _measurer
 local _measureFS
@@ -290,6 +290,24 @@ function BR.CreateButton(parent, text, onClick, tooltip, colorOverrides)
         UpdateVisual()
     end
 
+    -- Opt this button into the OnShow refresh pattern: enabledFn is re-evaluated
+    -- by Components.RefreshAll() and applied via :SetEnabled. Use this instead
+    -- of imperative :SetEnabled cascades hooked to other widgets' OnClick.
+    function btn:BindEnabled(enabledFn)
+        btn._enabledGetter = enabledFn
+        btn:SetEnabled(enabledFn() and true or false)
+        if not btn._registeredForRefresh then
+            btn._registeredForRefresh = true
+            tinsert(RefreshableComponents, btn)
+        end
+    end
+
+    function btn:Refresh()
+        if btn._enabledGetter then
+            btn:SetEnabled(btn._enabledGetter() and true or false)
+        end
+    end
+
     return btn
 end
 
@@ -405,7 +423,7 @@ function Components.Slider(parent, config)
 
     -- Label width: explicit labelWidth is treated as a HARD target so columns
     -- of sliders stay aligned (label clips/extends past the boundary if too
-    -- long; the caller is responsible for picking a value that fits — see
+    -- long; the caller is responsible for picking a value that fits - see
     -- AppearanceGrid for the measurement-based pattern). Omitting labelWidth
     -- falls back to auto-grow for ad-hoc usage.
     local labelWidth
@@ -2572,13 +2590,14 @@ function Components.TextInput(parent, config)
         tinsert(panelEditBoxes, editBox)
     end
 
-    -- Callbacks
+    -- Callbacks. Use HookScript on OnEditFocusLost so we don't clobber
+    -- StyleEditBox's focus-color reset (SetScript would replace its hook).
     if config.onChange then
         editBox:SetScript("OnEnterPressed", function(self)
             self:ClearFocus()
             config.onChange(self:GetText())
         end)
-        editBox:SetScript("OnEditFocusLost", function(self)
+        editBox:HookScript("OnEditFocusLost", function(self)
             config.onChange(self:GetText())
         end)
     else

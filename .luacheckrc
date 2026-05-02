@@ -125,6 +125,7 @@ read_globals = {
     "Minimap",
     "RegisterStateDriver",
     "STANDARD_TEXT_FONT",
+    "UIFrameFadeIn",
     "UISpecialFrames",
     "UnregisterStateDriver",
 

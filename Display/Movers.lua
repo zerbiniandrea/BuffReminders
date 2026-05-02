@@ -875,7 +875,7 @@ local function CreateMoverFrame(catKey, displayName)
         if BR.SecureButtons then
             BR.SecureButtons.HideSecureFramesForCatKey(catKey)
         end
-        -- Clear external anchor on drag to avoid offset math issues — frame becomes UIParent-relative
+        -- Clear external anchor on drag to avoid offset math issues - frame becomes UIParent-relative
         -- Convert current screen position to UIParent-relative coords first so the frame stays in place
         local db = BR.profile
         if db.categorySettings and db.categorySettings[catKey] and db.categorySettings[catKey].anchorFrame then
@@ -1186,7 +1186,7 @@ local function AreAllCategoriesSplit()
 end
 
 -- Update mover frame visibility and labels based on lock/split state.
--- IMPORTANT: Never reposition a mover that is already shown — doing so would cancel
+-- IMPORTANT: Never reposition a mover that is already shown - doing so would cancel
 -- an active StartMoving() drag via ClearAllPoints(). Only position on first show.
 local function UpdateAnchor()
     if not BR.Display.mainFrame then
