@@ -1,4 +1,5 @@
-## Interface: 120001, 120005 
+# WOW_INTERFACE_TARGETS: mainline
+## Interface: 120001, 120005
 ## Title: BuffReminders
 ## Notes: Track missing buffs at a glance
 ## Author: zerbi
