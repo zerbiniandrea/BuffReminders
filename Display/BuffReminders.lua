@@ -203,6 +203,7 @@ local TEXCOORD_INSET = BR.TEXCOORD_INSET
 
 -- WoW API locals
 local PlaySoundFile = PlaySoundFile
+local GetInstanceInfo = GetInstanceInfo
 
 -- LibSharedMedia for font resolution
 local LSM = LibStub("LibSharedMedia-3.0")
@@ -619,6 +620,10 @@ local readyCheckTimer = nil
 local instanceEntryTimer = nil
 local delveEntryTimer = nil
 local SOULWELL_SPELL_IDS = { [29893] = true, [6201] = true } -- Create Soulwell, Create Healthstone
+
+-- "Decor Duel" prop-hunt brawl: hide-and-seek as furniture, buff reminders are
+-- meaningless and visually defeat the purpose. Identified by its unique difficulty ID.
+local DECOR_DUEL_DIFFICULTY_ID = 253
 local ClearInstanceEntryState -- forward declaration
 local ClearDelveEntryState -- forward declaration
 local HideDismissFrames -- forward declaration
@@ -2890,6 +2895,11 @@ UpdateDisplay = function(refreshMode)
         end
 
         local db = BR.profile
+
+        if select(3, GetInstanceInfo()) == DECOR_DUEL_DIFFICULTY_ID then
+            HideAllDisplayFrames()
+            return
+        end
 
         if db.showOnlyInGroup and BR.BuffState.IsAlone() then
             HideAllDisplayFrames()
