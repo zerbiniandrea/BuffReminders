@@ -40,6 +40,8 @@ local function ResolveChatRequestMsg(frame)
     return (customMsg and customMsg ~= "") and customMsg or L["ChatRequest." .. frame.key] or frame.displayName
 end
 
+local GetTime = GetTime
+
 -- ============================================================================
 -- SPELL HELPERS
 -- ============================================================================
@@ -249,13 +251,39 @@ local function CreateClickOverlay(frame)
     end)
     overlay:SetScript("PostClick", function(self)
         if self._br_chatRequestKey then
-            -- Chat-request: nothing to do post-click. We deliberately do NOT
-            -- mutate any secure-overlay state here (macrotext, type, or
-            -- EnableMouse) for spam prevention: every variant we tried broke
-            -- chat dispatch for users in restricted contexts (M+ / encounters)
-            -- in ways we couldn't diagnose remotely. WoW's server-side chat
-            -- throttle is the only rate-limit. If a visual click-feedback is
-            -- wanted, it must live on the non-secure buff frame, not here.
+            -- Anti-spam: disable mouse + show cooldown swirl for 5s. Gated by
+            -- BR.profile.chatRequestCooldown (default true). A small fraction
+            -- of users in restricted contexts (M+ / encounters) report this
+            -- breaking chat dispatch in ways we couldn't reproduce remotely;
+            -- they can opt out via the Chat Requests options page.
+            if BR.profile.chatRequestCooldown ~= false then
+                self._br_chatRequestCooldownUntil = GetTime() + 5
+                self:EnableMouse(false)
+                if not self._br_chatRequestCooldown then
+                    local cd = CreateFrame("Cooldown", nil, self, "CooldownFrameTemplate")
+                    cd:SetAllPoints(self)
+                    cd:SetDrawBling(false)
+                    cd:SetHideCountdownNumbers(true)
+                    cd.noCooldownCount = true
+                    self._br_chatRequestCooldown = cd
+                end
+                self._br_chatRequestCooldown:SetCooldown(GetTime(), 5)
+                C_Timer.After(5, function()
+                    -- DisableOverlay/ClearChatRequestState clear the flag, so a
+                    -- stale fire after a role change is a safe no-op.
+                    -- Skip the direct EnableMouse if combat started during the
+                    -- 5s window: it's protected on secure frames during combat
+                    -- lockdown. Post-combat, RefreshOverlaySpells ->
+                    -- UpdateActionButtons -> SetupChatRequestOverlay re-enables
+                    -- mouse explicitly, so recovery is automatic.
+                    if self._br_chatRequestKey then
+                        self._br_chatRequestCooldownUntil = nil
+                        if not InCombatLockdown() then
+                            self:EnableMouse(true)
+                        end
+                    end
+                end)
+            end
             return
         end
         BR.ConsumableMemory.RememberChoice(self.itemID, frame)
@@ -807,7 +835,17 @@ local function SyncSecureButtons()
                             overlay._br_width = width
                             overlay._br_height = height
                         end
-                        overlay:EnableMouse(true)
+                        -- Honor the chat-request cooldown gate while it's set
+                        -- and the feature is enabled. The cooldown timer
+                        -- clears the timestamp when it expires; SyncSecureButtons
+                        -- then re-enables mouse on its next run.
+                        local cdEnabled = BR.profile.chatRequestCooldown ~= false
+                        local cdUntil = cdEnabled and overlay._br_chatRequestCooldownUntil
+                        if cdUntil and cdUntil > GetTime() then
+                            overlay:EnableMouse(false)
+                        else
+                            overlay:EnableMouse(true)
+                        end
                         if not overlay:IsShown() then
                             overlay:Show()
                         end
@@ -1053,6 +1091,7 @@ local function DisableOverlay(overlay)
     overlay._br_clickMacroSpellID = nil
     overlay._br_chatRequestKey = nil
     overlay._br_chatRequestMsg = nil
+    overlay._br_chatRequestCooldownUntil = nil
     overlay.itemID = nil
     overlay:EnableMouse(false)
     overlay:Hide()
@@ -1062,11 +1101,13 @@ end
 ---Clear chat-request state from an overlay being repurposed for a non-chat
 ---action (consumable / pet / spell / custom / clickMacro). PreClick skips the
 ---dynamic click-macro write when _br_chatRequestKey is set, and PostClick
----early-returns on it; a stale flag would suppress legitimate click-macro
----updates. RefreshChatRequestMacros also iterates by this flag.
+---enters the anti-spam cooldown branch on it; a stale flag would suppress
+---legitimate click-macro updates and disable the overlay's mouse for 5s on
+---every click. RefreshChatRequestMacros also iterates by this flag.
 local function ClearChatRequestState(overlay)
     overlay._br_chatRequestKey = nil
     overlay._br_chatRequestMsg = nil
+    overlay._br_chatRequestCooldownUntil = nil
 end
 
 ---Set pet summon spell or Fel Domination macro attributes on an overlay.

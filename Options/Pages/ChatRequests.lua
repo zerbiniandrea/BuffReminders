@@ -139,6 +139,38 @@ local function Build(content, scrollFrame)
     end)
     layout:Add(resetBtn, nil, COMPONENT_GAP)
 
+    -- Troubleshooting opt-in for the rare client bug that silently drops chat
+    -- dispatch in restricted contexts (M+, encounters). Inverted vs. the
+    -- underlying setting: checked = fix attempt = chatRequestCooldown false.
+    -- Default unchecked, so the spam-prevention cooldown stays on for the
+    -- 99.99%+ of users who don't hit the bug.
+    layout:Space(12)
+    local fixAttemptHolder = Components.Checkbox(content, {
+        label = L["Options.ChatRequest.FixAttempt"],
+        get = function()
+            return BR.profile.chatRequestCooldown == false
+        end,
+        enabled = isToggleOn,
+        onChange = function(checked)
+            BR.profile.chatRequestCooldown = not checked
+        end,
+    })
+    layout:Add(fixAttemptHolder, nil, 4)
+
+    -- Yellow inline note. Wraps to the content width minus the layout's
+    -- current x-indent so it sits aligned under the checkbox, not at the
+    -- page edge.
+    local fixAttemptNote = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    fixAttemptNote:SetTextColor(1, 0.82, 0)
+    fixAttemptNote:SetJustifyH("LEFT")
+    local noteWidth = contentWidth - layout:GetX() - COL_PADDING
+    if noteWidth < 1 then
+        noteWidth = 1
+    end
+    fixAttemptNote:SetWidth(noteWidth)
+    fixAttemptNote:SetText(L["Options.ChatRequest.FixAttempt.Desc"])
+    layout:AddText(fixAttemptNote, math.ceil(fixAttemptNote:GetStringHeight()), COMPONENT_GAP)
+
     content:SetHeight(abs(layout:GetY()) + 20)
 
     -- rowX is reserved for absolute-positioned children; suppress unused-var.

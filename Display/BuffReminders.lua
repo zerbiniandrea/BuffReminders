@@ -380,6 +380,7 @@ local defaults = {
     optionsPanelScale = 1.2, -- base scale (displayed as 100%)
     showLoginMessages = true,
     requestBuffInChat = true,
+    chatRequestCooldown = true,
     chatRequestMessages = {},
 
     -- DK runeforge preferences: [specId] = { mainhand, dw_mainhand, dw_offhand }

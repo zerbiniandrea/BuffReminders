@@ -132,6 +132,7 @@ local RootSettings = {
     petPassiveOnlyInCombat = "VisibilityRefresh",
     bronzeHideInCombat = "VisibilityRefresh",
     requestBuffInChat = false, -- No auto-refresh, handled manually
+    chatRequestCooldown = false, -- No auto-refresh, read live in PostClick + SyncSecureButtons
 }
 
 -- Per-category settings (path = categorySettings.{category}.{key})

@@ -437,7 +437,10 @@ english["Options.HoverHighlight"] = "Hover highlight"
 english["Options.HoverHighlight.Desc"] = "Show a subtle highlight when hovering over clickable buff icons."
 english["Options.RequestBuffInChat"] = "Request missing buffs in chat"
 english["Options.RequestBuffInChat.Desc"] =
-    "Click a missing buff your class cannot provide to request it in chat. Auto-detects channel (instance/raid/party/say). 30-second cooldown per buff."
+    "Click a missing buff your class cannot provide to request it in chat. Auto-detects channel (instance/raid/party/say)."
+english["Options.ChatRequest.FixAttempt"] = "|cffffd200EXPERIMENTAL|r Attempt to fix chat requests not being sent"
+english["Options.ChatRequest.FixAttempt.Desc"] =
+    "Enable this only if your chat requests aren't being sent. This also disables the 5-second click cooldown that prevents accidental spam-clicking."
 english["Options.ChatRequest.ResetAll"] = "Reset All"
 english["ChatRequests.PerBuffMessages"] = "Per-buff messages"
 -- Chat request messages (keyed by buff.key, sent as-is via SendChatMessage)
