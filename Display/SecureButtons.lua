@@ -251,25 +251,17 @@ local function CreateClickOverlay(frame)
     end)
     overlay:SetScript("PostClick", function(self)
         if self._br_chatRequestKey then
-            -- Anti-spam: disable mouse + show cooldown swirl for 5s.
-            -- The cooldownUntil timestamp is the source of truth; SyncSecureButtons
-            -- honors it instead of unconditionally re-enabling mouse on every
-            -- layout sync (which would otherwise let spam clicks through).
+            -- Anti-spam: disable mouse for 5s. The cooldownUntil timestamp is
+            -- the source of truth; SyncSecureButtons honors it instead of
+            -- unconditionally re-enabling mouse on every layout sync (which
+            -- would otherwise let spam clicks through).
+            -- We deliberately do NOT attach a CooldownFrameTemplate child to
+            -- the overlay: it broke chat dispatch for affected users (likely
+            -- a taint or protection-state interaction with the secure parent
+            -- in restricted contexts). If a visual cooldown is wanted, it
+            -- should live on the non-secure buff frame instead.
             self._br_chatRequestCooldownUntil = GetTime() + 5
             self:EnableMouse(false)
-            if not self._br_chatRequestCooldown then
-                local cd = CreateFrame("Cooldown", nil, self, "CooldownFrameTemplate")
-                cd:SetAllPoints(self)
-                cd:SetDrawBling(false)
-                -- Show only the swipe animation, not the countdown number.
-                -- SetHideCountdownNumbers covers Blizzard's built-in numbers;
-                -- noCooldownCount is the convention OmniCC and similar addons
-                -- check before adding their own overlay.
-                cd:SetHideCountdownNumbers(true)
-                cd.noCooldownCount = true
-                self._br_chatRequestCooldown = cd
-            end
-            self._br_chatRequestCooldown:SetCooldown(GetTime(), 5)
             C_Timer.After(5, function()
                 -- Clear the gate so SyncSecureButtons re-enables mouse on its
                 -- next run; also re-enable directly in case no sync is pending.
