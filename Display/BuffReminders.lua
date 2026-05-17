@@ -442,6 +442,7 @@ local defaults = {
         consumableTextScale = 25,
         hideConsumableLabels = false,
         showConsumableTooltips = false,
+        showBuffTooltips = false,
         hideLegacyConsumables = true,
         petDisplayMode = "generic", -- "generic" or "expanded"
         petLabels = true,
@@ -1427,6 +1428,40 @@ end
 -- Map buff key -> consumable category (derived from buff definitions in Data/Buffs.lua)
 local BUFF_KEY_TO_CATEGORY = BR.BUFF_KEY_TO_CATEGORY
 
+-- Show the spell tooltip for a buff frame (raid/presence hover), with a
+-- class-colored "Provided by" line. Gated by defaults.showBuffTooltips so
+-- hover never pops a tooltip unless the user opted in. Called from the icon
+-- frame itself when no click overlay covers it, and from the click overlay
+-- in SecureButtons.lua when click-to-cast is on - callers pass the actual
+-- hovered frame as `anchor` so the tooltip lines up with the cursor.
+local function ShowBuffSpellTooltip(frame, anchor)
+    local db = BR.profile
+    if not db or not db.defaults or db.defaults.showBuffTooltips ~= true then
+        return
+    end
+    local def = frame.buffDef
+    if not def then
+        return
+    end
+    local spellID = type(def.spellID) == "table" and def.spellID[1] or def.spellID
+    if not spellID then
+        return
+    end
+    GameTooltip:SetOwner(anchor or frame, "ANCHOR_RIGHT")
+    GameTooltip:SetSpellByID(spellID)
+    if def.class then
+        local className = (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[def.class]) or def.class
+        local r, g, b = 1, 1, 1
+        local c = RAID_CLASS_COLORS and RAID_CLASS_COLORS[def.class]
+        if c then
+            r, g, b = c.r, c.g, c.b
+        end
+        GameTooltip:AddLine(format(L["BuffTooltip.ProvidedBy"], className), r, g, b)
+    end
+    GameTooltip:Show()
+end
+BR.Display.ShowBuffSpellTooltip = ShowBuffSpellTooltip
+
 -- Create icon frame for a buff
 local function CreateBuffFrame(buff, category)
     local parent
@@ -1512,8 +1547,24 @@ local function CreateBuffFrame(buff, category)
         end
     end
 
-    -- Always click-through (dragging is handled by anchor handles)
-    frame:EnableMouse(false)
+    -- Always click-through (dragging is handled by anchor handles). For raid
+    -- and presence frames we still want hover events so the buff tooltip can
+    -- pop on mouseover when the user opts in - clicks remain disabled so the
+    -- mover/anchor flow stays intact. Other categories already have their own
+    -- hover paths (consumable item tooltip + targeted last-target tooltip
+    -- live on the click overlay, which sits above the icon when active).
+    if category == "raid" or category == "presence" then
+        frame:SetMouseClickEnabled(false)
+        frame:SetMouseMotionEnabled(true)
+        frame:SetScript("OnEnter", function(self)
+            ShowBuffSpellTooltip(self)
+        end)
+        frame:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+    else
+        frame:EnableMouse(false)
+    end
 
     frame:Hide()
     return frame

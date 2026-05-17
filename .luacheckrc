@@ -117,6 +117,7 @@ read_globals = {
 
     -- WoW UI globals
     "RAID_CLASS_COLORS",
+    "LOCALIZED_CLASS_NAMES_MALE",
     "ColorPickerFrame",
     "DynamicResizeButton_Resize",
     "GameTooltip",

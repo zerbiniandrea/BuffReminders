@@ -333,11 +333,21 @@ local function CreateClickOverlay(frame)
                 GameTooltip:SetItemByID(itemID)
                 GameTooltip:Show()
             end
+            return
+        end
+        -- Raid/presence: spell tooltip + "Provided by <class>" line, gated by
+        -- defaults.showBuffTooltips. Delegate to the shared helper, anchoring
+        -- the tooltip to the overlay (which is what the cursor is actually
+        -- over) instead of the buff frame underneath.
+        if frame.buffCategory == "raid" or frame.buffCategory == "presence" then
+            if BR.Display.ShowBuffSpellTooltip then
+                BR.Display.ShowBuffSpellTooltip(frame, overlay)
+            end
         end
     end)
     overlay:HookScript("OnLeave", function()
         HideLastTargetTooltip()
-        if frame.buffCategory == "consumable" then
+        if frame.buffCategory == "consumable" or frame.buffCategory == "raid" or frame.buffCategory == "presence" then
             GameTooltip:Hide()
         end
     end)

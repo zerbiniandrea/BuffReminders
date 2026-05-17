@@ -212,6 +212,7 @@ english["Tooltip.MayShowExtraIcon.Desc"] =
 english["Tooltip.InstanceEntryReminder"] = "Instance Entry Reminder"
 english["Tooltip.InstanceEntryReminder.Desc"] =
     "Briefly shown when entering a dungeon as a reminder to drop a Soulwell. Dismissed after casting or after 30 seconds."
+english["BuffTooltip.ProvidedBy"] = "Provided by %s"
 
 -- ============================================================================
 -- GLOW TYPE NAMES
@@ -484,6 +485,9 @@ english["Options.PetSpecIcon.Desc"] =
     "Swap the pet icon to its specialization ability (Cunning, Ferocity, Tenacity) when hovering."
 english["Options.ShowItemTooltips"] = "Show item tooltips"
 english["Options.ShowItemTooltips.Desc"] = "When hovering over a consumable icon, show its item tooltip."
+english["Options.ShowBuffTooltips"] = "Show buff tooltips"
+english["Options.ShowBuffTooltips.Desc"] =
+    "When hovering over a raid or presence buff icon, show the spell tooltip and which class provides the buff."
 english["Options.Behavior"] = "Behavior"
 english["Options.PetPassiveCombat"] = "Pet passive only in combat"
 english["Options.PetPassiveCombat.Desc"] =

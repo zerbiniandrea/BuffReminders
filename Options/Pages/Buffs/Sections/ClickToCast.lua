@@ -96,6 +96,25 @@ local function Build(ctx, layout)
         layout:Add(showTooltipsHolder, nil, COMPONENT_GAP)
     end
 
+    if category == "raid" or category == "presence" then
+        -- Hover tooltip works on the icon frame itself (not the click overlay),
+        -- so it's intentionally not gated by isClickable.
+        local showBuffTooltipsHolder = Components.Checkbox(parent, {
+            label = L["Options.ShowBuffTooltips"],
+            get = function()
+                return BR.Config.Get("defaults.showBuffTooltips", false) ~= false
+            end,
+            tooltip = {
+                title = L["Options.ShowBuffTooltips"],
+                desc = L["Options.ShowBuffTooltips.Desc"],
+            },
+            onChange = function(checked)
+                BR.Config.Set("defaults.showBuffTooltips", checked)
+            end,
+        })
+        layout:Add(showBuffTooltipsHolder, nil, COMPONENT_GAP)
+    end
+
     layout:SetX(COL_PADDING)
 end
 
