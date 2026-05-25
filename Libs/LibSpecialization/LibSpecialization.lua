@@ -4,7 +4,7 @@ local cataWowID = 14
 local mistsWowID = 19
 if wowID ~= 1 and wowID ~= cataWowID and wowID ~= mistsWowID then return end -- Retail, Cata, Mists
 
-local LS, oldminor = LibStub:NewLibrary("LibSpecialization", 26)
+local LS, oldminor = LibStub:NewLibrary("LibSpecialization", 27)
 if not LS then return end -- No upgrade needed
 
 LS.callbackMapGroup = LS.callbackMapGroup or {}
@@ -568,11 +568,10 @@ do
 	}
 	local tonumber, strmatch = tonumber, string.match
 	local Ambiguate = Ambiguate
-	local issecretvalue = issecretvalue or function() return false end
 	local C_ClassTalents_GetActiveConfigID = C_ClassTalents and C_ClassTalents.GetActiveConfigID
 	LS.frame:SetScript("OnEvent", function(self, event, prefix, msg, channel, sender)
 		if event == "CHAT_MSG_ADDON" then
-			if not issecretvalue(msg) and prefix == "LibSpec" and approved[channel] then -- Only approved channels
+			if prefix == "LibSpec" and approved[channel] then -- Only approved channels
 				if msg == "R" then
 					if channel == "GUILD" then
 						PrepareForGuild()
@@ -631,10 +630,13 @@ do
 			RequestGroupSpecialization()
 		elseif event == "PLAYER_LOGIN" then
 			RequestGroupSpecialization()
-			CTimerNewTimer(0, RequestGroupSpecialization)
+			-- Calling this again will schedule a delayed request. We want to do this in case we logged into an active encounter, but InChatMessagingLockdown didn't signal this in the first check.
+			RequestGroupSpecialization()
 		elseif event == "ADDON_RESTRICTION_STATE_CHANGED" then
-			if prefix == 5 and msg == 0 then -- prefix=restrictionType, msg=state
+			if prefix == 5 and msg == 0 then -- [prefix=restrictionType] 5=Chat restriction, [msg=state] 0=Inactive
 				self:UnregisterEvent(event)
+				RequestGroupSpecialization()
+				-- Calling this again will schedule a delayed request. We want to do this in case we requested group data a millisecond too early, and not everyone in the group was out of chat lockdown to hear our request.
 				RequestGroupSpecialization()
 			end
 		end
@@ -654,7 +656,8 @@ end
 
 do
 	function LS.RequestGroupSpecialization()
-		-- DEPRECATED
+		-- DEPRECATED. This function was never supposed to be used as this library handles communication automatically.
+		-- Unfortunately bad devs or bad AI started overusing this function, creating a lot of transmission noise on pointless ingame events.
 	end
 end
 
