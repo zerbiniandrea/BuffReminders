@@ -256,8 +256,6 @@ L["Display.DismissConsumables"] = "다음 로딩 화면 전까지 소모품 알�
 L["Display.DismissConsumablesChat"] = "소모품 알림이 다음 로딩 화면까지 숨겨집니다."
 L["Display.LoginFirstInstall"] =
     "설치해 주셔서 감사합니다! |cFFFFD100/br unlock|r을 입력하여 버프 표시를 이동하거나, |cFFFFD100/br|r 옵션 패널 하단의 버튼을 사용하세요."
-L["Display.LoginSelfOnlyOutside"] =
-    "새로운 기본값: 야외에서는 내 스스로 거는 버프만 추적합니다. 변경하려면 설정 탭에서 |cFFFFD100던전/공격대 밖에선 내것만 추적|r 옵션을 설정하세요."
 
 -- ============================================================================
 -- OPTIONS: NAVIGATION LABELS

@@ -249,8 +249,6 @@ L["Display.DebugDisabled"] = "调试模式已禁用。"
 L["Display.DebugEnabled"] = "调试模式已启用。再次输入 |cFFFFD100/br debug|r 将其关闭。"
 L["Display.LoginFirstInstall"] =
     "感谢安装！输入 |cFFFFD100/br unlock|r 来移动增益显示，或者使用 |cFFFFD100/br|r 选项面板底部的按钮。"
-L["Display.LoginSelfOnlyOutside"] =
-    "新默认设置：在野外时，仅追踪对自己施放的本职业增益。可在“设置”标签页中切换 |cFFFFD100在地下城和团队副本外强制仅追踪自身|r 来更改此设置。"
 
 -- ============================================================================
 -- OPTIONS: NAVIGATION LABELS

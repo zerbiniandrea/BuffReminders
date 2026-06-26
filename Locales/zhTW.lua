@@ -293,8 +293,6 @@ L["Display.DismissConsumables"] = "在下一次載入畫面前隱藏消耗品提
 L["Display.DismissConsumablesChat"] = "在下一次載入畫面前消耗品提示將隱藏。"
 L["Display.LoginFirstInstall"] =
     "感謝安裝！輸入 |cFFFFD100/br unlock|r 來移動增益顯示，或者使用 |cFFFFD100/br|r 選項面板底部的按鈕。"
-L["Display.LoginSelfOnlyOutside"] =
-    "新的預設：在開放世界中，只會追蹤您自己的職業增益。在「設定」標籤中切換|cFFFFD100強制在地下城與團隊副本之外只有自己|r來變更設定。"
 
 -- ============================================================================
 -- OPTIONS: NAVIGATION LABELS

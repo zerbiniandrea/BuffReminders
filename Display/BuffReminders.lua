@@ -4209,7 +4209,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
         -- ====================================================================
         -- Versioned migrations - each runs exactly once, tracked by dbVersion
         -- ====================================================================
-        local DB_VERSION = 44
+        local DB_VERSION = 45
 
         local migrations = {
             -- [1] Consolidate all pre-versioning migrations (v2.8 -> v3.x)
@@ -5108,6 +5108,14 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
                 db.hideOthersInCombat = nil
                 db.myBuffsOnlyWhileLeveling = nil
             end,
+
+            -- [45] Drop the retired selfOnlyOutsideNoticeShown global flag. The
+            -- one-time login notice it gated has been removed (shipped 2+ months).
+            [45] = function()
+                if BR.aceDB and BR.aceDB.global then
+                    BR.aceDB.global.selfOnlyOutsideNoticeShown = nil
+                end
+            end,
         }
 
         -- Run pending migrations
@@ -5235,9 +5243,6 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
         C_Timer.After(5, function()
             if isFirstInstall then
                 print("|cff00ccffBuffReminders:|r " .. L["Display.LoginFirstInstall"])
-            elseif BR.profile.showLoginMessages ~= false and not BR.aceDB.global.selfOnlyOutsideNoticeShown then
-                print("|cff00ccffBuffReminders:|r " .. L["Display.LoginSelfOnlyOutside"])
-                BR.aceDB.global.selfOnlyOutsideNoticeShown = true
             end
         end)
     elseif event == "PLAYER_ENTERING_WORLD" then
