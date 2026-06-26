@@ -47,6 +47,7 @@ Locales\zhTW.lua
 Core\Core.lua
 Core\TextPositions.lua
 Core\Profiles.lua
+Core\Migrations.lua
 Data\Buffs.lua
 Data\Beneficiaries.lua
 Data\AuraWhitelist.lua
