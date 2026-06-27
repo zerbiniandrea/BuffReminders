@@ -181,10 +181,24 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
     end
 
     -- Login messages
+    local GLOW_NOTICE_MAX = 5 -- show the glow-default change notice for this many logins
     C_Timer.After(5, function()
+        local glob = BR.aceDB.global
         if isFirstInstall then
+            -- Fresh installs already default to no glow; suppress the change notice.
+            glob.glowDefaultNoticeCount = GLOW_NOTICE_MAX
             print("|cff00ccffBuffReminders:|r " .. L["Display.LoginFirstInstall"])
-        elseif BR.profile.showLoginMessages ~= false then
+            return
+        end
+        -- Glow default flipped to off for existing users who never explicitly
+        -- enabled it. Shown for the first few logins (one-time messages are
+        -- easily missed), regardless of showLoginMessages, then stops. Does not
+        -- replace the regular login message - both can print the same login.
+        if (glob.glowDefaultNoticeCount or 0) < GLOW_NOTICE_MAX then
+            glob.glowDefaultNoticeCount = (glob.glowDefaultNoticeCount or 0) + 1
+            print("|cff00ccffBuffReminders:|r " .. L["Display.LoginGlowDefaultChanged"])
+        end
+        if BR.profile.showLoginMessages ~= false then
             print("|cff00ccffBuffReminders:|r " .. L["Display.LoginLoadout"])
         end
     end)

@@ -71,8 +71,8 @@ BR.defaults = {
         borderSize = 2,
         growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT", "UP", "DOWN"
         -- Behavior (glow settings)
-        showExpirationGlow = true,
-        showMissingGlow = true,
+        showExpirationGlow = false,
+        showMissingGlow = false,
         expirationThreshold = 15, -- minutes
         preKeyThreshold = 0, -- minutes (0 = off); used in M0 before inserting a keystone
         glowType = 2, -- BR.Glow.Type: Pixel=1, AutoCast=2, Border=3, Proc=4 (expiring default)

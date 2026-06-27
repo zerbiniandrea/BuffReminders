@@ -306,6 +306,8 @@ english["Display.DismissConsumablesChat"] = "Consumable reminders hidden until n
 english["Display.LoginFirstInstall"] =
     "Thanks for installing! Type |cFFFFD100/br unlock|r to move the buff display, or use the button at the bottom of the |cFFFFD100/br|r options panel."
 english["Display.LoginLoadout"] = "New: loadout reminders! Set them up on the Gear & Talents page in |cFFFFD100/br|r."
+english["Display.LoginGlowDefaultChanged"] =
+    "Buff glow is now off by default to reduce CPU usage. Re-enable it any time on the Defaults page in |cFFFFD100/br|r."
 
 -- ============================================================================
 -- OPTIONS: NAVIGATION LABELS
