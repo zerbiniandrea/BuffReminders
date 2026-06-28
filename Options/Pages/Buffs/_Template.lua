@@ -29,7 +29,7 @@ function Template.Build(content, scrollFrame, category)
         scrollFrame = scrollFrame,
         contentWidth = scrollFrame:GetContentWidth(),
     }
-    local layout = Components.VerticalLayout(content, { x = COL_PADDING, y = -10 })
+    local layout = Components.VerticalLayout(content, { x = COL_PADDING, y = -16 })
 
     local Sections = BR.Options.BuffSections
 

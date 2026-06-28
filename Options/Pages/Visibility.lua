@@ -262,7 +262,7 @@ local function BuildTrackingOverridesSection(content, layout)
 end
 
 local function Build(content)
-    local layout = Components.VerticalLayout(content, { x = COL_PADDING, y = -10 })
+    local layout = Components.VerticalLayout(content, { x = COL_PADDING, y = -16 })
 
     BuildHideWhenSection(content, layout)
     BuildTrackingSection(content, layout)

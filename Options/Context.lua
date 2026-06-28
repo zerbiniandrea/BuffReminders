@@ -25,7 +25,7 @@ BR.Options.Constants = {
     SECTION_SPACING = 12,
     ITEM_HEIGHT = 22,
     SCROLLBAR_WIDTH = 24,
-    COMPONENT_GAP = 4, -- standard gap between components
+    COMPONENT_GAP = 6, -- standard gap between components
     SECTION_GAP = 8, -- gap before/after section boundaries
     DROPDOWN_EXTRA = 8, -- extra clearance after dropdowns (menu overlay space)
 
@@ -136,7 +136,7 @@ local COL_PADDING = BR.Options.Constants.COL_PADDING
 local SEP_OFFSET = 4
 local SEP_HEIGHT = 1
 local AFTER_HEADER_GAP = 8 -- between the accent line and the first content row
-local BEFORE_HEADER_GAP = 12 -- between the previous section's last item and this header
+local BEFORE_HEADER_GAP = 16 -- between the previous section's last item and this header
 local CONTENT_INDENT = 10 -- how far content nests under each section header
 
 function Helpers.LayoutSectionHeader(layout, parent, text)
@@ -485,7 +485,7 @@ end
 function Helpers.LayoutSeparator(layout, parent)
     local sep = parent:CreateTexture(nil, "ARTWORK")
     sep:SetHeight(1)
-    sep:SetColorTexture(0.3, 0.3, 0.3, 0.6)
+    sep:SetColorTexture(0.27, 0.27, 0.32, 0.6)
     layout:Add(sep, 1, COMPONENT_GAP)
     sep:SetWidth((parent.GetWidth and parent:GetWidth() or 600) - 40)
 end

@@ -21,7 +21,7 @@ local abs = math.abs
 
 local function Build(content, scrollFrame)
     local contentWidth = scrollFrame:GetContentWidth()
-    local layout = Components.VerticalLayout(content, { x = COL_PADDING, y = -10 })
+    local layout = Components.VerticalLayout(content, { x = COL_PADDING, y = -16 })
     local RefreshProfileDropdown
 
     LayoutSectionHeader(layout, content, L["Options.ActiveProfile"])

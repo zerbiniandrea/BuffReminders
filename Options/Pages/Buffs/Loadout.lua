@@ -202,7 +202,7 @@ end
 
 local function Build(content, scrollFrame)
     local contentWidth = scrollFrame:GetContentWidth()
-    local layout = Components.VerticalLayout(content, { x = COL_PADDING, y = -10 })
+    local layout = Components.VerticalLayout(content, { x = COL_PADDING, y = -16 })
 
     LayoutSectionHeader(layout, content, L["Category.LoadoutReminders"])
     LayoutSectionNote(layout, content, L["Category.LoadoutNote"])

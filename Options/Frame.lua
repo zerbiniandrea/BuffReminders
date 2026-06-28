@@ -377,13 +377,13 @@ local function CreateOptionsPanel()
     headerSep:SetHeight(1)
     headerSep:SetPoint("TOPLEFT", SIDEBAR_X, -CONTENT_TOP_OFFSET + 4)
     headerSep:SetPoint("TOPRIGHT", -COL_PADDING, -CONTENT_TOP_OFFSET + 4)
-    headerSep:SetColorTexture(0.3, 0.3, 0.3, 1)
+    headerSep:SetColorTexture(0.27, 0.27, 0.32, 1)
 
     local bottomSep = panel:CreateTexture(nil, "ARTWORK")
     bottomSep:SetHeight(1)
     bottomSep:SetPoint("BOTTOMLEFT", SIDEBAR_X, BOTTOM_BAR_HEIGHT - 5)
     bottomSep:SetPoint("BOTTOMRIGHT", -COL_PADDING, BOTTOM_BAR_HEIGHT - 5)
-    bottomSep:SetColorTexture(0.3, 0.3, 0.3, 1)
+    bottomSep:SetColorTexture(0.27, 0.27, 0.32, 1)
 
     -- ====================================================================
     -- SIDEBAR
@@ -395,13 +395,13 @@ local function CreateOptionsPanel()
 
     local sidebarBg = sidebar:CreateTexture(nil, "BACKGROUND")
     sidebarBg:SetAllPoints()
-    sidebarBg:SetColorTexture(0, 0, 0, 0.25)
+    sidebarBg:SetColorTexture(0, 0, 0.04, 0.35)
 
     local sidebarBorder = sidebar:CreateTexture(nil, "BORDER")
     sidebarBorder:SetWidth(1)
     sidebarBorder:SetPoint("TOPRIGHT", 0, 0)
     sidebarBorder:SetPoint("BOTTOMRIGHT", 0, 0)
-    sidebarBorder:SetColorTexture(0.3, 0.3, 0.3, 1)
+    sidebarBorder:SetColorTexture(0.27, 0.27, 0.32, 1)
 
     -- ====================================================================
     -- CONTENT AREA

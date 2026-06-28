@@ -16,7 +16,7 @@ local COL_PADDING = BR.Options.Constants.COL_PADDING
 local abs = math.abs
 
 local function Build(content)
-    local layout = Components.VerticalLayout(content, { x = COL_PADDING, y = -10 })
+    local layout = Components.VerticalLayout(content, { x = COL_PADDING, y = -16 })
 
     local loginMsgHolder = Components.Checkbox(content, {
         label = L["Options.ShowLoginMessages"],

@@ -25,7 +25,7 @@ local abs = math.abs
 local wipe = wipe
 
 local function Build(content, scrollFrame)
-    local layout = Components.VerticalLayout(content, { x = COL_PADDING, y = -10 })
+    local layout = Components.VerticalLayout(content, { x = COL_PADDING, y = -16 })
 
     local contentWidth = scrollFrame:GetContentWidth()
     local rowWidth = contentWidth - COL_PADDING * 2

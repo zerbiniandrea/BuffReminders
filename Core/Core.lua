@@ -690,8 +690,10 @@ function BR.CreatePanel(name, width, height, options)
     -- hairline border - and rely on the soft drop shadow (below) rather than a
     -- loud gold frame to read as elevated above the content underneath. Gold is
     -- reserved for accents (active tabs), mirroring the panel's active-nav cue.
-    local bgColor = options.bgColor or (isDialog and { 0.11, 0.11, 0.12, 1 } or { 0.1, 0.1, 0.1, 0.95 })
-    local borderColor = options.borderColor or { 0.3, 0.3, 0.3, 1 }
+    -- Cool-biased neutrals: a slight blue tint over flat grey reads as a chosen
+    -- ground against the warm gold accent (a pure mid-grey reads as unconsidered).
+    local bgColor = options.bgColor or (isDialog and { 0.098, 0.098, 0.118, 1 } or { 0.09, 0.09, 0.107, 0.97 })
+    local borderColor = options.borderColor or { 0.27, 0.27, 0.32, 1 }
 
     local panel = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
     panel:SetSize(width, height)
@@ -736,7 +738,7 @@ function BR.CreatePanel(name, width, height, options)
         body:SetPoint("TOPLEFT", 2, -2)
         body:SetPoint("BOTTOMRIGHT", -2, 2)
         body:SetColorTexture(1, 1, 1, 1)
-        body:SetGradient("VERTICAL", CreateColor(0.100, 0.100, 0.110, 1), CreateColor(0.140, 0.140, 0.150, 1))
+        body:SetGradient("VERTICAL", CreateColor(0.094, 0.094, 0.112, 1), CreateColor(0.130, 0.130, 0.152, 1))
 
         -- A thin gray separator under the title mirrors the main panel's header
         -- divider, so the dialog reads as a titled card in the same family. The
@@ -747,7 +749,7 @@ function BR.CreatePanel(name, width, height, options)
         titleSep:SetPoint("TOPLEFT", 2, -32)
         titleSep:SetPoint("TOPRIGHT", -2, -32)
         titleSep:SetHeight(1)
-        titleSep:SetColorTexture(0.3, 0.3, 0.3, 1)
+        titleSep:SetColorTexture(0.27, 0.27, 0.32, 1)
 
         -- Dialogs are modeless: ESC handled via keyboard input so closing this
         -- dialog doesn't also close the parent options panel (unlike
