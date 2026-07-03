@@ -307,9 +307,6 @@ L["Tab.DisplayBehavior"] = "顯示/行為"
 
 -- Sidebar groups
 L["Sidebar.General"] = "通用"
-L["Sidebar.Buffs"] = "增益"
-L["Sidebar.DisplayBehavior"] = "顯示與行為"
-L["Sidebar.Loadouts"] = "裝備 & 天賦"
 L["Sidebar.Profiles"] = "設定檔"
 
 -- Page titles
@@ -317,13 +314,8 @@ L["Page.General"] = "通用"
 L["Page.Defaults"] = "預設"
 L["Page.Visibility"] = "可見性"
 L["Page.ChatRequests"] = "聊天請求"
-L["Page.AnchorFrames"] = "定位框架"
 L["Page.Profiles"] = "設定檔"
 L["Page.AllBuffs"] = "所有增益"
-L["Page.DetachedIcons"] = "分離圖示"
-L["Page.Sounds"] = "音效"
-L["Page.Sounds.Desc"] =
-    "當追蹤的增益缺失時播放聲音。警報適用於所有增益類別 - 每個增益分配一個。"
 
 -- Per-category page section headers
 L["Section.Tracking"] = "追蹤"
@@ -334,16 +326,8 @@ L["Section.TrackingOverrides.Desc"] =
 -- ============================================================================
 -- OPTIONS: SOUND ALERTS
 -- ============================================================================
-L["Options.Sound.NoAlerts"] = "未設定聲音警報。"
-L["Options.Sound.AddAlert"] = "新增聲音警報"
-L["Options.Sound.Title"] = "新增聲音警報"
-L["Options.Sound.EditTitle"] = "編輯聲音警報"
-L["Options.Sound.SelectBuff"] = "選擇增益"
-L["Options.Sound.SelectSound"] = "選擇聲音"
 L["Options.Sound.Preview"] = "預覽"
 L["Options.Preview"] = "預覽"
-L["Options.Sound.Save"] = "儲存"
-L["Options.Sound.NoBuffs"] = "所有增益都已有音效。"
 
 -- ============================================================================
 -- OPTIONS: GLOBAL DEFAULTS
@@ -363,10 +347,7 @@ L["Options.TextOutline.ThickMono"] = "粗外框 + 單色"
 -- ============================================================================
 -- OPTIONS: GLOW SETTINGS
 -- ============================================================================
-L["Options.GlowReminderIcons"] = "提示圖示發光"
 L["Options.GlowReminderIcons.Title"] = "提示圖示發光"
-L["Options.GlowReminderIcons.Desc"] =
-    "為所有顯示的提示圖示添加發光效果，包括缺失和即將過期的增益。"
 L["Options.GlowReminderIcons.CpuWarning"] =
     "為螢幕上每個圖示的每偵發光動畫，所以這會使用較多的CPU。如果圖示長時間保持開啟狀態 (例如一個你在戰鬥中不會重上的增益)，該耗費是連續的。由於這個原因預設情況下會停用。"
 L["Options.GlowKind.Expiring"] = "即將過期"
@@ -376,7 +357,6 @@ L["Options.GlowSettings.Missing"] = "發光設置 — 缺失"
 L["Options.Glow.Enabled"] = "啟用"
 L["Options.Threshold"] = "閾值"
 L["Options.GlowMissingPets"] = "缺失寵物發光"
-L["Options.CustomGlowStyle"] = "自定義發光樣式"
 L["Options.Expiration"] = "過期"
 L["Options.Glow"] = "發光"
 L["Options.UseCustomColor"] = "使用自定義顏色"
@@ -414,15 +394,6 @@ L["Options.Visibility"] = "顯示條件"
 -- ============================================================================
 -- OPTIONS: HEALTHSTONE
 -- ============================================================================
-L["Options.Healthstone.ReadyCheckOnly"] = "僅準備確認時"
-L["Options.Healthstone.ReadyCheckWarlock"] = "準備確認 + 術士始終顯示"
-L["Options.Healthstone.AlwaysShow"] = "始終顯示"
-L["Options.Healthstone.Visibility"] = "治療石顯示"
-L["Options.Healthstone.Visibility.Desc"] =
-    "設置何時顯示治療石提示。\n\n|cffffcc00僅準備確認時:|r 僅在準備確認（15秒內）時顯示。\n|cffffcc00準備確認 + 術士始終顯示:|r 術士始終顯示，其他職業僅在準備確認時顯示。\n|cffffcc00始終顯示:|r 在符合設置的內容類型中始終顯示。"
-L["Options.Healthstone.WarlockAlwaysDesc"] = "術士始終顯示提示，其他職業僅在準備確認時顯示"
-L["Options.Healthstone.ReadyCheckDesc"] = "在準備確認後15秒內顯示"
-L["Options.Healthstone.AlwaysDesc"] = "在符合當前內容類型時始終顯示"
 L["Options.Healthstone.LowStock"] = "治療石不足警告"
 L["Options.Healthstone.LowStock.Desc"] =
     "當有治療石但數量較少時顯示警告。不管此設置如何，沒有治療石（0個）時都會被追蹤。"
@@ -433,15 +404,6 @@ L["Options.Healthstone.Threshold.Desc"] =
 -- ============================================================================
 -- OPTIONS: SOULSTONE
 -- ============================================================================
-L["Options.Soulstone.Visibility"] = "靈魂石顯示"
-L["Options.Soulstone.Visibility.Desc"] =
-    "設置何時顯示靈魂石提示。\n\n|cffffcc00僅準備確認時:|r 僅在準備確認時顯示（預設）。\n|cffffcc00準備確認 + 術士始終顯示:|r 術士始終顯示，其他職業僅在準備確認時顯示。\n|cffffcc00始終顯示:|r 只要職業增益類別可見就顯示。"
-L["Options.Soulstone.ReadyCheckOnly"] = "僅準備確認時"
-L["Options.Soulstone.ReadyCheckWarlock"] = "準備確認 + 術士始終顯示"
-L["Options.Soulstone.AlwaysShow"] = "始終顯示"
-L["Options.Soulstone.ReadyCheckDesc"] = "在準備確認後15秒內顯示"
-L["Options.Soulstone.WarlockAlwaysDesc"] = "術士始終顯示提示，其他職業僅在準備確認時顯示"
-L["Options.Soulstone.AlwaysDesc"] = "只要職業增益類別可見就顯示"
 L["Options.Soulstone.HideCooldown"] = "冷卻時隱藏（術士）"
 L["Options.Soulstone.HideCooldown.Desc"] =
     "啟用後，當靈魂石法術處於冷卻中時，不會向術士顯示提示。僅適用於術士。"
@@ -498,9 +460,6 @@ L["Options.HoverHighlight.Desc"] = "將鼠標懸停在可點擊的增益圖示�
 L["Options.RequestBuffInChat"] = "在聊天中請求缺失的增益"
 L["Options.RequestBuffInChat.Desc"] =
     "點擊您的職業無法提供的缺失增益，並在聊天中請求它。自動偵測頻道（副本/團隊/隊伍/說）。"
-L["Options.ChatRequest.FixAttempt"] = "|cffffd200實驗性|r 嘗試修復未發送的聊天請求"
-L["Options.ChatRequest.FixAttempt.Desc"] =
-    "僅當您的聊天請求未發送時才啟用此功能。這也會停用5秒的點擊冷卻時間，以防止意外的垃圾點擊。"
 L["Options.ChatRequest.ResetAll"] = "重置全部"
 L["ChatRequests.PerBuffMessages"] = "每個增益的訊息"
 -- Chat request messages (keyed by buff.key, sent as-is via SendChatMessage)
@@ -594,9 +553,6 @@ L["Options.HideLegacyConsumables.Desc"] =
 -- ============================================================================
 -- OPTIONS: DK RUNEFORGE PREFERENCES
 -- ============================================================================
-L["Options.RuneforgePreferences"] = "DK符文偏好"
-L["Options.RuneforgeNote"] =
-    "為每個專精選擇你期望的DK符文。如果套用了錯誤的符文或缺少符文，將顯示提示。"
 L["Options.RuneMainHand"] = "主手"
 L["Options.RuneOffHand"] = "副手"
 L["Options.RuneTwoHanded"] = "雙手"
@@ -605,7 +561,6 @@ L["Options.RuneDualWield"] = "雙持"
 -- ============================================================================
 -- OPTIONS: ROGUE POISON PREFERENCES
 -- ============================================================================
-L["Options.RoguePoisonPreferences"] = "盜賊毒藥偏好"
 L["Options.RoguePoisonNote"] =
     "選擇要應用的毒藥及其優先順序（頂部=最高）。停用的毒藥永遠不會被施放，也不會觸發提醒。"
 L["Options.PoisonLethal"] = "致命"
@@ -617,26 +572,12 @@ L["Options.PoisonReset"] = "重置回預設"
 -- ============================================================================
 -- OPTIONS: BUFF SETTINGS GEAR ICONS
 -- ============================================================================
-L["Options.HealthstoneSettings"] = "治療石設置"
-L["Options.HealthstoneSettings.Note"] = "設置顯示條件和不足警告閾值。"
-L["Options.SoulstoneSettings"] = "靈魂石設置"
-L["Options.SoulstoneSettings.Note"] = "設置何時顯示靈魂石提示。"
-L["Options.BronzeSettings"] = "青銅龍的祝福設定"
-L["Options.BronzeSettings.Note"] = "設置青銅龍的祝福的提醒。"
 L["Options.BronzeHideInCombat"] = "戰鬥中隱藏"
 L["Options.BronzeHideInCombat.Desc"] =
     "當戰鬥中隱藏青銅龍的祝福的提醒。這個增益不太重要，你可能不想在戰鬥中補上。"
-L["Options.DruidFormSettings"] = "德魯伊型態設定"
-L["Options.DruidFormSettings.Note"] = "設置錯誤型態的提醒。"
 L["Options.DruidIgnoreTravelForm"] = "當旅行中忽略"
 L["Options.DruidIgnoreTravelForm.Desc"] =
     "當於旅行型態或上坐騎時時隱藏錯誤型態的提醒 (地面、水中、飛行或坐騎型態)，因此當您有意旅行時，它不會打擾您。"
-L["Options.PetPassiveSettings"] = "被動寵物設置"
-L["Options.PetPassiveSettings.Note"] = "設置被動模式寵物的提示行為。"
-L["Options.PetSummonSettings"] = "寵物召喚設置"
-L["Options.PetSummonSettings.Note"] = "配置寵物召喚行為。"
-L["Options.DelveFoodSettings"] = "探究食物設定"
-L["Options.DelveFoodSettings.Note"] = "設置探究食物的提示行為。"
 L["Options.DelveFoodTimer"] = "30秒後自動隱藏"
 L["Options.DelveFoodTimer.Desc"] =
     "當啟用後，進入探究後，探究食物提醒僅出現30秒，然後自動隱藏。當停用後，只要您位於探究並且缺少增益效果，該提醒就會保持可見。"
@@ -651,31 +592,14 @@ L["Options.SplitFrame.Desc"] = "將此類別中的增益顯示在可獨立移動
 -- Display Order section (Defaults page) - drives the same priority field the
 -- old per-category slider wrote, but as a single ordered list across all
 -- non-split categories.
-L["Options.DisplayOrder"] = "顯示順序"
 L["Options.DisplayOrder.Note"] =
     "類別如何在組合框架內從上到下堆疊。分離的類別存在於它們自己的框架中不參與。"
-L["Options.DisplayOrder.SplitGroup"] = "分離 (獨立框架)"
-L["Options.DisplayOrder.SplitBadge"] = "分離"
 
 -- Detached Icons page (search-driven dual-list manager).
-L["DetachedIcons.PageNote"] =
-    "將單一增益從其類別中拉出到其自己的獨立定位框架中。分離的圖示保留自己的定位點，並且在框架解鎖時可以獨立移動。"
-L["DetachedIcons.Search"] = "搜尋:"
-L["DetachedIcons.Available"] = "可用"
-L["DetachedIcons.CurrentlyDetachedCount"] = "目前已分離 (%d)"
-L["DetachedIcons.NoneDetached"] = "沒有分離的圖示。找到下面的增益並點擊分離"
-L["DetachedIcons.NoMatches"] = "無符合的。"
-L["DetachedIcons.Detach"] = "分離"
-L["DetachedIcons.Reattach"] = "重新連接"
-L["DetachedIcons.ResetPos"] = "重置"
-L["DetachedIcons.ReattachAll"] = "全部重新連接"
 
 -- ============================================================================
 -- OPTIONS: APPEARANCE
 -- ============================================================================
-L["Options.CustomAppearance"] = "使用自定義外觀"
-L["Options.CustomAppearance.Desc"] =
-    "禁用時，此類別將繼承全局預設值的外觀設置。必須分離為獨立框架才能自定義增長方向。"
 L["Options.Customize"] = "自定義"
 L["Options.ResetPosition"] = "重置位置"
 L["Options.MasqueNote"] = "縮放和邊框設置由Masque管理。"

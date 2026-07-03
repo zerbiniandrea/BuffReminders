@@ -316,9 +316,10 @@ english["Tab.DisplayBehavior"] = "Display/Behavior"
 
 -- Sidebar groups
 english["Sidebar.General"] = "General"
-english["Sidebar.Buffs"] = "Buffs"
-english["Sidebar.DisplayBehavior"] = "Display & Behavior"
-english["Sidebar.Loadouts"] = "Gear & Talents"
+english["Sidebar.BuffsReminders"] = "Buffs & Reminders"
+english["Sidebar.Appearance"] = "Appearance"
+english["Sidebar.Display"] = "Display"
+english["Sidebar.Alerts"] = "Alerts"
 english["Sidebar.Profiles"] = "Profiles"
 
 -- Page titles
@@ -326,33 +327,26 @@ english["Page.General"] = "General"
 english["Page.Defaults"] = "Defaults"
 english["Page.Visibility"] = "Visibility"
 english["Page.ChatRequests"] = "Chat Requests"
-english["Page.AnchorFrames"] = "Anchor Frames"
+english["Page.Layout"] = "Layout"
+english["Page.Categories"] = "Categories"
 english["Page.Profiles"] = "Profiles"
 english["Page.AllBuffs"] = "All Buffs"
-english["Page.DetachedIcons"] = "Detached Icons"
-english["Page.Sounds"] = "Sounds"
-english["Page.Sounds.Desc"] =
-    "Play a sound when a tracked buff is missing. Alerts apply across all buff categories - assign one per buff."
 
 -- Per-category page section headers
 english["Section.Tracking"] = "Tracking"
-english["Section.TrackingOverrides"] = "Tracking overrides"
+english["Section.TrackingOverrides"] = "Tracking Overrides"
 english["Section.TrackingOverrides.Desc"] =
     "Narrow the tracking mode in specific situations. Leave a situation on Default to always use the mode above. When several apply at once (e.g. fighting while leveling), the most restrictive one wins."
+english["DisabledReason.PvPDisabled"] = "This category is hidden in PvP entirely (see the Visibility page)."
 
 -- ============================================================================
 -- OPTIONS: SOUND ALERTS
 -- ============================================================================
-english["Options.Sound.NoAlerts"] = "No sound alerts configured."
-english["Options.Sound.AddAlert"] = "Add Sound Alert"
-english["Options.Sound.Title"] = "Add Sound Alert"
-english["Options.Sound.EditTitle"] = "Edit Sound Alert"
-english["Options.Sound.SelectBuff"] = "Select Buff"
-english["Options.Sound.SelectSound"] = "Select Sound"
+-- Sound alerts are set per buff in the buff panel (BuffPanel); the sound
+-- dropdown + Preview button live there. The old standalone Sounds page and
+-- add/edit dialog were retired, so only the in-panel labels remain.
 english["Options.Sound.Preview"] = "Preview"
 english["Options.Preview"] = "Preview"
-english["Options.Sound.Save"] = "Save"
-english["Options.Sound.NoBuffs"] = "All buffs already have sounds."
 
 -- ============================================================================
 -- OPTIONS: GLOBAL DEFAULTS
@@ -372,26 +366,30 @@ english["Options.TextOutline.ThickMono"] = "Thick + Monochrome"
 -- ============================================================================
 -- OPTIONS: GLOW SETTINGS
 -- ============================================================================
-english["Options.GlowReminderIcons"] = "Glow reminder icons"
 english["Options.GlowReminderIcons.Title"] = "Glow Reminder Icons"
-english["Options.GlowReminderIcons.Desc"] =
-    "Add a glow effect to reminder icons. Customize to configure expiring and missing glows independently."
 english["Options.GlowReminderIcons.CpuWarning"] =
     "Glow animates every frame for each icon on screen, so it uses more CPU. If an icon stays up for a long time (e.g. a buff you don't rebuff mid-fight), that cost is continuous. Disabled by default for this reason."
 english["Options.GlowKind.Expiring"] = "Expiring"
 english["Options.GlowKind.Missing"] = "Missing"
+english["Options.ExpiringGlow"] = "Expiring glow"
+english["Options.ExpiringGlow.Desc"] = "Glow icons whose buff is still active but running out soon."
+english["Options.MissingGlow"] = "Missing glow"
+english["Options.MissingGlow.Desc"] = "Glow icons whose buff is completely missing."
 english["Options.GlowSettings.Expiring"] = "Glow Settings - Expiring"
 english["Options.GlowSettings.Missing"] = "Glow Settings - Missing"
 english["Options.Glow.Enabled"] = "Enabled"
 english["Options.Threshold"] = "Threshold"
 english["Options.GlowMissingPets"] = "Glow missing pets"
-english["Options.CustomGlowStyle"] = "Custom glow style"
 english["Options.Expiration"] = "Expiration"
 english["Options.Glow"] = "Glow"
 english["Options.UseCustomColor"] = "Use Custom Color"
 english["Options.UseCustomColor.Desc"] =
     "When enabled, the proc glow is desaturated and recolored.\nThis looks less vibrant than the default proc glow."
 english["Options.ExpirationReminder"] = "Expiration Reminder"
+english["Options.Timing"] = "Timing"
+english["Options.UseDefaultThreshold"] = "Use default threshold"
+english["Options.UseDefaultThreshold.Desc"] =
+    "When checked, this category follows the global expiration threshold from the Defaults page.\nUncheck to set a category-specific threshold."
 english["Options.PreKeyThreshold"] = "Pre-Key Threshold"
 english["Options.PreKeyThreshold.Desc"] =
     "Use a longer expiration threshold when inside a Mythic dungeon (M0) before a keystone is inserted.\nHelps ensure your buffs are fresh before the key goes in."
@@ -423,15 +421,6 @@ english["Options.Visibility"] = "Visibility"
 -- ============================================================================
 -- OPTIONS: HEALTHSTONE
 -- ============================================================================
-english["Options.Healthstone.ReadyCheckOnly"] = "Ready check only"
-english["Options.Healthstone.ReadyCheckWarlock"] = "Ready check + warlock always"
-english["Options.Healthstone.AlwaysShow"] = "Always show"
-english["Options.Healthstone.Visibility"] = "Healthstone visibility"
-english["Options.Healthstone.Visibility.Desc"] =
-    "Controls when the healthstone reminder appears.\n\n|cffffcc00Ready check only:|r Only during ready checks (15s window).\n|cffffcc00Ready check + warlock always:|r Warlocks always see it; others only on ready check.\n|cffffcc00Always show:|r Visible whenever you're in matching content."
-english["Options.Healthstone.WarlockAlwaysDesc"] = "Warlocks always see the reminder; other classes only on ready check"
-english["Options.Healthstone.ReadyCheckDesc"] = "Show for 15 seconds after a ready check starts"
-english["Options.Healthstone.AlwaysDesc"] = "Show whenever the content type matches"
 english["Options.Healthstone.LowStock"] = "Warn when low"
 english["Options.Healthstone.LowStock.Desc"] =
     "Show a soft warning when you have healthstones but not enough. Missing healthstones (0) are always tracked regardless of this setting."
@@ -442,15 +431,6 @@ english["Options.Healthstone.Threshold.Desc"] =
 -- ============================================================================
 -- OPTIONS: SOULSTONE
 -- ============================================================================
-english["Options.Soulstone.Visibility"] = "Soulstone visibility"
-english["Options.Soulstone.Visibility.Desc"] =
-    "Controls when the soulstone reminder appears.\n\n|cffffcc00Ready check only:|r Only during ready checks (default).\n|cffffcc00Ready check + warlock always:|r Warlocks always see it; others only on ready check.\n|cffffcc00Always show:|r Visible whenever the presence category is visible."
-english["Options.Soulstone.ReadyCheckOnly"] = "Ready check only"
-english["Options.Soulstone.ReadyCheckWarlock"] = "Ready check + warlock always"
-english["Options.Soulstone.AlwaysShow"] = "Always show"
-english["Options.Soulstone.ReadyCheckDesc"] = "Show for 15 seconds after a ready check starts"
-english["Options.Soulstone.WarlockAlwaysDesc"] = "Warlocks always see it; other classes only on ready check"
-english["Options.Soulstone.AlwaysDesc"] = "Show whenever the presence category is visible"
 english["Options.Soulstone.HideCooldown"] = "Hide when on cooldown (warlock)"
 english["Options.Soulstone.HideCooldown.Desc"] =
     "When enabled, warlocks won't see the soulstone reminder while the spell is on cooldown. Only applies to warlocks."
@@ -507,9 +487,10 @@ english["Options.HoverHighlight.Desc"] = "Show a subtle highlight when hovering 
 english["Options.RequestBuffInChat"] = "Request missing buffs in chat"
 english["Options.RequestBuffInChat.Desc"] =
     "Click a missing buff your class cannot provide to request it in chat. Auto-detects channel (instance/raid/party/say)."
-english["Options.ChatRequest.FixAttempt"] = "|cffffd200EXPERIMENTAL|r Attempt to fix chat requests not being sent"
-english["Options.ChatRequest.FixAttempt.Desc"] =
-    "Enable this only if your chat requests aren't being sent. This also disables the 5-second click cooldown that prevents accidental spam-clicking."
+english["Options.ChatRequest.Cooldown"] = "Chat request cooldown"
+english["Options.ChatRequest.Cooldown.Desc"] =
+    "Waits 5 seconds between chat requests to prevent accidental spam-clicking.\nIf your requests sometimes aren't sent to chat at all, turn this off."
+english["Options.ChatRequest.Cooldown.Hint"] = "Requests not showing up in chat? Turn this off."
 english["Options.ChatRequest.ResetAll"] = "Reset All"
 english["ChatRequests.PerBuffMessages"] = "Per-buff messages"
 -- Chat request messages (keyed by buff.key, sent as-is via SendChatMessage)
@@ -605,9 +586,6 @@ english["Options.HideLegacyConsumables.Desc"] =
 -- ============================================================================
 -- OPTIONS: DK RUNEFORGE PREFERENCES
 -- ============================================================================
-english["Options.RuneforgePreferences"] = "Runeforge Preferences"
-english["Options.RuneforgeNote"] =
-    "Select your expected runeforge per spec. A reminder shows when the wrong or no runeforge is applied."
 english["Options.RuneMainHand"] = "Main Hand"
 english["Options.RuneOffHand"] = "Off Hand"
 english["Options.RuneTwoHanded"] = "Two-Handed"
@@ -616,7 +594,6 @@ english["Options.RuneDualWield"] = "Dual Wield"
 -- ============================================================================
 -- OPTIONS: ROGUE POISON PREFERENCES
 -- ============================================================================
-english["Options.RoguePoisonPreferences"] = "Rogue Poison Preferences"
 english["Options.RoguePoisonNote"] =
     "Choose which poisons to apply and their priority order (top = highest). Disabled poisons are never cast and do not trigger reminders."
 english["Options.PoisonLethal"] = "Lethal"
@@ -628,26 +605,12 @@ english["Options.PoisonReset"] = "Reset to Default"
 -- ============================================================================
 -- OPTIONS: BUFF SETTINGS GEAR ICONS
 -- ============================================================================
-english["Options.HealthstoneSettings"] = "Healthstone Settings"
-english["Options.HealthstoneSettings.Note"] = "Configure visibility and low stock threshold."
-english["Options.SoulstoneSettings"] = "Soulstone Settings"
-english["Options.SoulstoneSettings.Note"] = "Configure when the soulstone reminder appears."
-english["Options.BronzeSettings"] = "Blessing of the Bronze Settings"
-english["Options.BronzeSettings.Note"] = "Configure the Blessing of the Bronze reminder."
 english["Options.BronzeHideInCombat"] = "Hide in combat"
 english["Options.BronzeHideInCombat.Desc"] =
     "Hide the Blessing of the Bronze reminder during combat. This buff is less critical and you may not want to rebuff mid-fight."
-english["Options.DruidFormSettings"] = "Druid Form Settings"
-english["Options.DruidFormSettings.Note"] = "Configure the wrong-form reminder."
 english["Options.DruidIgnoreTravelForm"] = "Ignore while traveling"
 english["Options.DruidIgnoreTravelForm.Desc"] =
     "Hide the wrong-form reminder while in Travel Form (ground, aquatic, flight, or Mount Form) or while mounted, so it doesn't nag you when you're intentionally traveling."
-english["Options.PetPassiveSettings"] = "Pet Passive Settings"
-english["Options.PetPassiveSettings.Note"] = "Configure the passive pet reminder."
-english["Options.PetSummonSettings"] = "Pet Summon Settings"
-english["Options.PetSummonSettings.Note"] = "Configure pet summoning behavior."
-english["Options.DelveFoodSettings"] = "Delve Food Settings"
-english["Options.DelveFoodSettings.Note"] = "Configure the delve food reminder behavior."
 english["Options.DelveFoodTimer"] = "Auto-hide after 30 seconds"
 english["Options.DelveFoodTimer.Desc"] =
     "When enabled, the delve food reminder only appears for 30 seconds after entering a delve, then hides automatically. When disabled, the reminder stays visible as long as you are in a delve and missing the buff."
@@ -662,31 +625,96 @@ english["Options.SplitFrame.Desc"] = "Display this category's buffs in a separat
 -- Display Order section (Defaults page) - drives the same priority field the
 -- old per-category slider wrote, but as a single ordered list across all
 -- non-split categories.
-english["Options.DisplayOrder"] = "Display Order"
+english["Options.DisplayOrder"] = "Stacking Order"
+english["Options.DisplayOrder.Moved"] = "Looking for Display Order? It moved to the Layout page."
+
+-- Layout page
+english["Layout.PositionFrames"] = "Position Frames"
+english["Layout.PositionFrames.Note"] =
+    "Unlock to get drag handles in-game. Click a handle to type exact coordinates; drag to reposition. Anchored frames keep their anchor while dragging."
+english["Layout.SplitFrames"] = "Split Frames"
+english["Layout.SplitFrames.Note"] =
+    "Categories split into their own independently positioned frame. Split a category from the Layout section of its page."
+english["Layout.NoSplitFrames"] = "No categories are split into their own frame."
+english["Layout.DetachedIcons"] = "Detached Icons"
+english["Layout.NoDetached"] =
+    'No detached icons. Detach a buff from its settings panel on the All Buffs page ("Own frame").'
+english["Layout.AnchorTargets"] = "Anchor Targets"
+english["Layout.AnchorFrame.Desc"] = "Attach this frame to another frame instead of a fixed screen position."
+english["Layout.AnchorPoint.Desc"] = "Which corner or edge of the anchor frame to attach to."
+english["Layout.FrameNotFound"] =
+    "This frame doesn't currently exist in-game.\nIt will appear in anchor dropdowns once its addon creates it."
+english["DisabledReason.AnchorPoint"] =
+    "Pick an anchor frame first - anchor points only apply when anchored to a frame."
+
+-- Buff panel (uniform per-buff settings dialog)
+english["BuffPanel.SettingsLink"] = "Settings"
+english["BuffRow.SettingsLink.Tooltip"] = "Sound alert, show mode, and detach options for this buff."
+-- Row captions: the gold "option: value" line under buffs with their own
+-- options (All Buffs page). %s is the current value. The trailing "clickable
+-- link" chevron is appended in code (_BuffRow.lua), not stored here, so
+-- translators never handle the raw escape.
+english["BuffRow.Caption.Poisons"] = "Poisons: %s"
+english["BuffRow.Caption.PoisonsUnset"] = "Choose which poisons you use"
+english["BuffRow.Caption.Runeforge"] = "Runeforge: %s"
+english["BuffRow.Caption.RuneforgeUnset"] = "Set your runeforge per spec"
+english["BuffRow.Caption.Healthstone"] = "Low-stock alert: below %d"
+english["BuffRow.Caption.HealthstoneOff"] = "Low-stock alert: off"
+english["BuffRow.Caption.SoulstoneHidden"] = "Hidden while on cooldown"
+english["BuffRow.Caption.SoulstoneShown"] = "Shown while on cooldown"
+english["BuffRow.Caption.BronzeHidden"] = "Hidden in combat"
+english["BuffRow.Caption.BronzeShown"] = "Shown in combat"
+english["BuffRow.Caption.TravelIgnored"] = "Travel Form ignored"
+english["BuffRow.Caption.TravelCounts"] = "Travel Form counts as wrong"
+english["BuffRow.Caption.PetPassiveCombat"] = "Warns in combat only"
+english["BuffRow.Caption.PetPassiveAlways"] = "Warns anywhere"
+english["BuffRow.Caption.FelOn"] = "Uses Fel Domination"
+english["BuffRow.Caption.FelOff"] = "Fel Domination off"
+english["BuffRow.Caption.FoodTimerOn"] = "Shows expiry timer"
+english["BuffRow.Caption.FoodTimerOff"] = "No expiry timer"
+-- Trailing link on the All Buffs row: a gold "Extras" for any buff with its own
+-- options (vs the gray "Settings" for the rest); the specific option is named
+-- inside the drawer. The two rich editors keep their name for the drawer's
+-- "Edit X" door.
+english["BuffRow.Extras"] = "Extras"
+english["BuffRow.Option.Poisons"] = "Poisons"
+english["BuffRow.Option.Runeforge"] = "Runeforge"
+-- Row state glyph tooltips (the small sound / pin markers left of the link).
+english["BuffRow.Glyph.Sound"] = "Sound alert"
+english["BuffRow.Glyph.Detached"] = "Detached icon"
+english["BuffRow.Glyph.Detached.Desc"] =
+    "This icon is placed freely on screen. Manage it in the buff's Settings or on the Layout page."
+-- Drawer door to a buff's focused editor (poison/runeforge). %s = option name.
+english["BuffPanel.EditOption"] = "Edit %s"
+english["BuffPanel.Show"] = "Show"
+english["BuffPanel.Sound"] = "Sound"
+english["BuffPanel.Sound.None"] = "None"
+english["BuffPanel.Detached"] = "Own frame (detached)"
+english["BuffPanel.Detached.Desc"] =
+    "Pull this buff out of its category into its own independently positioned frame.\nPosition it from the Layout page or by unlocking frames."
+english["BuffPanel.CasterAlways"] = "Warlocks always see it"
+english["BuffPanel.CasterAlways.Desc"] =
+    "Warlocks (who provide this) always see the reminder; everyone else only on ready check."
+english["DisabledReason.NotDetached"] = "This buff isn't detached - it sits inside its category frame."
+english["DisabledReason.CasterAlways"] = 'Only applies in ready-check mode. Switch "Show" back to ready check first.'
 english["Options.DisplayOrder.Note"] =
     "How categories stack inside the combined frame, from top to bottom. Split categories live in their own frames and don't participate."
-english["Options.DisplayOrder.SplitGroup"] = "Split (independent frames)"
-english["Options.DisplayOrder.SplitBadge"] = "split"
 
--- Detached Icons page (search-driven dual-list manager).
-english["DetachedIcons.PageNote"] =
-    "Pull a single buff out of its category into its own independently-positioned frame. Detached icons keep their own anchor and can be moved independently when frames are unlocked."
-english["DetachedIcons.Search"] = "Search:"
-english["DetachedIcons.Available"] = "Available"
-english["DetachedIcons.CurrentlyDetachedCount"] = "Currently detached (%d)"
-english["DetachedIcons.NoneDetached"] = "No icons detached. Find a buff below and click Detach."
-english["DetachedIcons.NoMatches"] = "No matches."
-english["DetachedIcons.Detach"] = "Detach"
-english["DetachedIcons.Reattach"] = "Reattach"
-english["DetachedIcons.ResetPos"] = "Reset"
-english["DetachedIcons.ReattachAll"] = "Reattach all"
+-- Detached Icons (inline manager on the Layout page).
+english["DetachedIcons.Reattach"] = "Return to category"
+english["DetachedIcons.ResetPos"] = "Reset position"
 
 -- ============================================================================
 -- OPTIONS: APPEARANCE
 -- ============================================================================
-english["Options.CustomAppearance"] = "Use custom appearance"
-english["Options.CustomAppearance.Desc"] =
-    "When disabled, this category inherits appearance settings from Global Defaults. Grow direction requires splitting into a separate frame."
+english["Options.Appearance"] = "Appearance"
+english["Options.Override"] = "Override"
+english["Options.Override.Inherited"] = "Inherited from Defaults"
+english["Options.Override.Overriding"] = "Overriding defaults"
+english["Options.Override.Appearance.Desc"] =
+    "Override the global appearance defaults for this category.\nWhile off, the controls below show the inherited values from the Defaults page."
+english["Options.Override.Glow.Desc"] =
+    "Override the global glow settings for this category.\nWhile off, the controls below show the inherited values from the Defaults page."
 english["Options.Customize"] = "Customize"
 english["Options.ResetPosition"] = "Reset Position"
 english["Options.MasqueNote"] = "Zoom and Border settings are managed by Masque"
@@ -825,6 +853,7 @@ english["CustomBuff.Edit"] = "Edit Custom Buff"
 english["CustomBuff.EditShort"] = "Edit"
 english["CustomBuff.Add"] = "Add Custom Buff"
 english["CustomBuff.AddButton"] = "+ Add Custom Buff"
+english["CustomBuff.Empty"] = "No custom buffs yet. Add one below."
 english["CustomBuff.SpellIDs"] = "Spell IDs:"
 english["CustomBuff.Lookup"] = "Lookup"
 english["CustomBuff.AddSpellID"] = "+ Add Spell ID"
@@ -965,6 +994,28 @@ english["Appearance.Text"] = "Text"
 english["Component.AdjustValue"] = "Adjust value"
 english["Component.AdjustValue.Desc"] = "Click to type or use mouse wheel"
 english["Component.AdjustValue.ClickHint"] = "Click the number to input a specific value"
+
+-- Scope tag for globally-stored controls on category pages
+english["Options.GlobalTag"] = "GLOBAL"
+english["Options.GlobalTag.Title"] = "Applies everywhere"
+english["Options.GlobalTag.Desc"] =
+    "This setting is stored once for the whole addon.\nChanging it here changes it for every category, not just this one."
+
+-- Disabled-control explanations (shown on hover while the control is disabled)
+english["Component.DisabledReason.Title"] = "Why is this disabled?"
+english["DisabledReason.GrowDirection"] =
+    'Grow direction needs this category in its own frame.\nEnable "Split into separate frame" in the Layout section first.'
+english["DisabledReason.ResetPosition"] =
+    'Only split categories have their own position.\nEnable "Split into separate frame" first.'
+english["DisabledReason.OverrideSection"] = 'Turn on "Override" at the top of this section first.'
+english["DisabledReason.CombatOverride"] =
+    '"In combat" hiding is enabled above, so nothing shows in combat and this override would have no effect.\nUncheck it to use a combat tracking override.'
+english["DisabledReason.LevelingOverride"] =
+    '"Leveling" hiding is enabled above, so nothing shows while leveling and this override would have no effect.\nUncheck it to use a leveling tracking override.'
+english["DisabledReason.ExpiringInCombat"] =
+    '"In combat" hiding is enabled, so everything is already hidden during combat.'
+english["DisabledReason.HealthstoneThreshold"] = 'Enable "Warn when low" first.'
+english["DisabledReason.UseDefaultThreshold"] = 'Uncheck "Use default threshold" to set a category-specific value.'
 
 -- Direction labels
 english["Direction.Left"] = "Left"

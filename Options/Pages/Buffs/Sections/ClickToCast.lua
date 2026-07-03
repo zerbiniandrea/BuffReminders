@@ -112,6 +112,8 @@ local function Build(ctx, layout)
                 BR.Config.Set("defaults.showBuffTooltips", checked)
             end,
         })
+        -- One key shared by the raid AND presence pages: flag the blast radius.
+        BR.Options.Helpers.AttachGlobalTag(showBuffTooltipsHolder)
         layout:Add(showBuffTooltipsHolder, nil, COMPONENT_GAP)
     end
 

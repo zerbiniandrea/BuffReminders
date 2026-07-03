@@ -1,15 +1,33 @@
 local _, BR = ...
 
+-- ============================================================================
+-- RUNEFORGE EDITOR (inline section)
+-- ============================================================================
+-- A 4-tab strip (Blood / Frost 2H / Frost Dual-Wield / Unholy) of accepted
+-- runeforge checkboxes, stored per spec. Formerly a standalone dialog opened by
+-- a button inside the buff panel; now rendered INLINE at the top of the
+-- Runeforge buff panel so the choice is one click away, not two windows deep.
+--
+-- BuildInline(parent, opts) draws the editor into `parent` at (opts.x, opts.y)
+-- within opts.width and returns the vertical space it consumed. The buff panel
+-- rebuilds its body (and this editor) on every open, so no persistent-dialog
+-- caching is needed. Checkbox holders are handed to opts.registerHolder so the
+-- panel can unregister them on teardown.
+
 local L = BR.L
 local Components = BR.Components
-local CreateButton = BR.CreateButton
-local CreatePanel = BR.CreatePanel
 
 local UpdateDisplay = BR.Display.Update
 
-local runeforgeDialog = nil
+local CHECKBOX_HEIGHT = 22
+local CHECKBOX_GAP = 3
+local TAB_HEIGHT = 24
+local TAB_GAP = 2
+local TABS_TO_CONTENT_GAP = 10
+local DW_LABEL_HEIGHT = 18
+local RUNE_LABEL_FONT = "GameFontHighlight"
 
--- Resolve rune icon textures once (cached across dialog opens)
+-- Rune icon textures resolved once (cached across builds).
 local cachedRuneIcons = nil
 local function GetRuneIcons()
     if cachedRuneIcons then
@@ -23,56 +41,45 @@ local function GetRuneIcons()
     return cachedRuneIcons
 end
 
-local function Show()
-    if runeforgeDialog then
-        Components.RefreshAll()
-        runeforgeDialog:Show()
-        return
+local function EnsureSpecPrefs(specId)
+    local db = BR.profile
+    if not db.dkRunePreferences then
+        db.dkRunePreferences = {}
     end
+    if not db.dkRunePreferences[specId] then
+        db.dkRunePreferences[specId] = {}
+    end
+    return db.dkRunePreferences[specId]
+end
 
-    local DIALOG_WIDTH = 560
-    local DIALOG_HEIGHT = 280
-    local MARGIN = 16
-    local CHECKBOX_HEIGHT = 22
-    local CHECKBOX_GAP = 3
-    local RUNE_LABEL_FONT = "GameFontHighlight"
+-- Which tab to open on first show: the player's current spec (dual-wield vs
+-- two-handed for Frost), so a DK lands on the runes that matter right now.
+local function DefaultTabKey()
+    local specId = BR.StateHelpers.GetPlayerSpecId()
+    if specId == 251 then
+        return BR.BuffState.HasOffHandWeapon() and "frostdw" or "frost2h"
+    elseif specId == 252 then
+        return "unholy"
+    end
+    return "blood"
+end
 
-    local dialog = CreatePanel("BuffRemindersRuneforgeDialog", DIALOG_WIDTH, DIALOG_HEIGHT, {
-        level = 200,
-        dialog = true,
-    })
-
-    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -12)
-    title:SetText(L["Options.RuneforgePreferences"])
-
-    local closeBtn = CreateButton(dialog, "x", function()
-        dialog:Hide()
-    end)
-    closeBtn:SetSize(22, 22)
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-
+---Render the runeforge editor into `parent`. Returns the height consumed (px).
+---@param parent table Frame to parent the editor into
+---@param opts table { x, y, width, registerHolder? }
+---@return number height
+local function BuildInline(parent, opts)
+    local x, y, width = opts.x, opts.y, opts.width
+    local register = opts.registerHolder or function(_) end
     local runeIcons = GetRuneIcons()
+    local numRunes = #BR.DK_RUNEFORGES
 
-    local function EnsureSpecPrefs(specId)
-        local db = BR.profile
-        if not db.dkRunePreferences then
-            db.dkRunePreferences = {}
-        end
-        if not db.dkRunePreferences[specId] then
-            db.dkRunePreferences[specId] = {}
-        end
-        return db.dkRunePreferences[specId]
-    end
-
-    -- Helper: create rune checkboxes for a slot
-    local function CreateRuneCheckboxes(parent, specId, slot, x, startY, maxLabelWidth)
-        local y = startY
+    local function CreateRuneCheckboxes(content, specId, slot, cx, startY, maxLabelWidth)
+        local cy = startY
         for _, rune in ipairs(BR.DK_RUNEFORGES) do
             local enchantID = rune.enchantID
-            local runeName = BR.GetSpellName(rune.spellID) or rune.key
-            local runeHolder = Components.Checkbox(parent, {
-                label = runeName,
+            local holder = Components.Checkbox(content, {
+                label = BR.GetSpellName(rune.spellID) or rune.key,
                 labelFont = RUNE_LABEL_FONT,
                 icons = runeIcons[enchantID],
                 get = function()
@@ -89,21 +96,21 @@ local function Show()
                     UpdateDisplay()
                 end,
             })
-            if maxLabelWidth and runeHolder.label then
-                runeHolder.label:SetWidth(maxLabelWidth)
-                runeHolder.label:SetWordWrap(false)
+            if maxLabelWidth and holder.label then
+                holder.label:SetWidth(maxLabelWidth)
+                holder.label:SetWordWrap(false)
             end
-            runeHolder:SetPoint("TOPLEFT", x, y)
-            y = y - (CHECKBOX_HEIGHT + CHECKBOX_GAP)
+            holder:SetPoint("TOPLEFT", cx, cy)
+            register(holder)
+            cy = cy - (CHECKBOX_HEIGHT + CHECKBOX_GAP)
         end
-        return y
+        return cy
     end
 
-    -- 4 top-level tabs: Blood, Frost 2H, Frost DW, Unholy
+    -- Tab definitions (spec + storage slot per column).
     local _, bloodName = GetSpecializationInfoByID(250)
     local _, frostName = GetSpecializationInfoByID(251)
     local _, unholyName = GetSpecializationInfoByID(252)
-
     local DK_TABS = {
         { key = "blood", specId = 250, label = bloodName or "Blood" },
         { key = "frost2h", specId = 251, label = (frostName or "Frost") .. " " .. L["Options.RuneTwoHanded"] },
@@ -113,33 +120,26 @@ local function Show()
 
     local tabButtons = {}
     local tabContents = {}
-
     local function SetActiveTab(activeKey)
         for key, tab in pairs(tabButtons) do
             tab:SetActive(key == activeKey)
         end
         for key, content in pairs(tabContents) do
-            if key == activeKey then
-                content:Show()
-            else
-                content:Hide()
-            end
+            content:SetShown(key == activeKey)
         end
     end
 
-    -- Build tab buttons (evenly distributed across dialog width)
-    local tabGap = 2
-    local totalTabWidth = DIALOG_WIDTH - MARGIN * 2
+    -- Tab strip, evenly distributed across the width.
     local numTabs = #DK_TABS
-    local tabWidth = (totalTabWidth - (numTabs - 1) * tabGap) / numTabs
-
-    local prevTab = nil
+    local tabWidth = (width - (numTabs - 1) * TAB_GAP) / numTabs
+    local prevTab, firstTab
     for _, tabDef in ipairs(DK_TABS) do
-        local tab = Components.Tab(dialog, { label = tabDef.label, width = tabWidth })
+        local tab = Components.Tab(parent, { label = tabDef.label, width = tabWidth })
         if prevTab then
-            tab:SetPoint("LEFT", prevTab, "RIGHT", tabGap, 0)
+            tab:SetPoint("LEFT", prevTab, "RIGHT", TAB_GAP, 0)
         else
-            tab:SetPoint("TOPLEFT", MARGIN, -36)
+            tab:SetPoint("TOPLEFT", x, y)
+            firstTab = tab
         end
         local key = tabDef.key
         tab:SetScript("OnClick", function()
@@ -148,44 +148,41 @@ local function Show()
         tabButtons[key] = tab
         prevTab = tab
     end
+    Components.TabBaseline(parent, firstTab, width)
 
-    local contentWidth = DIALOG_WIDTH - MARGIN * 2
+    -- Content height fits the tallest tab (Frost Dual-Wield adds a column-label
+    -- row above its checkboxes); shorter tabs simply leave slack below.
+    local contentTop = y - TAB_HEIGHT - TABS_TO_CONTENT_GAP
+    local contentH = DW_LABEL_HEIGHT + numRunes * (CHECKBOX_HEIGHT + CHECKBOX_GAP)
 
-    -- Build tab content
     for _, tabDef in ipairs(DK_TABS) do
-        local content = CreateFrame("Frame", nil, dialog)
-        content:SetPoint("TOPLEFT", MARGIN, -60)
-        content:SetPoint("BOTTOMRIGHT", -MARGIN, MARGIN)
+        local content = CreateFrame("Frame", nil, parent)
+        content:SetPoint("TOPLEFT", x, contentTop)
+        content:SetSize(width, contentH)
         content:Hide()
         tabContents[tabDef.key] = content
 
-        local y = -6
-
         if tabDef.key == "frostdw" then
-            -- Frost DW: two columns (MH | OH)
-            local colWidth = contentWidth / 2
-
-            local mhLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            mhLabel:SetPoint("TOPLEFT", 0, y)
+            local colWidth = width / 2
+            local mhLabel = content:CreateFontString(nil, "OVERLAY", RUNE_LABEL_FONT)
+            mhLabel:SetPoint("TOPLEFT", 0, -2)
             mhLabel:SetText("|cffffcc00" .. L["Options.RuneMainHand"] .. "|r")
-
-            local ohLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            ohLabel:SetPoint("TOPLEFT", colWidth, y)
+            local ohLabel = content:CreateFontString(nil, "OVERLAY", RUNE_LABEL_FONT)
+            ohLabel:SetPoint("TOPLEFT", colWidth, -2)
             ohLabel:SetText("|cffffcc00" .. L["Options.RuneOffHand"] .. "|r")
 
             local dwLabelWidth = colWidth - 46
-            CreateRuneCheckboxes(content, tabDef.specId, "dw_mainhand", 6, y - 16, dwLabelWidth)
-            CreateRuneCheckboxes(content, tabDef.specId, "dw_offhand", colWidth + 6, y - 16, dwLabelWidth)
+            CreateRuneCheckboxes(content, tabDef.specId, "dw_mainhand", 6, -DW_LABEL_HEIGHT, dwLabelWidth)
+            CreateRuneCheckboxes(content, tabDef.specId, "dw_offhand", colWidth + 6, -DW_LABEL_HEIGHT, dwLabelWidth)
         else
-            -- Blood / Frost 2H / Unholy: single column
-            CreateRuneCheckboxes(content, tabDef.specId, "mainhand", 6, y)
+            CreateRuneCheckboxes(content, tabDef.specId, "mainhand", 6, -2)
         end
     end
 
-    SetActiveTab("blood")
+    SetActiveTab(DefaultTabKey())
 
-    runeforgeDialog = dialog
-    dialog:Show()
+    local finalY = contentTop - contentH
+    return y - finalY
 end
 
-BR.Options.Dialogs.Runeforge = { Show = Show }
+BR.Options.Dialogs.Runeforge = { BuildInline = BuildInline }

@@ -309,7 +309,7 @@ local DefaultSettingKeys = {
 -- display stacking, the Defaults "Display Order" UI, the movers, and config
 -- validation. Adding a category here automatically wires it into config-path
 -- validation (ValidCategories below), the display loop (BR.CATEGORIES), the
--- reorder UI (ALL_CATEGORIES), and the sidebar page map (CategoryPages) -- all
+-- reorder UI (ALL_CATEGORIES), and the Categories page tab strip -- all
 -- of which derive from this list instead of repeating it. Forgetting to extend
 -- one of those parallel lists is what silently breaks live config updates, so
 -- there is exactly one list to maintain.
@@ -587,13 +587,18 @@ local AppearanceKeys = {
     iconZoom = true,
     borderSize = true,
     growDirection = true,
+}
+-- NOTE: expirationThreshold is deliberately NOT an appearance key. It is a timing/behavior
+-- setting and uses the standard per-key fallback (category value if set, else defaults),
+-- independent of useCustomAppearance. Stale pre-2.5 values stored while the appearance
+-- flag was off are cleaned up in Migrations.lua.
+
+-- Keys that are glow-related (inherit from defaults when useCustomGlow is false).
+-- Includes the per-kind ENABLE flags: the Glow override owns both whether each
+-- glow kind fires and how it looks, independent of the appearance override.
+local GlowKeys = {
     showExpirationGlow = true,
     showMissingGlow = true,
-    expirationThreshold = true,
-}
-
--- Keys that are glow-style-related (inherit from defaults when useCustomGlow is false)
-local GlowKeys = {
     glowType = true,
     glowColor = true,
     glowSize = true,
@@ -652,9 +657,11 @@ function BR.Config.GetCategorySetting(category, key)
         return catSettings[key]
     end
 
-    -- Glow style keys: inherit from defaults unless BOTH useCustomAppearance and useCustomGlow are true
+    -- Glow keys: inherit from defaults unless useCustomGlow is true.
+    -- Independent of useCustomAppearance - glow and appearance are separate
+    -- override switches.
     if GlowKeys[key] then
-        if not catSettings.useCustomAppearance or not catSettings.useCustomGlow then
+        if not catSettings.useCustomGlow then
             return db.defaults and db.defaults[key]
         end
         return catSettings[key]
@@ -679,7 +686,7 @@ function BR.Config.HasCustomAppearance(category)
     return db.categorySettings[category].useCustomAppearance == true
 end
 
----Check if a category has custom glow style enabled (requires custom appearance)
+---Check if a category has custom glow enabled (independent of custom appearance)
 ---@param category string
 ---@return boolean
 function BR.Config.HasCustomGlow(category)
@@ -687,8 +694,7 @@ function BR.Config.HasCustomGlow(category)
     if not db or not db.categorySettings or not db.categorySettings[category] then
         return false
     end
-    local cat = db.categorySettings[category]
-    return cat.useCustomAppearance == true and cat.useCustomGlow == true
+    return db.categorySettings[category].useCustomGlow == true
 end
 
 -- ============================================================================
@@ -728,7 +734,9 @@ function BR.CreatePanel(name, width, height, options)
     panel:RegisterForDrag("LeftButton")
     panel:SetScript("OnDragStart", panel.StartMoving)
     panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
-    panel:SetFrameStrata(options.strata or "DIALOG")
+    -- Dialogs default to FULLSCREEN_DIALOG so they always sit above the main
+    -- options panel (which is on DIALOG); plain panels stay on DIALOG.
+    panel:SetFrameStrata(options.strata or (isDialog and "FULLSCREEN_DIALOG" or "DIALOG"))
     if options.level then
         panel:SetFrameLevel(options.level)
     end

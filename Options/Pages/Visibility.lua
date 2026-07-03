@@ -3,8 +3,10 @@ local _, BR = ...
 -- ============================================================================
 -- VISIBILITY PAGE
 -- ============================================================================
--- "What do I see?" - gating rules for when the panel hides plus the buff
--- tracking mode that controls which auras count as missing.
+-- "What do I see?" - the global gating rules for when the panel hides plus the
+-- buff tracking mode that controls which auras count as missing. Per-category
+-- content visibility (W/S/D/R) lives on each category's own tab (Categories
+-- page), not here.
 --
 -- The Hide When list folds the legacy "Show only in group" toggle in as a
 -- "When alone" entry. The DB key (showOnlyInGroup) is reused as-is - checked
@@ -57,6 +59,7 @@ local HIDE_WHEN_ROWS = {
         enabled = function()
             return BR.profile.hideInCombat ~= true
         end,
+        disabledReason = "DisabledReason.ExpiringInCombat",
     },
     {
         key = "hideWhileMounted",
@@ -115,6 +118,7 @@ local function BuildHideWhenSection(content, layout)
             get = MakeProfileGetter(row.key, row.default),
             onChange = onChange,
             enabled = row.enabled,
+            disabledReason = row.disabledReason and L[row.disabledReason] or nil,
         }
         if row.tooltipTitle then
             cfg.tooltip = { title = L[row.tooltipTitle], desc = L[row.tooltipDesc] }
@@ -219,6 +223,7 @@ local function BuildTrackingOverridesSection(content, layout)
                 return BR.Config.Get(cfg.path)
             end,
             enabled = cfg.enabled,
+            disabledReason = cfg.disabledReason,
             onChange = function(val)
                 BR.Config.Set(cfg.path, val)
             end,
@@ -246,6 +251,7 @@ local function BuildTrackingOverridesSection(content, layout)
         enabled = function()
             return BR.profile.hideInCombat ~= true
         end,
+        disabledReason = L["DisabledReason.CombatOverride"],
     })
 
     OverrideDropdown({
@@ -259,6 +265,7 @@ local function BuildTrackingOverridesSection(content, layout)
         enabled = function()
             return BR.profile.hideWhileLeveling ~= true
         end,
+        disabledReason = L["DisabledReason.LevelingOverride"],
     })
 end
 

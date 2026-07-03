@@ -256,22 +256,15 @@ L["Display.LoginFirstInstall"] =
 L["Tab.DisplayBehavior"] = "显示与行为"
 
 -- Sidebar groups
-L["Sidebar.Buffs"] = "增益"
-L["Sidebar.DisplayBehavior"] = "显示与行为"
 L["Sidebar.General"] = "常规"
 L["Sidebar.Profiles"] = "配置文件"
 
 -- Page titles
 L["Page.AllBuffs"] = "所有增益"
-L["Page.AnchorFrames"] = "锚点框体"
 L["Page.ChatRequests"] = "聊天频道请求"
 L["Page.Defaults"] = "默认值"
-L["Page.DetachedIcons"] = "已分离图标"
 L["Page.General"] = "常规"
 L["Page.Profiles"] = "配置文件"
-L["Page.Sounds"] = "声音提醒"
-L["Page.Sounds.Desc"] =
-    "当追踪的增益缺失时播放声音。警报适用于所有增益类别——请为每个增益单独指定。"
 L["Page.Visibility"] = "可见性"
 
 -- Section headers
@@ -288,10 +281,7 @@ L["Options.Font"] = "字体"
 -- ============================================================================
 -- OPTIONS: GLOW SETTINGS
 -- ============================================================================
-L["Options.GlowReminderIcons"] = "提示图标发光"
 L["Options.GlowReminderIcons.Title"] = "提示图标发光"
-L["Options.GlowReminderIcons.Desc"] =
-    "为所有显示的提示图标添加发光效果，包括缺失和即将过期的增益。"
 L["Options.GlowKind.Expiring"] = "即将过期"
 L["Options.GlowKind.Missing"] = "缺失"
 L["Options.PreKeyThreshold"] = "插钥匙前阈值"
@@ -302,7 +292,6 @@ L["Options.GlowSettings.Missing"] = "发光设置 - 缺失"
 L["Options.Glow.Enabled"] = "启用"
 L["Options.Threshold"] = "阈值"
 L["Options.GlowMissingPets"] = "缺失宠物发光"
-L["Options.CustomGlowStyle"] = "自定义发光样式"
 L["Options.Expiration"] = "过期"
 L["Options.Glow"] = "发光"
 L["Options.UseCustomColor"] = "使用自定义颜色"
@@ -337,15 +326,6 @@ L["Options.Visibility"] = "显示条件"
 -- ============================================================================
 -- OPTIONS: HEALTHSTONE
 -- ============================================================================
-L["Options.Healthstone.ReadyCheckOnly"] = "仅就位确认时"
-L["Options.Healthstone.ReadyCheckWarlock"] = "就位确认 + 术士始终显示"
-L["Options.Healthstone.AlwaysShow"] = "始终显示"
-L["Options.Healthstone.Visibility"] = "治疗石显示"
-L["Options.Healthstone.Visibility.Desc"] =
-    "设置何时显示治疗石提示。\n\n|cffffcc00仅就位确认时:|r 仅在就位确认（15秒内）时显示。\n|cffffcc00就位确认 + 术士始终显示:|r 术士始终显示，其他职业仅在就位确认时显示。\n|cffffcc00始终显示:|r 在符合设置的内容类型中始终显示。"
-L["Options.Healthstone.WarlockAlwaysDesc"] = "术士始终显示提示，其他职业仅在就位确认时显示"
-L["Options.Healthstone.ReadyCheckDesc"] = "在就位确认后15秒内显示"
-L["Options.Healthstone.AlwaysDesc"] = "在符合当前内容类型时始终显示"
 L["Options.Healthstone.LowStock"] = "治疗石不足警告"
 L["Options.Healthstone.LowStock.Desc"] =
     "当有治疗石但数量较少时显示警告。不管此设置如何，没有治疗石（0个）时都会被追踪。"
@@ -356,15 +336,6 @@ L["Options.Healthstone.Threshold.Desc"] =
 -- ============================================================================
 -- OPTIONS: SOULSTONE
 -- ============================================================================
-L["Options.Soulstone.Visibility"] = "灵魂石显示"
-L["Options.Soulstone.Visibility.Desc"] =
-    "设置何时显示灵魂石提示。\n\n|cffffcc00仅就位确认时:|r 仅在就位确认时显示（默认）。\n|cffffcc00就位确认 + 术士始终显示:|r 术士始终显示，其他职业仅在就位确认时显示。\n|cffffcc00始终显示:|r 只要特殊增益类别可见就显示。"
-L["Options.Soulstone.ReadyCheckOnly"] = "仅就位确认时"
-L["Options.Soulstone.ReadyCheckWarlock"] = "就位确认 + 术士始终显示"
-L["Options.Soulstone.AlwaysShow"] = "始终显示"
-L["Options.Soulstone.ReadyCheckDesc"] = "在就位确认后15秒内显示"
-L["Options.Soulstone.WarlockAlwaysDesc"] = "术士始终显示提示，其他职业仅在就位确认时显示"
-L["Options.Soulstone.AlwaysDesc"] = "只要特殊增益类别可见就显示"
 L["Options.Soulstone.HideCooldown"] = "冷却时隐藏（术士）"
 L["Options.Soulstone.HideCooldown.Desc"] =
     "启用后，当灵魂石法术处于冷却中时，不会向术士显示提示。仅适用于术士。"
@@ -405,9 +376,6 @@ L["Options.HoverHighlight.Desc"] = "将鼠标悬停在可点击的增益图标�
 L["Options.RequestBuffInChat"] = "在聊天频道中请求缺失的增益"
 L["Options.RequestBuffInChat.Desc"] =
     "点击你的职业无法提供的缺失增益，可在聊天频道中发送请求。插件会自动检测当前合适的频道（副本/团队/小队/说）。每个增益有30秒的喊话冷却时间。"
-L["Options.ChatRequest.FixAttempt"] = "|cffffd200实验版|r 尝试修复喊话请求无法发送的问题"
-L["Options.ChatRequest.FixAttempt.Desc"] =
-    "仅当你的喊话请求无法发送时才启用此项。这同时会禁用防止误触刷屏的5秒点击冷却限制。"
 L["Options.ChatRequest.ResetAll"] = "全部重置"
 L["ChatRequests.PerBuffMessages"] = "独立增益喊话信息"
 -- Chat request messages
@@ -494,9 +462,6 @@ L["Options.HideConsumableLabels.Desc"] =
 -- ============================================================================
 -- OPTIONS: DK RUNEFORGE PREFERENCES
 -- ============================================================================
-L["Options.RuneforgePreferences"] = "DK符文偏好"
-L["Options.RuneforgeNote"] =
-    "为每个专精选择你期望的DK符文。如果应用了错误的符文或缺少符文，将显示提示。"
 L["Options.RuneMainHand"] = "主手"
 L["Options.RuneOffHand"] = "副手"
 L["Options.RuneTwoHanded"] = "双手"
@@ -505,7 +470,6 @@ L["Options.RuneDualWield"] = "双持"
 -- ============================================================================
 -- OPTIONS: ROGUE POISON PREFERENCES
 -- ============================================================================
-L["Options.RoguePoisonPreferences"] = "潜行者毒药偏好"
 L["Options.RoguePoisonNote"] =
     "选择要涂抹的毒药及其优先级顺序（最上方优先级最高）。被禁用的毒药永远不会被施放，也不会触发提示。"
 L["Options.PoisonLethal"] = "致命"
@@ -517,21 +481,9 @@ L["Options.PoisonReset"] = "重置为默认"
 -- ============================================================================
 -- OPTIONS: BUFF SETTINGS GEAR ICONS
 -- ============================================================================
-L["Options.HealthstoneSettings"] = "治疗石设置"
-L["Options.HealthstoneSettings.Note"] = "设置显示条件和不足警告阈值。"
-L["Options.SoulstoneSettings"] = "灵魂石设置"
-L["Options.SoulstoneSettings.Note"] = "设置何时显示灵魂石提示。"
-L["Options.BronzeSettings"] = "青铜龙的祝福设置"
-L["Options.BronzeSettings.Note"] = "配置青铜龙的祝福提示。"
 L["Options.BronzeHideInCombat"] = "战斗中隐藏"
 L["Options.BronzeHideInCombat.Desc"] =
     "在战斗中隐藏青铜龙的祝福提示。这个增益没那么关键，你通常不会想在战斗中途去补它。"
-L["Options.PetPassiveSettings"] = "被动宠物设置"
-L["Options.PetPassiveSettings.Note"] = "设置被动模式宠物的提示行为。"
-L["Options.PetSummonSettings"] = "宠物召唤设置"
-L["Options.PetSummonSettings.Note"] = "配置宠物召唤行为。"
-L["Options.DelveFoodSettings"] = "地下堡食物设置"
-L["Options.DelveFoodSettings.Note"] = "配置地下堡食物提示行为。"
 L["Options.DelveFoodTimer"] = "30秒后自动隐藏"
 L["Options.DelveFoodTimer.Desc"] =
     "启用后，地下堡食物提示会在进入地下堡后显示30秒，然后自动隐藏。禁用后，只要你在地下堡中且缺少该增益，提示就会一直显示。"
@@ -539,17 +491,6 @@ L["Options.DelveFoodTimer.Desc"] =
 -- ============================================================================
 -- OPTIONS: DETACHED ICONS
 -- ============================================================================
-L["DetachedIcons.PageNote"] =
-    "将单个增益从其所属类别中提取出来，放入可独立定位的框体中。分离的图标保留其自身的锚点，并在框体解锁时可独立移动。"
-L["DetachedIcons.CurrentlyDetachedCount"] = "当前已分离 (%d)"
-L["DetachedIcons.NoneDetached"] = "没有已分离的图标。请在下方找到增益并点击“分离”。"
-L["DetachedIcons.Available"] = "可用"
-L["DetachedIcons.Search"] = "搜索："
-L["DetachedIcons.NoMatches"] = "没有匹配项。"
-L["DetachedIcons.Detach"] = "分离"
-L["DetachedIcons.Reattach"] = "归位"
-L["DetachedIcons.ReattachAll"] = "全部归位"
-L["DetachedIcons.ResetPos"] = "重置"
 
 -- ============================================================================
 -- OPTIONS: LAYOUT
@@ -557,18 +498,12 @@ L["DetachedIcons.ResetPos"] = "重置"
 L["Options.Layout"] = "布局"
 L["Options.SplitFrame"] = "分离为独立框体"
 L["Options.SplitFrame.Desc"] = "将此类别中的增益显示在可独立移动的单独框体中。"
-L["Options.DisplayOrder"] = "显示顺序"
 L["Options.DisplayOrder.Note"] =
     "整合框体中各类别的自上而下排列顺序。已分离的类别位于独立的框体中，不参与此排序。"
-L["Options.DisplayOrder.SplitBadge"] = "分离"
-L["Options.DisplayOrder.SplitGroup"] = "已分离（独立框体）"
 
 -- ============================================================================
 -- OPTIONS: APPEARANCE
 -- ============================================================================
-L["Options.CustomAppearance"] = "使用自定义外观"
-L["Options.CustomAppearance.Desc"] =
-    "禁用时，此类别将继承全局默认值的外观设置。必须分离为独立框体才能自定义生长方向。"
 L["Options.Customize"] = "自定义"
 L["Options.ResetPosition"] = "重置位置"
 L["Options.MasqueNote"] = "缩放和边框设置由Masque管理。"
@@ -690,15 +625,7 @@ L["Options.UnknownError"] = "未知错误"
 -- ============================================================================
 -- OPTIONS: SOUND ALERTS
 -- ============================================================================
-L["Options.Sound.AddAlert"] = "添加声音提醒"
-L["Options.Sound.NoAlerts"] = "未配置声音提醒。"
-L["Options.Sound.NoBuffs"] = "所有增益已配置声音提醒。"
 L["Options.Sound.Preview"] = "预览"
-L["Options.Sound.Save"] = "保存"
-L["Options.Sound.SelectBuff"] = "选择增益"
-L["Options.Sound.SelectSound"] = "选择声音提醒"
-L["Options.Sound.Title"] = "添加声音提醒"
-L["Options.Sound.EditTitle"] = "编辑声音提醒"
 
 -- ============================================================================
 -- OPTIONS: DIALOGS

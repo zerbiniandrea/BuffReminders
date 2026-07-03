@@ -4,9 +4,11 @@ local _, BR = ...
 -- BUFF PAGE SECTION: Visibility
 -- ============================================================================
 -- Per-category content visibility (W/S/D/R + difficulty filters), the
--- hide-on-PvP-match-start toggle, and the ready-check-only toggle. The
--- consumable-only "Free Consumables" sub-section lives in its own file
--- (Sections/FreeConsumables.lua) and is composed conditionally by _Template.lua.
+-- hide-on-PvP-match-start toggle, and the ready-check-only toggle. Each
+-- category configures its own visibility right here on its tab, rather than in
+-- a separate matrix. The consumable-only "Free Consumables" sub-section lives
+-- in its own file (Sections/FreeConsumables.lua) and is composed conditionally
+-- by _Template.lua.
 
 local L = BR.L
 local Components = BR.Components
@@ -52,6 +54,7 @@ local function Build(ctx, layout)
             local vis = db.categoryVisibility and db.categoryVisibility[category]
             return not vis or vis.pvp ~= false
         end,
+        disabledReason = L["DisabledReason.PvPDisabled"],
         tooltip = {
             title = L["Options.HidePvPMatchStart.Title"],
             desc = L["Options.HidePvPMatchStart.Desc"],
@@ -72,7 +75,7 @@ local function Build(ctx, layout)
                 }
             end
             db.categoryVisibility[category].hideInPvPMatch = checked
-            OnCategoryVisibilityChange()
+            UpdateDisplay()
         end,
     })
     layout:Add(hideInPvPMatchHolder, nil, COMPONENT_GAP)

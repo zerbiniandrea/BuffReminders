@@ -387,11 +387,11 @@ local function BuildPanel()
     titleFS = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     titleFS:SetPoint("TOP", 0, -10)
 
-    local closeBtn = CreateButton(panel, "x", function()
+    local closeBtn = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
+    closeBtn:SetPoint("TOPRIGHT", -2, -2)
+    closeBtn:SetScript("OnClick", function()
         panel:Hide()
     end)
-    closeBtn:SetSize(24, 24)
-    closeBtn:SetPoint("TOPRIGHT", -6, -6)
 
     -- Expiring / Missing tab toggle (sits below the header divider)
     expiringTab = Components.Tab(panel, { label = L["Options.GlowKind.Expiring"] })
@@ -405,6 +405,9 @@ local function BuildPanel()
     missingTab:SetScript("OnClick", function()
         Show(currentCategory, "missing")
     end)
+
+    -- Grounding baseline under the tab strip (matches the Categories tabs).
+    Components.TabBaseline(panel, expiringTab, PANEL_W - MARGIN * 2)
 
     staticLayout = Components.VerticalLayout(panel, { x = MARGIN, y = -74 })
 

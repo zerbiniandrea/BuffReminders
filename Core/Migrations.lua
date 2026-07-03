@@ -23,7 +23,7 @@ local max = math.max
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 45
+BR.Migrations.DB_VERSION = 47
 
 -- Run pending migrations against the profile `db`, using code `defaults` for
 -- fallbacks. `ctx` carries the few Display.lua file-scope deps the
@@ -930,6 +930,97 @@ function BR.Migrations.Run(db, defaults, ctx)
         [45] = function()
             if BR.aceDB and BR.aceDB.global then
                 BR.aceDB.global.selfOnlyOutsideNoticeShown = nil
+            end
+        end,
+
+        -- [46] expirationThreshold is no longer an appearance key: it now uses
+        -- the standard per-key fallback regardless of useCustomAppearance.
+        -- Categories could hold a stale stored threshold from an earlier
+        -- custom-appearance stint that has been silently ignored while the
+        -- flag was off; without cleanup it would suddenly become active.
+        -- Drop it wherever custom appearance is currently disabled.
+        [46] = function()
+            if db.categorySettings then
+                for _, catSettings in pairs(db.categorySettings) do
+                    if type(catSettings) == "table" and not catSettings.useCustomAppearance then
+                        catSettings.expirationThreshold = nil
+                    end
+                end
+            end
+        end,
+
+        -- [47] Custom glow no longer requires custom appearance: useCustomGlow
+        -- is now an independent override switch, and the per-kind glow ENABLE
+        -- flags (showExpirationGlow/showMissingGlow) moved from the appearance
+        -- gate to the glow gate. Two behavior-preserving fixups:
+        -- a) useCustomGlow stored while custom appearance was off used to be
+        --    ineffective - drop it so it doesn't suddenly activate stale style
+        --    values.
+        -- b) Categories whose enable-flag overrides were live through the
+        --    appearance gate (custom appearance on, custom glow off) keep them
+        --    live by enabling useCustomGlow, with the currently-effective
+        --    global glow STYLE mirrored in (overwriting any stale stored
+        --    style keys - the old two-flag gate meant style always came from
+        --    defaults, so resurrecting dormant category values would change
+        --    visuals).
+        --
+        -- Deliberately NOT preserved: categories with custom appearance on
+        -- and NO stored enable flags used to render glow unconditionally (raw
+        -- nil passed the consumers' `~= false` checks) while every checkbox
+        -- displayed glow as off. That UI/runtime contradiction is resolved
+        -- toward what the UI always claimed: such categories now inherit the
+        -- global enable flags.
+        [47] = function()
+            local GLOW_STYLE_KEYS = {
+                "glowType",
+                "glowSize",
+                "glowPixelLines",
+                "glowPixelFrequency",
+                "glowPixelLength",
+                "glowAutocastParticles",
+                "glowAutocastFrequency",
+                "glowAutocastScale",
+                "glowBorderFrequency",
+                "glowProcDuration",
+                "glowProcStartAnim",
+                "glowProcUseCustomColor",
+                "glowXOffset",
+                "glowYOffset",
+                "missingGlowType",
+                "missingGlowSize",
+                "missingGlowPixelLines",
+                "missingGlowPixelFrequency",
+                "missingGlowPixelLength",
+                "missingGlowAutocastParticles",
+                "missingGlowAutocastFrequency",
+                "missingGlowAutocastScale",
+                "missingGlowBorderFrequency",
+                "missingGlowProcDuration",
+                "missingGlowProcStartAnim",
+                "missingGlowProcUseCustomColor",
+                "missingGlowXOffset",
+                "missingGlowYOffset",
+            }
+            local gd = db.defaults or {}
+            for _, cs in pairs(db.categorySettings or {}) do
+                if type(cs) == "table" then
+                    if cs.useCustomGlow and not cs.useCustomAppearance then
+                        cs.useCustomGlow = nil
+                    elseif
+                        cs.useCustomAppearance
+                        and not cs.useCustomGlow
+                        and (cs.showExpirationGlow ~= nil or cs.showMissingGlow ~= nil)
+                    then
+                        cs.useCustomGlow = true
+                        for _, key in ipairs(GLOW_STYLE_KEYS) do
+                            cs[key] = gd[key]
+                        end
+                        for _, colorKey in ipairs({ "glowColor", "missingGlowColor" }) do
+                            local c = gd[colorKey]
+                            cs[colorKey] = c and { c[1], c[2], c[3], c[4] } or nil
+                        end
+                    end
+                end
             end
         end,
     }

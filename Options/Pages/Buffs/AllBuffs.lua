@@ -19,6 +19,7 @@ local L = BR.L
 local BUFF_TABLES = BR.BUFF_TABLES
 
 local COL_PADDING = BR.Options.Constants.COL_PADDING
+local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
 
 local floor = math.floor
 local max = math.max
@@ -85,12 +86,15 @@ local function CreateSectionWithNote(parent, x, y, headerText, noteText)
     return y - HEADER_TO_NOTE_GAP - NOTE_TO_ROWS_GAP
 end
 
-local function RenderColumn(parent, x, y, sections)
+local function RenderColumn(parent, x, y, sections, colWidth)
     local Render = BR.Options.BuffRow.Render
     local rowsX = x + ROW_INDENT
+    -- Rows start ROW_INDENT in from the column's left edge; span the rest of
+    -- the column so the "Settings" link lands on the column's right edge.
+    local rowWidth = colWidth - ROW_INDENT
     for i, section in ipairs(sections) do
         y = CreateSectionWithNote(parent, x, y, L[section.titleKey], L[section.noteKey])
-        y = Render(parent, rowsX, y, BUFF_TABLES[section.category] or {})
+        y = Render(parent, rowsX, y, BUFF_TABLES[section.category] or {}, rowWidth)
         if i < #sections then
             y = y - INTER_SECTION_GAP
         end
@@ -104,12 +108,12 @@ local function Build(content, scrollFrame)
     local leftX = COL_PADDING
     local rightX = COL_PADDING + colWidth + COL_PADDING
 
-    -- Match the standard page top margin so the first section header sits
-    -- at the same Y as on every other page (VerticalLayout starts at y=-10).
-    local startY = -10
+    -- Match the standard page top margin so the first section header sits at
+    -- the same Y as on every other page (VerticalLayout starts at PAGE_TOP_PADDING).
+    local startY = PAGE_TOP_PADDING
 
-    local leftEndY = RenderColumn(content, leftX, startY, LEFT_SECTIONS)
-    local rightEndY = RenderColumn(content, rightX, startY, RIGHT_SECTIONS)
+    local leftEndY = RenderColumn(content, leftX, startY, LEFT_SECTIONS, colWidth)
+    local rightEndY = RenderColumn(content, rightX, startY, RIGHT_SECTIONS, colWidth)
 
     content:SetHeight(max(abs(leftEndY), abs(rightEndY)) + 16)
 end

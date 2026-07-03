@@ -1,20 +1,40 @@
 local _, BR = ...
 
+-- ============================================================================
+-- ROGUE POISON EDITOR (inline section)
+-- ============================================================================
+-- Two reorderable columns (Lethal | Non-lethal) of poison checkboxes, top =
+-- highest priority. Formerly a standalone dialog opened by a button inside the
+-- buff panel; now rendered INLINE at the top of the Rogue Poisons buff panel so
+-- the buff's defining choice is one click away, not two windows deep.
+--
+-- BuildInline(parent, opts) draws the editor into `parent` at (opts.x, opts.y)
+-- within opts.width and returns the vertical space it consumed. The buff panel
+-- rebuilds its body (and this editor) on every open, so no persistent-dialog
+-- caching is needed - each build is fresh. Checkbox holders are handed to
+-- opts.registerHolder so the panel can unregister them on teardown.
+
 local L = BR.L
 local Components = BR.Components
 local CreateButton = BR.CreateButton
-local CreatePanel = BR.CreatePanel
 
 local UpdateDisplay = BR.Display.Update
 
 local tinsert = table.insert
 local tsort = table.sort
+local ceil = math.ceil
+local max = math.max
+local huge = math.huge
 
-local roguePoisonDialog = nil
--- The prefs table the rows were last built from. Rows bind to entry tables by
--- closure, so they only need rebuilding when the underlying table identity
--- changes (i.e. a profile switch swapped BR.profile) - not on every reopen.
-local lastBuiltPrefs = nil
+local ROW_HEIGHT = 24
+local NOTE_TO_LABEL_GAP = 8
+local LABEL_TO_ROW_GAP = 18
+local RESET_GAP = 6
+local RESET_HEIGHT = 22
+
+local ARROW_IDLE = { 0.7, 0.7, 0.7 }
+local ARROW_HOVER = BR.Colors.Accent
+local ARROW_DISABLED = { 0.4, 0.4, 0.4 }
 
 local function EnsureRoguePoisonPrefs()
     local db = BR.profile
@@ -33,70 +53,82 @@ local function EnsureRoguePoisonPrefs()
     return prefs
 end
 
-local function Show()
-    if roguePoisonDialog then
-        local prefs = EnsureRoguePoisonPrefs()
-        -- Only rebuild rows when the prefs table changed (e.g. profile switch);
-        -- otherwise the existing rows are still valid - just resync their values.
-        if prefs ~= lastBuiltPrefs and roguePoisonDialog.Rebuild then
-            roguePoisonDialog:Rebuild()
-        end
-        Components.RefreshAll()
-        roguePoisonDialog:Show()
-        return
+-- Reuse the dropdown chevron texture: rotate +90° for up, -90° for down. Vertex
+-- color tracks state (idle / hover / disabled) to match Dropdown styling.
+local function CreateArrowButton(parent, direction, tooltipTitle, onClick)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetSize(14, 14)
+    local arrow = btn:CreateTexture(nil, "ARTWORK")
+    arrow:SetAllPoints()
+    arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
+    arrow:SetRotation(math.rad(direction == "Up" and 90 or -90))
+    arrow:SetVertexColor(unpack(ARROW_IDLE))
+    btn.arrow = arrow
+    local enabled = true
+    local function paint()
+        arrow:SetVertexColor(unpack(enabled and ARROW_IDLE or ARROW_DISABLED))
     end
-
-    local DIALOG_WIDTH = 520
-    local DIALOG_HEIGHT = 290
-    local MARGIN = 16
-    local ROW_HEIGHT = 24
-    local LABEL_TO_ROW_GAP = 6 -- gap between column label and first row
-    local NOTE_TO_LABEL_GAP = 16 -- gap between note text and column label
-
-    local dialog = CreatePanel("BuffRemindersRoguePoisonDialog", DIALOG_WIDTH, DIALOG_HEIGHT, {
-        level = 200,
-        dialog = true,
-    })
-
-    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -12)
-    title:SetText(L["Options.RoguePoisonPreferences"])
-
-    local closeBtn = CreateButton(dialog, "x", function()
-        dialog:Hide()
+    btn:SetScript("OnEnter", function(self)
+        if enabled then
+            arrow:SetVertexColor(unpack(ARROW_HOVER))
+        end
+        BR.ShowTooltip(self, tooltipTitle, nil, "ANCHOR_TOP")
     end)
-    closeBtn:SetSize(22, 22)
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
+    btn:SetScript("OnLeave", function()
+        paint()
+        BR.HideTooltip()
+    end)
+    btn:SetScript("OnClick", function()
+        if enabled then
+            onClick()
+        end
+    end)
+    function btn:SetEnabled(v)
+        enabled = v and true or false
+        paint()
+    end
+    return btn
+end
 
-    local note = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    note:SetPoint("TOPLEFT", MARGIN, -36)
-    note:SetPoint("TOPRIGHT", -MARGIN, -36)
-    note:SetJustifyH("LEFT")
-    note:SetText("|cffaaaaaa" .. L["Options.RoguePoisonNote"] .. "|r")
+---Render the poison editor into `parent`. Returns the height consumed (px).
+---@param parent table Frame to parent the editor into
+---@param opts table { x, y, width, registerHolder? }
+---@return number height
+local function BuildInline(parent, opts)
+    local x, y, width = opts.x, opts.y, opts.width
+    local register = opts.registerHolder or function(_) end
+    local colWidth = width / 2
+    local colX = { lethal = x, nonLethal = x + colWidth }
 
-    local colWidth = (DIALOG_WIDTH - MARGIN * 2) / 2
-
-    -- Column labels anchor to the note's bottom so the layout self-adjusts if the note
-    -- wraps to an extra line in a longer translation.
-    local lethalLabel = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    lethalLabel:SetPoint("TOPLEFT", note, "BOTTOMLEFT", 0, -NOTE_TO_LABEL_GAP)
-    lethalLabel:SetText("|cffffcc00" .. L["Options.PoisonLethal"] .. "|r")
-
-    local nonLethalLabel = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    nonLethalLabel:SetPoint("TOPLEFT", lethalLabel, "TOPLEFT", colWidth, 0)
-    nonLethalLabel:SetText("|cffffcc00" .. L["Options.PoisonNonLethal"] .. "|r")
-
-    local categoryLabels = { lethal = lethalLabel, nonLethal = nonLethalLabel }
+    local prefs = EnsureRoguePoisonPrefs()
     local rows = { lethal = {}, nonLethal = {} }
 
+    -- Intro note (wrap-aware).
+    local note = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    note:SetPoint("TOPLEFT", x, y)
+    note:SetWidth(width)
+    note:SetJustifyH("LEFT")
+    note:SetText(L["Options.RoguePoisonNote"])
+    local noteH = max(ceil(note:GetStringHeight()), 12)
+
+    -- Column headers.
+    local labelY = y - noteH - NOTE_TO_LABEL_GAP
+    local lethalLabel = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    lethalLabel:SetPoint("TOPLEFT", colX.lethal, labelY)
+    lethalLabel:SetText("|cffffcc00" .. L["Options.PoisonLethal"] .. "|r")
+    local nonLethalLabel = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    nonLethalLabel:SetPoint("TOPLEFT", colX.nonLethal, labelY)
+    nonLethalLabel:SetText("|cffffcc00" .. L["Options.PoisonNonLethal"] .. "|r")
+
+    local rowsTop = labelY - LABEL_TO_ROW_GAP
+
     local function Reposition(category)
-        local rowsList = rows[category]
-        local anchorLabel = categoryLabels[category]
-        for i, row in ipairs(rowsList) do
+        local list = rows[category]
+        for i, row in ipairs(list) do
             row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", anchorLabel, "BOTTOMLEFT", 0, -LABEL_TO_ROW_GAP - (i - 1) * ROW_HEIGHT)
+            row:SetPoint("TOPLEFT", parent, "TOPLEFT", colX[category], rowsTop - (i - 1) * ROW_HEIGHT)
             row.upBtn:SetEnabled(i > 1)
-            row.downBtn:SetEnabled(i < #rowsList)
+            row.downBtn:SetEnabled(i < #list)
         end
     end
 
@@ -104,20 +136,22 @@ local function Show()
         BR.InvalidatePoisonCache()
         BR.BuffState.Refresh()
         UpdateDisplay()
+        -- Repaint the All Buffs row: its trailing link flips gold <-> orange as
+        -- the poison selection goes set <-> unset.
+        Components.RefreshAll()
     end
 
     local function Swap(category, i, j)
-        local prefs = EnsureRoguePoisonPrefs()
         local list = prefs[category]
         list[i], list[j] = list[j], list[i]
-        local rowsList = rows[category]
-        rowsList[i], rowsList[j] = rowsList[j], rowsList[i]
+        local rowList = rows[category]
+        rowList[i], rowList[j] = rowList[j], rowList[i]
         Reposition(category)
         ApplyChange()
     end
 
-    local function FindRowIndex(rowsList, row)
-        for idx, r in ipairs(rowsList) do
+    local function FindRowIndex(rowList, row)
+        for idx, r in ipairs(rowList) do
             if r == row then
                 return idx
             end
@@ -125,57 +159,13 @@ local function Show()
         return nil
     end
 
-    -- Reuse the chevron texture the dropdown uses - rotate 90° for up, -90° for down.
-    -- Vertex color tracks state (idle / hover / disabled) to match Dropdown styling.
-    local ARROW_IDLE = { 0.7, 0.7, 0.7 }
-    local ARROW_HOVER = BR.Colors.Accent
-    local ARROW_DISABLED = { 0.4, 0.4, 0.4 }
-    local function CreateArrowButton(parent, direction, tooltipTitle, onClick)
-        local btn = CreateFrame("Button", nil, parent)
-        btn:SetSize(14, 14)
-        local arrow = btn:CreateTexture(nil, "ARTWORK")
-        arrow:SetAllPoints()
-        arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
-        arrow:SetRotation(math.rad(direction == "Up" and 90 or -90))
-        arrow:SetVertexColor(unpack(ARROW_IDLE))
-        btn.arrow = arrow
-        local enabled = true
-        local function paint()
-            if not enabled then
-                arrow:SetVertexColor(unpack(ARROW_DISABLED))
-            else
-                arrow:SetVertexColor(unpack(ARROW_IDLE))
-            end
-        end
-        btn:SetScript("OnEnter", function(self)
-            if enabled then
-                arrow:SetVertexColor(unpack(ARROW_HOVER))
-            end
-            BR.ShowTooltip(self, tooltipTitle, nil, "ANCHOR_TOP")
-        end)
-        btn:SetScript("OnLeave", function()
-            paint()
-            BR.HideTooltip()
-        end)
-        btn:SetScript("OnClick", function()
-            if enabled then
-                onClick()
-            end
-        end)
-        function btn:SetEnabled(v)
-            enabled = v and true or false
-            paint()
-        end
-        return btn
-    end
-
     local function CreatePoisonRow(category, entry)
-        local row = CreateFrame("Frame", nil, dialog)
+        local row = CreateFrame("Frame", nil, parent)
         row:SetSize(colWidth - 8, ROW_HEIGHT - 2)
 
-        -- Assign to a local first: C_Spell.GetSpellTexture may return multiple values,
-        -- and `{ f() }` as the final expression in a table constructor expands ALL of
-        -- them - that would render one icon per returned value.
+        -- Assign to a local first: C_Spell.GetSpellTexture may return multiple
+        -- values, and `{ f() }` as the final table-constructor expression expands
+        -- ALL of them - that would render one icon per returned value.
         local spellIcon = C_Spell.GetSpellTexture(entry.spellID)
         local holder = Components.Checkbox(row, {
             label = BR.GetSpellName(entry.spellID) or tostring(entry.spellID),
@@ -193,11 +183,11 @@ local function Show()
             holder.label:SetWidth(colWidth - 110)
             holder.label:SetWordWrap(false)
         end
+        register(holder)
 
-        local rowsList = rows[category]
-
+        local rowList = rows[category]
         local upBtn = CreateArrowButton(row, "Up", L["Options.PoisonMoveUp"], function()
-            local idx = FindRowIndex(rowsList, row)
+            local idx = FindRowIndex(rowList, row)
             if idx and idx > 1 then
                 Swap(category, idx, idx - 1)
             end
@@ -205,8 +195,8 @@ local function Show()
         upBtn:SetPoint("RIGHT", row, "RIGHT", -22, 0)
 
         local downBtn = CreateArrowButton(row, "Down", L["Options.PoisonMoveDown"], function()
-            local idx = FindRowIndex(rowsList, row)
-            if idx and idx < #rowsList then
+            local idx = FindRowIndex(rowList, row)
+            if idx and idx < #rowList then
                 Swap(category, idx, idx + 1)
             end
         end)
@@ -215,37 +205,20 @@ local function Show()
         row.upBtn = upBtn
         row.downBtn = downBtn
         row.entry = entry
-        row.checkbox = holder
         return row
     end
 
-    local function BuildRows()
-        -- Tear down any existing rows (re-open path after profile switch, etc.).
-        -- Unregister each row's Checkbox holder so stale entries don't accumulate
-        -- in the refresh registry across rebuilds.
-        for _, category in ipairs({ "lethal", "nonLethal" }) do
-            for _, row in ipairs(rows[category]) do
-                row:Hide()
-                row:SetParent(nil)
-                Components.Unregister(row.checkbox)
-            end
-            rows[category] = {}
+    for _, category in ipairs({ "lethal", "nonLethal" }) do
+        for _, entry in ipairs(prefs[category]) do
+            tinsert(rows[category], CreatePoisonRow(category, entry))
         end
-        local prefs = EnsureRoguePoisonPrefs()
-        for _, category in ipairs({ "lethal", "nonLethal" }) do
-            for _, entry in ipairs(prefs[category]) do
-                tinsert(rows[category], CreatePoisonRow(category, entry))
-            end
-            Reposition(category)
-        end
-        lastBuiltPrefs = prefs
+        Reposition(category)
     end
 
-    -- Reset: reorder prefs in place and re-enable all, then sync rows to match.
-    -- Does NOT rebuild row frames - avoids the rebuild cost since entry tables
-    -- survive tsort and row Checkbox holders can be reused.
+    -- Reset: reorder prefs to defaults + re-enable all, then reorder the live
+    -- row frames to match (rows are bound to entry tables by closure; entry
+    -- identity survives tsort).
     local function ResetToDefaults()
-        local prefs = EnsureRoguePoisonPrefs()
         for _, category in ipairs({ "lethal", "nonLethal" }) do
             local catDefaults = BR.DEFAULT_POISON_PREFERENCES[category]
             local defaultIndex = {}
@@ -253,13 +226,11 @@ local function Show()
                 defaultIndex[e.spellID] = i
             end
             tsort(prefs[category], function(a, b)
-                return (defaultIndex[a.spellID] or math.huge) < (defaultIndex[b.spellID] or math.huge)
+                return (defaultIndex[a.spellID] or huge) < (defaultIndex[b.spellID] or huge)
             end)
             for _, entry in ipairs(prefs[category]) do
                 entry.enabled = true
             end
-            -- Reorder row frames to match the new prefs order (rows are bound to entry
-            -- tables by closure; entry identity survives tsort).
             local rowByEntry = {}
             for _, row in ipairs(rows[category]) do
                 rowByEntry[row.entry] = row
@@ -274,20 +245,19 @@ local function Show()
             rows[category] = newRows
             Reposition(category)
         end
-        Components.RefreshAll()
+        -- ApplyChange re-syncs every refreshable (poison checkboxes + the row).
         ApplyChange()
     end
 
-    local resetBtn = CreateButton(dialog, L["Options.PoisonReset"], ResetToDefaults)
-    resetBtn:SetPoint("BOTTOMLEFT", MARGIN, MARGIN)
+    local maxRows = max(#prefs.lethal, #prefs.nonLethal)
+    local rowsBottom = rowsTop - maxRows * ROW_HEIGHT
 
-    function dialog:Rebuild()
-        BuildRows()
-    end
-    BuildRows()
+    -- CreateButton auto-sizes to its text (height 22); just anchor it.
+    local resetBtn = CreateButton(parent, L["Options.PoisonReset"], ResetToDefaults)
+    resetBtn:SetPoint("TOPLEFT", x, rowsBottom - RESET_GAP)
 
-    roguePoisonDialog = dialog
-    dialog:Show()
+    local finalY = rowsBottom - RESET_GAP - RESET_HEIGHT
+    return y - finalY
 end
 
-BR.Options.Dialogs.RoguePoison = { Show = Show }
+BR.Options.Dialogs.RoguePoison = { BuildInline = BuildInline }

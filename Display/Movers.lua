@@ -9,6 +9,7 @@ local _, BR = ...
 -- Lua stdlib locals
 local floor = math.floor
 local format = string.format
+local strfind = string.find
 local tinsert, tconcat = table.insert, table.concat
 
 local L = BR.L
@@ -197,6 +198,22 @@ local function RestoreContainer(catKey)
     end
 end
 
+---Absolute screen coordinates (scale-normalized) of a named point on a frame.
+---@param frame table
+---@param point string Anchor point name (TOPLEFT, CENTER, BOTTOMRIGHT, ...)
+---@return number? x, number? y nil when the frame has no laid-out rect yet
+local function GetPointCoords(frame, point)
+    local left, bottom = frame:GetLeft(), frame:GetBottom()
+    if not left or not bottom then
+        return nil, nil
+    end
+    local w, h = frame:GetWidth(), frame:GetHeight()
+    local x = strfind(point, "LEFT") and left or (strfind(point, "RIGHT") and (left + w) or (left + w / 2))
+    local y = strfind(point, "TOP") and (bottom + h) or (strfind(point, "BOTTOM") and bottom or (bottom + h / 2))
+    local scale = frame:GetEffectiveScale()
+    return x * scale, y * scale
+end
+
 -- Finish a mover drag: read the direction-anchor edge, re-anchor, save
 local function FinishMoverDrag(mover, catKey)
     mover.isDragging = false
@@ -205,8 +222,36 @@ local function FinishMoverDrag(mover, catKey)
     local settings = GetCategorySettings(catKey)
     local direction = settings.growDirection or "CENTER"
     local anchor = DIRECTION_ANCHORS[direction] or "CENTER"
-    -- Anchor is always cleared on drag start, so this is always UIParent-relative
     local x, y
+
+    -- Anchored frame: dragging adjusts the offsets RELATIVE TO the anchor
+    -- frame instead of silently deleting the anchor (clearing an anchor is an
+    -- explicit action in the coordinate popup, never a drag side effect).
+    local extFrame, extPoint = ResolveAnchorParent(catKey)
+    if extFrame then
+        local extAnchor = EXT_DIRECTION_ANCHORS[extPoint] and EXT_DIRECTION_ANCHORS[extPoint][direction] or anchor
+        local mx, my = GetPointCoords(mover, extAnchor)
+        local ex, ey = GetPointCoords(extFrame, extPoint)
+        if mx and ex then
+            local scale = mover:GetEffectiveScale()
+            x = RoundCoord((mx - ex) / scale)
+            y = RoundCoord((my - ey) / scale)
+            mover:ClearAllPoints()
+            mover:SetPoint(extAnchor, extFrame, extPoint, x, y)
+            SavePosition(catKey, x, y)
+            if coordPopup and coordPopup:IsShown() and coordPopup.catKey == catKey then
+                coordPopup.xEdit:SetText(tostring(x))
+                coordPopup.yEdit:SetText(tostring(y))
+            end
+            RestoreContainer(catKey)
+            if BR.SecureButtons then
+                BR.SecureButtons.ScheduleSecureSync()
+            end
+            return
+        end
+    end
+
+    -- No anchor frame (or it isn't laid out): UIParent-relative
     local px, py = UIParent:GetCenter()
     local coordFn = ANCHOR_COORD_FN[anchor]
     if coordFn then
@@ -878,35 +923,9 @@ local function CreateMoverFrame(catKey, displayName)
         if BR.SecureButtons then
             BR.SecureButtons.HideSecureFramesForCatKey(catKey)
         end
-        -- Clear external anchor on drag to avoid offset math issues - frame becomes UIParent-relative
-        -- Convert current screen position to UIParent-relative coords first so the frame stays in place
-        local db = BR.profile
-        if db.categorySettings and db.categorySettings[catKey] and db.categorySettings[catKey].anchorFrame then
-            local settings = GetCategorySettings(catKey)
-            local dir = settings.growDirection or "CENTER"
-            local anchor = DIRECTION_ANCHORS[dir] or "CENTER"
-            local px, py = UIParent:GetCenter()
-            local coordFn = ANCHOR_COORD_FN[anchor]
-            local cx, cy
-            if coordFn then
-                cx, cy = coordFn(self, px, py)
-            else
-                local mx, my = self:GetCenter()
-                cx, cy = mx - px, my - py
-            end
-            db.categorySettings[catKey].anchorFrame = nil
-            db.categorySettings[catKey].anchorPoint = nil
-            SavePosition(catKey, RoundCoord(cx), RoundCoord(cy))
-            -- Update popup if open
-            if coordPopup and coordPopup:IsShown() and coordPopup.catKey == catKey then
-                coordPopup.anchorText:SetText(L["Mover.NoneScreenCenter"])
-                coordPopup.pointBtn:SetEnabled(false)
-                coordPopup.pointText:SetTextColor(0.4, 0.4, 0.4, 1)
-                coordPopup.pointArrow:SetVertexColor(BORDER_R, BORDER_G, BORDER_B, 1)
-            end
-            -- Update mover label
-            self.anchorText:SetText(format(L["Mover.AnchorGrowth"], dir))
-        end
+        -- External anchors survive dragging: FinishMoverDrag recomputes the
+        -- offsets relative to the anchor frame, so a nudge never silently
+        -- converts an anchored frame back to screen coordinates.
         self.isDragging = true
         self:StartMoving()
         -- Live coordinate updates if popup is already open
@@ -1348,6 +1367,7 @@ BR.Movers = {
     UpdateAnchor = UpdateAnchor,
     HideAll = HideAllMovers,
     SavePosition = SavePosition,
+    ScanAnchorFrames = ScanAnchorFrames,
     GetMoverFrames = function()
         return moverFrames
     end,

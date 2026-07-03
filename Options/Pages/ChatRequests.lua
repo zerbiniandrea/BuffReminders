@@ -16,6 +16,7 @@ local GetBuffIcons = BR.Helpers.GetBuffIcons
 
 local LayoutSectionHeader = BR.Options.Helpers.LayoutSectionHeader
 local LayoutSectionNote = BR.Options.Helpers.LayoutSectionNote
+local LayoutSubsectionNote = BR.Options.Helpers.LayoutSubsectionNote
 
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local COL_PADDING = BR.Options.Constants.COL_PADDING
@@ -134,37 +135,31 @@ local function Build(content, scrollFrame)
     end)
     layout:Add(resetBtn, nil, COMPONENT_GAP)
 
-    -- Troubleshooting opt-in for the rare client bug that silently drops chat
-    -- dispatch in restricted contexts (M+, encounters). Inverted vs. the
-    -- underlying setting: checked = fix attempt = chatRequestCooldown false.
-    -- Default unchecked, so the spam-prevention cooldown stays on for the
-    -- 99.99%+ of users who don't hit the bug.
+    -- Anti-spam cooldown between chat requests. Straightforward polarity:
+    -- checked = cooldown on (the default). Disabling it is the workaround for a
+    -- client bug that silently drops chat dispatch for some players - the yellow
+    -- hint below points at the fix without inverting the checkbox into a
+    -- confusing "attempt to fix" toggle.
     layout:Space(12)
-    local fixAttemptHolder = Components.Checkbox(content, {
-        label = L["Options.ChatRequest.FixAttempt"],
+    local cooldownHolder = Components.Checkbox(content, {
+        label = L["Options.ChatRequest.Cooldown"],
         get = function()
-            return BR.profile.chatRequestCooldown == false
+            return BR.profile.chatRequestCooldown ~= false
         end,
+        tooltip = {
+            title = L["Options.ChatRequest.Cooldown"],
+            desc = L["Options.ChatRequest.Cooldown.Desc"],
+        },
         enabled = isToggleOn,
         onChange = function(checked)
-            BR.profile.chatRequestCooldown = not checked
+            BR.Config.Set("chatRequestCooldown", checked)
         end,
     })
-    layout:Add(fixAttemptHolder, nil, 4)
+    layout:Add(cooldownHolder, nil, COMPONENT_GAP)
 
-    -- Yellow inline note. Wraps to the content width minus the layout's
-    -- current x-indent so it sits aligned under the checkbox, not at the
-    -- page edge.
-    local fixAttemptNote = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    fixAttemptNote:SetTextColor(unpack(BR.Colors.Accent))
-    fixAttemptNote:SetJustifyH("LEFT")
-    local noteWidth = contentWidth - layout:GetX() - COL_PADDING
-    if noteWidth < 1 then
-        noteWidth = 1
-    end
-    fixAttemptNote:SetWidth(noteWidth)
-    fixAttemptNote:SetText(L["Options.ChatRequest.FixAttempt.Desc"])
-    layout:AddText(fixAttemptNote, math.ceil(fixAttemptNote:GetStringHeight()), COMPONENT_GAP)
+    -- Yellow troubleshooting hint sitting directly under the checkbox.
+    local cooldownHint = LayoutSubsectionNote(layout, content, L["Options.ChatRequest.Cooldown.Hint"])
+    cooldownHint:SetTextColor(1, 0.82, 0)
 
     content:SetHeight(abs(layout:GetY()) + 20)
 end

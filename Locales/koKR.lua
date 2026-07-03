@@ -308,9 +308,6 @@ L["Tab.DisplayBehavior"] = "표시/동작"
 
 -- Sidebar groups
 L["Sidebar.General"] = "일반"
-L["Sidebar.Buffs"] = "버프"
-L["Sidebar.DisplayBehavior"] = "표시 및 동작"
-L["Sidebar.Loadouts"] = "장비 및 특성"
 L["Sidebar.Profiles"] = "프로필"
 
 -- Page titles
@@ -318,13 +315,8 @@ L["Page.General"] = "일반"
 L["Page.Defaults"] = "기본값"
 L["Page.Visibility"] = "표시 설정"
 L["Page.ChatRequests"] = "채팅 요청"
-L["Page.AnchorFrames"] = "앵커 프레임"
 L["Page.Profiles"] = "프로필"
 L["Page.AllBuffs"] = "모든 버프"
-L["Page.DetachedIcons"] = "분리된 아이콘"
-L["Page.Sounds"] = "효과음"
-L["Page.Sounds.Desc"] =
-    "추적된 버프가 없을 때 효과음을 재생합니다. 모든 버프 카테고리에 걸쳐 적용됩니다 - 버프당 1개씩 지정하세요"
 
 -- Per-category page section headers
 L["Section.Tracking"] = "추적"
@@ -335,16 +327,8 @@ L["Section.TrackingOverrides.Desc"] =
 -- ============================================================================
 -- OPTIONS: SOUND ALERTS
 -- ============================================================================
-L["Options.Sound.NoAlerts"] = "설정된 효과음 알림이 없습니다."
-L["Options.Sound.AddAlert"] = "효과음 알림 추가"
-L["Options.Sound.Title"] = "효과음 알림 추가"
-L["Options.Sound.EditTitle"] = "효과음 알림 편집"
-L["Options.Sound.SelectBuff"] = "버프 선택"
-L["Options.Sound.SelectSound"] = "효과음 선택"
 L["Options.Sound.Preview"] = "미리듣기"
 L["Options.Preview"] = "미리보기"
-L["Options.Sound.Save"] = "저장"
-L["Options.Sound.NoBuffs"] = "모든 버프에 효과음이 있습니다."
 
 -- ============================================================================
 -- OPTIONS: GLOBAL DEFAULTS
@@ -365,10 +349,7 @@ L["Options.TextOutline.ThickMono"] = "두꺼움 + 모노크롬"
 -- ============================================================================
 -- OPTIONS: GLOW SETTINGS
 -- ============================================================================
-L["Options.GlowReminderIcons"] = "알림 아이콘 반짝임"
 L["Options.GlowReminderIcons.Title"] = "알림 아이콘 반짝임"
-L["Options.GlowReminderIcons.Desc"] =
-    "알림 아이콘에 반짝임 효과를 추가합니다. 만료 임박과 누락 반짝임 효과를 각자 독립적으로 설정할 수 있습니다."
 L["Options.GlowReminderIcons.CpuWarning"] =
     "화면의 각 아이콘에 매 프레임 반짝임 효과를 주며 CPU를 보다 많이 사용합니다. 아이콘이 오래 떠있을 경우(전투 도중 버프를 걸지 않았을 때 처럼) 자원 소비도 그만큼 지속됩니다. 이러한 이유로 기본값은 비활성화입니다."
 L["Options.GlowKind.Expiring"] = "만료 임박"
@@ -378,7 +359,6 @@ L["Options.GlowSettings.Missing"] = "반짝임 설정 - 누락"
 L["Options.Glow.Enabled"] = "활성화"
 L["Options.Threshold"] = "기준값"
 L["Options.GlowMissingPets"] = "소환수 없음 반짝임"
-L["Options.CustomGlowStyle"] = "사용자 지정 반짝임 스타일"
 L["Options.Expiration"] = "만료 임박"
 L["Options.Glow"] = "반짝임"
 L["Options.UseCustomColor"] = "사용자 지정 색상 사용"
@@ -417,16 +397,6 @@ L["Options.Visibility"] = "표시 설정"
 -- ============================================================================
 -- OPTIONS: HEALTHSTONE
 -- ============================================================================
-L["Options.Healthstone.ReadyCheckOnly"] = "전투 준비 시에만"
-L["Options.Healthstone.ReadyCheckWarlock"] = "전투 준비 + 흑마법사는 항상 표시"
-L["Options.Healthstone.AlwaysShow"] = "항상 표시"
-L["Options.Healthstone.Visibility"] = "생명석 표시"
-L["Options.Healthstone.Visibility.Desc"] =
-    "생명석 알림이 표시되는 시점을 설정합니다.\n\n|cffffcc00전투 준비 시에만:|r 전투 준비(15초)때만 표시.\n|cffffcc00전투 준비 + 흑마법사는 항상 표시:|r 흑마법사는 항상 표시, 다른 직업은 전투 준비때만.\n|cffffcc00항상 표시:|r 설정에 맞는 콘텐츠에 있을 때 항상 표시."
-L["Options.Healthstone.WarlockAlwaysDesc"] =
-    "흑마법사는 항상 알림 표시, 다른 직업은 전투 준비때만"
-L["Options.Healthstone.ReadyCheckDesc"] = "전투 준비 후 15초 동안 표시"
-L["Options.Healthstone.AlwaysDesc"] = "해당 콘텐츠 유형과 일치할 때 항상 표시"
 L["Options.Healthstone.LowStock"] = "부족 시 경고"
 L["Options.Healthstone.LowStock.Desc"] =
     "생명석이 있지만 부족할 때 경고를 표시합니다. 생명석이 없는 경우(0개)는 이 설정과 관계없이 항상 추적됩니다."
@@ -437,15 +407,6 @@ L["Options.Healthstone.Threshold.Desc"] =
 -- ============================================================================
 -- OPTIONS: SOULSTONE
 -- ============================================================================
-L["Options.Soulstone.Visibility"] = "영혼석 표시"
-L["Options.Soulstone.Visibility.Desc"] =
-    "영혼석 알림이 표시되는 시점을 설정합니다.\n\n|cffffcc00전투 준비 시에만:|r 전투 준비 시에만 표시 (기본값).\n|cffffcc00전투 준비 + 흑마법사는 항상 표시:|r 흑마법사는 항상 보이고, 다른 직업은 전투 준비 시에만.\n|cffffcc00항상 표시:|r 특수 버프 카테고리가 보일 때마다 표시."
-L["Options.Soulstone.ReadyCheckOnly"] = "전투 준비 시에만"
-L["Options.Soulstone.ReadyCheckWarlock"] = "전투 준비 + 흑마법사는 항상 표시"
-L["Options.Soulstone.AlwaysShow"] = "항상 표시"
-L["Options.Soulstone.ReadyCheckDesc"] = "전투 준비 후 15초 동안 표시"
-L["Options.Soulstone.WarlockAlwaysDesc"] = "흑마법사는 항상 알림 표시, 다른 직업은 전투 준비때만"
-L["Options.Soulstone.AlwaysDesc"] = "특수 버프 카테고리가 보일 때마다 표시"
 L["Options.Soulstone.HideCooldown"] = "쿨타임일 때 숨기기 (흑마법사)"
 L["Options.Soulstone.HideCooldown.Desc"] =
     "활성화하면 주문이 쿨타임일 때 흑마법사에게 영혼석 알림을 표시하지 않습니다. 흑마법사에게만 적용됩니다."
@@ -503,9 +464,6 @@ L["Options.HoverHighlight.Desc"] =
 L["Options.RequestBuffInChat"] = "없는 버프를 채팅으로 요청"
 L["Options.RequestBuffInChat.Desc"] =
     "내 직업이 걸 수 없는 누락된 버프를 클릭하면 채팅으로 요청합니다. 채널(인스턴스/공격대/파티/일반)을 자동으로 감지합니다. 버프당 30초의 쿨타임이 있습니다."
-L["Options.ChatRequest.FixAttempt"] = "|cffffd200시험용|r 전송이 안된 채팅 요청 복구 시도"
-L["Options.ChatRequest.FixAttempt.Desc"] =
-    "채팅 요청이 전송되지 않았을 때만 사용하세요. 의도치 않은 클릭 도배를 방지하기 위한 5초 클릭 쿨타임도 함께 비활성화됩니다."
 L["Options.ChatRequest.ResetAll"] = "모두 초기화"
 L["ChatRequests.PerBuffMessages"] = "버프별 메시지"
 -- Chat request messages (keyed by buff.key, sent as-is via SendChatMessage)
@@ -603,9 +561,6 @@ L["Options.HideLegacyConsumables.Desc"] =
 -- ============================================================================
 -- OPTIONS: DK RUNEFORGE PREFERENCES
 -- ============================================================================
-L["Options.RuneforgePreferences"] = "룬벼리기 설정"
-L["Options.RuneforgeNote"] =
-    "전문화별로 선호하는 룬벼리기를 선택하세요. 잘못된 룬벼리기나 안했을 경우 알림이 표시됩니다."
 L["Options.RuneMainHand"] = "주장비"
 L["Options.RuneOffHand"] = "보조장비"
 L["Options.RuneTwoHanded"] = "양손 무기"
@@ -614,7 +569,6 @@ L["Options.RuneDualWield"] = "쌍수 무기"
 -- ============================================================================
 -- OPTIONS: ROGUE POISON PREFERENCES
 -- ============================================================================
-L["Options.RoguePoisonPreferences"] = "도적 독 설정"
 L["Options.RoguePoisonNote"] =
     "바를 독과 우선순위(맨 위 = 제일 높음)를 선택하세요. 비활성화된 독은 시전되지 않으며 알림도 발생하지 않습니다."
 L["Options.PoisonLethal"] = "살상용"
@@ -626,26 +580,12 @@ L["Options.PoisonReset"] = "기본값으로 초기화"
 -- ============================================================================
 -- OPTIONS: BUFF SETTINGS GEAR ICONS
 -- ============================================================================
-L["Options.HealthstoneSettings"] = "생명석 설정"
-L["Options.HealthstoneSettings.Note"] = "표시 조건 및 낮은 수량 기준값을 설정합니다."
-L["Options.SoulstoneSettings"] = "영혼석 설정"
-L["Options.SoulstoneSettings.Note"] = "영혼석 알림이 표시되는 시점을 설정합니다."
-L["Options.BronzeSettings"] = "청동용군단의 축복 설정"
-L["Options.BronzeSettings.Note"] = "청동용군단의 축복 알림을 설정합니다."
 L["Options.BronzeHideInCombat"] = "전투 중 숨기기"
 L["Options.BronzeHideInCombat.Desc"] =
     "전투 중에 청동용군단의 축복 알림을 숨깁니다. 이 버프는 덜 중요하기 때문에 전투 중에 다시 걸고 싶지 않을 수 있습니다."
-L["Options.DruidFormSettings"] = "드루이드 변신 설정"
-L["Options.DruidFormSettings.Note"] = "잘못된 변신 알림을 설정합니다."
 L["Options.DruidIgnoreTravelForm"] = "날쌘 동물 변신일땐 무시"
 L["Options.DruidIgnoreTravelForm.Desc"] =
     "날쌘 동물 변신(지상, 수중, 비행, 탈것 변신)이나 탈것 탑승중엔 잘못된 변신 알림을 숨겨서 날쌘 동물 변신을 의도했을 때 알림이 귀찮게 하지 않습니다."
-L["Options.PetPassiveSettings"] = "수동적 소환수 설정"
-L["Options.PetPassiveSettings.Note"] = "수동적 소환수 알림을 설정합니다."
-L["Options.PetSummonSettings"] = "소환수 소환 설정"
-L["Options.PetSummonSettings.Note"] = "소환수 소환 동작을 설정합니다."
-L["Options.DelveFoodSettings"] = "구렁 음식 설정"
-L["Options.DelveFoodSettings.Note"] = "구렁 음식 알림 동작을 설정합니다."
 L["Options.DelveFoodTimer"] = "30초 후 자동 숨김"
 L["Options.DelveFoodTimer.Desc"] =
     "활성화하면 구렁 입장 후 30초 동안만 알림이 표시되고 자동으로 숨겨집니다. 비활성화하면 구렁에서 버프가 없는 동안 계속 알림이 표시됩니다."
@@ -661,32 +601,14 @@ L["Options.SplitFrame.Desc"] =
 -- Display Order section (Defaults page) - drives the same priority field the
 -- old per-category slider wrote, but as a single ordered list across all
 -- non-split categories.
-L["Options.DisplayOrder"] = "표시 순서"
 L["Options.DisplayOrder.Note"] =
     "조합된 프레임 내에서 카테고리들이 위에서 아래로 쌓이는 순서를 설정합니다. 분리한 카테고리는 별도의 프레임에 있으므로 여기엔 나오지 않습니다."
-L["Options.DisplayOrder.SplitGroup"] = "분리됨 (독립 프레임)"
-L["Options.DisplayOrder.SplitBadge"] = "분리됨"
 
 -- Detached Icons page (search-driven dual-list manager).
-L["DetachedIcons.PageNote"] =
-    "카테고리에서 버프 한개를 꺼내 자체 독립 프레임에 넣습니다. 분리된 아이콘은 자체 앵커를 유지하며 프레임 잠금 해제시 독립적으로 옮길 수 있습니다."
-L["DetachedIcons.Search"] = "검색:"
-L["DetachedIcons.Available"] = "분리 가능"
-L["DetachedIcons.CurrentlyDetachedCount"] = "분리됨 (%d)"
-L["DetachedIcons.NoneDetached"] =
-    "분리된 아이콘이 없습니다. 아래에서 버프를 검색 후 분리를 클릭하세요."
-L["DetachedIcons.NoMatches"] = "검색 결과가 없습니다."
-L["DetachedIcons.Detach"] = "분리"
-L["DetachedIcons.Reattach"] = "다시 합침"
-L["DetachedIcons.ResetPos"] = "초기화"
-L["DetachedIcons.ReattachAll"] = "전부 다시 합침"
 
 -- ============================================================================
 -- OPTIONS: APPEARANCE
 -- ============================================================================
-L["Options.CustomAppearance"] = "사용자 지정 외형 사용"
-L["Options.CustomAppearance.Desc"] =
-    "비활성화 시, 이 카테고리는 전체 기본값의 외형 설정을 상속받습니다. 성장 방향은 개별 프레임마다 따로 설정해야 합니다."
 L["Options.Customize"] = "사용자 지정"
 L["Options.ResetPosition"] = "위치 초기화"
 L["Options.MasqueNote"] = "확대 및 테두리 설정은 Masque에서 관리합니다."

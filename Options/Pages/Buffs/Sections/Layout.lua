@@ -62,6 +62,7 @@ local function Build(ctx, layout)
     resetBtn:BindEnabled(function()
         return IsCategorySplit(category)
     end)
+    resetBtn:SetDisabledReason(L["DisabledReason.ResetPosition"])
 end
 
 BR.Options.BuffSections.Layout = Build

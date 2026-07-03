@@ -15,25 +15,22 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LOCALES_DIR="$ROOT/Locales"
 
 # --- Collect keys -----------------------------------------------------------
-# Direct literal usage: L["Foo.Bar"]
-direct_used=$(grep -rhoP 'L\["[^"]+"\]' "$ROOT" --include='*.lua' --exclude-dir=Locales --exclude-dir=Libs --exclude-dir=.ignored | sed 's/L\["\(.*\)"\]/\1/' | sort -u)
-
-# Indirect usage via convention-named role keys that are later passed to L[].
-# Source patterns like `labelKey = "Options.HideWhen.Alone"` paired with
-# `L[row.labelKey]` are common for declarative table-driven UI; harvest the
-# string literals so the keys aren't reported as unused.
-# Only treat dotted strings as full keys. Non-dotted role-key values (e.g.
-# `labelKey = "Duration"` in a Glow row) are suffixes used with the
-# concat-prefix machinery below, not standalone keys.
-indirect_used=$(grep -rhoP '(labelKey|titleKey|noteKey|tooltipTitle|tooltipDesc)\s*=\s*"[^"]+"' "$ROOT" --include='*.lua' --exclude-dir=Locales --exclude-dir=Libs --exclude-dir=.ignored | sed -E 's/^[^=]+=\s*"//' | sed 's/"$//' | grep '\.' | sort -u)
-
-# Concatenation prefixes: L["Options.Glow." .. spec.labelKey]. Treat any
-# defined key starting with such a prefix as used.
-concat_prefixes=$(grep -rhoP 'L\["[^"]+"\s*\.\.' "$ROOT" --include='*.lua' --exclude-dir=Locales --exclude-dir=Libs --exclude-dir=.ignored | sed -E 's/^L\["//' | sed -E 's/"[[:space:]]*\.\..*$//' | sort -u)
-
 defined=$(grep -oP 'english\["[^"]+"\]' "$LOCALES_DIR/enUS.lua" | sed 's/english\["\(.*\)"\]/\1/' | sort -u)
 enUS_count=$(echo "$defined" | wc -l)
 
+# Every dotted string literal in source. This is intentionally broad: it catches
+# keys however they reach L[] - directly (L["Foo.Bar"]), as a role-key value
+# (labelKey = "Foo.Bar"), passed positionally (ToggleCaption(g, "Foo.Bar", ...)),
+# or as a table value (SCOPE_LABELS = { raid = "Loadout.Scope.Raid" }). It also
+# sweeps in non-label strings like config paths ("defaults.iconWidth"), but those
+# are filtered out below by intersecting with the defined keys - a literal only
+# counts as a used key when enUS actually defines it. The regex matches dotted
+# identifier tokens only (no spaces), so English text never leaks in.
+literals=$(grep -rhoP '"[A-Za-z][A-Za-z0-9]*(\.[A-Za-z0-9]+)+"' "$ROOT" --include='*.lua' --exclude-dir=Locales --exclude-dir=Libs --exclude-dir=.ignored | tr -d '"' | sort -u)
+
+# Concatenation prefixes: L["Options.Glow." .. spec.labelKey]. The full key never
+# appears as a literal, so mark every defined key under such a prefix as used.
+concat_prefixes=$(grep -rhoP 'L\["[^"]+"\s*\.\.' "$ROOT" --include='*.lua' --exclude-dir=Locales --exclude-dir=Libs --exclude-dir=.ignored | sed -E 's/^L\["//' | sed -E 's/"[[:space:]]*\.\..*$//' | sort -u)
 prefix_used=""
 if [ -n "$concat_prefixes" ]; then
     while IFS= read -r prefix; do
@@ -43,12 +40,17 @@ if [ -n "$concat_prefixes" ]; then
     done <<< "$concat_prefixes"
 fi
 
-used=$(printf '%s\n%s\n%s\n' "$direct_used" "$indirect_used" "$prefix_used" | grep -v '^$' | sort -u)
+# A defined key is "used" when it appears as a literal or is covered by a prefix.
+used=$(printf '%s\n%s\n' "$(comm -12 <(echo "$literals") <(echo "$defined"))" "$prefix_used" | grep -v '^$' | sort -u)
+
+# Direct L["..."] references - the only reliable signal for "referenced a key that
+# doesn't exist" (a bare dotted literal could just be a config path, not a typo).
+direct_used=$(grep -rhoP 'L\["[^"]+"\]' "$ROOT" --include='*.lua' --exclude-dir=Locales --exclude-dir=Libs --exclude-dir=.ignored | sed 's/L\["\(.*\)"\]/\1/' | sort -u)
 
 errors=0
 
 # --- enUS <-> source sync (always checked, always errors) --------------------
-missing_src=$(comm -23 <(echo "$used") <(echo "$defined"))
+missing_src=$(comm -23 <(echo "$direct_used") <(echo "$defined"))
 unused_src=$(comm -13 <(echo "$used") <(echo "$defined") | grep -v '^ChatRequest\.' || true)
 
 if [ -n "$missing_src" ]; then

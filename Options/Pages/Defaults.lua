@@ -16,16 +16,12 @@ local Helpers = BR.Options.Helpers
 
 local LSM = BR.LSM
 local IsFontPathValid = BR.Helpers.IsFontPathValid
-local IsCategorySplit = BR.Helpers.IsCategorySplit
 local IsMasqueActive = BR.Masque and BR.Masque.IsActive or function()
     return false
 end
 
-local GetCategoryLabels = BR.Options.GetCategoryLabels
-
 local LayoutSectionHeader = Helpers.LayoutSectionHeader
 local LayoutSectionNote = Helpers.LayoutSectionNote
-local GetCategorySetting = Helpers.GetCategorySetting
 local MakeDefaultsGetter = Helpers.MakeDefaultsGetter
 local MakeDefaultsSetter = Helpers.MakeDefaultsSetter
 
@@ -35,25 +31,7 @@ local COL_PADDING = BR.Options.Constants.COL_PADDING
 local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
 
 local tinsert = table.insert
-local tsort = table.sort
 local abs = math.abs
-local rad = math.rad
-
--- Color palette for the textured arrow buttons in Display Order. Mirrors the
--- dropdown chevron (UI/Components.lua) so the page reads as one visual family.
-local ARROW_COLOR = { 0.7, 0.7, 0.7, 1 }
-local ARROW_HOVER_COLOR = BR.Colors.Accent
-local ARROW_DISABLED_COLOR = { 0.4, 0.4, 0.4, 1 }
-local ARROW_BG = { 0.1, 0.1, 0.1, 0.7 }
-local ARROW_BG_HOVER = { 0.2, 0.2, 0.2, 0.85 }
-local ARROW_BG_DISABLED = { 0.05, 0.05, 0.05, 0.5 }
-local ARROW_BORDER = BR.Colors.Border
-local ARROW_BORDER_DISABLED = { 0.2, 0.2, 0.2, 0.6 }
-
--- All categories that have a slot in defaults.categorySettings, in canonical
--- order. The Display Order section enumerates these; the list comes from
--- BR.CATEGORY_ORDER (Core.lua) so it can't drift from the rest of the addon.
-local ALL_CATEGORIES = BR.CATEGORY_ORDER
 
 local function BuildFontOptions()
     local fontList = LSM:List("font")
@@ -64,279 +42,6 @@ local function BuildFontOptions()
         end
     end
     return opts
-end
-
--- ============================================================================
--- DISPLAY ORDER HELPERS
--- ============================================================================
-
----Read a category's effective priority (saved value or default).
-local function GetPriority(category)
-    local catDefaults = BR.defaults.categorySettings[category]
-    return GetCategorySetting(category, "priority", catDefaults and catDefaults.priority or 99)
-end
-
----Categories that participate in the combined-frame ordering, sorted by
----priority (ascending). Ties fall back to the declared ALL_CATEGORIES order
----to keep the sort stable across renders.
-local function GetCombinedOrder()
-    local list = {}
-    for _, cat in ipairs(ALL_CATEGORIES) do
-        if not IsCategorySplit(cat) then
-            tinsert(list, cat)
-        end
-    end
-    local declarationIndex = {}
-    for i, cat in ipairs(ALL_CATEGORIES) do
-        declarationIndex[cat] = i
-    end
-    tsort(list, function(a, b)
-        local pa, pb = GetPriority(a), GetPriority(b)
-        if pa == pb then
-            return declarationIndex[a] < declarationIndex[b]
-        end
-        return pa < pb
-    end)
-    return list
-end
-
----Categories that are split off into their own frames (no priority).
----Sorted by declaration order so the section reads consistently.
-local function GetSplitList()
-    local list = {}
-    for _, cat in ipairs(ALL_CATEGORIES) do
-        if IsCategorySplit(cat) then
-            tinsert(list, cat)
-        end
-    end
-    return list
-end
-
----Renormalize priorities to 1..N for a given ordered list of categories.
----Writing through SetMulti fires LayoutRefresh once and avoids stale-tie
----pathology when users had collisions from the old per-category slider.
-local function ApplyOrder(orderedList)
-    local changes = {}
-    for i, cat in ipairs(orderedList) do
-        changes["categorySettings." .. cat .. ".priority"] = i
-    end
-    BR.Config.SetMulti(changes)
-end
-
----Swap a category with its neighbor (delta = -1 for up, +1 for down).
-local function MoveCategory(category, delta)
-    local list = GetCombinedOrder()
-    for i, cat in ipairs(list) do
-        if cat == category then
-            local j = i + delta
-            if j < 1 or j > #list then
-                return
-            end
-            list[i], list[j] = list[j], list[i]
-            ApplyOrder(list)
-            Components.RefreshAll()
-            return
-        end
-    end
-end
-
--- ============================================================================
--- DISPLAY ORDER SECTION
--- ============================================================================
-
-local ORDER_ROW_H = 22
-local ORDER_DIVIDER_H = 22
-local ORDER_ARROW_W = 22
-local ORDER_ARROW_H = 18
-local ORDER_ARROW_GAP = 4
-local ORDER_ARROW_TEX_SIZE = 10
-
----Build a small textured arrow button. Uses the same chevron texture +
----rotation trick the Dropdown component uses for its expand glyph, so the
----arrows render reliably across every locale (the unicode triangle glyphs
----are missing from several of the default WoW fonts).
----@param parent table
----@param direction "up"|"down"
----@param onClick fun()
-local function CreateOrderArrowButton(parent, direction, onClick)
-    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    btn:SetSize(ORDER_ARROW_W, ORDER_ARROW_H)
-    btn:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-
-    local arrow = btn:CreateTexture(nil, "OVERLAY")
-    arrow:SetSize(ORDER_ARROW_TEX_SIZE, ORDER_ARROW_TEX_SIZE)
-    arrow:SetPoint("CENTER", 0, 0)
-    arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
-    -- Texture points right by default; rotate +90 for up, -90 for down.
-    arrow:SetRotation(direction == "up" and rad(90) or rad(-90))
-
-    local enabled = true
-
-    local function UpdateVisual()
-        if not enabled then
-            btn:SetBackdropColor(unpack(ARROW_BG_DISABLED))
-            btn:SetBackdropBorderColor(unpack(ARROW_BORDER_DISABLED))
-            arrow:SetVertexColor(unpack(ARROW_DISABLED_COLOR))
-        elseif btn:IsMouseOver() then
-            btn:SetBackdropColor(unpack(ARROW_BG_HOVER))
-            btn:SetBackdropBorderColor(unpack(ARROW_BORDER))
-            arrow:SetVertexColor(unpack(ARROW_HOVER_COLOR))
-        else
-            btn:SetBackdropColor(unpack(ARROW_BG))
-            btn:SetBackdropBorderColor(unpack(ARROW_BORDER))
-            arrow:SetVertexColor(unpack(ARROW_COLOR))
-        end
-    end
-    UpdateVisual()
-
-    btn:SetScript("OnEnter", UpdateVisual)
-    btn:SetScript("OnLeave", UpdateVisual)
-    btn:SetScript("OnClick", function()
-        if enabled then
-            onClick()
-        end
-    end)
-
-    -- Override Button:SetEnabled so callers get visual + click-gating in one
-    -- call (matches the dropdown's behavior model).
-    function btn:SetEnabled(e)
-        enabled = e
-        UpdateVisual()
-    end
-
-    return btn
-end
-
----One row per category. Persistent (created once, repositioned on Refresh)
----so we don't leak frames when users toggle Split on/off elsewhere.
----@param parent table container Frame
----@param category string category id
-local function CreateOrderRow(parent, category)
-    local labels = GetCategoryLabels()
-    local row = CreateFrame("Frame", nil, parent)
-    row:SetHeight(ORDER_ROW_H)
-
-    local label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    label:SetPoint("LEFT", 4, 0)
-    label:SetText(labels[category] or category)
-
-    local downBtn = CreateOrderArrowButton(row, "down", function()
-        MoveCategory(category, 1)
-    end)
-    downBtn:SetPoint("RIGHT", -4, 0)
-
-    local upBtn = CreateOrderArrowButton(row, "up", function()
-        MoveCategory(category, -1)
-    end)
-    upBtn:SetPoint("RIGHT", downBtn, "LEFT", -ORDER_ARROW_GAP, 0)
-
-    -- Badge shown for split categories instead of the arrows: makes the
-    -- "this isn't in the ordering" state self-explanatory.
-    local splitBadge = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    splitBadge:SetPoint("RIGHT", -4, 0)
-    splitBadge:SetText(L["Options.DisplayOrder.SplitBadge"])
-    splitBadge:Hide()
-
-    function row:SetSplit(isSplit)
-        if isSplit then
-            upBtn:Hide()
-            downBtn:Hide()
-            splitBadge:Show()
-            label:SetTextColor(0.55, 0.55, 0.55)
-        else
-            upBtn:Show()
-            downBtn:Show()
-            splitBadge:Hide()
-            label:SetTextColor(unpack(BR.Colors.Accent))
-        end
-    end
-
-    function row:SetArrowEnabled(canUp, canDown)
-        upBtn:SetEnabled(canUp)
-        downBtn:SetEnabled(canDown)
-    end
-
-    return row
-end
-
----Container that renders the full ordered list (combined section + split
----section). Returns the container plus a Refresh closure (registered on
----BR.RefreshableComponents so the list re-syncs whenever a component
----elsewhere flips Split state).
-local function BuildDisplayOrderList(parent, contentWidth)
-    -- Budget enough height for all 7 categories + the divider regardless of
-    -- whether splits are present; that keeps subsequent sections anchored at
-    -- a stable Y when users toggle Split on/off.
-    local containerHeight = #ALL_CATEGORIES * ORDER_ROW_H + ORDER_DIVIDER_H
-
-    local container = CreateFrame("Frame", nil, parent)
-    container:SetSize(contentWidth, containerHeight)
-
-    local rows = {}
-    for _, cat in ipairs(ALL_CATEGORIES) do
-        rows[cat] = CreateOrderRow(container, cat)
-    end
-
-    -- Divider between combined and split groups.
-    local divider = container:CreateTexture(nil, "ARTWORK")
-    divider:SetHeight(1)
-    divider:SetColorTexture(0.4, 0.32, 0.05, 0.6)
-    divider:Hide()
-
-    local dividerLabel = container:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    dividerLabel:SetText(L["Options.DisplayOrder.SplitGroup"])
-    dividerLabel:Hide()
-
-    local function PositionRow(cat, y)
-        local row = rows[cat]
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", container, "TOPLEFT", 0, y)
-        row:SetPoint("TOPRIGHT", container, "TOPRIGHT", 0, y)
-    end
-
-    local function Refresh()
-        local combined = GetCombinedOrder()
-        local split = GetSplitList()
-
-        local y = 0
-        for i, cat in ipairs(combined) do
-            PositionRow(cat, y)
-            rows[cat]:SetSplit(false)
-            rows[cat]:SetArrowEnabled(i > 1, i < #combined)
-            rows[cat]:Show()
-            y = y - ORDER_ROW_H
-        end
-
-        if #split > 0 then
-            divider:ClearAllPoints()
-            divider:SetPoint("TOPLEFT", container, "TOPLEFT", 4, y - 8)
-            divider:SetPoint("TOPRIGHT", container, "TOPRIGHT", -4, y - 8)
-            dividerLabel:ClearAllPoints()
-            dividerLabel:SetPoint("TOPLEFT", container, "TOPLEFT", 4, y - 12)
-            divider:Show()
-            dividerLabel:Show()
-            y = y - ORDER_DIVIDER_H
-
-            for _, cat in ipairs(split) do
-                PositionRow(cat, y)
-                rows[cat]:SetSplit(true)
-                rows[cat]:Show()
-                y = y - ORDER_ROW_H
-            end
-        else
-            divider:Hide()
-            dividerLabel:Hide()
-        end
-    end
-
-    Refresh()
-    container.Refresh = Refresh
-    tinsert(BR.RefreshableComponents, container)
-    return container, containerHeight
 end
 
 local function Build(content)
@@ -423,34 +128,86 @@ local function Build(content)
     })
     layout:Add(defDirHolder, nil, COMPONENT_GAP + DROPDOWN_EXTRA)
 
-    local defGlowHolder = Components.Checkbox(content, {
-        label = L["Options.GlowReminderIcons"],
-        tooltip = {
-            title = L["Options.GlowReminderIcons.Title"],
-            desc = L["Options.GlowReminderIcons.Desc"],
+    -- Glow: one independent row per glow kind (expiring / missing), each with
+    -- its own enable checkbox, a live style summary, and a Customize button
+    -- opening the Glow dialog on that kind. One control = one setting: the
+    -- old single checkbox wrote both enable keys at once and read "on" when
+    -- either was on, which made mixed states impossible to see or set here.
+    local GLOW_ROWS = {
+        {
+            label = L["Options.ExpiringGlow"],
+            desc = L["Options.ExpiringGlow.Desc"],
+            enableKey = "showExpirationGlow",
+            typeKey = "glowType",
+            typeFallback = 2,
+            kind = "expiring",
         },
-        warningTooltip = {
-            title = L["Options.GlowReminderIcons.Title"],
-            desc = L["Options.GlowReminderIcons.CpuWarning"],
+        {
+            label = L["Options.MissingGlow"],
+            desc = L["Options.MissingGlow.Desc"],
+            enableKey = "showMissingGlow",
+            typeKey = "missingGlowType",
+            typeFallback = 1,
+            kind = "missing",
         },
-        get = function()
-            local d = BR.profile.defaults
-            return d and (d.showExpirationGlow ~= false or d.showMissingGlow ~= false)
-        end,
-        onChange = function(checked)
-            BR.Config.Set("defaults.showExpirationGlow", checked)
-            BR.Config.Set("defaults.showMissingGlow", checked)
-            Components.RefreshAll()
-        end,
-    })
+    }
+    -- Fixed column boundaries so the style summary and Customize button line up
+    -- across rows regardless of label / glow-name length. Both label and glow
+    -- name vary in width, so chaining button -> summary -> label would scatter
+    -- the buttons; anchor them to the holder's LEFT at precomputed offsets.
+    local GLOW_COL_GAP = 8
+    -- Reserve the trailing warning icon (4px gap + 14px icon) that these rows
+    -- render after the label, so the summary column clears it on the widest row.
+    local GLOW_INFO_ICON_RESERVE = 4 + 14
+    local glowLabelWidth = Components.MeasureSharedLabelWidth({
+        L["Options.ExpiringGlow"],
+        L["Options.MissingGlow"],
+    }, "GameFontHighlightSmall", 0)
+    local glowNames = {}
+    for _, t in ipairs(BR.Glow.Types) do
+        tinsert(glowNames, t.name)
+    end
+    local glowSummaryWidth = Components.MeasureSharedLabelWidth(glowNames, "GameFontDisableSmall", 0)
 
-    local glowSettingsBtn = CreateButton(content, L["Options.Customize"], function()
-        BR.Options.Dialogs.Glow.Show()
-    end)
-    glowSettingsBtn:SetPoint("LEFT", defGlowHolder.infoIcon or defGlowHolder.label, "RIGHT", 8, 0)
-    glowSettingsBtn:SetFrameLevel(defGlowHolder:GetFrameLevel() + 5)
+    for _, row in ipairs(GLOW_ROWS) do
+        local rowGlowHolder = Components.Checkbox(content, {
+            label = row.label,
+            tooltip = { title = row.label, desc = row.desc },
+            warningTooltip = {
+                title = L["Options.GlowReminderIcons.Title"],
+                desc = L["Options.GlowReminderIcons.CpuWarning"],
+            },
+            get = function()
+                local d = BR.profile.defaults
+                return d and d[row.enableKey] ~= false
+            end,
+            onChange = function(checked)
+                BR.Config.Set("defaults." .. row.enableKey, checked)
+                Components.RefreshAll()
+            end,
+        })
 
-    layout:Add(defGlowHolder, nil, COMPONENT_GAP)
+        local summaryX = rowGlowHolder.labelOffset + glowLabelWidth + GLOW_INFO_ICON_RESERVE + GLOW_COL_GAP
+        local styleSummary = content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        styleSummary:SetPoint("LEFT", rowGlowHolder, "LEFT", summaryX, 0)
+
+        local rowCustomizeBtn = CreateButton(content, L["Options.Customize"], function()
+            BR.Options.Dialogs.Glow.Show(nil, row.kind)
+        end)
+        rowCustomizeBtn:SetPoint("LEFT", rowGlowHolder, "LEFT", summaryX + glowSummaryWidth + GLOW_COL_GAP, 0)
+        rowCustomizeBtn:SetFrameLevel(rowGlowHolder:GetFrameLevel() + 5)
+
+        local function refreshGlowRow()
+            local d = BR.profile.defaults or {}
+            local typeIndex = d[row.typeKey] or row.typeFallback
+            local typeInfo = BR.Glow.Types[typeIndex]
+            styleSummary:SetText(typeInfo and typeInfo.name or "")
+        end
+        refreshGlowRow()
+        tinsert(BR.RefreshableComponents, { Refresh = refreshGlowRow })
+
+        layout:Add(rowGlowHolder, nil, COMPONENT_GAP)
+    end
 
     -- Expiration Reminder
     LayoutSectionHeader(layout, content, L["Options.ExpirationReminder"])
@@ -489,16 +246,10 @@ local function Build(content)
     })
     layout:Add(preKeyThresholdHolder, nil, COMPONENT_GAP)
 
-    -- Display Order: cross-category spatial composition. Replaces the old
-    -- per-category Priority slider (which forced users to imagine the global
-    -- ordering across 6 disconnected pages).
-    LayoutSectionHeader(layout, content, L["Options.DisplayOrder"])
-    LayoutSectionNote(layout, content, L["Options.DisplayOrder.Note"])
-
-    local listX = layout:GetX()
-    local listWidth = (content.GetWidth and content:GetWidth() or 600) - listX - COL_PADDING
-    local orderList, orderHeight = BuildDisplayOrderList(content, listWidth)
-    layout:Add(orderList, orderHeight, COMPONENT_GAP)
+    -- Transition breadcrumb: the stacking-order editor lived here for a long
+    -- time before moving to the Layout page with everything else spatial.
+    layout:Space(12)
+    LayoutSectionNote(layout, content, L["Options.DisplayOrder.Moved"])
 
     content:SetHeight(abs(layout:GetY()) + 20)
 end
