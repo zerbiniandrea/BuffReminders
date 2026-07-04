@@ -1560,6 +1560,13 @@ local function CreateDropdownCore(parent, width, options, initialValue, onChange
     local function OpenMenu()
         isOpen = true
         PositionMenu()
+        -- The menu sits on FULLSCREEN_DIALOG so it floats over the main options
+        -- panel (DIALOG strata). But dialogs also live on FULLSCREEN_DIALOG, so
+        -- inside a dialog the strata ties and draw order falls back to frame
+        -- level - the dialog's own widgets would then paint over the open menu.
+        -- Raise the menu well above the button's level (recomputed each open so
+        -- it tracks a reparented/relevelled dropdown) so it always reads on top.
+        menu:SetFrameLevel((button:GetFrameLevel() or 0) + 50)
         menu:Show()
         if scrollFrame then
             scrollFrame:SetVerticalScroll(0)
