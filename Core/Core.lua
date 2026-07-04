@@ -289,7 +289,7 @@ local DefaultSettingKeys = {
     consumableTextScale = "VisualsRefresh",
     hideConsumableLabels = "VisualsRefresh",
     showConsumableTooltips = false, -- No refresh needed, read at tooltip time
-    showBuffTooltips = false, -- No refresh needed, read at tooltip time
+    showBuffTooltips = "VisualsRefresh", -- Toggles raid/presence hover capture vs click-through
     hideLegacyConsumables = "DisplayRefresh",
     -- Pet display mode
     petDisplayMode = "DisplayRefresh",

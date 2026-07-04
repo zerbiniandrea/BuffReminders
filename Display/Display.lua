@@ -1103,6 +1103,29 @@ local function ShowBuffSpellTooltip(frame, anchor)
 end
 BR.Display.ShowBuffSpellTooltip = ShowBuffSpellTooltip
 
+-- Apply mouse interactivity to a buff icon frame. Icons are always click-through
+-- (dragging is handled by anchor handles; click-to-cast/chat-requests live on the
+-- secure overlays that float above the icon). Raid/presence frames get hover
+-- events ONLY when the buff tooltip is opted in - otherwise they stay fully
+-- click-through so the world beneath (camera drag, unit clicks) is reachable.
+-- Re-called from UpdateVisuals so toggling showBuffTooltips takes effect live.
+local function ApplyBuffFrameMouse(frame, category)
+    if (category == "raid" or category == "presence") and BR.profile.defaults.showBuffTooltips == true then
+        frame:SetMouseClickEnabled(false)
+        frame:SetMouseMotionEnabled(true)
+        frame:SetScript("OnEnter", function(self)
+            ShowBuffSpellTooltip(self)
+        end)
+        frame:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+    else
+        frame:SetScript("OnEnter", nil)
+        frame:SetScript("OnLeave", nil)
+        frame:EnableMouse(false)
+    end
+end
+
 -- Create icon frame for a buff
 local function CreateBuffFrame(buff, category)
     local parent
@@ -1203,24 +1226,7 @@ local function CreateBuffFrame(buff, category)
         frame.subLabel:Hide()
     end
 
-    -- Always click-through (dragging is handled by anchor handles). For raid
-    -- and presence frames we still want hover events so the buff tooltip can
-    -- pop on mouseover when the user opts in - clicks remain disabled so the
-    -- mover/anchor flow stays intact. Other categories already have their own
-    -- hover paths (consumable item tooltip + targeted last-target tooltip
-    -- live on the click overlay, which sits above the icon when active).
-    if category == "raid" or category == "presence" then
-        frame:SetMouseClickEnabled(false)
-        frame:SetMouseMotionEnabled(true)
-        frame:SetScript("OnEnter", function(self)
-            ShowBuffSpellTooltip(self)
-        end)
-        frame:SetScript("OnLeave", function()
-            GameTooltip:Hide()
-        end)
-    else
-        frame:EnableMouse(false)
-    end
+    ApplyBuffFrameMouse(frame, category)
 
     frame:Hide()
     return frame
@@ -3391,6 +3397,10 @@ local function UpdateVisuals()
             BR.TextPositions.Apply(frame.subLabel, frame, lz, lx, ly)
         end
         UpdateIconStyling(frame, catSettings)
+
+        -- Re-apply mouse state so toggling Show Buff Tooltips (raid/presence)
+        -- switches between hover-enabled and fully click-through without /reload.
+        ApplyBuffFrameMouse(frame, frame.buffCategory)
 
         -- Per-category text visibility
         if not ShouldShowText(frame.buffCategory) then
