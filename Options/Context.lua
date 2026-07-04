@@ -94,11 +94,11 @@ BR.Options.Groups = {
     },
 }
 
--- Ordered list of the built-in (non-custom) categories that have entries in
+-- Ordered list of the built-in (non-virtual) categories that have entries in
 -- BR.BUFF_TABLES. Iterating this is the right way to walk every static buff
 -- without hardcoding the category set in each consumer.
 -- Custom buffs live in db.customBuffs and must be iterated separately.
-BR.Options.StaticCategories = { "raid", "presence", "targeted", "self", "pet", "consumable" }
+BR.Options.StaticCategories = BR.STATIC_CATEGORIES
 
 -- ============================================================================
 -- SHARED HELPERS

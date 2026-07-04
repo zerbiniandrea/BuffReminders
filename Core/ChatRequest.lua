@@ -13,9 +13,10 @@ local L = BR.L
 
 local ChatRequest = {}
 
--- Categories scanned for requestable buffs, in display order. Custom buffs are
--- excluded: there is no UI to flag them and they never carry chatRequestable.
-local CATEGORY_ORDER = { "raid", "presence", "targeted", "self", "pet", "consumable" }
+-- Categories scanned for requestable buffs, in display order. The virtual
+-- categories (custom/loadout) are excluded by construction: there is no UI to
+-- flag them and they never carry chatRequestable.
+local CATEGORY_ORDER = BR.STATIC_CATEGORIES
 
 local buffList -- ordered list of requestable buff defs (lazily built, cached)
 local categoryList -- ordered list of categories hosting one (lazily built, cached)

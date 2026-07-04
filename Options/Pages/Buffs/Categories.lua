@@ -18,7 +18,7 @@ local Components = BR.Components
 local COL_PADDING = BR.Options.Constants.COL_PADDING
 local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
 
-local TAB_CATEGORIES = { "raid", "presence", "targeted", "self", "pet", "consumable", "custom", "loadout" }
+local TAB_CATEGORIES = BR.CATEGORY_ORDER
 local TAB_STRIP_H = 26
 -- How far below the content top the tab strip sits (positive magnitude, matching
 -- every other page's top padding). PAGE_TOP_PADDING is negative, so negate it.
