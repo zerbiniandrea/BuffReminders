@@ -14,7 +14,8 @@ local _, BR = ...
 --     icon,                              -- fileID fallback (live icon via GetRuleIcon)
 --     -- require == "gear":    gear = { setID, name }
 --     -- require == "talent":  spellID = <talent spell>
---     -- require == "loadout": specID, loadout = { name, configID }
+--     -- require == "loadout": specID, loadout = { name, configID }              (WoW named loadout)
+--     --                       specID, loadout = { name, source = "tlex" }       (Talent Loadout Ex loadout)
 --     when = { <content gates, same shape as CustomBuff.loadConditions>,
 --              instances = { { id, mapID, name }, ... } },  -- empty = any
 --     clickToFix = boolean,
@@ -27,7 +28,8 @@ local _, BR = ...
 -- reminders you can't satisfy). Stamped at save time, enforced by
 -- AppliesToCurrentCharacter, surfaced in the list by GetBindingLabel:
 --   * require "talent"  -> spec-bound (talents live in a spec tree)       -> specID
---   * require "loadout" -> character + spec bound (configID is per-toon)  -> character + specID
+--   * require "loadout" (WoW)  -> character + spec bound (configID per-toon) -> character + specID
+--   * require "loadout" (tlex) -> spec-bound (TLEx data is account-wide by class+spec) -> specID
 --   * require "gear"    -> character-bound (setID is per-character)        -> character
 -- Rules saved before binding existed (no specID / character) apply everywhere.
 
@@ -41,6 +43,7 @@ local GetSpecializationInfo = GetSpecializationInfo
 local GetSpecializationInfoByID = GetSpecializationInfoByID
 local GetInstanceInfo = GetInstanceInfo
 local UnitName = UnitName
+local UnitClass = UnitClass
 local GetRealmName = GetRealmName
 local LOCALIZED_CLASS_NAMES_MALE = LOCALIZED_CLASS_NAMES_MALE
 local C_ClassTalents = C_ClassTalents
@@ -220,6 +223,55 @@ function Loadouts.IsLoadoutActive(specID, name)
     return ok and active or false
 end
 
+-- Whether Talent Loadout Ex is installed and exposes its API. Memoized once
+-- positive (an addon can't unload mid-session), re-probed while absent because
+-- TLEx's load order relative to BuffReminders isn't guaranteed - so an early probe
+-- can't poison it into skipping forever. A single global lookup is cheap and only
+-- runs on cache-cold refreshes / when the picker opens, so there's no per-frame cost.
+local tlxAvailable = false
+local function IsTLXAvailable()
+    if tlxAvailable then
+        return true
+    end
+    ---@diagnostic disable-next-line: undefined-field
+    local TLX = _G.TLX
+    tlxAvailable = TLX ~= nil and TLX.GetLoadedData ~= nil
+    return tlxAvailable
+end
+Loadouts.IsTLXAvailable = IsTLXAvailable
+
+local function ResolveTLXLoadoutActive(name)
+    if not IsTLXAvailable() then
+        return false
+    end
+    -- GetLoadedData() varargs the loadout(s) TLEx considers currently loaded (it
+    -- diffs each stored talent string against the active config). Pack into a table
+    -- so we can scan; returns {} when none / not yet computed.
+    ---@diagnostic disable-next-line: undefined-field
+    local loaded = { _G.TLX.GetLoadedData() }
+    for _, data in ipairs(loaded) do
+        if data and data.name == name then
+            return true
+        end
+    end
+    return false
+end
+
+---Whether a Talent Loadout Ex loadout (matched by name within the current spec)
+---is the one currently loaded. Talent Loadout Ex loadouts are NOT WoW named
+---loadouts, so `C_ClassTalents` can't see them - detection goes through TLEx's own
+---public API (`_G.TLX.GetLoadedData`). Returns false when TLEx isn't installed or
+---hasn't computed its loaded state yet.
+---@param name string?
+---@return boolean
+function Loadouts.IsTLXLoadoutActive(name)
+    if not name then
+        return true
+    end
+    local ok, active = pcall(ResolveTLXLoadoutActive, name)
+    return ok and active or false
+end
+
 local function ResolveSetEquipped(setID)
     -- GetEquipmentSetInfo -> name, iconFileID, setID, isEquipped, ...
     local _, _, _, isEquipped = C_EquipmentSet.GetEquipmentSetInfo(setID)
@@ -248,6 +300,10 @@ function Loadouts.IsSatisfied(rule)
         -- Loadouts are per-spec: a rule for another spec doesn't apply right now.
         if rule.specID and rule.specID ~= GetCurrentSpecID() then
             return true
+        end
+        ---@diagnostic disable-next-line: undefined-field
+        if rule.loadout and rule.loadout.source == "tlex" then
+            return Loadouts.IsTLXLoadoutActive(rule.loadout.name)
         end
         return Loadouts.IsLoadoutActive(rule.specID, rule.loadout and rule.loadout.name)
     end
@@ -304,6 +360,40 @@ function Loadouts.ListLoadouts(specID)
             local info = C_Traits.GetConfigInfo(cfgID)
             if info and info.name then
                 out[#out + 1] = { name = info.name, configID = cfgID }
+            end
+        end
+    end)
+    return out
+end
+
+---List the Talent Loadout Ex loadouts saved for the current class + spec. TLEx
+---stores account-wide keyed by class token + spec INDEX (not spec ID); group
+---headers (entries without a `.text` talent string) are skipped. Returns an empty
+---list when TLEx isn't installed, so the picker self-gates on its presence.
+---@return { name: string, icon: number|string? }[]
+function Loadouts.ListTLXLoadouts()
+    local out = {}
+    if not IsTLXAvailable() then
+        return out
+    end
+    pcall(function()
+        ---@diagnostic disable-next-line: undefined-field
+        local db = _G.TalentLoadoutEx
+        if not db then
+            return
+        end
+        local _, class = UnitClass("player")
+        local specIndex = GetSpecialization and GetSpecialization()
+        if not class or not specIndex then
+            return
+        end
+        local specTable = db[class] and db[class][specIndex]
+        if not specTable then
+            return
+        end
+        for _, data in ipairs(specTable) do
+            if data.text and data.name then
+                out[#out + 1] = { name = data.name, icon = data.icon }
             end
         end
     end)
@@ -396,11 +486,18 @@ function Loadouts.GetRuleIcon(rule)
         end
         -- Set has no icon (or was deleted): fall back to a generic gear icon.
         return rule.icon or DEFAULT_GEAR_ICON
-    elseif rule.require == "loadout" and rule.specID then
-        -- GetSpecializationInfoByID -> id, name, description, icon, ...
-        local ok, _, _, _, icon = pcall(GetSpecializationInfoByID, rule.specID)
-        if ok and icon then
-            return icon
+    elseif rule.require == "loadout" then
+        -- TLEx loadouts carry their own icon (fileID or atlas/path string); use it.
+        ---@diagnostic disable-next-line: undefined-field
+        if rule.loadout and rule.loadout.source == "tlex" then
+            return rule.icon or DEFAULT_TALENT_ICON
+        end
+        if rule.specID then
+            -- GetSpecializationInfoByID -> id, name, description, icon, ...
+            local ok, _, _, _, icon = pcall(GetSpecializationInfoByID, rule.specID)
+            if ok and icon then
+                return icon
+            end
         end
     end
     return rule.icon or DEFAULT_TALENT_ICON

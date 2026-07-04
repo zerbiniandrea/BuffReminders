@@ -48,6 +48,7 @@ english["Category.SelfNote"] = "(buffs strictly on yourself)"
 english["Category.PetNote"] = "(pet summon reminders)"
 english["Category.CustomNote"] = "(track any buff/glow by spell ID)"
 english["Category.LoadoutNote"] = "(remind me when my gear or talents don't match the content)"
+english["Category.LoadoutTLXNote"] = "Talent Loadout Ex detected - its loadouts appear in the talent loadout picker."
 
 -- Loadout reminders
 english["Loadout.Add"] = "Add Loadout Reminder"
@@ -65,6 +66,7 @@ english["Loadout.NoSets"] = "No equipment sets found. Create one from the charac
 english["Loadout.NoSetSelected"] = "Select an equipment set first."
 english["Loadout.NoLoadouts"] = "No saved talent loadouts for this spec."
 english["Loadout.NoLoadoutSelected"] = "Select a talent loadout first."
+english["Loadout.TLXTag"] = "|cff9d9d9d(Loadout Ex)|r"
 english["Loadout.InvalidSpell"] = "That spell ID doesn't exist. Use a talent's spell ID."
 english["Loadout.CombatBlocked"] = "Can't change gear or talents in combat."
 english["Loadout.Instances"] = "%d instances"

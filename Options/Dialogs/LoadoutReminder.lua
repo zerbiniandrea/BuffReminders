@@ -118,11 +118,32 @@ local function Show(existingKey, refreshPanelCallback)
     local sets = BR.Loadouts.ListEquipmentSets()
     local selectedSetID = editingRule and editingRule.gear and editingRule.gear.setID
 
-    -- loadout (per current spec)
+    -- loadout (per current spec). The picker merges WoW named loadouts and Talent
+    -- Loadout Ex loadouts into one list; each entry carries a source-tagged string
+    -- id so the two id spaces (WoW numeric configID vs TLEx name) can't collide.
     local specID = BR.Loadouts.GetCurrentSpecID()
-    local loadouts = BR.Loadouts.ListLoadouts(specID)
-    local selectedConfigID = editingRule and editingRule.loadout and editingRule.loadout.configID
-    local selectedLoadoutName = editingRule and editingRule.loadout and editingRule.loadout.name
+    local loadoutEntries = {}
+    for _, lo in ipairs(BR.Loadouts.ListLoadouts(specID)) do
+        loadoutEntries[#loadoutEntries + 1] =
+            { id = "wow:" .. lo.configID, source = "wow", configID = lo.configID, name = lo.name }
+    end
+    for _, lo in ipairs(BR.Loadouts.ListTLXLoadouts()) do
+        loadoutEntries[#loadoutEntries + 1] =
+            { id = "tlex:" .. lo.name, source = "tlex", name = lo.name, icon = lo.icon }
+    end
+
+    local selectedLoadoutId
+    do
+        local sel = editingRule and editingRule.loadout
+        if sel then
+            ---@diagnostic disable-next-line: undefined-field
+            if sel.source == "tlex" then
+                selectedLoadoutId = "tlex:" .. (sel.name or "")
+            elseif sel.configID then
+                selectedLoadoutId = "wow:" .. sel.configID
+            end
+        end
+    end
 
     -- scope / readyCheck / instances
     local prevWhen = editingRule and editingRule.when or nil
@@ -236,10 +257,13 @@ local function Show(existingKey, refreshPanelCallback)
 
     -- loadout target
     local loadoutWidget
-    if #loadouts > 0 then
+    if #loadoutEntries > 0 then
         local options = {}
-        for _, lo in ipairs(loadouts) do
-            options[#options + 1] = { value = lo.configID, label = lo.name }
+        for _, e in ipairs(loadoutEntries) do
+            -- Tag TLEx entries so users can tell the two loadout sources apart when a
+            -- WoW loadout and a TLEx loadout share a name.
+            local label = (e.source == "tlex") and (e.name .. "  " .. L["Loadout.TLXTag"]) or e.name
+            options[#options + 1] = { value = e.id, label = label }
         end
         loadoutWidget = Components.Dropdown(targetSlot, {
             label = L["Loadout.Require.Loadout"],
@@ -247,16 +271,10 @@ local function Show(existingKey, refreshPanelCallback)
             width = DROPDOWN_W,
             options = options,
             get = function()
-                return selectedConfigID
+                return selectedLoadoutId
             end,
             onChange = function(val)
-                selectedConfigID = val
-                for _, lo in ipairs(loadouts) do
-                    if lo.configID == val then
-                        selectedLoadoutName = lo.name
-                        break
-                    end
-                end
+                selectedLoadoutId = val
             end,
         })
         loadoutWidget:SetPoint("TOPLEFT", 0, 0)
@@ -486,17 +504,31 @@ local function Show(existingKey, refreshPanelCallback)
             rule.name = typedName ~= "" and typedName or setName or L["Category.LoadoutReminders"]
             rule.overlayText = setName or rule.name
         elseif requireType == "loadout" then
-            if not selectedConfigID then
+            local entry
+            for _, e in ipairs(loadoutEntries) do
+                if e.id == selectedLoadoutId then
+                    entry = e
+                    break
+                end
+            end
+            if not entry then
                 UIErrorsFrame:AddMessage(L["Loadout.NoLoadoutSelected"], 1, 0.3, 0.3)
                 return
             end
             rule.specID = specID > 0 and specID or nil -- 0 (no spec) is truthy in Lua; store nil
-            rule.character = BR.Loadouts.GetCurrentCharacterKey() -- configID is per-character per-spec
-            rule.loadout = { name = selectedLoadoutName, configID = selectedConfigID }
             local _, _, _, specIcon = GetSpecializationInfoByID(specID)
-            rule.icon = specIcon
-            rule.name = typedName ~= "" and typedName or selectedLoadoutName or L["Category.LoadoutReminders"]
-            rule.overlayText = selectedLoadoutName or rule.name
+            if entry.source == "tlex" then
+                -- TLEx loadouts are account-wide by class + spec, so bind by spec only
+                -- (no character anchor); detection matches on name via TLEx's API.
+                rule.loadout = { name = entry.name, source = "tlex" }
+                rule.icon = entry.icon or specIcon
+            else
+                rule.character = BR.Loadouts.GetCurrentCharacterKey() -- configID is per-character per-spec
+                rule.loadout = { name = entry.name, configID = entry.configID }
+                rule.icon = specIcon
+            end
+            rule.name = typedName ~= "" and typedName or entry.name or L["Category.LoadoutReminders"]
+            rule.overlayText = entry.name or rule.name
         elseif requireType == "talent" then
             local spellID = tonumber(talentEditBox:GetText())
             local valid, spellName, spellIcon = false, nil, nil

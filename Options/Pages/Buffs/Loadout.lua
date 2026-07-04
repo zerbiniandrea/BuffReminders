@@ -177,9 +177,16 @@ local function GetSortedRules()
 end
 
 local function Build(content, scrollFrame)
+    -- Advertise Talent Loadout Ex support only when it's actually installed, so
+    -- non-users see no mention of a third-party addon they don't have.
+    local note = L["Category.LoadoutNote"]
+    if BR.Loadouts.IsTLXAvailable() then
+        note = note .. "\n" .. L["Category.LoadoutTLXNote"]
+    end
+
     ListEditor(content, scrollFrame, {
         header = L["Category.LoadoutReminders"],
-        note = L["Category.LoadoutNote"],
+        note = note,
         addLabel = L["Loadout.AddButton"],
         addWidth = 180,
         onAdd = function(render)
