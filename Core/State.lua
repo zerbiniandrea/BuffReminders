@@ -540,6 +540,26 @@ local function HasItemByMode(itemID, mode)
     return result
 end
 
+-- Item count cache (charges included), invalidated together with cachedItemOwnership
+-- on BAG_UPDATE_DELAYED / PLAYER_EQUIPMENT_CHANGED. Counts only change on bag
+-- updates, so re-querying C_Item.GetItemCount every refresh is wasted work.
+---@type table<number, number>
+local cachedItemCounts = {}
+
+---Get the player's item count including charges (cached)
+---@param itemID number
+---@return number
+local function GetItemCountCached(itemID)
+    local count = cachedItemCounts[itemID]
+    if count ~= nil then
+        return count
+    end
+    local ok, c = pcall(C_Item.GetItemCount, itemID, false, true)
+    count = (ok and c) or 0
+    cachedItemCounts[itemID] = count
+    return count
+end
+
 -- ============================================================================
 -- UTILITY FUNCTIONS
 -- ============================================================================
@@ -1673,15 +1693,17 @@ local function ShouldShowConsumableBuff(buff)
         end
     end
 
-    -- Check inventory for item
+    -- Check inventory for item (counts cached, invalidated on bag/equipment events)
     if buff.itemID then
-        local itemList = type(buff.itemID) == "table" and buff.itemID or { buff.itemID }
-        local totalCount = 0
-        for _, id in ipairs(itemList) do
-            local ok, count = pcall(C_Item.GetItemCount, id, false, true)
-            if ok and count then
-                totalCount = totalCount + count
+        local itemID = buff.itemID
+        local totalCount
+        if type(itemID) == "table" then
+            totalCount = 0
+            for _, id in ipairs(itemID) do
+                totalCount = totalCount + GetItemCountCached(id)
             end
+        else
+            totalCount = GetItemCountCached(itemID)
         end
         if totalCount > 0 then
             return false, nil, nil, totalCount -- Has the item in inventory
@@ -2705,9 +2727,10 @@ function BuffState.InvalidateOffHandCache()
     cachedOffHandType = nil
 end
 
----Invalidate item ownership cache (call on BAG_UPDATE_DELAYED, PLAYER_EQUIPMENT_CHANGED)
+---Invalidate item ownership + count caches (call on BAG_UPDATE_DELAYED, PLAYER_EQUIPMENT_CHANGED)
 function BuffState.InvalidateItemCache()
     cachedItemOwnership = {}
+    cachedItemCounts = {}
 end
 
 ---Invalidate loadout state cache (call on PLAYER_SPECIALIZATION_CHANGED,
