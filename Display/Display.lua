@@ -3951,7 +3951,11 @@ eventHandlers.UNIT_AURA = function(arg1, arg2)
         SetDirty("full")
     elseif arg1 == "pet" then
         SetDirty("full")
-    else
+    elseif BR.BuffState.GroupAuraUpdateMatters(arg1, arg2) then
+        -- Group aura churn is filtered against the tracked spell set: most
+        -- payloads (HoTs, procs, debuffs) can't affect the display and skip the
+        -- rescan entirely. The 3s fallback ticker bounds anything the filter
+        -- can't see (secret values, unrecordable instance IDs).
         SetDirty("group")
     end
 end

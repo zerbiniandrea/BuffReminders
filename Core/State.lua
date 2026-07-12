@@ -413,6 +413,61 @@ local function IsAuraTrackable(buff)
     return result
 end
 
+-- Set of spell IDs the addon queries on GROUP MEMBERS (raid coverage counts,
+-- presence scans, targeted-buff target scans), including per-class variants.
+-- Used to filter group-unit UNIT_AURA payloads: an aura change outside this set
+-- cannot affect what the addon displays. Player/pet-only detection (self,
+-- consumable, custom, pet) is irrelevant here - player/pet UNIT_AURA always
+-- refreshes. Static: built once from the built-in buff tables (custom buffs are
+-- only ever scanned on the player).
+local groupTrackedSpells = {}
+do
+    local function addSpells(val)
+        if type(val) == "table" then
+            for _, id in ipairs(val) do
+                groupTrackedSpells[id] = true
+            end
+        elseif val then
+            groupTrackedSpells[val] = true
+        end
+    end
+    for _, buff in ipairs(RaidBuffs) do
+        addSpells(buff.spellID)
+    end
+    for _, buff in ipairs(PresenceBuffs) do
+        addSpells(buff.spellID)
+    end
+    for _, buff in ipairs(TargetedBuffs) do
+        addSpells(buff.spellID)
+    end
+    for _, perClass in pairs(UNIT_CLASS_BUFF_SPELLS) do
+        for _, id in pairs(perClass) do
+            groupTrackedSpells[id] = true
+        end
+    end
+end
+
+-- auraInstanceIDs of tracked auras found on group units during the most recent
+-- scan (unit token -> instanceID set). Wiped at the start of every refresh and
+-- repopulated by the scans, so removal/update payloads arriving between
+-- refreshes can be matched against what the display actually reflects.
+---@type table<string, table<number, true>>
+local trackedAuraInstances = {}
+
+---Record a found tracked aura's instance ID (pcall body: auraInstanceID can be
+---a secret value in restricted contexts; a failed record just means the aura's
+---removal falls back to the 3s ticker instead of the event fast path).
+---@param unit string
+---@param auraData table
+local function RecordAuraInstance(unit, auraData)
+    local set = trackedAuraInstances[unit]
+    if not set then
+        set = {}
+        trackedAuraInstances[unit] = set
+    end
+    set[auraData.auraInstanceID] = true
+end
+
 -- Reusable set for target-memory pruning (avoids per-refresh allocation)
 ---@type table<string, true>
 local activeNames = {}
@@ -612,6 +667,11 @@ local function BuildValidUnitCache()
     RecycleUnitEntries()
     wipe(classMaxLevels)
     wipe(activeNames)
+    -- Reset per-unit tracked-aura instance sets; the scans this refresh performs
+    -- repopulate them (sets are reused to avoid churn; stale unit keys stay empty)
+    for _, set in pairs(trackedAuraInstances) do
+        wipe(set)
+    end
 
     -- Keep player spec in allySpecCache so CountMissingBuff can use a single
     -- lookup path (allySpecCache[name]) for both the player and allies.
@@ -702,6 +762,9 @@ local function UnitHasBuff(unit, spellIDs)
     if type(spellIDs) == "number" then
         local auraData = C_UnitAuras.GetUnitAuraBySpellID(unit, spellIDs)
         if auraData then
+            if unit ~= "player" then
+                pcall(RecordAuraInstance, unit, auraData)
+            end
             local remaining
             if auraData.expirationTime and auraData.expirationTime > 0 then
                 remaining = auraData.expirationTime - GetTime()
@@ -715,6 +778,9 @@ local function UnitHasBuff(unit, spellIDs)
     for _, id in ipairs(spellIDs) do
         local auraData = C_UnitAuras.GetUnitAuraBySpellID(unit, id)
         if auraData then
+            if unit ~= "player" then
+                pcall(RecordAuraInstance, unit, auraData)
+            end
             local remaining
             if auraData.expirationTime and auraData.expirationTime > 0 then
                 remaining = auraData.expirationTime - GetTime()
@@ -783,6 +849,9 @@ local function UnitHasBuffFromPlayer(unit, spellIDs)
     while auraData do
         local ok, match = pcall(AuraMatchesSpellIDs, auraData, singleId, spellIDs)
         if ok and match then
+            if unit ~= "player" then
+                pcall(RecordAuraInstance, unit, auraData)
+            end
             local remaining
             if auraData.expirationTime and auraData.expirationTime > 0 then
                 remaining = auraData.expirationTime - GetTime()
@@ -2660,6 +2729,69 @@ end
 ---@return boolean
 function BuffState.IsAlone()
     return GetNumGroupMembers() <= 1
+end
+
+---pcall body: spellId is a secret value for non-whitelisted auras in restricted
+---contexts; indexing the tracked set with it throws, which the caller treats as
+---"not tracked" (a secret spellId cannot be a whitelisted spell, and only
+---whitelisted spells are queried on group members in restricted contexts).
+---@param aura table
+---@return boolean
+local function IsTrackedAddedAura(aura)
+    return groupTrackedSpells[aura.spellId] == true
+end
+
+---Decide whether a group unit's UNIT_AURA payload can affect tracked buff state,
+---so irrelevant aura churn (HoTs, procs, debuffs) skips the group rescan.
+---Fail-open on ambiguous payloads (nil updateInfo, isFullUpdate); fail-closed on
+---secret added-aura spellIds (see IsTrackedAddedAura). Removals and updates are
+---matched against the instance IDs recorded during the last scan; anything this
+---misses (e.g. an unrecordable instance ID) is bounded by the 3s fallback ticker.
+---@param unit string
+---@param updateInfo table?
+---@return boolean
+function BuffState.GroupAuraUpdateMatters(unit, updateInfo)
+    if not updateInfo or updateInfo.isFullUpdate then
+        return true
+    end
+    -- Conservative gate: it is not yet verified in-game that whitelisted auras'
+    -- payload fields stay readable in restricted contexts (combat / encounters /
+    -- M+ / PvP), so pass every payload through there - identical to the old
+    -- behavior. The secret-value handling below is designed to be correct in
+    -- restricted contexts too; once verified, remove this gate to extend the
+    -- filtering to raid combat, where the churn is heaviest.
+    if BuffState.IsRestricted() then
+        return true
+    end
+    local added = updateInfo.addedAuras
+    if added then
+        for i = 1, #added do
+            local ok, matters = pcall(IsTrackedAddedAura, added[i])
+            if ok and matters then
+                return true
+            end
+        end
+    end
+    local set = trackedAuraInstances[unit]
+    if set and next(set) then
+        local removed = updateInfo.removedAuraInstanceIDs
+        if removed then
+            for i = 1, #removed do
+                if set[removed[i]] then
+                    return true
+                end
+            end
+        end
+        local updated = updateInfo.updatedAuraInstanceIDs
+        if updated then
+            for i = 1, #updated do
+                if set[updated[i]] then
+                    return true
+                end
+            end
+        end
+    end
+    return false
 end
 
 -- ============================================================================
