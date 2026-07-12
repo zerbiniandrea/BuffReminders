@@ -2753,20 +2753,15 @@ end
 ---secret added-aura spellIds (see IsTrackedAddedAura). Removals and updates are
 ---matched against the instance IDs recorded during the last scan; anything this
 ---misses (e.g. an unrecordable instance ID) is bounded by the 3s fallback ticker.
+---Applies in restricted contexts too: verified in-game (2026-07-12, follower
+---dungeon combat and battleground) that whitelisted auras' payload fields stay
+---readable there, matching GetUnitAuraBySpellID's whitelist behavior - so a
+---secret spellId reliably means "not a spell we can display here".
 ---@param unit string
 ---@param updateInfo table?
 ---@return boolean
 function BuffState.GroupAuraUpdateMatters(unit, updateInfo)
     if not updateInfo or updateInfo.isFullUpdate then
-        return true
-    end
-    -- Conservative gate: it is not yet verified in-game that whitelisted auras'
-    -- payload fields stay readable in restricted contexts (combat / encounters /
-    -- M+ / PvP), so pass every payload through there - identical to the old
-    -- behavior. The secret-value handling below is designed to be correct in
-    -- restricted contexts too; once verified, remove this gate to extend the
-    -- filtering to raid combat, where the churn is heaviest.
-    if BuffState.IsRestricted() then
         return true
     end
     local added = updateInfo.addedAuras
