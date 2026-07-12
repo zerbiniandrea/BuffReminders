@@ -167,6 +167,8 @@ local inCombat = false
 -- Content type cache (invalidated on PLAYER_ENTERING_WORLD)
 local cachedContentType = nil
 local cachedInstanceType = nil -- raw WoW instanceType, stashed alongside content type
+local cachedDifficultyID = nil -- raw GetInstanceInfo difficultyID, stashed alongside content type
+local GetDifficultyIDCached -- forward declaration (defined next to GetCurrentContentType)
 
 -- Whether we are in the PvP prep phase (before gates open). Used by the
 -- `hideInPvPMatch` visibility setting to gate buff display once the match starts.
@@ -618,7 +620,7 @@ local function BuildValidUnitCache()
     do
         -- Default: exclude NPCs from buff counting.
         -- Only whitelist specific content where NPC companions can receive player buffs.
-        local difficultyID = select(3, GetInstanceInfo())
+        local difficultyID = GetDifficultyIDCached()
         includeNPCsInCounting = difficultyID == 205 or difficultyID == 208 -- Follower dungeon / Delves
     end
 
@@ -836,6 +838,12 @@ local function GetCurrentContentType()
         return cachedContentType
     end
 
+    -- Stash the raw difficultyID for cheap reuse (delve check below, difficulty
+    -- key, NPC-counting gate, Decor Duel check in Display) - same lifecycle as
+    -- the content type cache, cleared together in InvalidateContentTypeCache.
+    local difficultyID = select(3, GetInstanceInfo())
+    cachedDifficultyID = difficultyID
+
     -- Check housing before instance type (housing zones may report as instanced)
     if
         C_Housing
@@ -850,7 +858,6 @@ local function GetCurrentContentType()
 
     -- Delves report inInstance=false but instanceType="scenario" and difficultyID=208;
     -- check difficultyID first so they are correctly classified as scenarios.
-    local difficultyID = select(3, GetInstanceInfo())
     if difficultyID == 208 then
         cachedContentType = "scenario"
         return cachedContentType
@@ -876,6 +883,16 @@ local function GetCurrentContentType()
     return cachedContentType
 end
 
+---Raw difficultyID from GetInstanceInfo, cached alongside the content type
+---(nil cache = not yet computed; GetInstanceInfo itself never returns nil here).
+---@return number
+function GetDifficultyIDCached()
+    if cachedDifficultyID == nil then
+        GetCurrentContentType() -- populates cachedDifficultyID
+    end
+    return cachedDifficultyID or 0
+end
+
 ---Get the current difficulty key (cached)
 ---Only caches valid keys; returns nil (retried next call) if the API returns
 ---an unmapped difficultyID (e.g. 0 during a loading transition).
@@ -884,7 +901,7 @@ local function GetCurrentDifficultyKey()
     if cachedDifficultyKey ~= nil then
         return cachedDifficultyKey
     end
-    local difficultyID = select(3, GetInstanceInfo())
+    local difficultyID = GetDifficultyIDCached()
     local contentType = GetCurrentContentType()
     local diffTable = CONTENT_DIFFICULTY_TABLES[contentType]
     if diffTable then
@@ -2606,6 +2623,9 @@ function BuffState.SetPvPPrepPhase(state)
     inPvPPrepPhase = state
 end
 
+---Raw difficultyID from GetInstanceInfo (cached; invalidated with content type)
+BuffState.GetDifficultyID = GetDifficultyIDCached
+
 ---Whether the player is in a restricted context (combat, M+ keystone, or any PvP instance).
 ---PvP instances are treated as restricted for their entire duration (prep included), since
 ---Blizzard now gates the aura API the whole time the player is inside the BG/arena.
@@ -2631,6 +2651,7 @@ end
 function BuffState.InvalidateContentTypeCache()
     cachedContentType = nil
     cachedInstanceType = nil
+    cachedDifficultyID = nil
     cachedDifficultyKey = nil
     cachedCompetitivePvP = nil
     cachedIsLegacyInstance = nil

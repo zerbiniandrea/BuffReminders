@@ -200,7 +200,6 @@ local TEXCOORD_INSET = BR.TEXCOORD_INSET
 
 -- WoW API locals
 local PlaySoundFile = PlaySoundFile
-local GetInstanceInfo = GetInstanceInfo
 
 -- LibSharedMedia for font resolution
 local LSM = LibStub("LibSharedMedia-3.0")
@@ -522,11 +521,10 @@ local function GetDetachedPosition(key)
     return DETACHED_DEFAULT_POS
 end
 
----Get settings for a category with inheritance from defaults
----Uses BR.Config.GetCategorySetting for inherited values when applicable
+---Build the effective settings table for a category with inheritance from defaults
 ---@param category string
 ---@return table A table with all effective settings for this category
-local function GetCategorySettings(category)
+local function BuildCategorySettings(category)
     local db = BR.profile
     local catSettings = db.categorySettings and db.categorySettings[category]
     local globalDefaults = db.defaults or defaults.defaults
@@ -603,6 +601,25 @@ local function GetCategorySettings(category)
     return result
 end
 
+-- Memo for BuildCategorySettings: it builds a fresh ~15-field table per call but
+-- is invoked per frame in render paths (font sizing, secure sync, positioning).
+-- Wiped at the start of every UpdateDisplay / UpdateVisuals; every config change
+-- reaches one of those through the refresh events, so reads are never stale.
+-- Callers treat the returned table as read-only.
+local categorySettingsCache = {} ---@type table<string, table>
+
+---Get settings for a category with inheritance from defaults (memoized)
+---@param category string
+---@return table A table with all effective settings for this category
+local function GetCategorySettings(category)
+    local settings = categorySettingsCache[category]
+    if not settings then
+        settings = BuildCategorySettings(category)
+        categorySettingsCache[category] = settings
+    end
+    return settings
+end
+
 ---Get the effective category for a frame (its own category if split, otherwise "main")
 ---@param frame table
 ---@return string
@@ -642,6 +659,26 @@ end
 ---@return number
 local function GetFontSize(scale, textSize)
     return max(6, floor(textSize * (scale or 1)))
+end
+
+---@class BRFontString: FontString
+---@field _br_font_size number?   -- last font size applied via SetFontCached
+---@field _br_font_path string?   -- last font path applied via SetFontCached
+---@field _br_font_outline string? -- last outline flag applied via SetFontCached
+
+---Apply the shared font (fontPath/outlineFlag) to a fontstring only when
+---something actually changed. SetFont forces a full fontstring re-layout, and
+---render paths re-apply fonts up to twice per second with unchanged values.
+---@param fs BRFontString|FontString
+---@param size number
+local function SetFontCached(fs, size)
+    if fs._br_font_size == size and fs._br_font_path == fontPath and fs._br_font_outline == outlineFlag then
+        return
+    end
+    fs._br_font_size = size
+    fs._br_font_path = fontPath
+    fs._br_font_outline = outlineFlag
+    fs:SetFont(fontPath, size, outlineFlag)
 end
 
 ---Get effective icon width (falls back to iconSize for square icons)
@@ -887,7 +924,7 @@ local function ShowTextFrame(frame, overlayText, shouldGlow, category, cachedGlo
         frame.qualityIcon:Hide()
     end
     if overlayText then
-        frame.count:SetFont(fontPath, GetFrameFontSize(frame, OVERLAY_TEXT_SCALE), outlineFlag)
+        SetFontCached(frame.count, GetFrameFontSize(frame, OVERLAY_TEXT_SCALE))
         frame.count:SetText(overlayText)
         frame.count:Show()
     else
@@ -1178,7 +1215,7 @@ local function CreateBuffFrame(buff, category)
         BR.TextPositions.Apply(frame.count, frame, cz, cx, cy)
     end
     frame.count:SetTextColor(textColor[1], textColor[2], textColor[3], textAlpha)
-    frame.count:SetFont(fontPath, GetFontSize(1, catSettings.textSize), outlineFlag)
+    SetFontCached(frame.count, GetFontSize(1, catSettings.textSize))
 
     -- Stack count (bottom-right by default; user-positionable via textPositions)
     frame.stackCount = frame:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
@@ -1286,7 +1323,7 @@ local function GetOrCreateExtraFrame(frame, index)
         BR.TextPositions.Apply(extra.count, extra, cz, cx, cy)
     end
     extra.count:SetTextColor(textColor[1], textColor[2], textColor[3], textAlpha)
-    extra.count:SetFont(fontPath, GetFontSize(1, catSettings.textSize), outlineFlag)
+    SetFontCached(extra.count, GetFontSize(1, catSettings.textSize))
     extra.count:Hide()
 
     extra:SetAlpha(catSettings.iconAlpha or 1)
@@ -1425,14 +1462,9 @@ local function PositionMainContainer(mainFrameBuffs)
         local spacings = {} -- absolute pixel spacing per frame
         local maxWidth = 0
         local maxHeight = 0
-        local settingsCache = {} -- avoid redundant GetCategorySettings calls for same category
         for i, frame in ipairs(mainFrameBuffs) do
             local effectiveCat = GetEffectiveCategory(frame)
-            local settings = settingsCache[effectiveCat]
-            if not settings then
-                settings = GetCategorySettings(effectiveCat)
-                settingsCache[effectiveCat] = settings
-            end
+            local settings = GetCategorySettings(effectiveCat)
             local iconSize = settings.iconSize or 64
             local iconWidth = GetEffectiveWidth(settings.iconWidth, iconSize)
             widths[i] = iconWidth
@@ -1946,7 +1978,7 @@ local function ApplyConsumableOverlays(frame, item, fontSize)
             local sz, sx, sy = BR.TextPositions.Get("statLabel")
             BR.TextPositions.Apply(frame.statLabel, frame, sz, sx, sy)
         end
-        frame.statLabel:SetFont(fontPath, fontSize, outlineFlag)
+        SetFontCached(frame.statLabel, fontSize)
         frame.statLabel:SetTextColor(1, 1, 1, 1)
         frame.statLabel:SetText(item.statLabel)
         frame.statLabel:Show()
@@ -1983,7 +2015,7 @@ local function ApplyConsumableOverlays(frame, item, fontSize)
                 local bz, bx, by = BR.TextPositions.Get("badge")
                 BR.TextPositions.Apply(frame.badgeLabel, frame, bz, bx, by)
             end
-            frame.badgeLabel:SetFont(fontPath, fontSize, outlineFlag)
+            SetFontCached(frame.badgeLabel, fontSize)
             frame.badgeLabel:SetTextColor(bc.r, bc.g, bc.b, 1)
             frame.badgeLabel:SetText(item.badge)
             frame.badgeLabel:Show()
@@ -2052,7 +2084,7 @@ local function ResolveConsumableFrame(frame)
         local mainSize = frame:GetWidth()
         local cFontSize = BR.SecureButtons.ComputeConsumableFontSize(mainSize)
         frame.count:Hide()
-        frame.stackCount:SetFont(fontPath, cFontSize, outlineFlag)
+        SetFontCached(frame.stackCount, cFontSize)
         frame.stackCount:SetText(items[1].count)
         frame.stackCount:Show()
         ApplyConsumableOverlays(frame, items[1], cFontSize)
@@ -2091,7 +2123,7 @@ local function RenderVisibleEntry(frame, entry)
             -- Seed initial text, then hand off to per-frame OnUpdate for smooth countdown
             local remaining = entry.eatingExpirationTime - GetTime()
             if remaining > 0 then
-                frame.count:SetFont(fontPath, GetFrameFontSize(frame), outlineFlag)
+                SetFontCached(frame.count, GetFrameFontSize(frame))
                 frame.count:SetText(FormatEatingTime(remaining))
                 frame.count:Show()
             else
@@ -2146,7 +2178,7 @@ local function RenderVisibleEntry(frame, entry)
         if frame.buffCategory == "consumable" then
             SetIconDesaturated(frame.icon, false)
         end
-        frame.count:SetFont(fontPath, GetFrameFontSize(frame), outlineFlag)
+        SetFontCached(frame.count, GetFrameFontSize(frame))
         frame.count:SetText(entry.countText or "")
         frame.count:Show()
         frame:Show()
@@ -2258,7 +2290,7 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
                 extra:SetParent(frame)
                 extra:SetSize(size, size)
                 extra.icon:SetTexture(items[i].icon)
-                extra.stackCount:SetFont(fontPath, cFontSize, outlineFlag)
+                SetFontCached(extra.stackCount, cFontSize)
                 extra.stackCount:SetText(items[i].count > 1 and tostring(items[i].count) or "")
                 extra.stackCount:Show()
                 extra.count:Hide()
@@ -2319,7 +2351,7 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
                 extra:SetParent(parentFrame)
                 extra:SetSize(expandedSize, frame:GetHeight())
                 extra.icon:SetTexture(items[i].icon)
-                extra.stackCount:SetFont(fontPath, cFontSize, outlineFlag)
+                SetFontCached(extra.stackCount, cFontSize)
                 extra.stackCount:SetText(items[i].count)
                 extra.count:Hide()
                 local showText = ShouldShowText(frame.buffCategory)
@@ -2562,6 +2594,7 @@ UpdateDisplay = function(refreshMode)
     local groupOnly = refreshMode == "group"
 
     -- Clear per-cycle caches (before early exits - fallback paths also use these)
+    wipe(categorySettingsCache)
     if not groupOnly then
         wipe(expiringGlowCache)
         wipe(missingGlowCache)
@@ -2585,7 +2618,7 @@ UpdateDisplay = function(refreshMode)
 
         local db = BR.profile
 
-        if select(3, GetInstanceInfo()) == DECOR_DUEL_DIFFICULTY_ID then
+        if BR.BuffState.GetDifficultyID() == DECOR_DUEL_DIFFICULTY_ID then
             HideAllDisplayFrames()
             return
         end
@@ -3224,6 +3257,7 @@ BR.LoadoutReminders = {
 
 -- Update icon sizes and text (called when settings change)
 local function UpdateVisuals()
+    wipe(categorySettingsCache)
     for _, frame in pairs(buffFrames) do
         -- Use effective category settings (split category or "main")
         local effectiveCat = GetEffectiveCategory(frame)
@@ -3231,7 +3265,7 @@ local function UpdateVisuals()
         local size = catSettings.iconSize or 64
         local width = GetEffectiveWidth(catSettings.iconWidth, size)
         frame:SetSize(width, size)
-        frame.count:SetFont(fontPath, GetFrameFontSize(frame, 1), outlineFlag)
+        SetFontCached(frame.count, GetFrameFontSize(frame, 1))
 
         -- Re-anchor text overlays on every VisualsRefresh so config changes
         -- take effect immediately.
@@ -3256,12 +3290,12 @@ local function UpdateVisuals()
         if frame.statLabel or frame.badgeLabel or frame.qualityIcon then
             local flSize = BR.SecureButtons.ComputeConsumableFontSize(size)
             if frame.statLabel then
-                frame.statLabel:SetFont(fontPath, flSize, outlineFlag)
+                SetFontCached(frame.statLabel, flSize)
                 local sz, sx, sy = BR.TextPositions.Get("statLabel")
                 BR.TextPositions.Apply(frame.statLabel, frame, sz, sx, sy)
             end
             if frame.badgeLabel then
-                frame.badgeLabel:SetFont(fontPath, flSize, outlineFlag)
+                SetFontCached(frame.badgeLabel, flSize)
                 local bz, bx, by = BR.TextPositions.Get("badge")
                 BR.TextPositions.Apply(frame.badgeLabel, frame, bz, bx, by)
             end

@@ -170,21 +170,24 @@ BR.Glow.Types = {
     { name = L["Glow.Proc"] },
 }
 
+-- Shared read-only fallback so a nil params doesn't allocate a throwaway table
+local EMPTY_PARAMS = {}
+
 local GLOW_START = {
     function(f, color, key, size, xOff, yOff, params)
-        local p = params or {}
+        local p = params or EMPTY_PARAMS
         LCG.PixelGlow_Start(f, color, p.lines, p.frequency, p.length or 10, size, xOff, yOff, false, key)
     end,
     function(f, color, key, size, xOff, yOff, params)
-        local p = params or {}
+        local p = params or EMPTY_PARAMS
         LCG.AutoCastGlow_Start(f, color, p.particles, p.frequency, p.scale or (size / 2), xOff, yOff, key)
     end,
     function(f, color, key, size, xOff, yOff, params)
-        local p = params or {}
+        local p = params or EMPTY_PARAMS
         BR.Glow.PulsingBorderStart(f, key, color, size, xOff, yOff, p.frequency)
     end,
     function(f, color, key, _, xOff, yOff, params)
-        local p = params or {}
+        local p = params or EMPTY_PARAMS
         LCG.ProcGlow_Start(f, {
             color = color,
             key = key,
