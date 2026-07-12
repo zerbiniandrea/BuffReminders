@@ -388,6 +388,10 @@ local OVERLAY_TEXT_SCALE = 0.6 -- scale for "NO X" warning text
 -- Locals
 local mainFrame
 local buffFrames = {}
+-- Per-category index over buffFrames (category -> key -> frame), so per-category
+-- consumers (SecureButtons.UpdateActionButtons runs every display cycle) don't
+-- rescan the full frame table. Maintained by Register/UnregisterBuffFrame.
+local buffFramesByCategory = {}
 local updateTicker
 local readyCheckTimer = nil
 local instanceEntryTimer = nil
@@ -417,6 +421,30 @@ local dirty = false
 local dirtyMode = "full"
 local lastUpdateTime = 0
 local MIN_UPDATE_INTERVAL = 0.5 -- seconds between actual updates
+
+---Track a buff frame in both the flat table and the per-category index
+---@param key string
+---@param frame table
+---@param category string
+local function RegisterBuffFrame(key, frame, category)
+    buffFrames[key] = frame
+    local bucket = buffFramesByCategory[category]
+    if not bucket then
+        bucket = {}
+        buffFramesByCategory[category] = bucket
+    end
+    bucket[key] = frame
+end
+
+---Remove a buff frame from both the flat table and the per-category index
+---@param key string
+local function UnregisterBuffFrame(key)
+    local frame = buffFrames[key]
+    if frame and frame.buffCategory and buffFramesByCategory[frame.buffCategory] then
+        buffFramesByCategory[frame.buffCategory][key] = nil
+    end
+    buffFrames[key] = nil
+end
 
 ---@param mode? "full"|"group"
 local function SetDirty(mode)
@@ -2921,6 +2949,7 @@ local function InitializeFrames()
     BR.Display.categoryFrames = categoryFrames
     BR.Display.detachedFrames = detachedFrames
     BR.Display.frames = buffFrames
+    BR.Display.framesByCategory = buffFramesByCategory
 
     -- Create mover frames (shown when unlocked for drag positioning)
     BR.Movers.Initialize()
@@ -2929,7 +2958,7 @@ local function InitializeFrames()
     for category, buffArray in pairs(BUFF_TABLES) do
         for _, buff in ipairs(buffArray) do
             local frame = CreateBuffFrame(buff, category)
-            buffFrames[buff.key] = frame
+            RegisterBuffFrame(buff.key, frame, category)
             if category == "loadout" then
                 WireLoadoutFrameClick(frame)
             end
@@ -2949,7 +2978,7 @@ local function CreateCustomBuffFrameRuntime(customBuff)
         return
     end
     local frame = CreateBuffFrame(customBuff, "custom")
-    buffFrames[customBuff.key] = frame
+    RegisterBuffFrame(customBuff.key, frame, "custom")
     tinsert(CustomBuffs, customBuff)
     -- Only register for glow tracking if glowMode is not disabled
     if customBuff.glowMode ~= "disabled" then
@@ -3146,7 +3175,7 @@ local function RemoveCustomBuffFrame(key)
         end
         frame:Hide()
         frame:SetParent(nil)
-        buffFrames[key] = nil
+        UnregisterBuffFrame(key)
     end
     -- Clean up detached state
     local db = BR.profile
@@ -3210,7 +3239,7 @@ local function CreateLoadoutRuleFrameRuntime(rule)
         return
     end
     local frame = CreateBuffFrame(rule, "loadout")
-    buffFrames[rule.key] = frame
+    RegisterBuffFrame(rule.key, frame, "loadout")
     WireLoadoutFrameClick(frame)
     tinsert(LoadoutRules, rule)
     -- Keep the runtime array in the same key order BuildLoadoutRulesArray produces
@@ -3230,7 +3259,7 @@ local function RemoveLoadoutRuleFrame(key)
     if frame then
         frame:Hide()
         frame:SetParent(nil)
-        buffFrames[key] = nil
+        UnregisterBuffFrame(key)
     end
     local db = BR.profile
     if db.detachedIcons then
