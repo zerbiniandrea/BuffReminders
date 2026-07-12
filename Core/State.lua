@@ -349,7 +349,7 @@ local AURA_WHITELIST = BR.AURA_WHITELIST
 ---Aura-based detection requires all queried spell IDs to be in the Blizzard whitelist.
 ---@param buff table Any buff table entry (RaidBuff, SelfBuff, ConsumableBuff, etc.)
 ---@return boolean
-local function IsAuraTrackable(buff)
+local function ComputeAuraTrackable(buff)
     -- Non-aura detection is always safe in restricted contexts
     if buff.checkWeaponEnchant or buff.checkWeaponEnchantOH then
         return true
@@ -386,6 +386,26 @@ local function IsAuraTrackable(buff)
         end
     end
     return true
+end
+
+-- Memoized ComputeAuraTrackable: pure function of the (static) buff def and the
+-- static whitelist, but called 1-3x per buff on every refresh. Weak-keyed side
+-- table rather than a field on the def - custom buff / loadout defs are the live
+-- SavedVariables tables, so a cache field would leak into the user's DB. Edited
+-- custom buffs are new table objects, so they miss the cache and recompute.
+---@type table<table, boolean>
+local auraTrackableCache = setmetatable({}, { __mode = "k" })
+
+---@param buff table Any buff table entry (RaidBuff, SelfBuff, ConsumableBuff, etc.)
+---@return boolean
+local function IsAuraTrackable(buff)
+    local cached = auraTrackableCache[buff]
+    if cached ~= nil then
+        return cached
+    end
+    local result = ComputeAuraTrackable(buff)
+    auraTrackableCache[buff] = result
+    return result
 end
 
 -- Reusable set for target-memory pruning (avoids per-refresh allocation)
@@ -694,6 +714,35 @@ local function GetUnitSpellIDs(buffKey, spellIDs, class)
     return spellIDs
 end
 
+-- pcall bodies for per-aura scans, hoisted to named functions so hot loops don't
+-- allocate a closure per aura. Aura fields (spellId, icon) are tainted secret
+-- values for non-whitelisted auras in restricted contexts (combat, encounters,
+-- M+); the pcall turns the throwing compare into a non-match.
+---@param auraData table
+---@param singleId number?
+---@param spellIDs SpellID
+---@return boolean
+local function AuraMatchesSpellIDs(auraData, singleId, spellIDs)
+    local sid = auraData.spellId
+    if singleId then
+        return sid == singleId
+    end
+    local idList = spellIDs --[[@as number[] ]]
+    for _, id in ipairs(idList) do
+        if sid == id then
+            return true
+        end
+    end
+    return false
+end
+
+---@param auraData table
+---@param iconID number
+---@return boolean
+local function AuraMatchesIcon(auraData, iconID)
+    return auraData.icon == iconID
+end
+
 ---Scan player-cast buffs on a unit looking for a spellID (or any of a list).
 ---Used as a fallback when GetUnitAuraBySpellID returns another player's instance
 ---(e.g., two Aug Evokers both casting Blistering Scales on the same tank).
@@ -707,21 +756,7 @@ local function UnitHasBuffFromPlayer(unit, spellIDs)
     local i = 1
     local auraData = C_UnitAuras.GetAuraDataByIndex(unit, i, "HELPFUL|PLAYER")
     while auraData do
-        -- spellId is a tainted secret value for non-whitelisted auras in restricted contexts
-        -- (combat, encounters, M+). pcall avoids the error; tainted auras simply don't match.
-        local ok, match = pcall(function()
-            local sid = auraData.spellId
-            if singleId then
-                return sid == singleId
-            end
-            local idList = spellIDs --[[@as number[] ]]
-            for _, id in ipairs(idList) do
-                if sid == id then
-                    return true
-                end
-            end
-            return false
-        end)
+        local ok, match = pcall(AuraMatchesSpellIDs, auraData, singleId, spellIDs)
         if ok and match then
             local remaining
             if auraData.expirationTime and auraData.expirationTime > 0 then
@@ -1462,9 +1497,7 @@ local function ScanEatingState()
     local i = 1
     local auraData = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
     while auraData do
-        local ok, match = pcall(function()
-            return auraData.icon == EATING_AURA_ICON
-        end)
+        local ok, match = pcall(AuraMatchesIcon, auraData, EATING_AURA_ICON)
         if ok and match then
             eatingAuraInstanceID = auraData.auraInstanceID
             return
@@ -1482,9 +1515,7 @@ local function UpdateEatingState(updateInfo)
     end
     if updateInfo.addedAuras then
         for _, aura in ipairs(updateInfo.addedAuras) do
-            local ok, match = pcall(function()
-                return aura.icon == EATING_AURA_ICON
-            end)
+            local ok, match = pcall(AuraMatchesIcon, aura, EATING_AURA_ICON)
             if ok and match then
                 eatingAuraInstanceID = aura.auraInstanceID
                 break
@@ -1609,9 +1640,7 @@ local function ShouldShowConsumableBuff(buff)
         local i = 1
         local auraData = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
         while auraData do
-            local success, iconMatches = pcall(function()
-                return auraData.icon == buff.buffIconID
-            end)
+            local success, iconMatches = pcall(AuraMatchesIcon, auraData, buff.buffIconID)
             if success and iconMatches then
                 local remaining = nil
                 if auraData.expirationTime and auraData.expirationTime > 0 then
@@ -1677,8 +1706,9 @@ end
 ---@param buff table Any buff type with optional pre-check fields
 ---@param presentClasses? table<ClassName, boolean>
 ---@param db table Database settings
+---@param trackingMode string Effective tracking mode (already resolved once per refresh)
 ---@return boolean passes
-local function PassesPreChecks(buff, presentClasses, db)
+local function PassesPreChecks(buff, presentClasses, db, trackingMode)
     -- Custom visibility condition
     if buff.visibilityCondition and not buff.visibilityCondition() then
         return false
@@ -1695,7 +1725,6 @@ local function PassesPreChecks(buff, presentClasses, db)
 
     -- Class filtering
     if buff.class then
-        local trackingMode = GetEffectiveTrackingMode(db)
         if ModeHidesOtherClasses(trackingMode) and buff.class ~= playerClass then
             return false
         end
@@ -2113,7 +2142,7 @@ function BuffState.Refresh(refreshMode)
         if targetedVisible and IsBuffEnabled(settingKey) then
             local trackable = IsAuraTrackable(buff)
             local useGlowDet = isAuraRestricted and not trackable and buff.glowDetectable
-            if (not isAuraRestricted or trackable or useGlowDet) and PassesPreChecks(buff, nil, db) then
+            if (not isAuraRestricted or trackable or useGlowDet) and PassesPreChecks(buff, nil, db, trackingMode) then
                 if useGlowDet then
                     if IsAnySpellGlowing(buff) then
                         SetEntryText(entry, buff.overlayText, targMissGlow)
@@ -2212,7 +2241,7 @@ function BuffState.Refresh(refreshMode)
                     inDelveEntry
                     and consumableVisible
                     and IsBuffEnabled(settingKey)
-                    and PassesPreChecks(buff, nil, db)
+                    and PassesPreChecks(buff, nil, db, trackingMode)
                 then
                     local shouldShow = ShouldShowConsumableBuff(buff)
                     if shouldShow then
@@ -2244,7 +2273,7 @@ function BuffState.Refresh(refreshMode)
                     local useGlowDet = isAuraRestricted and not trackable and buff.glowDetectable
                     if
                         (not isAuraRestricted or trackable or useGlowDet)
-                        and PassesPreChecks(buff, nil, db)
+                        and PassesPreChecks(buff, nil, db, trackingMode)
                         and not (buff.key ~= "delveFood" and delveFoodOnly)
                     then
                         if useGlowDet then
