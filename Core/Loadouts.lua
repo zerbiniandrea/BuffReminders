@@ -41,7 +41,6 @@ local IsPlayerSpell = IsPlayerSpell
 local GetSpecialization = GetSpecialization
 local GetSpecializationInfo = GetSpecializationInfo
 local GetSpecializationInfoByID = GetSpecializationInfoByID
-local GetInstanceInfo = GetInstanceInfo
 local UnitName = UnitName
 local UnitClass = UnitClass
 local GetRealmName = GetRealmName
@@ -371,8 +370,10 @@ function Loadouts.CurrentInstanceMatches(instances)
     -- Name is the one identifier that lines up across dungeons (GetMapUIInfo) and
     -- raids (Encounter Journal) with GetInstanceInfo, so it's the primary key. The
     -- challenge-map id is an exact match inside a keystone; mapID is a last resort.
-    local name, _, _, _, _, _, _, instanceID = GetInstanceInfo()
-    local activeChallenge = C_ChallengeMode and C_ChallengeMode.GetActiveChallengeMapID()
+    -- Identity comes from State's content-type cache (one GetInstanceInfo per zone
+    -- instead of per rule per refresh). Runtime access is safe despite State
+    -- loading after this file: the only caller is State.Refresh itself.
+    local name, instanceID, activeChallenge = BR.BuffState.GetInstanceContext()
     for _, inst in ipairs(instances) do
         if inst.name and inst.name == name then
             return true

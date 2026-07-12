@@ -168,6 +168,9 @@ local inCombat = false
 local cachedContentType = nil
 local cachedInstanceType = nil -- raw WoW instanceType, stashed alongside content type
 local cachedDifficultyID = nil -- raw GetInstanceInfo difficultyID, stashed alongside content type
+local cachedInstanceName = nil -- GetInstanceInfo name, stashed alongside content type
+local cachedInstanceID = nil -- GetInstanceInfo instanceID, stashed alongside content type
+local cachedActiveChallenge = nil -- active challenge map ID, stashed alongside content type
 local GetDifficultyIDCached -- forward declaration (defined next to GetCurrentContentType)
 
 -- Whether we are in the PvP prep phase (before gates open). Used by the
@@ -838,11 +841,15 @@ local function GetCurrentContentType()
         return cachedContentType
     end
 
-    -- Stash the raw difficultyID for cheap reuse (delve check below, difficulty
-    -- key, NPC-counting gate, Decor Duel check in Display) - same lifecycle as
-    -- the content type cache, cleared together in InvalidateContentTypeCache.
-    local difficultyID = select(3, GetInstanceInfo())
+    -- Stash the raw GetInstanceInfo identity for cheap reuse (delve check below,
+    -- difficulty key, NPC-counting gate, Decor Duel check in Display, loadout
+    -- instance filters) - same lifecycle as the content type cache, cleared
+    -- together in InvalidateContentTypeCache.
+    local instName, _, difficultyID, _, _, _, _, instanceID = GetInstanceInfo()
+    cachedInstanceName = instName
+    cachedInstanceID = instanceID
     cachedDifficultyID = difficultyID
+    cachedActiveChallenge = C_ChallengeMode and C_ChallengeMode.GetActiveChallengeMapID() or nil
 
     -- Check housing before instance type (housing zones may report as instanced)
     if
@@ -891,6 +898,18 @@ function GetDifficultyIDCached()
         GetCurrentContentType() -- populates cachedDifficultyID
     end
     return cachedDifficultyID or 0
+end
+
+---Instance identity from GetInstanceInfo plus the active challenge map ID,
+---cached alongside the content type (used by loadout instance filters).
+---@return string? name
+---@return number? instanceID
+---@return number? activeChallengeMapID
+function BuffState.GetInstanceContext()
+    if cachedContentType == nil then
+        GetCurrentContentType() -- populates the instance identity fields
+    end
+    return cachedInstanceName, cachedInstanceID, cachedActiveChallenge
 end
 
 ---Get the current difficulty key (cached)
@@ -2652,6 +2671,9 @@ function BuffState.InvalidateContentTypeCache()
     cachedContentType = nil
     cachedInstanceType = nil
     cachedDifficultyID = nil
+    cachedInstanceName = nil
+    cachedInstanceID = nil
+    cachedActiveChallenge = nil
     cachedDifficultyKey = nil
     cachedCompetitivePvP = nil
     cachedIsLegacyInstance = nil
