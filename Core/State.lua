@@ -417,6 +417,14 @@ local function IsAuraTrackable(buff)
     return result
 end
 
+-- Secret-safe read helpers (see Core.lua / docs/SecretValues.md). Aliased to
+-- file-scope locals so hot loops pay only a local call, not a table lookup.
+local Plain = BR.Secret.Plain
+local AuraList = BR.Secret.AuraList
+local AuraField = BR.Secret.AuraField
+local AuraByIndex = BR.Secret.AuraByIndex
+local AuraByInstanceID = BR.Secret.AuraByInstanceID
+
 -- Set of spell IDs the addon queries on GROUP MEMBERS (raid coverage counts,
 -- presence scans, targeted-buff target scans), including per-class variants.
 -- Used to filter group-unit UNIT_AURA payloads: an aura change outside this set
@@ -458,18 +466,22 @@ end
 ---@type table<string, table<number, true>>
 local trackedAuraInstances = {}
 
----Record a found tracked aura's instance ID (pcall body: auraInstanceID can be
----a secret value in restricted contexts; a failed record just means the aura's
----removal falls back to the 3s ticker instead of the event fast path).
+---Record a found tracked aura's instance ID. A secret auraInstanceID (restricted
+---context) reads as nil and is skipped - that aura's removal then falls back to
+---the 3s ticker instead of the event fast path.
 ---@param unit string
 ---@param auraData table
 local function RecordAuraInstance(unit, auraData)
+    local inst = AuraField(auraData, "auraInstanceID")
+    if inst == nil then
+        return
+    end
     local set = trackedAuraInstances[unit]
     if not set then
         set = {}
         trackedAuraInstances[unit] = set
     end
-    set[auraData.auraInstanceID] = true
+    set[inst] = true
 end
 
 -- Reusable set for target-memory pruning (avoids per-refresh allocation)
@@ -771,13 +783,14 @@ local function UnitHasBuff(unit, spellIDs)
         local auraData = C_UnitAuras.GetUnitAuraBySpellID(unit, spellIDs)
         if auraData then
             if unit ~= "player" then
-                pcall(RecordAuraInstance, unit, auraData)
+                RecordAuraInstance(unit, auraData)
             end
             local remaining
-            if auraData.expirationTime and auraData.expirationTime > 0 then
-                remaining = auraData.expirationTime - GetTime()
+            local exp = AuraField(auraData, "expirationTime")
+            if exp and exp > 0 then
+                remaining = exp - GetTime()
             end
-            return true, remaining, auraData.sourceUnit
+            return true, remaining, AuraField(auraData, "sourceUnit")
         end
         return false, nil, nil
     end
@@ -787,13 +800,14 @@ local function UnitHasBuff(unit, spellIDs)
         local auraData = C_UnitAuras.GetUnitAuraBySpellID(unit, id)
         if auraData then
             if unit ~= "player" then
-                pcall(RecordAuraInstance, unit, auraData)
+                RecordAuraInstance(unit, auraData)
             end
             local remaining
-            if auraData.expirationTime and auraData.expirationTime > 0 then
-                remaining = auraData.expirationTime - GetTime()
+            local exp = AuraField(auraData, "expirationTime")
+            if exp and exp > 0 then
+                remaining = exp - GetTime()
             end
-            return true, remaining, auraData.sourceUnit
+            return true, remaining, AuraField(auraData, "sourceUnit")
         end
     end
 
@@ -813,16 +827,19 @@ local function GetUnitSpellIDs(buffKey, spellIDs, class)
     return spellIDs
 end
 
--- pcall bodies for per-aura scans, hoisted to named functions so hot loops don't
--- allocate a closure per aura. Aura fields (spellId, icon) are tainted secret
--- values for non-whitelisted auras in restricted contexts (combat, encounters,
--- M+); the pcall turns the throwing compare into a non-match.
+-- Per-aura match tests. Aura fields (spellId, icon) are secret values for
+-- non-whitelisted auras in restricted contexts (combat, encounters, M+);
+-- AuraField reads a secret as nil, so a secret aura simply never matches -
+-- no pcall needed at the call site.
 ---@param auraData table
 ---@param singleId number?
 ---@param spellIDs SpellID
 ---@return boolean
 local function AuraMatchesSpellIDs(auraData, singleId, spellIDs)
-    local sid = auraData.spellId
+    local sid = AuraField(auraData, "spellId")
+    if sid == nil then
+        return false
+    end
     if singleId then
         return sid == singleId
     end
@@ -839,7 +856,7 @@ end
 ---@param iconID number
 ---@return boolean
 local function AuraMatchesIcon(auraData, iconID)
-    return auraData.icon == iconID
+    return AuraField(auraData, "icon") == iconID
 end
 
 ---Scan player-cast buffs on a unit looking for a spellID (or any of a list).
@@ -853,21 +870,21 @@ end
 local function UnitHasBuffFromPlayer(unit, spellIDs)
     local singleId = type(spellIDs) == "number" and spellIDs or nil ---@type number?
     local i = 1
-    local auraData = C_UnitAuras.GetAuraDataByIndex(unit, i, "HELPFUL|PLAYER")
+    local auraData = AuraByIndex(unit, i, "HELPFUL|PLAYER")
     while auraData do
-        local ok, match = pcall(AuraMatchesSpellIDs, auraData, singleId, spellIDs)
-        if ok and match then
+        if AuraMatchesSpellIDs(auraData, singleId, spellIDs) then
             if unit ~= "player" then
-                pcall(RecordAuraInstance, unit, auraData)
+                RecordAuraInstance(unit, auraData)
             end
             local remaining
-            if auraData.expirationTime and auraData.expirationTime > 0 then
-                remaining = auraData.expirationTime - GetTime()
+            local exp = AuraField(auraData, "expirationTime")
+            if exp and exp > 0 then
+                remaining = exp - GetTime()
             end
             return true, remaining
         end
         i = i + 1
-        auraData = C_UnitAuras.GetAuraDataByIndex(unit, i, "HELPFUL|PLAYER")
+        auraData = AuraByIndex(unit, i, "HELPFUL|PLAYER")
     end
     return false, nil
 end
@@ -1415,12 +1432,12 @@ local function HasPresenceBuff(spellIDs, playerOnly, playerCastOnly)
             local hasBuff, remaining, sourceUnit = UnitHasBuff(data.unit, spellIDs)
             -- When restricted to player-cast auras, another player's cast may mask ours via
             -- GetUnitAuraBySpellID. Fall back to a HELPFUL|PLAYER scan to find our own.
-            if playerCastOnly and hasBuff and not (sourceUnit and UnitIsUnit(sourceUnit, "player")) then
+            if playerCastOnly and hasBuff and not (sourceUnit and Plain(UnitIsUnit(sourceUnit, "player"))) then
                 hasBuff, remaining = UnitHasBuffFromPlayer(data.unit, spellIDs)
             end
             if hasBuff then
                 found = true
-                if not targetEntry and not UnitIsUnit(data.unit, "player") then
+                if not targetEntry and not Plain(UnitIsUnit(data.unit, "player")) then
                     targetEntry = data
                 end
                 if remaining then
@@ -1455,7 +1472,7 @@ local function IsPlayerBuffActive(spellID, role)
                 hasBeneficiary = true
                 local hasBuff, remaining, sourceUnit = UnitHasBuff(data.unit, spellID)
                 if hasBuff then
-                    local isFromPlayer = sourceUnit and UnitIsUnit(sourceUnit, "player")
+                    local isFromPlayer = sourceUnit and Plain(UnitIsUnit(sourceUnit, "player"))
                     if not isFromPlayer then
                         -- GetUnitAuraBySpellID returns one instance; if another player cast the
                         -- same spell (e.g. two Aug Evokers), our instance may be hidden behind
@@ -1464,7 +1481,7 @@ local function IsPlayerBuffActive(spellID, role)
                     end
                     if isFromPlayer then
                         -- Track first non-player target for last target cache
-                        if not targetEntry and not UnitIsUnit(data.unit, "player") then
+                        if not targetEntry and not Plain(UnitIsUnit(data.unit, "player")) then
                             targetEntry = data
                         end
                         if not remaining then
@@ -1522,7 +1539,7 @@ local function ShouldShowTargetedBuff(spellIDs, requiredClass, beneficiaryRole, 
         -- overwrites on the next successful scan.
         if buffKey and not inCombat and hasBuff then
             for _, data in ipairs(currentValidUnits) do
-                if not UnitIsUnit(data.unit, "player") then
+                if not Plain(UnitIsUnit(data.unit, "player")) then
                     local targetHas = UnitHasBuff(data.unit, spellIDs)
                     if targetHas and data.name then
                         TargetMemory.Observe(buffKey, true, data.name, data.class)
@@ -1651,15 +1668,14 @@ end
 local function ScanEatingState()
     eatingAuraInstanceID = nil
     local i = 1
-    local auraData = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
+    local auraData = AuraByIndex("player", i, "HELPFUL")
     while auraData do
-        local ok, match = pcall(AuraMatchesIcon, auraData, EATING_AURA_ICON)
-        if ok and match then
-            eatingAuraInstanceID = auraData.auraInstanceID
+        if AuraMatchesIcon(auraData, EATING_AURA_ICON) then
+            eatingAuraInstanceID = AuraField(auraData, "auraInstanceID")
             return
         end
         i = i + 1
-        auraData = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
+        auraData = AuraByIndex("player", i, "HELPFUL")
     end
 end
 
@@ -1669,18 +1685,19 @@ local function UpdateEatingState(updateInfo)
     if not updateInfo then
         return
     end
-    if updateInfo.addedAuras then
-        for _, aura in ipairs(updateInfo.addedAuras) do
-            local ok, match = pcall(AuraMatchesIcon, aura, EATING_AURA_ICON)
-            if ok and match then
-                eatingAuraInstanceID = aura.auraInstanceID
-                break
-            end
+    -- A UNIT_AURA list container can itself be a secret value in restricted
+    -- contexts; AuraList yields an empty list then, so a secret payload is simply
+    -- skipped. ScanEatingState re-syncs on combat end (see Display.lua) and eating
+    -- can't start in combat, so nothing is lost by skipping here.
+    for _, aura in ipairs(AuraList(updateInfo.addedAuras)) do
+        if AuraField(aura, "icon") == EATING_AURA_ICON then
+            eatingAuraInstanceID = AuraField(aura, "auraInstanceID")
+            break
         end
     end
-    if updateInfo.removedAuraInstanceIDs and eatingAuraInstanceID then
-        for _, id in ipairs(updateInfo.removedAuraInstanceIDs) do
-            if id == eatingAuraInstanceID then
+    if eatingAuraInstanceID then
+        for _, id in ipairs(AuraList(updateInfo.removedAuraInstanceIDs)) do
+            if Plain(id) == eatingAuraInstanceID then
                 eatingAuraInstanceID = nil
                 break
             end
@@ -1688,17 +1705,21 @@ local function UpdateEatingState(updateInfo)
     end
 end
 
----Get expiration time of the eating aura (O(1) lookup via cached instance ID)
+---Get expiration time of the eating aura (O(1) lookup via cached instance ID).
+---eatingAuraInstanceID is always a plain value (only ever assigned via AuraField).
+---AuraByInstanceID guards the lookup (the call throws in restricted contexts); the
+---returned struct's field can still be secret, hence AuraField.
 ---@return number? expirationTime GetTime()-based expiration, nil if not eating or no duration
 local function GetEatingExpirationTime()
     if not eatingAuraInstanceID then
         return nil
     end
-    local ok, auraData = pcall(C_UnitAuras.GetAuraDataByAuraInstanceID, "player", eatingAuraInstanceID)
-    if not ok or not auraData or not auraData.expirationTime or auraData.expirationTime == 0 then
+    local auraData = AuraByInstanceID("player", eatingAuraInstanceID)
+    local exp = AuraField(auraData, "expirationTime")
+    if not exp or exp == 0 then
         return nil
     end
-    return auraData.expirationTime
+    return exp
 end
 
 ---Check if a consumable buff is free/reusable (freeConsumable flag or permanent rune in bags)
@@ -1794,18 +1815,18 @@ local function ShouldShowConsumableBuff(buff)
     -- Check buff auras by icon ID (e.g., food buffs all use icon 136000)
     if buff.buffIconID then
         local i = 1
-        local auraData = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
+        local auraData = AuraByIndex("player", i, "HELPFUL")
         while auraData do
-            local success, iconMatches = pcall(AuraMatchesIcon, auraData, buff.buffIconID)
-            if success and iconMatches then
+            if AuraMatchesIcon(auraData, buff.buffIconID) then
                 local remaining = nil
-                if auraData.expirationTime and auraData.expirationTime > 0 then
-                    remaining = auraData.expirationTime - GetTime()
+                local exp = AuraField(auraData, "expirationTime")
+                if exp and exp > 0 then
+                    remaining = exp - GetTime()
                 end
                 return false, remaining -- Has a buff with this icon
             end
             i = i + 1
-            auraData = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
+            auraData = AuraByIndex("player", i, "HELPFUL")
         end
     end
 
@@ -2762,72 +2783,69 @@ function BuffState.IsAlone()
     return GetNumGroupMembers() <= 1
 end
 
----pcall body: spellId is a secret value for non-whitelisted auras in restricted
----contexts; indexing the tracked set with it throws, which the caller treats as
----"not tracked" (a secret spellId cannot be a whitelisted spell, and only
----whitelisted spells are queried on group members in restricted contexts).
+---Whether an added aura is one the addon tracks on group members. A secret
+---spellId (non-whitelisted aura in a restricted context) reads as nil and is
+---treated as not-tracked - fail-closed (a secret spellId cannot be a whitelisted
+---spell, and only whitelisted spells are queried on group members there).
 ---@param aura table
 ---@return boolean
 local function IsTrackedAddedAura(aura)
-    return groupTrackedSpells[aura.spellId] == true
+    local sid = AuraField(aura, "spellId")
+    return sid ~= nil and groupTrackedSpells[sid] == true
 end
 
----pcall body: instance IDs from removal/update payloads can be secret values in
----restricted contexts (the same reason RecordAuraInstance is guarded); indexing
----the recorded set with one throws. The caller treats a throw as "no match":
----recorded IDs are readable values from our own successful scans, so a secret ID
----can never equal one - fail-closed, mirroring the added-aura path.
+---Whether a removal/update instance ID matches one recorded in the last scan. A
+---secret ID reads as nil and never matches - fail-closed; recorded IDs are
+---readable values from our own successful scans, so a secret ID can't equal one.
 ---@param set table<number, true>
 ---@param id number
 ---@return boolean
 local function IsRecordedInstance(set, id)
-    return set[id] == true
+    id = Plain(id)
+    return id ~= nil and set[id] == true
 end
 
 ---Decide whether a group unit's UNIT_AURA payload can affect tracked buff state,
 ---so irrelevant aura churn (HoTs, procs, debuffs) skips the group rescan.
----Fail-open on ambiguous payloads (nil updateInfo, isFullUpdate); fail-closed on
----secret added-aura spellIds (see IsTrackedAddedAura). Removals and updates are
----matched against the instance IDs recorded during the last scan; anything this
----misses (e.g. an unrecordable instance ID) is bounded by the 3s fallback ticker.
----Applies in restricted contexts too: verified in-game (2026-07-12, follower
----dungeon combat and battleground) that whitelisted auras' payload fields stay
----readable there, matching GetUnitAuraBySpellID's whitelist behavior - so a
----secret spellId reliably means "not a spell we can display here".
+---Fail-open on genuinely ambiguous payloads (nil updateInfo, isFullUpdate) where we
+---have no incremental info to filter on. Everything else fails CLOSED via AuraList:
+---a secret list container (verified 12.1 PTR: ~every group payload's container is
+---secret in combat) reads as empty, contributes no match, and the payload is skipped;
+---individual secret entries read as absent (IsTrackedAddedAura / IsRecordedInstance).
+---Anything skipped is bounded by the 3s ticker. This deliberately reverts group
+---refresh to ticker-driven in restricted contexts - the alternative (fail open on a
+---secret container) would rescan on every combat payload and undo the CPU win from
+---"perf(events): cut aura update CPU usage in groups and combat". See docs/SecretValues.md.
 ---@param unit string
 ---@param updateInfo table?
 ---@return boolean
 function BuffState.GroupAuraUpdateMatters(unit, updateInfo)
-    if not updateInfo or updateInfo.isFullUpdate then
+    if not updateInfo then
         return true
     end
-    local added = updateInfo.addedAuras
-    if added then
-        for i = 1, #added do
-            local ok, matters = pcall(IsTrackedAddedAura, added[i])
-            if ok and matters then
-                return true
-            end
+    -- isFullUpdate can be a SECRET BOOLEAN in restricted contexts, and a boolean test
+    -- on a secret boolean THROWS (unlike a secret number/table, whose truthiness is
+    -- constant and safe to branch on). Plain() reads a secret as nil, so a secret
+    -- isFullUpdate is treated as "not a full update" and we fall through to the
+    -- fail-closed container checks below.
+    if Plain(updateInfo.isFullUpdate) then
+        return true
+    end
+    for _, aura in ipairs(AuraList(updateInfo.addedAuras)) do
+        if IsTrackedAddedAura(aura) then
+            return true
         end
     end
     local set = trackedAuraInstances[unit]
     if set and next(set) then
-        local removed = updateInfo.removedAuraInstanceIDs
-        if removed then
-            for i = 1, #removed do
-                local ok, matters = pcall(IsRecordedInstance, set, removed[i])
-                if ok and matters then
-                    return true
-                end
+        for _, id in ipairs(AuraList(updateInfo.removedAuraInstanceIDs)) do
+            if IsRecordedInstance(set, id) then
+                return true
             end
         end
-        local updated = updateInfo.updatedAuraInstanceIDs
-        if updated then
-            for i = 1, #updated do
-                local ok, matters = pcall(IsRecordedInstance, set, updated[i])
-                if ok and matters then
-                    return true
-                end
+        for _, id in ipairs(AuraList(updateInfo.updatedAuraInstanceIDs)) do
+            if IsRecordedInstance(set, id) then
+                return true
             end
         end
     end
@@ -2960,17 +2978,19 @@ function BuffState.IsWrongDemonPet()
         return false
     end
     local name, familyID = UnitCreatureFamily("pet")
+    familyID = Plain(familyID)
     if type(familyID) ~= "number" then
-        -- Pet data not resolved yet; don't cache so next Refresh retries.
+        -- Pet data not resolved yet, or a secret value; don't cache so next
+        -- Refresh retries.
         return false
     end
-    local ok, isWrong = pcall(function()
-        return familyID ~= 29 and name ~= "Felguard"
-    end)
-    if not ok then
+    name = Plain(name)
+    if name == nil then
+        -- Name resolved to a secret; leave uncached and treat as "not wrong"
+        -- this pass (fail-closed), matching the old pcall behavior.
         return false
     end
-    cachedWrongPetStatus = isWrong == true
+    cachedWrongPetStatus = familyID ~= 29 and name ~= "Felguard"
     return cachedWrongPetStatus
 end
 

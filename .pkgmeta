@@ -1,5 +1,6 @@
 ignore:
   - images
+  - docs
   - .ignored
   - .github
   - .gitignore

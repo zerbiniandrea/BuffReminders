@@ -79,6 +79,7 @@ read_globals = {
     "GetTime",
     "GetWeaponEnchantInfo",
     "InCombatLockdown",
+    "issecretvalue",
     "IsInInstance",
     "IsInGroup",
     "IsInRaid",
