@@ -238,6 +238,13 @@ local cachedOffHandType = nil -- nil = not yet checked, "weapon" | "shield" | "n
 ---@type table<number, boolean>
 local cachedItemOwnership = {}
 
+-- Lowest equipped-item durability ratio (0-1). The 18-slot scan is a read-only
+-- lookup whose answer only changes on durability / equipment events, so it's
+-- memoized and reused on the fallback ticker instead of re-scanned every refresh.
+-- Invalidated on UPDATE_INVENTORY_DURABILITY, PLAYER_EQUIPMENT_CHANGED.
+---@type number|nil
+local cachedLowestDurability = nil
+
 -- Loadout state cache: rule.key -> { satisfied, icon }. The detection calls
 -- (IsSatisfied / GetRuleIcon) are read-only WoW lookups whose answers only change
 -- on spec / talent / equipment / equipment-set events, so they're cached here and
@@ -3020,6 +3027,32 @@ end
 function BuffState.InvalidateItemCache()
     cachedItemOwnership = {}
     cachedItemCounts = {}
+end
+
+---Lowest equipped-item durability ratio (0-1; 1 when nothing is damaged), cached.
+---Slots without durability (neck/rings/trinkets/shirt/tabard) return nil and are skipped.
+---@return number
+function BuffState.GetLowestDurability()
+    if cachedLowestDurability ~= nil then
+        return cachedLowestDurability
+    end
+    local lowest = 1
+    for slot = 1, 18 do
+        local cur, max = GetInventoryItemDurability(slot)
+        if cur and max and max > 0 then
+            local pct = cur / max
+            if pct < lowest then
+                lowest = pct
+            end
+        end
+    end
+    cachedLowestDurability = lowest
+    return lowest
+end
+
+---Invalidate the durability cache (call on UPDATE_INVENTORY_DURABILITY, PLAYER_EQUIPMENT_CHANGED)
+function BuffState.InvalidateDurabilityCache()
+    cachedLowestDurability = nil
 end
 
 ---Invalidate loadout state cache (call on PLAYER_SPECIALIZATION_CHANGED,

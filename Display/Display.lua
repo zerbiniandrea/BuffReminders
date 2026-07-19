@@ -3759,6 +3759,7 @@ eventFrame:RegisterEvent("PLAYER_UPDATE_RESTING")
 eventFrame:RegisterEvent("PLAYER_LEVEL_UP")
 eventFrame:RegisterEvent("UPDATE_EXPANSION_LEVEL")
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
+eventFrame:RegisterEvent("UPDATE_INVENTORY_DURABILITY")
 eventFrame:RegisterEvent("PVP_MATCH_STATE_CHANGED")
 
 ClearInstanceEntryState = function()
@@ -4151,7 +4152,13 @@ eventHandlers.PLAYER_EQUIPMENT_CHANGED = function()
     BR.BuffState.InvalidateItemCache()
     BR.BuffState.InvalidateOffHandCache()
     BR.BuffState.InvalidateLoadoutCache()
+    BR.BuffState.InvalidateDurabilityCache()
 
+    SetDirty()
+end
+
+eventHandlers.UPDATE_INVENTORY_DURABILITY = function()
+    BR.BuffState.InvalidateDurabilityCache()
     SetDirty()
 end
 

@@ -113,6 +113,7 @@ english["Overlay.NoAttune"] = "NO\nATTUNE"
 english["Overlay.NoFamiliar"] = "NO\nFAMILIAR"
 english["Overlay.DropWell"] = "DROP\nWELL"
 english["Overlay.DropTable"] = "DROP\nTABLE"
+english["Overlay.Repair"] = "REPAIR\nGEAR"
 english["Overlay.NoGrim"] = "NO\nGRIM"
 english["Overlay.BurningRush"] = "RUSH"
 english["Overlay.NoRite"] = "NO\nRITE"
@@ -204,6 +205,7 @@ english["Buff.ArcaneFamiliar"] = "Arcane Familiar"
 english["Buff.Attunement"] = "Attunement"
 english["Buff.CreateSoulwell"] = "Create Soulwell"
 english["Buff.RefreshmentTable"] = "Refreshment Table"
+english["Buff.RepairGear"] = "Repair Equipment"
 english["Buff.DruidForm"] = "Druid Form"
 english["Buff.GrimoireOfSacrifice"] = "Grimoire of Sacrifice"
 english["Buff.BurningRush"] = "Burning Rush"
@@ -263,6 +265,9 @@ english["Tooltip.MayShowExtraIcon.Desc"] =
 english["Tooltip.InstanceEntryReminder"] = "Instance Entry Reminder"
 english["Tooltip.InstanceEntryReminder.Desc"] =
     "Briefly shown when entering a dungeon as a reminder to drop a Soulwell. Dismissed after casting or after 30 seconds."
+english["Tooltip.Repair"] = "Repair Reminder"
+english["Tooltip.Repair.Desc"] =
+    "Shown when any equipped item drops below the durability threshold. Visit a merchant to repair."
 english["BuffTooltip.ProvidedBy"] = "Provided by %s"
 
 -- ============================================================================
@@ -435,6 +440,9 @@ english["Options.Healthstone.LowStock.Desc"] =
 english["Options.Healthstone.Threshold"] = "Warn when having"
 english["Options.Healthstone.Threshold.Desc"] =
     "Show a low-stock warning when you have this many healthstones or fewer.\n\n|cffffcc001:|r Warn when you have exactly 1.\n|cffffcc002:|r Warn when you have 1 or 2."
+english["Options.Repair.Threshold"] = "Warn below"
+english["Options.Repair.Threshold.Desc"] =
+    "Show the repair reminder when any equipped item's durability drops below this percentage."
 
 -- ============================================================================
 -- OPTIONS: SOULSTONE
@@ -672,6 +680,7 @@ english["BuffRow.Caption.PoisonsUnset"] = "Choose which poisons you use"
 english["BuffRow.Caption.Runeforge"] = "Runeforge: %s"
 english["BuffRow.Caption.RuneforgeUnset"] = "Set your runeforge per spec"
 english["BuffRow.Caption.Healthstone"] = "Low-stock alert: below %d"
+english["BuffRow.Caption.Repair"] = "Reminds below %d%% durability"
 english["BuffRow.Caption.HealthstoneOff"] = "Low-stock alert: off"
 english["BuffRow.Caption.SoulstoneHidden"] = "Hidden while on cooldown"
 english["BuffRow.Caption.SoulstoneShown"] = "Shown while on cooldown"

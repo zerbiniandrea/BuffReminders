@@ -264,6 +264,31 @@ local SPECIAL_SECTIONS = {
         end,
     },
 
+    repairGear = {
+        caption = function()
+            return format(L["BuffRow.Caption.Repair"], BR.Config.Get("defaults.repairThreshold") or 20), false
+        end,
+        build = function(layout)
+            local thresholdHolder = Components.Slider(body, {
+                label = L["Options.Repair.Threshold"],
+                labelWidth = 110,
+                min = 5,
+                max = 50,
+                step = 5,
+                suffix = "%",
+                get = function()
+                    return BR.Config.Get("defaults.repairThreshold") or 20
+                end,
+                tooltip = { title = L["Options.Repair.Threshold"], desc = L["Options.Repair.Threshold.Desc"] },
+                onChange = function(val)
+                    BR.Config.Set("defaults.repairThreshold", val)
+                end,
+            })
+            tinsert(bodyHolders, thresholdHolder)
+            layout:Add(thresholdHolder, nil, COMPONENT_GAP)
+        end,
+    },
+
     soulstone = {
         caption = function()
             local pinned = BR.Config.Get("defaults.soulstonePinnedTarget")

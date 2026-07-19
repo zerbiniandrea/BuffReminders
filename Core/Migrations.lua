@@ -23,7 +23,7 @@ local max = math.max
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 47
+BR.Migrations.DB_VERSION = 48
 
 -- Run pending migrations against the profile `db`, using code `defaults` for
 -- fallbacks. `ctx` carries the few Display.lua file-scope deps the
@@ -1021,6 +1021,23 @@ function BR.Migrations.Run(db, defaults, ctx)
                         end
                     end
                 end
+            end
+        end,
+
+        -- [48] Off-by-default reminders: repairGear (new opt-in buff) and mageFood
+        -- (flipped from on to opt-in). Nested defaults don't reliably merge once a
+        -- profile has its own enabledBuffs table, so write the values directly.
+        -- Separate nil-guards: repairGear is brand new, but mageFood may already
+        -- carry an explicit user choice (true/false) that must be preserved.
+        [48] = function()
+            if not db.enabledBuffs then
+                db.enabledBuffs = {}
+            end
+            if db.enabledBuffs.repairGear == nil then
+                db.enabledBuffs.repairGear = false
+            end
+            if db.enabledBuffs.mageFood == nil then
+                db.enabledBuffs.mageFood = false
             end
         end,
     }

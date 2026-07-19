@@ -1405,6 +1405,23 @@ BR.BUFF_TABLES = {
                 return not ok or result
             end,
         },
+        -- Repair reminder: shows when any equipped item drops below the configured
+        -- durability threshold. Durability is not a tainted read, so no restricted
+        -- gate; the 18-slot scan is memoized in State.lua (cachedLowestDurability).
+        {
+            key = "repairGear",
+            name = L["Buff.RepairGear"],
+            icons = { textures = { 1405803 } },
+            overlayText = L["Overlay.Repair"],
+            noClickToCast = true, -- nothing to cast; the action is visiting a merchant
+            infoTooltip = {
+                title = L["Tooltip.Repair"],
+                desc = L["Tooltip.Repair.Desc"],
+            },
+            customCheck = function()
+                return BR.BuffState.GetLowestDurability() < (BR.Config.Get("defaults.repairThreshold", 20) / 100)
+            end,
+        },
     },
 }
 
