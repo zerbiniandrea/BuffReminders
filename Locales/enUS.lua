@@ -443,6 +443,9 @@ english["Options.Healthstone.Threshold.Desc"] =
 english["Options.Repair.Threshold"] = "Warn below"
 english["Options.Repair.Threshold.Desc"] =
     "Show the repair reminder when any equipped item's durability drops below this percentage."
+english["Options.RepairHideInCombat"] = "Hide in combat"
+english["Options.RepairHideInCombat.Desc"] =
+    "Hide the repair reminder while in combat. You can't visit a merchant to repair mid-fight, so it's only actionable out of combat."
 
 -- ============================================================================
 -- OPTIONS: SOULSTONE

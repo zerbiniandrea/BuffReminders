@@ -286,6 +286,16 @@ local SPECIAL_SECTIONS = {
             })
             tinsert(bodyHolders, thresholdHolder)
             layout:Add(thresholdHolder, nil, COMPONENT_GAP)
+            AddSpecialCheckbox(layout, {
+                label = L["Options.RepairHideInCombat"],
+                get = function()
+                    return BR.Config.Get("defaults.repairHideInCombat") ~= false
+                end,
+                tooltip = { title = L["Options.RepairHideInCombat"], desc = L["Options.RepairHideInCombat.Desc"] },
+                onChange = function(checked)
+                    BR.Config.Set("defaults.repairHideInCombat", checked)
+                end,
+            })
         end,
     },
 

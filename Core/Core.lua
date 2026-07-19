@@ -381,6 +381,7 @@ local DefaultSettingKeys = {
     healthstoneLowStock = "DisplayRefresh",
     healthstoneThreshold = "DisplayRefresh",
     repairThreshold = "DisplayRefresh",
+    repairHideInCombat = "VisibilityRefresh",
     soulstoneVisibility = "DisplayRefresh",
     soulstoneHideCooldown = "DisplayRefresh",
     soulstonePinnedTarget = false, -- nil when unset (no Defaults entry); macro rebuilds on PreClick

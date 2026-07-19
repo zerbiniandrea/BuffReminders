@@ -97,6 +97,7 @@ BR.defaults = {
         healthstoneThreshold = 1,
         healthstoneLowStock = false,
         repairThreshold = 20, -- percent; repair reminder shows below this durability
+        repairHideInCombat = true,
         soulstoneVisibility = "readyCheck",
         soulstoneHideCooldown = false,
         -- soulstonePinnedTarget: deliberately absent - nil means "no pin" (set via BuffPanel drawer)
