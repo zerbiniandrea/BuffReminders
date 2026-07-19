@@ -77,11 +77,10 @@ local function CreateNewProfile(name)
     if name == "" then
         return
     end
-    local copyFrom = BR.Profiles.GetActiveProfileName()
-    BR.Profiles.BatchOperation(function()
-        BR.aceDB:SetProfile(name)
-        BR.aceDB:CopyProfile(copyFrom)
-    end)
+    -- New profiles start blank: SetProfile on a fresh name creates an empty
+    -- profile and fires OnProfileChanged -> RefreshAfterProfileChange, which
+    -- fills in defaults. No CopyProfile, so it does not clone the current one.
+    BR.aceDB:SetProfile(name)
     if BR.Options.RefreshProfileDropdown then
         BR.Options.RefreshProfileDropdown()
     end

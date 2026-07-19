@@ -63,7 +63,8 @@ function BR.Profiles.OnProfileEvent()
 end
 
 ---Suppress refresh callbacks for the duration of fn(), then fire one refresh.
----Used to batch SetProfile + CopyProfile into a single refresh cycle.
+---Used to batch several profile mutations (e.g. SetProfile + import writes)
+---into a single refresh cycle.
 ---@param fn function
 function BR.Profiles.BatchOperation(fn)
     suppressRefresh = true
