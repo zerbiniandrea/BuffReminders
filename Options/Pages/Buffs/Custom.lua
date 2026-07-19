@@ -69,7 +69,7 @@ local function FillRowBody(body, key, buff, onEdit, onDelete)
         label = "",
         holderWidth = 18,
         get = function()
-            return BR.profile.enabledBuffs[key] ~= false
+            return BR.StateHelpers.IsBuffEnabled(key)
         end,
         onChange = function(checked)
             BR.profile.enabledBuffs[key] = checked

@@ -1024,22 +1024,10 @@ function BR.Migrations.Run(db, defaults, ctx)
             end
         end,
 
-        -- [48] Off-by-default reminders: repairGear (new opt-in buff) and mageFood
-        -- (flipped from on to opt-in). Nested defaults don't reliably merge once a
-        -- profile has its own enabledBuffs table, so write the values directly.
-        -- Separate nil-guards: repairGear is brand new, but mageFood may already
-        -- carry an explicit user choice (true/false) that must be preserved.
-        [48] = function()
-            if not db.enabledBuffs then
-                db.enabledBuffs = {}
-            end
-            if db.enabledBuffs.repairGear == nil then
-                db.enabledBuffs.repairGear = false
-            end
-            if db.enabledBuffs.mageFood == nil then
-                db.enabledBuffs.mageFood = false
-            end
-        end,
+        -- [48] (no-op, retired: repairGear/mageFood now ship off-by-default via the
+        -- buff def's `defaultEnabled = false`, resolved at read time by
+        -- StateHelpers.IsBuffEnabled - no per-profile seeding needed)
+        [48] = function() end,
     }
 
     -- Run pending migrations

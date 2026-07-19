@@ -931,12 +931,39 @@ local function GetBuffSettingKey(buff)
     return buff.groupId or buff.key
 end
 
----Check if a buff is enabled (defaults to true if not explicitly set to false)
----@param key string
+-- Ship defaults for opt-in buffs. Built lazily from the buff definitions'
+-- `defaultEnabled = false` field, keyed by setting key (groupId or key). A buff
+-- absent here ships enabled. Resolving the default at read time (rather than
+-- seeding `false` into every profile) keeps the buff def the single source of
+-- truth and covers profiles created after install, which never run migrations.
+---@type table<string, boolean>|nil
+local defaultEnabledByKey = nil
+local function GetDefaultEnabledLookup()
+    local lookup = defaultEnabledByKey
+    if not lookup then
+        lookup = {}
+        for _, category in pairs(BUFF_TABLES) do
+            for _, buff in ipairs(category) do
+                if buff.defaultEnabled == false then
+                    lookup[buff.groupId or buff.key] = false
+                end
+            end
+        end
+        defaultEnabledByKey = lookup
+    end
+    return lookup
+end
+
+---Check if a buff is enabled. An explicit user choice wins; otherwise the buff's
+---declared ship default applies (enabled unless the def sets defaultEnabled=false).
+---@param key string setting key (groupId or individual key)
 ---@return boolean
 local function IsBuffEnabled(key)
-    local db = BR.profile
-    return db.enabledBuffs[key] ~= false
+    local stored = BR.profile.enabledBuffs[key]
+    if stored ~= nil then
+        return stored
+    end
+    return GetDefaultEnabledLookup()[key] ~= false
 end
 
 ---Get the current content type based on instance/zone (cached)

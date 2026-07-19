@@ -3,7 +3,10 @@ local _, BR = ...
 -- The addon's entire default config. Pure data, consumed by the bootstrap (AceDB
 -- seeding + migrations), the display layer, and the options panel. Exported as
 -- BR.defaults - the single source; read it directly, no module-namespaced alias.
--- Note: enabledBuffs defaults to all enabled - only set false to disable by default.
+-- Note: enabledBuffs holds only explicit user choices; it ships empty. A buff's
+-- ship default is declared on the buff definition itself (`defaultEnabled = false`
+-- for opt-in buffs) and resolved at read time by StateHelpers.IsBuffEnabled - no
+-- migration and no per-profile seeding needed for new off-by-default buffs.
 
 BR.defaults = {
     locked = true,

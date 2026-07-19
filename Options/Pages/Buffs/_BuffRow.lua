@@ -134,7 +134,7 @@ local function CreateBuffRow(
         -- the column edge instead of clustering 200px in from the left.
         holderWidth = rowWidth,
         get = function()
-            return BR.profile.enabledBuffs[key] ~= false
+            return BR.StateHelpers.IsBuffEnabled(key)
         end,
         onChange = function(checked)
             BR.profile.enabledBuffs[key] = checked

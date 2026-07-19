@@ -96,6 +96,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field icons? IconSpec See "Icon fields" comment at end of self[]
 ---@field requireSpecId? number
 ---@field infoTooltip? TooltipText
+---@field defaultEnabled? boolean Ships disabled when false (opt-in); enabled otherwise. Resolved at read time by IsBuffEnabled.
 ---@field clickMacro? fun(spellID: number?): string
 ---@field casterBuffId? number Check this buff on the caster instead of scanning group
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
@@ -107,6 +108,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field class? ClassName
 ---@field overlayText string
 ---@field groupId? string
+---@field defaultEnabled? boolean Ships disabled when false (opt-in); enabled otherwise. Resolved at read time by IsBuffEnabled.
 ---@field enchantID? number
 ---@field requiresBuffWithEnchant? boolean -- When true, require both enchant AND buff to be present (for Paladin Rites)
 ---@field castSpellID? number           -- Spell ID used for click-to-cast when different from spellID
@@ -732,6 +734,7 @@ BR.BUFF_TABLES = {
         {
             spellID = 111400,
             key = "burningRush",
+            defaultEnabled = false, -- opt-in: ships disabled
             name = L["Buff.BurningRush"],
             class = "WARLOCK",
             overlayText = L["Overlay.BurningRush"],
@@ -743,6 +746,7 @@ BR.BUFF_TABLES = {
         -- aura queries are restricted.
         {
             key = "druidWrongForm",
+            defaultEnabled = false, -- opt-in: ships disabled
             name = L["Buff.DruidForm"],
             class = "DRUID",
             overlayText = L["Overlay.WrongForm"],
@@ -1059,6 +1063,7 @@ BR.BUFF_TABLES = {
         -- clickMacro dispatches the spec-correct cast at click time.
         {
             key = "warriorWrongStance",
+            defaultEnabled = false, -- opt-in: ships disabled
             name = L["Buff.WarriorStance"],
             class = "WARRIOR",
             overlayText = L["Overlay.WrongStance"],
@@ -1282,6 +1287,7 @@ BR.BUFF_TABLES = {
         {
             itemID = { 113509 }, -- Conjured Mana Bun
             key = "mageFood",
+            defaultEnabled = false, -- opt-in: ships disabled
             name = L["Buff.MageFood"],
             casterClass = "MAGE",
             overlayText = L["Overlay.NoMageFood"],
@@ -1410,6 +1416,7 @@ BR.BUFF_TABLES = {
         -- gate; the 18-slot scan is memoized in State.lua (cachedLowestDurability).
         {
             key = "repairGear",
+            defaultEnabled = false, -- opt-in: ships disabled
             name = L["Buff.RepairGear"],
             icons = { textures = { 1405803 } },
             overlayText = L["Overlay.Repair"],
