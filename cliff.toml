@@ -1,0 +1,59 @@
+# git-cliff config — generates release notes from Conventional Commits.
+#
+# feat/fix/perf get their own sections; i18n collapses to a single Localization
+# line; everything else lands in a catch-all Other Changes section. Leading
+# gitmoji are stripped from each line; commit bodies render as a reflowed,
+# italic, indented user-facing description. Sections are ordered via HTML-comment
+# sort keys that the template strips before rendering.
+#
+# The alpha-folding and release range live in .github/workflows/release.yml
+# (--ignore-tags + an explicit <last-stable>..HEAD range), NOT here, so every
+# release shows all meaningful changes since the last stable, labeled with its
+# own tag.
+
+[changelog]
+header = "# BuffReminders\n\n"
+body = """
+## [{{ version }}](https://github.com/zerbiniandrea/BuffReminders/tree/{{ version }}){% if timestamp %} ({{ timestamp | date(format="%Y-%m-%d") }}){% endif %}
+{% if previous.version %}[Full Changelog](https://github.com/zerbiniandrea/BuffReminders/compare/{{ previous.version }}...{{ version }}) {% endif %}[Previous Releases](https://github.com/zerbiniandrea/BuffReminders/releases)
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | split(pat="-->") | last }}
+{% if group is containing("Localization") %}
+- Updated translations
+{%- else %}{% for commit in commits %}
+- {{ commit.message | upper_first }}
+{%- if commit.body and commit.body | trim != "" %}
+{{ commit.body | trim | split(pat="\n") | join(sep=" ") | replace(from="  ", to=" ") | indent(prefix="  _", first=true) }}_
+{%- endif %}
+{%- endfor %}{% endif %}
+{% endfor %}\n
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+
+# Strip leading gitmoji + variation selectors, then tidy whitespace.
+commit_preprocessors = [
+  { pattern = "[\\x{1F000}-\\x{1FAFF}\\x{2600}-\\x{27BF}\\x{2B00}-\\x{2BFF}\\x{2190}-\\x{21FF}\\x{2300}-\\x{23FF}\\x{FE0F}\\x{200D}]", replace = "" },
+  { pattern = "  +", replace = " " },
+  { pattern = "^ +", replace = "" },
+]
+
+# HTML-comment sort keys order the sections; the template strips them so they
+# never render. The final catch-all routes everything else to Other Changes.
+commit_parsers = [
+  { message = "^feat", group = "<!-- 0 -->✨ New Features" },
+  { message = "^fix", group = "<!-- 1 -->🐛 Bug Fixes" },
+  { message = "^perf", group = "<!-- 2 -->⚡️ Performance" },
+  { message = "^i18n", group = "<!-- 3 -->🌐 Localization" },
+  { message = "^i8n", group = "<!-- 3 -->🌐 Localization" },
+  { message = ".*", group = "<!-- 4 -->🔧 Other Changes" },
+]
+
+filter_commits = true
+tag_pattern = "v[0-9].*"
+topo_order = false
+sort_commits = "oldest"

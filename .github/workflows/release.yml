@@ -16,6 +16,28 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Generate changelog
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          # Baseline is the previous stable tag (exclude pre-releases and the
+          # tag being built, which already exists on a stable push).
+          LAST_STABLE=$(git tag --sort=-v:refname | grep -vE 'alpha|beta|rc' | grep -vFx "$TAG" | head -1)
+          RANGE="${LAST_STABLE:+${LAST_STABLE}..}HEAD"
+          echo "Tag=$TAG  Baseline=${LAST_STABLE:-<none>}  Range=$RANGE"
+          curl -sSL https://github.com/orhun/git-cliff/releases/download/v2.10.1/git-cliff-2.10.1-x86_64-unknown-linux-gnu.tar.gz \
+            | tar xz -C "$RUNNER_TEMP"
+          # --ignore-tags folds the pre-release alphas into one section labeled
+          # with the current tag, so every release lists all changes since the
+          # last stable.
+          "$RUNNER_TEMP/git-cliff-2.10.1/git-cliff" \
+            --config cliff.toml \
+            --ignore-tags '.*-alpha.*' \
+            --tag "$TAG" \
+            "$RANGE" \
+            --output CHANGELOG.md
+          echo "----- CHANGELOG.md -----"
+          cat CHANGELOG.md
+
       - name: Package and Release
         uses: BigWigsMods/packager@v2.5.0
         env:
