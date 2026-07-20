@@ -1,5 +1,7 @@
 # Contributing to BuffReminders
 
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
+
 ## Development Environment Setup
 
 You need three tools to run `make`:
@@ -19,22 +21,30 @@ Run `make` before committing.
 
 ## Commit Messages
 
-This project uses [Conventional Commits](https://www.conventionalcommits.org/) with [gitmoji](https://gitmoji.dev/). A body and footer are usually not needed, but add them if the change warrants extra context.
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) — `type(scope): description`, no gitmoji, no body. Scope is optional (the area touched, e.g. `options`, `state`, `loadouts`).
 
-```
-type: <gitmoji> short description
-```
+**Commits are the changelog.** Release notes are generated automatically from your commits (via [git-cliff](https://github.com/orhun/git-cliff)) and published to the GitHub release, CurseForge, Wago, and Discord — there is no hand-written changelog. Your commit subject is what users read, so write it as a clear, user-readable summary, and choose the type by **user impact**:
 
-Pick the commit type (`feat`, `fix`, `refactor`, `perf`, `docs`, `chore`, ...) and pair it with the matching gitmoji from the official list - not a random emoji.
+| Type | Where it lands in the changelog |
+|------|---------------------------------|
+| `feat` | ✨ New Features |
+| `fix` | 🐛 Bug Fixes |
+| `perf` | ⚡️ Performance |
+| `i18n(<locale>)` | 🌐 Localization — put the locale in the scope; the changelog lists them (e.g. `i18n(zhTW)`) |
+| `refactor`, `style`, `chore`, `build`, `ci`, `docs`, `test`, `revert` | 🔧 Other Changes |
+
+Only `feat`/`fix`/`perf` get top billing; everything else is grouped under "Other Changes" (nothing is hidden). If a change matters to users, give it the type that reflects that — a user-facing feature is a `feat` even if the diff looks like a refactor.
+
+Breaking changes: add `!` before the colon (`feat(api)!: ...`) or a `BREAKING CHANGE:` footer.
 
 ### Examples
 
 ```
-feat: ✨ add consumable display mode preview to options panel
-fix: 🐛 refresh spells and overlays on spec swap and talent changes
-refactor: ♻️ decouple sub-icon display from click-to-cast setting
-refactor: 🔥 remove tooltips from buff icons and sub-icons
-chore: 🔧 add 12.0.1 interface version to TOC
+feat: add consumable display mode preview to options panel
+fix: refresh spells and overlays on spec swap and talent changes
+perf: cache weapon enchant lookups in the refresh path
+i18n(zhTW): update localization
+refactor: decouple sub-icon display from click-to-cast setting
 ```
 
 ## Code Patterns
