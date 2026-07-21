@@ -127,3 +127,23 @@ BR.Options.Pages.allBuffs = {
     title = L["Page.AllBuffs"],
     Build = Build,
 }
+
+-- Buffs are a what's-new source: every buff carrying an `addedIn` cohort surfaces
+-- here, so its row and this page (plus the Buffs sidebar group) light a dot until
+-- acknowledged. A provider (not static Register) because BUFF_TABLES.custom /
+-- loadout finish populating at ADDON_LOADED, after this file loads.
+BR.Options.WhatsNew.RegisterProvider(function()
+    local entries = {}
+    for _, arr in pairs(BUFF_TABLES) do
+        for _, buff in ipairs(arr) do
+            if buff.addedIn then
+                entries[#entries + 1] = {
+                    cohort = buff.addedIn,
+                    pageId = "allBuffs",
+                    key = buff.groupId or buff.key,
+                }
+            end
+        end
+    end
+    return entries
+end)

@@ -265,9 +265,8 @@ english["Tooltip.MayShowExtraIcon.Desc"] =
 english["Tooltip.InstanceEntryReminder"] = "Instance Entry Reminder"
 english["Tooltip.InstanceEntryReminder.Desc"] =
     "Briefly shown when entering a dungeon as a reminder to drop a Soulwell. Dismissed after casting or after 30 seconds."
-english["Tooltip.Repair"] = "Repair Reminder"
-english["Tooltip.Repair.Desc"] =
-    "Shown when any equipped item drops below the durability threshold. Visit a merchant to repair."
+english["Tooltip.MageFood"] = "Healers Only"
+english["Tooltip.MageFood.Desc"] = "Only shown while you're playing a healer, since conjured mage food restores mana."
 english["BuffTooltip.ProvidedBy"] = "Provided by %s"
 
 -- ============================================================================
@@ -713,6 +712,8 @@ english["BuffRow.Glyph.Sound"] = "Sound alert"
 english["BuffRow.Glyph.Detached"] = "Detached icon"
 english["BuffRow.Glyph.Detached.Desc"] =
     "This icon is placed freely on screen. Manage it in the buff's Settings or on the Layout page."
+english["BuffRow.Glyph.New"] = "New buff"
+english["BuffRow.Glyph.New.Desc"] = "Added in the latest update."
 -- Drawer door to a buff's focused editor (poison/runeforge). %s = option name.
 english["BuffPanel.EditOption"] = "Edit %s"
 english["BuffPanel.Show"] = "Show"

@@ -32,7 +32,7 @@ local PANEL_HEIGHT = C.PANEL_HEIGHT
 local SIDEBAR_WIDTH = C.SIDEBAR_WIDTH
 local SIDEBAR_X = C.SIDEBAR_X
 local CONTENT_TOP_OFFSET = C.CONTENT_TOP_OFFSET
-local BOTTOM_BAR_HEIGHT = C.BOTTOM_BAR_HEIGHT
+local PANEL_BOTTOM_MARGIN = C.PANEL_BOTTOM_MARGIN
 local SCROLLBAR_WIDTH = C.SCROLLBAR_WIDTH
 local COL_PADDING = C.COL_PADDING
 
@@ -158,6 +158,7 @@ local function CreateSidebarGroupHeader(parent, text)
     fs:SetPoint("LEFT", 8, 0)
     fs:SetText("|cffffcc00" .. text:upper() .. "|r")
     fs:SetJustifyH("LEFT")
+    header.label = fs
 
     local sep = header:CreateTexture(nil, "ARTWORK")
     sep:SetHeight(1)
@@ -166,6 +167,86 @@ local function CreateSidebarGroupHeader(parent, text)
     sep:SetColorTexture(0.4, 0.32, 0.05, 0.6)
 
     return header
+end
+
+-- A small red notification dot pinned just to the right of a sidebar label
+-- (page button or group header), hidden until there are unacknowledged new
+-- features. Mirrors the mobile "there's something new here" affordance. Flat
+-- bundled circle tinted red, so it reads as a clean badge against the thin-edge
+-- chrome (the stock Indicator textures are glossy/beveled and look dated here).
+local NOTIFY_DOT_TEXTURE = "Interface\\AddOns\\BuffReminders\\Media\\dot.tga"
+local NOTIFY_DOT_COLOR = { 0.88, 0.42, 0.40 }
+local function AttachNotificationDot(anchorLabel)
+    local dot = anchorLabel:GetParent():CreateTexture(nil, "OVERLAY")
+    dot:SetTexture(NOTIFY_DOT_TEXTURE)
+    dot:SetVertexColor(NOTIFY_DOT_COLOR[1], NOTIFY_DOT_COLOR[2], NOTIFY_DOT_COLOR[3])
+    dot:SetSize(10, 10)
+    dot:SetPoint("LEFT", anchorLabel, "RIGHT", 6, 0)
+    dot:Hide()
+    return dot
+end
+
+-- A state-expressive toggle for the sidebar footer (Lock / Test). Bordered so it
+-- reads as a tool, not a nav row; when ACTIVE its fill + border + text take the
+-- given accent, so the current mode (unlocked / testing) is glanceable from any
+-- page. opts: { accent = {r,g,b}, tooltip = {title, desc}, onClick = fn(self) }.
+local function CreateFooterToggle(parent, opts)
+    local accent = opts.accent
+    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    btn:SetHeight(24)
+    btn:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    local label = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetPoint("CENTER", 0, 0)
+    btn.label = label
+
+    local isHovered, isActive = false, false
+    local function Update()
+        if isActive then
+            btn:SetBackdropColor(accent[1], accent[2], accent[3], 0.22)
+            btn:SetBackdropBorderColor(accent[1], accent[2], accent[3], 1)
+            label:SetTextColor(1, 1, 1)
+        elseif isHovered then
+            btn:SetBackdropColor(1, 1, 1, 0.06)
+            btn:SetBackdropBorderColor(accent[1], accent[2], accent[3], 0.8)
+            label:SetTextColor(1, 1, 1)
+        else
+            btn:SetBackdropColor(0, 0, 0, 0)
+            btn:SetBackdropBorderColor(BORDER_R, BORDER_G, BORDER_B, 1)
+            label:SetTextColor(0.85, 0.85, 0.85)
+        end
+    end
+
+    btn:SetScript("OnEnter", function()
+        isHovered = true
+        Update()
+        if opts.tooltip then
+            BR.ShowTooltip(btn, opts.tooltip.title, opts.tooltip.desc, "ANCHOR_RIGHT")
+        end
+    end)
+    btn:SetScript("OnLeave", function()
+        isHovered = false
+        Update()
+        if opts.tooltip then
+            BR.HideTooltip()
+        end
+    end)
+    btn:SetScript("OnClick", function()
+        opts.onClick(btn)
+    end)
+
+    function btn:SetActive(active)
+        isActive = active
+        Update()
+    end
+    function btn:SetLabel(text)
+        label:SetText(text)
+    end
+    Update()
+    return btn
 end
 
 local function CreateSidebarButton(parent, text)
@@ -233,6 +314,11 @@ local function CreateOptionsPanel()
         for _, editBox in ipairs(panelEditBoxes) do
             editBox:ClearFocus()
         end
+        -- Closing the panel acknowledges this release's additions: the user had
+        -- the cascade (sidebar + rows) in front of them this session. Persist,
+        -- then recompute the snapshot so the next open opens clean.
+        BR.Options.WhatsNew.MarkSeen()
+        BR.Options.WhatsNew.Refresh()
     end)
 
     -- ====================================================================
@@ -372,27 +458,22 @@ local function CreateOptionsPanel()
         panel:SetScale(BR.profile.optionsPanelScale)
     end
 
-    -- Top + bottom dividers act as the layout primitives: sidebar, contentArea
-    -- and the bottom button row anchor to them, so layout follows the dividers
-    -- automatically and there are no per-element pixel offsets to keep in sync.
+    -- The header divider is the top layout primitive: the sidebar and content
+    -- area hang from it and run to the panel's bottom margin. Global tools
+    -- (Lock / Test) live in the sidebar footer rather than a bottom bar, so no
+    -- horizontal strip steals height from every page.
     local headerSep = panel:CreateTexture(nil, "ARTWORK")
     headerSep:SetHeight(1)
     headerSep:SetPoint("TOPLEFT", SIDEBAR_X, -CONTENT_TOP_OFFSET + 4)
     headerSep:SetPoint("TOPRIGHT", -COL_PADDING, -CONTENT_TOP_OFFSET + 4)
     headerSep:SetColorTexture(BORDER_R, BORDER_G, BORDER_B, 1)
 
-    local bottomSep = panel:CreateTexture(nil, "ARTWORK")
-    bottomSep:SetHeight(1)
-    bottomSep:SetPoint("BOTTOMLEFT", SIDEBAR_X, BOTTOM_BAR_HEIGHT - 5)
-    bottomSep:SetPoint("BOTTOMRIGHT", -COL_PADDING, BOTTOM_BAR_HEIGHT - 5)
-    bottomSep:SetColorTexture(BORDER_R, BORDER_G, BORDER_B, 1)
-
     -- ====================================================================
     -- SIDEBAR
     -- ====================================================================
     local sidebar = CreateFrame("Frame", nil, panel)
     sidebar:SetPoint("TOPLEFT", headerSep, "BOTTOMLEFT", 0, 0)
-    sidebar:SetPoint("BOTTOMLEFT", bottomSep, "TOPLEFT", 0, 0)
+    sidebar:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", SIDEBAR_X, PANEL_BOTTOM_MARGIN)
     sidebar:SetWidth(SIDEBAR_WIDTH)
 
     local sidebarBg = sidebar:CreateTexture(nil, "BACKGROUND")
@@ -412,7 +493,7 @@ local function CreateOptionsPanel()
     -- per page (a ScrollableContainer), build its content lazily on first nav.
     local contentArea = CreateFrame("Frame", nil, panel)
     contentArea:SetPoint("TOPLEFT", headerSep, "BOTTOMLEFT", SIDEBAR_WIDTH + 6, 0)
-    contentArea:SetPoint("BOTTOMRIGHT", bottomSep, "TOPRIGHT", 4, 0)
+    contentArea:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -COL_PADDING + 4, PANEL_BOTTOM_MARGIN)
 
     local pageContainers = {} -- pageId -> scrollFrame
     local pageBuilt = {} -- pageId -> bool
@@ -455,6 +536,18 @@ local function CreateOptionsPanel()
     end
 
     local sidebarButtons = {} -- pageId -> button
+    local pageDots = {} -- pageId -> what's-new dot on that sidebar button
+    local groupDots = {} -- { dot, group } per sidebar group header (bubble-up)
+
+    local function UpdateWhatsNewDots()
+        local WhatsNew = BR.Options.WhatsNew
+        for pageId, dot in pairs(pageDots) do
+            dot:SetShown(WhatsNew.IsPageNew(pageId))
+        end
+        for _, gd in ipairs(groupDots) do
+            gd.dot:SetShown(WhatsNew.IsGroupNew(gd.group))
+        end
+    end
 
     local function ActivatePage(pageId)
         if activePageId == pageId then
@@ -496,6 +589,7 @@ local function CreateOptionsPanel()
             local header = CreateSidebarGroupHeader(sidebar, L[group.titleKey] or group.titleKey)
             header:SetPoint("TOPLEFT", 0, sidebarY)
             sidebarY = sidebarY - 22
+            groupDots[#groupDots + 1] = { dot = AttachNotificationDot(header.label), group = group }
 
             for _, pageId in ipairs(group.pages) do
                 local page = BR.Options.Pages[pageId]
@@ -506,6 +600,7 @@ local function CreateOptionsPanel()
                         ActivatePage(pageId)
                     end)
                     sidebarButtons[pageId] = btn
+                    pageDots[pageId] = AttachNotificationDot(btn.label)
                     sidebarY = sidebarY - 24
                     -- Pre-create the page container so masque banner refresh / page-show events work.
                     CreatePageContainer(pageId)
@@ -538,7 +633,7 @@ local function CreateOptionsPanel()
 
     UpdateBannerLayout = function()
         contentArea:ClearAllPoints()
-        contentArea:SetPoint("BOTTOMRIGHT", bottomSep, "TOPRIGHT", 4, 0)
+        contentArea:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -COL_PADDING + 4, PANEL_BOTTOM_MARGIN)
         if masqueBanner:IsShown() then
             masqueBanner:ClearAllPoints()
             masqueBanner:SetPoint("TOPLEFT", headerSep, "BOTTOMLEFT", SIDEBAR_WIDTH + 6, -BANNER_GAP)
@@ -556,40 +651,64 @@ local function CreateOptionsPanel()
             masqueBanner:Refresh()
         end
         UpdateBannerLayout()
+        UpdateWhatsNewDots()
     end)
 
     -- ====================================================================
-    -- BOTTOM BAR (Lock + Test)
+    -- SIDEBAR FOOTER (global tools: Lock + Test)
     -- ====================================================================
-    local bottomFrame = CreateFrame("Frame", nil, panel)
-    bottomFrame:SetPoint("BOTTOMLEFT", 0, 0)
-    bottomFrame:SetPoint("BOTTOMRIGHT", 0, 0)
-    bottomFrame:SetHeight(BOTTOM_BAR_HEIGHT)
-    bottomFrame:SetFrameLevel(panel:GetFrameLevel() + 10)
+    -- Pinned to the bottom of the nav rail behind a divider. Both are global
+    -- mode toggles whose effect is on-screen, so they stay always at hand from
+    -- every page and surface their active state via the accent fill - no bottom
+    -- bar stealing height from the content.
+    local FOOTER_WIDTH = SIDEBAR_WIDTH - 24
+    local FOOTER_PAD = 10 -- symmetric gap above the cluster (below the divider) and below it (to the sidebar edge)
+    local UNLOCK_ACCENT = { 0.95, 0.55, 0.2 } -- orange = "edit mode", matching the anchor hint banner
 
-    local btnHolder = CreateFrame("Frame", nil, bottomFrame)
-    btnHolder:SetPoint("TOP", bottomSep, "BOTTOM", 0, -8)
-    btnHolder:SetSize(1, 22)
-
-    local BTN_WIDTH = 80
-
-    local lockBtn = CreateButton(btnHolder, L["Options.Unlock"], function()
-        BR.Display.ToggleLock()
-        Components.RefreshAll()
-    end, { title = L["Options.LockUnlock"], desc = L["Options.LockUnlock.Desc"] }, {
-        border = { 0.7, 0.58, 0, 1 },
-        borderHover = BR.Colors.Accent,
-        text = BR.Colors.Accent,
+    local testToggle = CreateFooterToggle(sidebar, {
+        accent = { ACCENT_R, ACCENT_G, ACCENT_B },
+        tooltip = { title = L["Options.TestAppearance"], desc = L["Options.TestAppearance.Desc"] },
+        onClick = function(self)
+            ToggleTestMode()
+            self:Refresh()
+        end,
     })
-    lockBtn:SetSize(BTN_WIDTH, 22)
-    lockBtn:SetPoint("RIGHT", btnHolder, "CENTER", -4, 0)
-
-    function lockBtn:Refresh()
-        self.text:SetText(BR.profile.locked and L["Options.Unlock"] or L["Options.Lock"])
+    testToggle:SetWidth(FOOTER_WIDTH)
+    testToggle:SetPoint("BOTTOM", sidebar, "BOTTOM", 0, FOOTER_PAD)
+    function testToggle:Refresh()
+        local on = BR.Display.IsTestMode()
+        self:SetLabel(on and L["Options.StopTest"] or L["Options.Test"])
+        self:SetActive(on)
     end
-    lockBtn:Refresh()
-    tinsert(BR.RefreshableComponents, lockBtn)
+    testToggle:Refresh()
+    tinsert(BR.RefreshableComponents, testToggle)
+    panel.testToggle = testToggle
 
+    local lockToggle = CreateFooterToggle(sidebar, {
+        accent = UNLOCK_ACCENT,
+        tooltip = { title = L["Options.LockUnlock"], desc = L["Options.LockUnlock.Desc"] },
+        onClick = function()
+            BR.Display.ToggleLock()
+            Components.RefreshAll()
+        end,
+    })
+    lockToggle:SetWidth(FOOTER_WIDTH)
+    lockToggle:SetPoint("BOTTOM", testToggle, "TOP", 0, 6)
+    function lockToggle:Refresh()
+        local locked = BR.profile.locked
+        self:SetLabel(locked and L["Options.Unlock"] or L["Options.Lock"])
+        self:SetActive(not locked)
+    end
+    lockToggle:Refresh()
+    tinsert(BR.RefreshableComponents, lockToggle)
+
+    local footerSep = sidebar:CreateTexture(nil, "ARTWORK")
+    footerSep:SetHeight(1)
+    footerSep:SetPoint("BOTTOMLEFT", lockToggle, "TOPLEFT", 0, FOOTER_PAD)
+    footerSep:SetPoint("BOTTOMRIGHT", lockToggle, "TOPRIGHT", 0, FOOTER_PAD)
+    footerSep:SetColorTexture(BORDER_R, BORDER_G, BORDER_B, 0.7)
+
+    -- Anchor-unlock hint: hangs just below the panel while frames are unlocked.
     local unlockBanner = Components.Banner(panel, {
         text = L["Options.AnchorHint"],
         color = "orange",
@@ -602,17 +721,9 @@ local function CreateOptionsPanel()
     unlockBanner:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 0, 0)
     unlockBanner:SetPoint("TOPRIGHT", panel, "BOTTOMRIGHT", 0, 0)
 
-    local testBtn = CreateButton(btnHolder, L["Options.StopTest"], function(self)
-        local isOn = ToggleTestMode()
-        self.text:SetText(isOn and L["Options.StopTest"] or L["Options.Test"])
-    end, {
-        title = L["Options.TestAppearance"],
-        desc = L["Options.TestAppearance.Desc"],
-    })
-    testBtn:SetText(L["Options.Test"])
-    testBtn:SetSize(BTN_WIDTH, 22)
-    testBtn:SetPoint("LEFT", btnHolder, "CENTER", 4, 0)
-    panel.testBtn = testBtn
+    -- Snapshot unacknowledged what's-new entries before the first page builds,
+    -- so rows light their dots and the sidebar bubble-up reflects them.
+    BR.Options.WhatsNew.Refresh()
 
     -- Activate first available page.
     if firstPageId then
@@ -634,11 +745,8 @@ local function ShowOptions()
         optionsPanel = CreateOptionsPanel()
     end
     if not optionsPanel:IsShown() then
-        if BR.Display.IsTestMode() then
-            optionsPanel.testBtn.text:SetText(L["Options.StopTest"])
-        else
-            optionsPanel.testBtn.text:SetText(L["Options.Test"])
-        end
+        -- The Lock/Test footer toggles re-sync via Components.RefreshAll() on the
+        -- panel's OnShow, so their labels/active state are always current.
         optionsPanel:Show()
     end
 end

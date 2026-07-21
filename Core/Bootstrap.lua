@@ -90,6 +90,15 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
     end
     BR.Display.BuildLoadoutRulesArray()
 
+    -- What's-new notification dots: `BR.aceDB.global.seenVersions` tracks which
+    -- feature cohorts the user has acknowledged. Fresh installs pre-acknowledge
+    -- every current cohort (nothing is "new" to a brand-new user); upgraders
+    -- start empty so this release's additions light up. Additive global,
+    -- nil-safe for every prior DB.
+    if isFirstInstall then
+        BR.Options.WhatsNew.MarkSeen()
+    end
+
     -- Register custom buffs in glow fallback lookup (so they work in M+/combat)
     for _, customBuff in ipairs(BR.BUFF_TABLES.custom) do
         if customBuff.glowMode ~= "disabled" then

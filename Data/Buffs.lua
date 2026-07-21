@@ -1292,10 +1292,15 @@ BR.BUFF_TABLES = {
             itemID = { 113509 }, -- Conjured Mana Bun
             key = "mageFood",
             defaultEnabled = false, -- opt-in: ships disabled
+            addedIn = "6.3.0",
             name = L["Buff.MageFood"],
             casterClass = "MAGE",
             overlayText = L["Overlay.NoMageFood"],
             icons = { spells = { 190336 } }, -- Conjure Refreshment icon (the bun)
+            infoTooltip = {
+                title = L["Tooltip.MageFood"],
+                desc = L["Tooltip.MageFood.Desc"],
+            },
             chatRequestable = true,
             readyCheckOnly = true,
             ignoresReadyCheckFilter = true,
@@ -1394,6 +1399,7 @@ BR.BUFF_TABLES = {
             spellID = 190336, -- Conjure Refreshment (used for icon resolution)
             castSpellID = 190336, -- Click-to-cast: smart-drops the refreshment table
             key = "refreshmentTable",
+            addedIn = "6.3.0",
             name = L["Buff.RefreshmentTable"],
             class = "MAGE",
             overlayText = L["Overlay.DropTable"],
@@ -1428,14 +1434,11 @@ BR.BUFF_TABLES = {
         {
             key = "repairGear",
             defaultEnabled = false, -- opt-in: ships disabled
+            addedIn = "6.3.0",
             name = L["Buff.RepairGear"],
             icons = { textures = { 1405803 } },
             overlayText = L["Overlay.Repair"],
             noClickToCast = true, -- nothing to cast; the action is visiting a merchant
-            infoTooltip = {
-                title = L["Tooltip.Repair"],
-                desc = L["Tooltip.Repair.Desc"],
-            },
             customCheck = function()
                 return BR.BuffState.GetLowestDurability() < (BR.Config.Get("defaults.repairThreshold", 20) / 100)
             end,

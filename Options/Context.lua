@@ -16,8 +16,8 @@ BR.Options.Constants = {
     PANEL_HEIGHT = 670,
     SIDEBAR_WIDTH = 160,
     SIDEBAR_X = 14,
-    CONTENT_TOP_OFFSET = 64, -- Y offset from panel top to content top (below header bar)
-    BOTTOM_BAR_HEIGHT = 46,
+    CONTENT_TOP_OFFSET = 48, -- Y offset from panel top to content top (below the single-row header bar)
+    PANEL_BOTTOM_MARGIN = 14, -- breathing room between the content/sidebar and the panel's bottom edge
     -- Used for both the page-internal x-inset (where headers + content start
     -- inside each scrollable page) and the panel chrome's right margin.
     -- 28 aligns the panel title with the sidebar button labels.

@@ -3901,6 +3901,45 @@ function Components.ScrollableContainer(parent, config)
     content:SetSize(contentWidth, contentHeight)
     scrollFrame:SetScrollChild(content)
 
+    -- Edge fades: ambient "there's more" affordance (a scroll shadow). A short
+    -- gradient hugging each edge, shown only when content extends past it - the
+    -- top fade once scrolled down, the bottom fade while more remains below - so
+    -- the content reads as fading under the chrome. Live on a mouse-transparent
+    -- overlay above the scrolling child; stop short of the scrollbar column.
+    local fadeOverlay = CreateFrame("Frame", nil, scrollFrame)
+    fadeOverlay:SetAllPoints(scrollFrame)
+    fadeOverlay:SetFrameLevel(scrollFrame:GetFrameLevel() + 20)
+    fadeOverlay:EnableMouse(false)
+
+    local FADE_HEIGHT = 20
+    local opaque = CreateColor(0.05, 0.05, 0.06, 0.95)
+    local clear = CreateColor(0.05, 0.05, 0.06, 0)
+    local function MakeFade(edge, bottomColor, topColor)
+        local tex = fadeOverlay:CreateTexture(nil, "OVERLAY")
+        tex:SetColorTexture(1, 1, 1)
+        tex:SetHeight(FADE_HEIGHT)
+        tex:SetPoint(edge .. "LEFT", 0, 0)
+        tex:SetPoint(edge .. "RIGHT", -scrollbarWidth, 0)
+        -- SetGradient VERTICAL: first color is the bottom vertex, second the top.
+        tex:SetGradient("VERTICAL", bottomColor, topColor)
+        tex:Hide()
+        return tex
+    end
+    local topFade = MakeFade("TOP", clear, opaque) -- opaque at the very top edge
+    local bottomFade = MakeFade("BOTTOM", opaque, clear) -- opaque at the very bottom edge
+
+    local function UpdateFades()
+        local scroll = scrollFrame:GetVerticalScroll() or 0
+        local range = scrollFrame:GetVerticalScrollRange() or 0
+        topFade:SetShown(scroll > 1)
+        bottomFade:SetShown(range - scroll > 1)
+    end
+    scrollFrame:HookScript("OnVerticalScroll", UpdateFades)
+    scrollFrame:HookScript("OnScrollRangeChanged", UpdateFades)
+    scrollFrame:HookScript("OnSizeChanged", UpdateFades)
+    scrollFrame:HookScript("OnShow", UpdateFades)
+    UpdateFades()
+
     -- Public methods
     function scrollFrame:GetContentFrame()
         return content

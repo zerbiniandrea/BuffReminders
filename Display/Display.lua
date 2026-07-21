@@ -3709,6 +3709,35 @@ local function SlashHandler(msg)
         end
     elseif cmd == "runedebug" then
         PrintRuneDebug()
+    elseif cmd == "shownew" then
+        local WhatsNew = BR.Options.WhatsNew
+        local arg = msg:match("^%S+%s+(%S+)")
+        local counts = WhatsNew.GetCohorts()
+        local seen = BR.aceDB.global.seenVersions or {}
+        local PREFIX = "|cff00ccffBuffReminders what's-new:|r "
+        if arg == "all" then
+            BR.aceDB.global.seenVersions = {}
+            WhatsNew.Refresh()
+            print(PREFIX .. "cleared every cohort - all tagged features will show as new (open options).")
+        elseif arg then
+            if counts[arg] then
+                WhatsNew.Unsee(arg)
+                print(PREFIX .. "un-acknowledged " .. arg .. " (" .. counts[arg] .. " item(s)) - open options to view.")
+            else
+                local known = {}
+                for cohort in pairs(counts) do
+                    known[#known + 1] = cohort
+                end
+                print(PREFIX .. "unknown cohort '" .. arg .. "'. Known: " .. table.concat(known, ", "))
+            end
+        else
+            local any = false
+            for cohort, n in pairs(counts) do
+                any = true
+                print(PREFIX .. cohort .. " - " .. n .. " item(s) - " .. (seen[cohort] and "seen" or "UNSEEN"))
+            end
+            print(PREFIX .. (any and "usage: /br shownew <cohort>|all" or "no cohorts registered."))
+        end
     else
         BR.Options.Toggle()
     end

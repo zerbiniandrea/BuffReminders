@@ -72,9 +72,15 @@ local GLYPH_SIZE = 13
 local GLYPH_GAP = 5
 -- Gap between the trailing link and the first glyph to its left.
 local GLYPH_TO_LINK_GAP = 7
--- Space the label clamp reserves for glyphs so a row with both glyphs shown can
+-- Space the label clamp reserves for glyphs so a row with every glyph shown can
 -- never overlap the buff name, regardless of how glyph visibility changes later.
-local GLYPH_RESERVE = 2 * (GLYPH_SIZE + GLYPH_GAP)
+-- Three slots: new-buff dot, detached pin, sound.
+local GLYPH_RESERVE = 3 * (GLYPH_SIZE + GLYPH_GAP)
+
+-- New-feature notification dot: flat bundled circle, tinted red at runtime.
+-- Shared look with the sidebar bubble-up dots in Frame.lua.
+local NOTIFY_DOT_TEXTURE = "Interface\\AddOns\\BuffReminders\\Media\\dot.tga"
+local NOTIFY_DOT_COLOR = { 0.88, 0.42, 0.40 }
 
 local SOUND_ATLAS = "chatframe-button-icon-voicechat"
 -- Bundled white "pop-out" glyph (64x64 TGA), tinted slate at runtime. Reads as
@@ -168,6 +174,26 @@ local function CreateBuffRow(
         t:SetAtlas(SOUND_ATLAS)
     end, L["BuffRow.Glyph.Sound"], nil)
 
+    -- New-buff notification dot. Not a slate glyph: a flat red badge (bundled
+    -- circle, tinted) so it reads as "unseen, look here" rather than a status
+    -- marker. Inset a touch inside the glyph slot so it sits smaller than the
+    -- sound/pin icons.
+    local newDot = CreateFrame("Button", nil, holder)
+    newDot:SetSize(GLYPH_SIZE, GLYPH_SIZE)
+    newDot:SetFrameLevel(holder:GetFrameLevel() + 5)
+    local newDotTex = newDot:CreateTexture(nil, "ARTWORK")
+    newDotTex:SetPoint("CENTER")
+    newDotTex:SetSize(GLYPH_SIZE - 2, GLYPH_SIZE - 2)
+    newDotTex:SetTexture(NOTIFY_DOT_TEXTURE)
+    newDotTex:SetVertexColor(NOTIFY_DOT_COLOR[1], NOTIFY_DOT_COLOR[2], NOTIFY_DOT_COLOR[3])
+    newDot:SetScript("OnEnter", function(self)
+        BR.ShowTooltip(self, L["BuffRow.Glyph.New"], L["BuffRow.Glyph.New.Desc"], "ANCHOR_RIGHT")
+    end)
+    newDot:SetScript("OnLeave", function()
+        BR.HideTooltip()
+    end)
+    newDot:Hide()
+
     -- Re-reads the buff's live state (has-options + warn, sound, detach) and
     -- repaints the trailing cluster. Registered below so it re-runs on every
     -- RefreshAll (the panel edits these values and calls RefreshAll on change).
@@ -191,14 +217,15 @@ local function CreateBuffRow(
         settingsText:SetTextColor(unpack(idle))
         settingsBtn:SetSize(settingsText:GetStringWidth() + 4, 16)
 
-        -- Lay visible glyphs out right-to-left: [sound][pin] <link>.
+        -- Lay visible glyphs out right-to-left: [sound][pin][new] <link>.
         local sounds = BR.profile.buffSounds
         local hasSound = sounds and sounds[key] ~= nil
         local hasPin = IsIconDetached(key)
+        local isRowNew = BR.Options.WhatsNew.IsItemNew(key)
         soundGlyph.dynamicDesc = hasSound and sounds[key] or nil
 
         local anchor, anchorGap = settingsBtn, GLYPH_TO_LINK_GAP
-        for _, g in ipairs({ { pinGlyph, hasPin }, { soundGlyph, hasSound } }) do
+        for _, g in ipairs({ { newDot, isRowNew }, { pinGlyph, hasPin }, { soundGlyph, hasSound } }) do
             local glyph, active = g[1], g[2]
             if active then
                 glyph:ClearAllPoints()

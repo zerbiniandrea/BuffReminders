@@ -68,6 +68,7 @@ Display\Movers.lua
 Display\SecureButtons.lua
 Core\Bootstrap.lua
 Options\Context.lua
+Options\WhatsNew.lua
 Options\Dialogs\Glow.lua
 Options\Dialogs\CustomBuff.lua
 Options\Dialogs\LoadoutReminder.lua
