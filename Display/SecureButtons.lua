@@ -161,8 +161,6 @@ local lastTargetTooltip
 ---@param hint? string Gray auxiliary text appended after the name (e.g. "(not in group)")
 local function ShowLastTargetTooltip(anchor, name, class, hint)
     if not lastTargetTooltip then
-        local fontPath = BR.Display.GetFontPath()
-        local outlineFlag = BR.Display.GetOutline()
         local tip = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
         tip:SetFrameStrata("TOOLTIP")
         tip:SetBackdrop({
@@ -173,11 +171,11 @@ local function ShowLastTargetTooltip(anchor, name, class, hint)
         tip:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
         tip:SetBackdropBorderColor(0.25, 0.25, 0.25, 1)
         tip.name = tip:CreateFontString(nil, "OVERLAY")
-        tip.name:SetFont(fontPath, 13, outlineFlag)
         tip.name:SetPoint("CENTER", 0, 0)
         lastTargetTooltip = tip
     end
     local tip = lastTargetTooltip
+    BR.Display.SetFontCached(tip.name, 13)
     -- Set class-colored name
     local r, g, b = 1, 1, 1
     if class then
@@ -913,6 +911,7 @@ local function SyncSecureButtons()
     end
     local fontPath = BR.Display.GetFontPath()
     local outlineFlag = BR.Display.GetOutline()
+    local SetFontCached = BR.Display.SetFontCached
     for frame in pairs(secureHostFrames) do
         -- Sync click overlay
         local overlay = frame.clickOverlay
@@ -1025,10 +1024,15 @@ local function SyncSecureButtons()
                                         btnY = bottom + ACTION_ICON_OFFSET - size - row * (size + btnSpacing)
                                     end
                                 end
+                                -- Font stamps are part of the dirty check so a font
+                                -- change (or a failed SetFont) re-applies on next sync.
                                 local needsUpdate = btn._br_needs_sync
                                     or btn._br_x ~= btnX
                                     or btn._br_y ~= btnY
                                     or btn._br_size ~= size
+                                    or btn.count._br_font_size ~= cFontSize
+                                    or btn.count._br_font_path ~= fontPath
+                                    or btn.count._br_font_outline ~= outlineFlag
                                 if needsUpdate then
                                     -- Reposition
                                     btn:ClearAllPoints()
@@ -1043,7 +1047,7 @@ local function SyncSecureButtons()
                                     btn.count:SetText(
                                         btn._br_count and btn._br_count > 1 and tostring(btn._br_count) or ""
                                     )
-                                    btn.count:SetFont(fontPath, cFontSize, outlineFlag)
+                                    SetFontCached(btn.count, cFontSize)
                                     -- Quality atlas icon (holder frame at +10 to draw above borders/glows)
                                     if btn._br_qualityAtlas then
                                         if not btn._br_qualityIcon then
@@ -1070,7 +1074,7 @@ local function SyncSecureButtons()
                                         end
                                         btn._br_badgeLabel:ClearAllPoints()
                                         btn._br_badgeLabel:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
-                                        btn._br_badgeLabel:SetFont(fontPath, cFontSize, outlineFlag)
+                                        SetFontCached(btn._br_badgeLabel, cFontSize)
                                         btn._br_badgeLabel:SetTextColor(bc.r, bc.g, bc.b, 1)
                                         btn._br_badgeLabel:SetText(btn._br_badge)
                                         btn._br_badgeLabel:Show()

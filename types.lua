@@ -25,7 +25,7 @@
 ---@field Hide fun(self: Texture)
 
 ---@class FontString
----@field SetFont fun(self: FontString, font: string, size: number, flags?: string)
+---@field SetFont fun(self: FontString, font: string, size: number, flags?: string): boolean? # false when the font file isn't loaded/usable yet
 ---@field SetText fun(self: FontString, text: string)
 ---@field SetTextColor fun(self: FontString, r: number, g: number, b: number, a?: number)
 ---@field ClearAllPoints fun(self: FontString)
