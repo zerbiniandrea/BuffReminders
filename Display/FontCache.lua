@@ -5,9 +5,13 @@ local _, BR = ...
 -- overlays, and the externals tracker (the options panel typeface is a
 -- separate system, see UI/Fonts.lua). The module resolves the configured LSM
 -- face when the setting changes, applies it with fallback, and memoizes per
--- fontstring.
+-- fontstring. Every apply is verified through GetFont, because SetFont can
+-- report success without a real apply during the login window (confirmed
+-- live on 2026-08-13: return value true, GetFont unchanged). A failed apply
+-- schedules a deferred VisualsRefresh, so static labels heal too.
 
 local LSM = LibStub("LibSharedMedia-3.0")
+local abs = math.abs
 
 -- Cached font path - resolved once on load and updated when the setting changes (via VisualsRefresh).
 -- All SetFont calls read this local directly instead of calling LSM:Fetch() every time.
@@ -17,20 +21,49 @@ local fontPath = STANDARD_TEXT_FONT
 -- "NONE" in saved settings is translated to "" at the WoW API level.
 local outlineFlag = "OUTLINE"
 
----One guarded SetFont attempt. The pcall catches paths that raise a hard
----error (for example, a missing TTF that another addon registered in LSM).
----The boolean return catches faces that the client cannot load yet. SetFont
----reports those with `false` instead of an error. The client loads addon
----font files on first use, so the first SetFont of a session can fail while
----a later call succeeds.
+---One guarded and verified SetFont attempt. The pcall catches paths that
+---raise a hard error (for example, a missing TTF that another addon
+---registered in LSM). The return value of SetFont is NOT sufficient: during
+---the login window it can be `true` while the fontstring keeps its previous
+---face and size. Only a GetFont read-back that matches the request counts
+---as success. Outline flags are not compared - the client can reformat the
+---flags string, and a wrong outline is not worth a retry loop.
 ---@param fs FontString|EditBox any FontInstance
 ---@param path string
 ---@param size number
 ---@param outline string
----@return boolean applied true when the face is now on the font instance
+---@return boolean applied true when the face and size are on the font instance
 local function TrySetFont(fs, path, size, outline)
     local ok, valid = pcall(fs.SetFont, fs, path, size, outline)
-    return ok and valid == true
+    if not ok or valid ~= true then
+        return false
+    end
+    -- pcall again: GetFont on a forbidden subtree (externals) can throw.
+    ---@diagnostic disable-next-line: undefined-field
+    local okRead, appliedPath, appliedSize = pcall(fs.GetFont, fs)
+    return okRead and appliedPath == path and appliedSize ~= nil and abs(appliedSize - size) < 0.5
+end
+
+-- Deferred self-heal: when a verified apply fails, one VisualsRefresh is
+-- scheduled. Its handler re-resolves and re-applies every display font, which
+-- reaches static labels that no render path touches again ("NO PET" text
+-- never changes, so nothing else re-calls SetFontCached on it). The counter
+-- caps the pump for a face that never loads; Resolve resets it when the
+-- configured face changes.
+local retryScheduled = false
+local retryCount = 0
+local MAX_FONT_RETRIES = 10
+
+local function ScheduleRetry()
+    if retryScheduled or retryCount >= MAX_FONT_RETRIES then
+        return
+    end
+    retryScheduled = true
+    retryCount = retryCount + 1
+    C_Timer.After(1.5, function()
+        retryScheduled = false
+        BR.CallbackRegistry:TriggerEvent("VisualsRefresh")
+    end)
 end
 
 local fontProbe = UIParent:CreateFontString(nil, "BACKGROUND")
@@ -65,6 +98,10 @@ local function Resolve()
     local defaults = BR.profile and BR.profile.defaults
     local fontName = defaults and defaults.fontFace
     local path = fontName and LSM:Fetch("font", fontName)
+    if path ~= fontPath and path ~= nil then
+        -- A new face gets a fresh retry budget.
+        retryCount = 0
+    end
     fontPath = path or STANDARD_TEXT_FONT
 
     local outline = defaults and defaults.textOutline
@@ -93,6 +130,7 @@ local function ApplyFont(fs, size, outline)
     if TrySetFont(fs, fontPath, size, outline) then
         return fontPath
     end
+    ScheduleRetry()
     if fontPath ~= STANDARD_TEXT_FONT and TrySetFont(fs, STANDARD_TEXT_FONT, size, outline) then
         return STANDARD_TEXT_FONT
     end
@@ -125,6 +163,9 @@ local function SetFontCached(fs, size, outline)
     fs._br_font_size = size
     fs._br_font_path = applied
     fs._br_font_outline = outline
+    if applied ~= fontPath then
+        ScheduleRetry()
+    end
     return applied == fontPath
 end
 
@@ -140,3 +181,21 @@ BR.FontCache = {
     ApplyFont = ApplyFont,
     SetFontCached = SetFontCached,
 }
+
+-- LSM can change what Fetch returns after login: a late registration of the
+-- configured face, or a global override (LSM 12 SetGlobal makes every Fetch
+-- return the override). Re-resolve on both signals and refresh only when the
+-- resolved values changed. A trigger before Display registers its handler is
+-- a safe no-op.
+local function OnMediaChanged(_, mediatype)
+    if mediatype ~= "font" then
+        return
+    end
+    local oldPath, oldOutline = fontPath, outlineFlag
+    Resolve()
+    if fontPath ~= oldPath or outlineFlag ~= oldOutline then
+        BR.CallbackRegistry:TriggerEvent("VisualsRefresh")
+    end
+end
+LSM.RegisterCallback(BR.FontCache, "LibSharedMedia_Registered", OnMediaChanged)
+LSM.RegisterCallback(BR.FontCache, "LibSharedMedia_SetGlobal", OnMediaChanged)
