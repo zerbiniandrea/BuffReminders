@@ -453,7 +453,25 @@ liftWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
 liftWatcher:RegisterEvent("ENCOUNTER_END")
 liftWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
 liftWatcher:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+-- Blizzard bug: an AuraContainer can show stale or unrelated auras after a
+-- cinematic or a vehicle transition. A forced full update resyncs it. STOP_MOVIE
+-- covers pre-rendered movies, which end without CINEMATIC_STOP.
+liftWatcher:RegisterEvent("CINEMATIC_STOP")
+liftWatcher:RegisterEvent("STOP_MOVIE")
+liftWatcher:RegisterUnitEvent("UNIT_ENTERED_VEHICLE", "player")
+liftWatcher:RegisterUnitEvent("UNIT_EXITED_VEHICLE", "player")
 liftWatcher:SetScript("OnEvent", function(_, event)
+    if
+        event == "CINEMATIC_STOP"
+        or event == "STOP_MOVIE"
+        or event == "UNIT_ENTERED_VEHICLE"
+        or event == "UNIT_EXITED_VEHICLE"
+    then
+        if container and Settings().enabled and not pcall(container.UpdateAllAuras, container) then
+            applyPending = true
+        end
+        return
+    end
     -- PLAYER_ENTERING_WORLD doubles as first-run creation: the profile is seeded by
     -- then, and creating out of combat keeps the initial styling out of the deferred path.
     if event == "PLAYER_ENTERING_WORLD" or (applyPending and Settings().enabled) then
