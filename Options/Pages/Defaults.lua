@@ -15,7 +15,7 @@ local CreateButton = BR.CreateButton
 local Helpers = BR.Options.Helpers
 
 local LSM = BR.LSM
-local IsFontPathValid = BR.FontCache.IsFontPathValid
+local IsFontPathValid = BR.DisplayFonts.IsFontPathValid
 local IsMasqueActive = BR.Masque and BR.Masque.IsActive or function()
     return false
 end

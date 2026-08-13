@@ -46,6 +46,7 @@ read_globals = {
     "C_SpellActivationOverlay",
     "C_Timer",
     "C_UnitAuras",
+    "CreateFont",
     "CreateFrame",
     "CreateColor",
     "EJ_GetCurrentTier",

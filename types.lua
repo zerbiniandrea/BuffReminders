@@ -15,8 +15,21 @@
 
 ---@class Button: Frame
 
----@class EditBox: Frame
----@field SetFont fun(self: EditBox, font: string, size: number, flags?: string)
+-- Anything that carries a font: Font objects, FontStrings, EditBoxes.
+-- SetFont returns a boolean, but the return value can lie during the login
+-- window - Display/Fonts.lua owns the verified-apply logic.
+---@class FontInstance
+---@field SetFont fun(self: FontInstance, font: string, size: number, flags?: string): boolean
+---@field GetFont fun(self: FontInstance): string?, number?, string?
+---@field SetFontObject fun(self: FontInstance, fontObject: Font|string)
+---@field GetFontObject fun(self: FontInstance): Font?
+---@field SetTextScale? fun(self: FontInstance, scale: number) -- FontString only
+---@field GetTextScale? fun(self: FontInstance): number -- FontString only
+
+-- A shared font object from CreateFont()
+---@class Font: FontInstance
+
+---@class EditBox: Frame, FontInstance
 
 ---@class Texture
 ---@field SetAllPoints fun(self: Texture, target?: any)
@@ -27,9 +40,10 @@
 ---@field Show fun(self: Texture)
 ---@field Hide fun(self: Texture)
 
----@class FontString
----@field SetFont fun(self: FontString, font: string, size: number, flags?: string)
+---@class FontString: FontInstance
 ---@field SetText fun(self: FontString, text: string)
+---@field GetStringWidth fun(self: FontString): number
+---@field GetStringHeight fun(self: FontString): number
 ---@field SetTextColor fun(self: FontString, r: number, g: number, b: number, a?: number)
 ---@field ClearAllPoints fun(self: FontString)
 ---@field SetPoint fun(self: FontString, point: string, relativeTo?: any, relativePoint?: string, x?: number, y?: number)

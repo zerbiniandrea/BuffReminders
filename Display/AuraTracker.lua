@@ -148,23 +148,13 @@ local function StyleButton(button)
     regions.icon:SetTexCoord(xInset, 1 - xInset, yInset, 1 - yInset)
     regions.icon:SetAlpha(Setting("iconAlpha") or 1)
 
-    -- Duration text: ours to place and font, Blizzard's to write. Uses the addon's
-    -- configured font face and outline, so it matches every other icon's text.
-    --
-    -- Memoized like SetFontCached (SetFont forces a full fontstring re-layout, and
-    -- VisualsRefresh lands here on every step of any appearance slider drag), but
-    -- the signature lives in OUR side table because _br_font_* fields become
-    -- per-button state on a subtree that goes forbidden. The signature records
-    -- the applied path. A denial in combat, or a face that the client did not
-    -- load yet, leaves a mismatched signature, and the next pass retries.
-    local fontPath = BR.FontCache.GetFontPath()
-    local outline = BR.FontCache.GetOutline()
-    local durationSize = Setting("durationSize") or 16
-    local fontSig = fontPath .. "|" .. durationSize .. "|" .. outline
-    if regions.fontSig ~= fontSig then
-        local applied = BR.FontCache.ApplyFont(regions.duration, durationSize, outline)
-        regions.fontSig = applied and (applied .. "|" .. durationSize .. "|" .. outline) or nil
-    end
+    -- Duration text: ours to place and font, Blizzard's to write. Links to the
+    -- addon's shared font object, so it matches every other icon's text and
+    -- follows face changes with no work here. The call is idempotent and
+    -- stores nothing on the region (per-button state on a subtree that goes
+    -- forbidden); a denial throws out of it like every other call in this
+    -- function, and the caller's pcall queues the retry.
+    BR.DisplayFonts.Apply(regions.duration, Setting("durationSize") or 16)
 
     -- Border protrudes past the button's bounds, same as the reminder icons.
     -- Regions may extend outside a button; only their parentage is constrained.
@@ -328,10 +318,10 @@ local function CreateMover()
     mover.label = label
 
     -- The mover is built once, so it would otherwise keep the font it was created
-    -- with - same reason Movers.lua re-applies this from UpdateSize(). SetFontCached
+    -- with - same reason Movers.lua re-applies this from UpdateSize(). ApplyFont
     -- is safe here: this is our own frame, not a forbidden button subtree.
     function mover:UpdateFont()
-        BR.FontCache.SetFontCached(self.label, MOVER_LABEL_SIZE)
+        BR.DisplayFonts.Apply(self.label, MOVER_LABEL_SIZE)
     end
     -- Must run before SetText: the FontString inherits no font, and setting text on
     -- a font-less FontString raises an error (hence the same order in Movers.lua).
