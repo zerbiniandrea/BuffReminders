@@ -2583,6 +2583,40 @@ local function TryPlayBuffSound(key, buffSounds)
     end
 end
 
+-- One armed timer for the next time-driven display change computed by
+-- State.Refresh (text minute tick, threshold crossing, weapon enchant
+-- expiry). Out of restricted contexts this replaces fast polling; the slow
+-- safety tick in StartUpdates bounds anything the refresh did not see.
+local nextChangeTimer, nextChangeAt
+local function ArmNextChangeTimer(refreshMode)
+    local delay = BR.BuffState.GetNextTimedChange()
+    local now = GetTime()
+    -- Group refreshes recompute only group categories, so their candidate set
+    -- is incomplete: keep an earlier alarm from the last full refresh and only
+    -- tighten. An early alarm is harmless (one extra refresh); a late one is
+    -- stale text.
+    if refreshMode == "group" and nextChangeAt and (not delay or now + delay >= nextChangeAt) then
+        return
+    end
+    if nextChangeTimer then
+        nextChangeTimer:Cancel()
+        nextChangeTimer = nil
+        nextChangeAt = nil
+    end
+    if not delay then
+        return
+    end
+    if delay < 0.5 then
+        delay = 0.5
+    end
+    nextChangeAt = now + delay
+    nextChangeTimer = C_Timer.NewTimer(delay, function()
+        nextChangeTimer = nil
+        nextChangeAt = nil
+        SetDirty("full")
+    end)
+end
+
 -- Update the display
 ---@param refreshMode? "full"|"group"
 UpdateDisplay = function(refreshMode)
@@ -2799,6 +2833,7 @@ UpdateDisplay = function(refreshMode)
 
     -- Skip secure frame sync in test mode (secure frames are hidden)
     if not testMode then
+        ArmNextChangeTimer(refreshMode)
         BR.SecureButtons.ScheduleSecureSync()
 
         -- Sync click overlays on expanded extra frames (they are created above but
@@ -2819,11 +2854,18 @@ local function StartUpdates()
     if updateTicker then
         updateTicker:Cancel()
     end
-    -- Slow fallback ticker for expiration text staleness (e.g. "14m" -> "13m").
-    -- NewTicker passes the ticker object to its callback, so wrap SetDirty
-    -- instead of passing it directly - a table arg would corrupt dirtyMode.
+    -- Fallback ticker. In restricted contexts secret group payloads make aura
+    -- events unreadable, so poll at full 3s cadence there. Everywhere else the
+    -- armed next-change timer owns time-driven updates and this only fires a
+    -- slow safety refresh. (NewTicker passes the ticker object to its callback,
+    -- so wrap SetDirty - a table arg would corrupt dirtyMode.)
+    local safetyTicks = 0
     updateTicker = C_Timer.NewTicker(3, function()
-        SetDirty("full")
+        safetyTicks = safetyTicks + 1
+        if safetyTicks >= 10 or BR.BuffState.IsRestricted() then
+            safetyTicks = 0
+            SetDirty("full")
+        end
     end)
     -- OnUpdate checks dirty flag with throttle
     eventFrame:SetScript("OnUpdate", function()

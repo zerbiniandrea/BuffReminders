@@ -2084,6 +2084,41 @@ local function GetCategoryGlowSettings(cat)
     return expiringGlow, missingGlow, threshold
 end
 
+-- Seconds until the earliest display change caused by time alone: countdown
+-- text ticking a minute, remaining time crossing the expiration threshold, or
+-- an expiring buff running out (weapon enchant expiry fires no event).
+-- Accumulated per refresh; Display arms one timer for it instead of polling.
+local nextTimedChangeIn = nil
+
+---@param remaining? number
+---@param threshold number
+local function NoteTimedChange(remaining, threshold)
+    if not remaining or remaining <= 0 then
+        return
+    end
+    local candidate
+    if remaining >= threshold then
+        candidate = remaining - threshold -- future crossing into "expiring"
+    elseif remaining > 60 then
+        candidate = remaining % 60 -- next minute tick of the countdown text
+        if candidate == 0 then
+            candidate = 60
+        end
+    else
+        candidate = remaining -- "<1m": the expiry itself is the next change
+    end
+    if not nextTimedChangeIn or candidate < nextTimedChangeIn then
+        nextTimedChangeIn = candidate
+    end
+end
+
+---Seconds until the earliest time-driven display change found by the last
+---refresh, or nil when nothing tracked expires.
+---@return number?
+function BuffState.GetNextTimedChange()
+    return nextTimedChangeIn
+end
+
 ---If remaining time is below threshold, mark entry as visible+expiring with glow.
 ---@param entry BuffStateEntry
 ---@param remaining? number
@@ -2091,6 +2126,7 @@ end
 ---@param shouldGlow boolean
 ---@return boolean wasSet true if the entry was marked as expiring
 local function TrySetEntryExpiring(entry, remaining, threshold, shouldGlow)
+    NoteTimedChange(remaining, threshold)
     if remaining and remaining < threshold then
         entry.visible = true
         entry.displayType = "expiring"
@@ -2133,6 +2169,7 @@ function BuffState.Refresh(refreshMode)
     end
     refreshMode = refreshMode or "full"
     local groupOnly = refreshMode == "group"
+    nextTimedChangeIn = nil
 
     -- Cache Display.IsSpellGlowing once per refresh cycle (State.lua loads before Display)
     cachedIsSpellGlowing = BR.Display and BR.Display.IsSpellGlowing
@@ -2212,6 +2249,7 @@ function BuffState.Refresh(refreshMode)
                 entry.countText = scope.playerOnly and ""
                     or (missingCountOnly and tostring(missing) or (buffed .. "/" .. total))
                 entry.shouldGlow = raidMissGlow
+                NoteTimedChange(minRemaining, raidThreshold)
                 if minRemaining and minRemaining < raidThreshold then
                     entry.expiringTime = minRemaining
                 end
