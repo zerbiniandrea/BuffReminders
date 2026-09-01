@@ -755,10 +755,8 @@ local function RefreshConsumableCache()
     local hideLegacy = defs.hideLegacyConsumables ~= false
     local preferReusableRunes = defs.preferReusableRunes == true
     local buckets = {}
-    local maxBags = NUM_BAG_SLOTS or 4
-    for bag = 0, maxBags do
-        local slots = C_Container.GetContainerNumSlots(bag)
-        for slot = 1, slots do
+    for bag = 0, (NUM_BAG_SLOTS or 4) do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local itemID = C_Container.GetContainerItemID(bag, slot)
             if itemID then
                 for category, allowedSet in pairs(itemSets) do
@@ -1097,10 +1095,9 @@ local function SyncSecureButtons()
                 if left then
                     local effectiveCat = GetEffectiveCategory(frame)
                     local catSettings = GetCategorySettings(effectiveCat)
-                    local consumableSettings = GetCategorySettings("consumable")
                     local size = max(ACTION_ICON_MIN, floor((catSettings.iconSize or 64) * ACTION_ICON_SCALE))
                     local btnSpacing = max(2, floor(size * 0.2))
-                    local subIconSide = consumableSettings.subIconSide or "BOTTOM"
+                    local subIconSide = GetCategorySettings("consumable").subIconSide or "BOTTOM"
                     local visibleCount = 0
                     for _, btn in ipairs(frame.actionButtons) do
                         if btn._br_visible then

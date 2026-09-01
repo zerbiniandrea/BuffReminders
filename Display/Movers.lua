@@ -934,9 +934,8 @@ local function CreateCoordinatePopup()
     anchorScroll:SetScrollChild(anchorScrollChild)
 
     anchorMenu:SetScript("OnMouseWheel", function(_, delta)
-        local cur = anchorScroll:GetVerticalScroll()
         local maxScroll = anchorScrollChild:GetHeight() - anchorScroll:GetHeight()
-        local newScroll = cur - delta * ITEM_HEIGHT * 3
+        local newScroll = anchorScroll:GetVerticalScroll() - delta * ITEM_HEIGHT * 3
         anchorScroll:SetVerticalScroll(math.max(0, math.min(newScroll, math.max(0, maxScroll))))
     end)
 
@@ -1334,8 +1333,7 @@ local function CreateMoverFrame(catKey, displayName)
     end
 
     local pos = GetSavedPosition(catKey)
-    local initSettings = GetCategorySettings(catKey)
-    local initDirection = initSettings.growDirection or "CENTER"
+    local initDirection = GetCategorySettings(catKey).growDirection or "CENTER"
     local initAnchor = DIRECTION_ANCHORS[initDirection] or "CENTER"
     local extFrame, extPoint = ResolveAnchorParent(catKey)
     if extFrame then

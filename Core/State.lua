@@ -182,26 +182,22 @@ local GetDifficultyIDCached -- forward declaration (defined next to GetCurrentCo
 -- flag does NOT affect IsRestricted().
 local inPvPPrepPhase = false
 
-local DUNGEON_DIFFICULTY_KEYS = {
-    [1] = "normal", -- Normal
-    [2] = "heroic", -- Heroic
-    [23] = "mythic", -- Mythic
-    [8] = "mythicPlus", -- Mythic Keystone
-    [24] = "timewalking", -- Timewalking
-    [205] = "follower", -- Follower Dungeon
-}
-
-local RAID_DIFFICULTY_KEYS = {
-    [17] = "lfr", -- Looking for Raid
-    [14] = "normal", -- Normal
-    [15] = "heroic", -- Heroic
-    [16] = "mythic", -- Mythic
-}
-
 -- Maps content type to its difficulty-key lookup table
 local CONTENT_DIFFICULTY_TABLES = {
-    dungeon = DUNGEON_DIFFICULTY_KEYS,
-    raid = RAID_DIFFICULTY_KEYS,
+    dungeon = {
+        [1] = "normal", -- Normal
+        [2] = "heroic", -- Heroic
+        [23] = "mythic", -- Mythic
+        [8] = "mythicPlus", -- Mythic Keystone
+        [24] = "timewalking", -- Timewalking
+        [205] = "follower", -- Follower Dungeon
+    },
+    raid = {
+        [17] = "lfr", -- Looking for Raid
+        [14] = "normal", -- Normal
+        [15] = "heroic", -- Heroic
+        [16] = "mythic", -- Mythic
+    },
 }
 
 -- Maps content type to the DB key holding its difficulty sub-filter
@@ -1628,10 +1624,6 @@ local function ShouldShowTargetedBuff(spellIDs, requiredClass, beneficiaryRole, 
     return not isActive, remaining
 end
 
--- Categories that skip the "player knows this spell" check.
--- Custom buffs track buffs the user *receives*, not necessarily casts.
-local SKIP_SPELL_KNOWN_CATEGORIES = { custom = true }
-
 ---Check if player should cast their self buff or weapon imbue (returns true if missing)
 ---@param spellID SpellID
 ---@param requiredClass ClassName
@@ -1859,8 +1851,7 @@ end
 ---@return number? itemCount total count of items in inventory (for item-based consumables)
 local function ShouldShowConsumableBuff(buff)
     if buff.spellID then
-        local spellList = AsSpellList(buff.spellID)
-        for _, id in ipairs(spellList) do
+        for _, id in ipairs(AsSpellList(buff.spellID)) do
             local hasBuff, remaining = UnitHasBuff("player", id)
             if hasBuff then
                 local CM = BR.ConsumableMemory
@@ -2588,7 +2579,6 @@ end
 -- User-defined buffs. They take the same path as self and pet buffs.
 local function RefreshCustom(isAuraRestricted, hideExpiring)
     local _, customMissGlow = GetCategoryGlowSettings("custom")
-    local skipSpellKnown = SKIP_SPELL_KNOWN_CATEGORIES["custom"]
     for i, buff in ipairs(CustomBuffs) do
         local entry = GetOrCreateEntry(buff.key, "custom", i)
         local settingKey = buff.groupId or buff.key
@@ -2652,7 +2642,7 @@ local function RefreshCustom(isAuraRestricted, hideExpiring)
                 buff.buffIdOverride,
                 buff.customCheck,
                 buff.requireSpecId,
-                skipSpellKnown,
+                true, -- custom buffs track buffs the player receives, not casts
                 buff.requiresBuffWithEnchant
             )
             local wantPresent = buff.showWhenPresent

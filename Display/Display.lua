@@ -456,7 +456,7 @@ local soundPlayedThisCycle = {} ---@type table<string, boolean>
 -- Signatures are concatenated visible frame keys; if unchanged, skip repositioning
 local lastMainSignature = ""
 local lastSplitSignatures = {} ---@type table<string, string>
-local CATEGORY_LABELS = {
+BR.CATEGORY_LABELS = {
     raid = L["Category.Raid"],
     presence = L["Category.Presence"],
     targeted = L["Category.Targeted"],
@@ -469,7 +469,6 @@ local CATEGORY_LABELS = {
 }
 
 BR.CATEGORIES = CATEGORIES
-BR.CATEGORY_LABELS = CATEGORY_LABELS
 
 -- Early init of BR.Display for split modules (populated further below and in InitializeFrames)
 BR.Display = BR.Display or {}
@@ -1636,8 +1635,7 @@ local function GenerateTestEntries()
         local threshold = BR.Config.GetCategorySetting(category, "expirationThreshold") or 15
         local expiringShown = false
 
-        local buffTable = BUFF_TABLES[category]
-        for i, buff in ipairs(buffTable) do
+        for i, buff in ipairs(BUFF_TABLES[category]) do
             local settingKey = buff.groupId or buff.key
             if IsBuffEnabled(settingKey) then
                 local entry = BR.BuffState.entries[buff.key]
@@ -2709,9 +2707,7 @@ UpdateDisplay = function(refreshMode)
     wipe(reusableVisibleKeys)
     wipe(reusableMainBuffs)
 
-    local sortedCategories = GetSortedCategories()
-
-    for _, catEntry in ipairs(sortedCategories) do
+    for _, catEntry in ipairs(GetSortedCategories()) do
         local category = catEntry.name
         local entries = visibleByCategory[category]
 

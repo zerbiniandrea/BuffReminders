@@ -54,10 +54,8 @@ local function PrintRuneDebug()
         end
         return (link:gsub("|", "||"))
     end
-    local mhLink = GetInventoryItemLink("player", 16)
-    local ohLink = GetInventoryItemLink("player", 17)
-    line("MH link =", escapeLink(mhLink))
-    line("OH link =", escapeLink(ohLink))
+    line("MH link =", escapeLink(GetInventoryItemLink("player", 16)))
+    line("OH link =", escapeLink(GetInventoryItemLink("player", 17)))
     line("MH permanent enchant =", enchantLabel(BR.BuffState.GetPermanentWeaponEnchantID(16)))
     line("OH permanent enchant =", enchantLabel(BR.BuffState.GetPermanentWeaponEnchantID(17)))
 

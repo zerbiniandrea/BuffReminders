@@ -1090,8 +1090,7 @@ function BR.Migrations.Run(db, defaults, ctx)
         end,
     }
 
-    local currentVersion = db.dbVersion or 0
-    for version = currentVersion + 1, BR.Migrations.DB_VERSION do
+    for version = (db.dbVersion or 0) + 1, BR.Migrations.DB_VERSION do
         if migrations[version] then
             migrations[version]()
         end

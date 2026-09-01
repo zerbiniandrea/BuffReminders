@@ -360,11 +360,8 @@ local function RefreshPoisonCache()
     end
     poisonCache.time = now
 
-    local lethalList = GetEnabledPoisons("lethal")
-    local nonLethalList = GetEnabledPoisons("nonLethal")
-
-    local activeL, knownL, missingL, minRemL, expIDL = ScanPoisonCategory(lethalList, now)
-    local activeNL, knownNL, missingNL, minRemNL, expIDNL = ScanPoisonCategory(nonLethalList, now)
+    local activeL, knownL, missingL, minRemL, expIDL = ScanPoisonCategory(GetEnabledPoisons("lethal"), now)
+    local activeNL, knownNL, missingNL, minRemNL, expIDNL = ScanPoisonCategory(GetEnabledPoisons("nonLethal"), now)
 
     poisonCache.activeL = activeL
     poisonCache.activeNL = activeNL

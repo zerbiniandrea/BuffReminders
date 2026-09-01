@@ -466,8 +466,7 @@ local function ValidatePath(segments)
     local root = segments[1]
 
     -- Check root-level settings (false = valid but no refresh event)
-    local isRootSetting = RootSettings[root] ~= nil
-    if isRootSetting then
+    if RootSettings[root] ~= nil then
         if #segments == 1 then
             return true, RootSettings[root]
         end
