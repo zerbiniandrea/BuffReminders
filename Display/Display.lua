@@ -411,8 +411,9 @@ local function IsTrackedDisplayUnit(unit)
     return unit == "player" or unit == "pet" or unit:match("^party%d+$") ~= nil or unit:match("^raid%d+$") ~= nil
 end
 
--- Track combat state via events (InCombatLockdown() can lag behind PLAYER_REGEN_DISABLED)
--- inCombat reflects both player regen AND boss encounter state for early detection
+-- Track combat state via events (InCombatLockdown() can lag behind PLAYER_REGEN_DISABLED).
+-- inCombat reflects both player regen and boss encounter state; it feeds the
+-- fighting-dependent gates in State.lua, not restriction detection.
 local inCombat = false
 local inEncounter = false
 
@@ -3603,6 +3604,9 @@ local function SlashHandler(msg)
     elseif cmd == "spelldebug" then
         local arg = msg:match("^%S+%s+(%S+)")
         BR.Display.PrintSpellDebug(arg and arg:lower())
+    elseif cmd == "secretdebug" then
+        local arg = msg:match("^%S+%s+(%S+)")
+        BR.Display.PrintSecretDebug(arg)
     elseif cmd == "shownew" then
         local WhatsNew = BR.Options.WhatsNew
         local arg = msg:match("^%S+%s+(%S+)")
@@ -3711,6 +3715,7 @@ eventHandlers.PLAYER_ENTERING_WORLD = function()
     BR.BuffState.SetConsumablesDismissed(false)
     -- Invalidate caches on zone change (the spec can auto-switch on entry)
     BR.BuffState.InvalidateContentTypeCache()
+    BR.BuffState.InvalidateAuraTrackableCache()
     BR.BuffState.InvalidateSpellCache()
     BR.BuffState.InvalidateSpecCache()
     BR.BuffState.InvalidateOffHandCache()

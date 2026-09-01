@@ -147,16 +147,10 @@ local inVehicle = false
 -- Consumables dismissed state (transient, resets on instance change / reload)
 local consumablesDismissed = false
 
--- Combat/encounter state (set via SetInCombat by the Display layer)
--- This flag is the single source of truth for "are aura queries restricted?"
--- within State.lua. It covers BOTH combat lockdown AND boss encounters.
---
--- InCombatLockdown() alone is not sufficient. ENCOUNTER_START fires BEFORE
--- InCombatLockdown() returns true - the player is not in combat until their first
--- hostile action lands on the boss. During that window (hundreds of ms while a
--- spell travels) the aura API is already restricted, but InCombatLockdown() still
--- returns false. Non-whitelisted spells (e.g. Devotion Aura 465) silently return
--- nil from C_UnitAuras.GetUnitAuraBySpellID, which causes false "missing" flashes.
+-- Combat/encounter state (set via SetInCombat by the Display layer). It covers
+-- both combat lockdown and boss encounters (ENCOUNTER_START fires before
+-- InCombatLockdown() turns true). The flag gates fighting-dependent behavior
+-- only; restriction detection is measured in IsRestricted().
 local inCombat = false
 
 -- ============================================================================
@@ -367,12 +361,11 @@ local nameKeyedAllyCaches = { allySpecCache, allyClassCache, allyRoleCache }
 -- True in follower dungeons and delves where NPC companions can receive buffs.
 local includeNPCsInCounting = false
 
--- Aura-safe spell whitelist loaded from Data/AuraWhitelist.lua
-local AURA_WHITELIST = BR.AURA_WHITELIST
+local IsAuraSpellTrackable = BR.Restrictions.IsAuraSpellTrackable
 
 ---Determine if a buff's detection method works in aura-restricted contexts (combat + M+ keystones).
 ---Non-aura detection (weapon enchants, inventory checks) is always safe.
----Aura-based detection requires all queried spell IDs to be in the Blizzard whitelist.
+---Aura-based detection requires every queried spell ID to classify as never secret.
 ---@param buff table Any buff table entry (RaidBuff, SelfBuff, ConsumableBuff, etc.)
 ---@return boolean
 local function ComputeAuraTrackable(buff)
@@ -402,21 +395,22 @@ local function ComputeAuraTrackable(buff)
     end
 
     if type(idsToCheck) == "number" then
-        return AURA_WHITELIST[idsToCheck] ~= nil
+        return IsAuraSpellTrackable(idsToCheck)
     end
     for _, id in ipairs(idsToCheck) do
-        if not AURA_WHITELIST[id] then
+        if not IsAuraSpellTrackable(id) then
             return false
         end
     end
     return true
 end
 
--- Memoized ComputeAuraTrackable: pure function of the (static) buff def and the
--- static whitelist, but called 1-3x per buff on every refresh. Weak-keyed side
+-- Memoized ComputeAuraTrackable: a function of the buff def and the per-spell
+-- secrecy classification, called 1-3x per buff on every refresh. Weak-keyed side
 -- table rather than a field on the def - custom buff / loadout defs are the live
 -- SavedVariables tables, so a cache field leaks into the user's DB. Edited
 -- custom buffs are new table objects, so they miss the cache and recompute.
+-- InvalidateAuraTrackableCache resets it together with the classification cache.
 ---@type table<table, boolean>
 local auraTrackableCache = setmetatable({}, { __mode = "k" })
 
@@ -2913,7 +2907,7 @@ function BuffState.GetConsumablesDismissed()
     return consumablesDismissed
 end
 
----Set the combat/encounter state (single source of truth for aura restrictions)
+---Set the combat/encounter state.
 ---Called by the Display layer on ENCOUNTER_START, PLAYER_REGEN_DISABLED, etc.
 ---@param state boolean
 function BuffState.SetInCombat(state)
@@ -2929,13 +2923,10 @@ end
 ---Raw difficultyID from GetInstanceInfo (cached; invalidated with content type)
 BuffState.GetDifficultyID = GetDifficultyIDCached
 
----Whether the player is in a restricted context (combat, M+ keystone, or any PvP instance).
----A PvP instance is restricted for its entire duration, prep included: Blizzard
----gates the aura API the whole time the player is inside the BG or arena.
----@return boolean
-function BuffState.IsRestricted()
-    return inCombat or GetCurrentDifficultyKey() == "mythicPlus" or GetCurrentContentType() == "pvp"
-end
+---Whether the player is in a restricted context: aura queries return secret
+---values. Measured through C_Secrets.ShouldAurasBeSecret.
+---@type fun(): boolean
+BuffState.IsRestricted = BR.Restrictions.AurasRestricted
 
 ---Whether the player has no allies in the group (open-world solo or scenario solo).
 ---Live check: covers both open-world solo (groupSize 0) and scenario solo such as
@@ -3048,6 +3039,13 @@ function BuffState.InvalidateContentTypeCache()
     -- inPvPPrepPhase is NOT reset here - SetPvPPrepPhase() manages it explicitly.
     -- A reset here clobbers the prep state when the deferred
     -- ZONE_CHANGED_NEW_AREA invalidation fires 0.5s after entry to a PvP instance.
+end
+
+---Invalidate the aura-trackable caches (call on PLAYER_ENTERING_WORLD).
+---Blizzard can reclassify a spell's secrecy in a mid-session hotfix.
+function BuffState.InvalidateAuraTrackableCache()
+    auraTrackableCache = setmetatable({}, { __mode = "k" })
+    BR.Restrictions.InvalidateSpellSecrecyCache()
 end
 
 ---Invalidate spec ID cache (call on PLAYER_ENTERING_WORLD, PLAYER_SPECIALIZATION_CHANGED)

@@ -321,6 +321,123 @@ local function PrintSpellDebug(arg)
     end
 end
 
+-- Diagnostic for restriction detection: the C_Secrets answers, plus the
+-- classification-vs-live-read cross-check for one spell. Paste target for
+-- false-"missing" reports; the cross-check is the API-lie detector that
+-- justifies an OVERRIDE_NOT_TRACKABLE entry.
+
+local SECRECY_LEVEL_NAMES = { [0] = "NeverSecret", [1] = "AlwaysSecret", [2] = "ContextuallySecret" }
+
+local function PrintSecretDebug(arg)
+    local PREFIX = "|cff00ccffBuffReminders secret debug:|r "
+    local function line(...)
+        print(PREFIX .. table.concat({ ... }, " "))
+    end
+    local function str(v)
+        if v == nil then
+            return "nil"
+        end
+        if issecretvalue(v) then
+            return "SECRET"
+        end
+        return tostring(v)
+    end
+    -- Every C_Secrets call is wrapped: a client without the namespace or a
+    -- member must not stop the dump.
+    local function ask(fn, ...)
+        if type(fn) ~= "function" then
+            return "unavailable"
+        end
+        local ok, v = pcall(fn, ...)
+        if not ok then
+            return "ERROR(" .. tostring(v) .. ")"
+        end
+        return str(v)
+    end
+    local S = C_Secrets
+    local AuraField = BR.Secret.AuraField
+
+    line("addon =", C_AddOns.GetAddOnMetadata("BuffReminders", "Version") or "?", "| client =", (GetBuildInfo()))
+    local _, instanceType, difficultyID = GetInstanceInfo()
+    line(
+        "zone =",
+        str(instanceType),
+        "| difficultyID =",
+        str(difficultyID),
+        "| InCombatLockdown =",
+        tostring(InCombatLockdown())
+    )
+    line("IsRestricted() =", tostring(BR.BuffState.IsRestricted()))
+
+    line("HasSecretRestrictions =", ask(S.HasSecretRestrictions))
+    line("ShouldAurasBeSecret =", ask(S.ShouldAurasBeSecret))
+    line("ShouldCooldownsBeSecret =", ask(S.ShouldCooldownsBeSecret))
+    line("ShouldUnitIdentityBeSecret(player) =", ask(S.ShouldUnitIdentityBeSecret, "player"))
+
+    -- Group-unit identity sample: the ally class/role caches in State.lua exist
+    -- because these reads can degrade to secrets.
+    if IsInGroup() then
+        local unit = UnitExists("party1") and "party1" or "raid1"
+        line(
+            "ShouldUnitIdentityBeSecret(" .. unit .. ") =",
+            ask(S.ShouldUnitIdentityBeSecret, unit),
+            "| UnitClass =",
+            str(select(2, UnitClass(unit))),
+            "| UnitGroupRolesAssigned =",
+            str(UnitGroupRolesAssigned(unit)),
+            "| UnitIsPlayer =",
+            str(UnitIsPlayer(unit)),
+            "| UnitLevel =",
+            str(UnitLevel(unit))
+        )
+    end
+
+    local okEnum, firstAura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", 1, "HELPFUL")
+    line("enumerate player =", okEnum and ("OK spellId=" .. str(AuraField(firstAura, "spellId"))) or "THREW")
+
+    if not arg then
+        return
+    end
+    local id = tonumber(arg)
+    if not id then
+        line("unknown spell '" .. tostring(arg) .. "'. Usage: /br secretdebug [spellID]")
+        return
+    end
+
+    -- Cross-check: classification against a real read. A non-nil aura table
+    -- proves presence - table identity is never secret.
+    local level
+    local okLevel, rawLevel = pcall(S.GetSpellAuraSecrecy, id)
+    if okLevel and not issecretvalue(rawLevel) then
+        level = rawLevel
+    end
+    local okRead, aura = pcall(C_UnitAuras.GetUnitAuraBySpellID, "player", id)
+    local readResult
+    if not okRead then
+        readResult = "THREW"
+    elseif aura == nil then
+        readResult = "nil"
+    elseif issecretvalue(aura) then
+        readResult = "SECRET"
+    else
+        readResult = "FOUND"
+    end
+    line(
+        "live check",
+        tostring(id),
+        str(C_Spell.GetSpellName(id)),
+        "| classification =",
+        SECRECY_LEVEL_NAMES[level] or str(level),
+        "| ShouldSpellAuraBeSecret =",
+        ask(S.ShouldSpellAuraBeSecret, id),
+        "| IsAuraSpellTrackable =",
+        tostring(BR.Restrictions.IsAuraSpellTrackable(id)),
+        "| GetUnitAuraBySpellID(player) =",
+        readResult
+    )
+end
+
 BR.Display.PrintRuneDebug = PrintRuneDebug
 BR.Display.PrintSpellDebug = PrintSpellDebug
+BR.Display.PrintSecretDebug = PrintSecretDebug
 BR.Display.LogLoadoutChange = LogLoadoutChange

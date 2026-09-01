@@ -724,6 +724,9 @@ local function GetItemCooldown(itemID)
     if not itemID then
         return nil
     end
+    if BR.Restrictions.CooldownsRestricted() then
+        return nil
+    end
     local ok, start, duration = pcall(C_Item.GetItemCooldown, itemID)
     if not ok then
         return nil

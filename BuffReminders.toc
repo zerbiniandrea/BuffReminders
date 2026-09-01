@@ -45,13 +45,13 @@ Locales\zhCN.lua
 Locales\zhTW.lua
 
 Core\Core.lua
+Core\Restrictions.lua
 Core\TextPositions.lua
 Core\Profiles.lua
 Core\Migrations.lua
 Data\Buffs.lua
 Data\Defaults.lua
 Data\Beneficiaries.lua
-Data\AuraWhitelist.lua
 Data\ConsumableItems.lua
 Data\Pets.lua
 Data\Externals.lua

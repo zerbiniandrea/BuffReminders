@@ -18,6 +18,9 @@ local _, playerClass = UnitClass("player")
 local AuraField = BR.Secret.AuraField
 local Plain = BR.Secret.Plain
 
+-- Restriction predicate for the cooldown domain (see Core/Restrictions.lua)
+local CooldownsRestricted = BR.Restrictions.CooldownsRestricted
+
 -- ============================================================================
 -- BUFF DATA TABLES
 -- ============================================================================
@@ -567,7 +570,7 @@ BR.BUFF_TABLES = {
             readyCheckOnly = true,
             castOnOthers = true,
             noExpirationGlow = true,
-            customCheck = function(isRestricted)
+            customCheck = function()
                 if playerClass ~= "WARLOCK" then
                     return nil
                 end
@@ -575,7 +578,8 @@ BR.BUFF_TABLES = {
                 if not (db.defaults and db.defaults.soulstoneHideCooldown) then
                     return nil -- Setting off: no opinion, rely on aura presence
                 end
-                if isRestricted then
+                -- C_Spell.GetSpellCooldown returns secret values when cooldowns are restricted
+                if CooldownsRestricted() then
                     return false
                 end
                 local ok, result = pcall(function()
@@ -1374,9 +1378,9 @@ BR.BUFF_TABLES = {
                 desc = L["Tooltip.InstanceEntryReminder.Desc"],
                 atlas = "auctionhouse-icon-clock", -- clock reads "timed reminder", not the generic "!" info icon
             },
-            customCheck = function(isRestricted)
-                -- Cooldown API returns tainted values during combat/encounters/M+
-                if isRestricted then
+            customCheck = function()
+                -- C_Spell.GetSpellCooldown returns secret values when cooldowns are restricted
+                if CooldownsRestricted() then
                     return false
                 end
                 local ok, result = pcall(function()
@@ -1404,14 +1408,18 @@ BR.BUFF_TABLES = {
                 atlas = "auctionhouse-icon-clock", -- clock reads "timed reminder", not the generic "!" info icon
             },
             customCheck = function(isRestricted)
-                -- Cooldown API returns tainted values during combat/encounters/M+
+                -- Role reads stay plain only outside aura-restricted contexts, so
+                -- this gate must come before HasHealerInGroup.
                 if isRestricted then
                     return false
                 end
                 -- Only mana users drink from the table, so the reminder needs a healer
-                -- in the party. The scan comes after the isRestricted gate, which keeps
-                -- the role read plain.
+                -- in the party.
                 if not BR.BuffState.HasHealerInGroup() then
+                    return false
+                end
+                -- C_Spell.GetSpellCooldown returns secret values when cooldowns are restricted
+                if CooldownsRestricted() then
                     return false
                 end
                 local ok, result = pcall(function()
