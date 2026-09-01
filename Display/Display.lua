@@ -2048,6 +2048,19 @@ local function RestoreFallbackIcon(frame)
     end
 end
 
+-- Bag items for a consumable frame, memoized for the render cycle. `false` records a
+-- scan that found nothing, so an empty bag never repeats it.
+---@param frame BuffFrame
+---@return table|false items
+local function GetCachedItems(frame)
+    local items = frame._cachedItems
+    if items == nil then
+        items = BR.SecureButtons.GetConsumableActionItems(frame.buffDef) or false
+        frame._cachedItems = items
+    end
+    return items
+end
+
 -- Resolve a consumable frame's icon from bag items.
 -- Returns "items" if bag items found (sets icon, quality overlay, stack count),
 -- "missing" if no items but showConsumablesWithoutItems is on (icon greyed out),
@@ -2055,11 +2068,7 @@ end
 ---@param frame BuffFrame
 ---@return string|false result "items", "missing", or false
 local function ResolveConsumableFrame(frame)
-    local items = frame._cachedItems
-    if items == nil then
-        items = BR.SecureButtons.GetConsumableActionItems(frame.buffDef) or false
-        frame._cachedItems = items
-    end
+    local items = GetCachedItems(frame)
     if items and items[1] then
         if items[1].icon then
             frame.icon:SetTexture(items[1].icon)
@@ -2165,11 +2174,7 @@ local function RenderVisibleEntry(frame, entry)
         SetExpirationGlow(frame, entry.shouldGlow, entry.category, cachedGlow)
         -- Show consumable stat label for expiring consumables (resolve from cached items)
         if entry.displayType == "expiring" and BUFF_KEY_TO_CATEGORY[frame.key] then
-            local items = frame._cachedItems
-            if items == nil then
-                items = BR.SecureButtons.GetConsumableActionItems(frame.buffDef) or false
-                frame._cachedItems = items
-            end
+            local items = GetCachedItems(frame)
             -- entry.dynamicIcon holds the texture of the aura that expires now. It stays
             -- on the icon, with the labels this render already cleared: they name a bag
             -- item, and that belongs to the missing state where every option fans out.
@@ -2253,11 +2258,7 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
     end
 
     local displayMode = (BR.profile.defaults or {}).consumableDisplayMode or "sub_icons"
-    local items = frame._cachedItems
-    if items == nil then
-        items = BR.SecureButtons.GetConsumableActionItems(frame.buffDef) or false
-        frame._cachedItems = items
-    end
+    local items = GetCachedItems(frame)
 
     if displayMode == "sub_icons" then
         if testMode and items and #items > 1 then
