@@ -2170,15 +2170,21 @@ local function RenderVisibleEntry(frame, entry)
                 items = BR.SecureButtons.GetConsumableActionItems(frame.buffDef) or false
                 frame._cachedItems = items
             end
-            if items and items[1] then
-                if items[1].icon then
-                    frame.icon:SetTexture(items[1].icon)
+            -- entry.dynamicIcon holds the texture of the aura that expires now. It stays
+            -- on the icon, with the labels this render already cleared: they name a bag
+            -- item, and that belongs to the missing state where every option fans out.
+            -- The bag item still supplies the cooldown swipe of a reusable consumable.
+            local item = items and items[1] or nil
+            ApplyItemCooldown(frame, item)
+            if not entry.dynamicIcon then
+                if item then
+                    if item.icon then
+                        frame.icon:SetTexture(item.icon)
+                    end
+                    ApplyConsumableOverlays(frame, item)
+                else
+                    RestoreFallbackIcon(frame)
                 end
-                ApplyConsumableOverlays(frame, items[1])
-                ApplyItemCooldown(frame, items[1])
-            else
-                RestoreFallbackIcon(frame)
-                ApplyItemCooldown(frame, nil)
             end
         end
     else -- "text"
