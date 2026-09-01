@@ -2061,6 +2061,12 @@ local function GetCachedItems(frame)
     return items
 end
 
+-- Drop the memo so the next read rescans the bags.
+---@param frame BuffFrame
+local function InvalidateCachedItems(frame)
+    frame._cachedItems = nil
+end
+
 -- Resolve a consumable frame's icon from bag items.
 -- Returns "items" if bag items found (sets icon, quality overlay, stack count),
 -- "missing" if no items but showConsumablesWithoutItems is on (icon greyed out),
@@ -2627,7 +2633,7 @@ UpdateDisplay = function(refreshMode)
         for key in pairs(BUFF_KEY_TO_CATEGORY) do
             local frame = buffFrames[key]
             if frame then
-                frame._cachedItems = nil
+                InvalidateCachedItems(frame)
             end
         end
     end
@@ -2801,7 +2807,7 @@ UpdateDisplay = function(refreshMode)
             local frame = buffFrames[key]
             if frame then
                 HideFrame(frame)
-                frame._cachedItems = nil
+                InvalidateCachedItems(frame)
                 UpdatePetLabels(frame, nil)
                 if frame.extraFrames then
                     for _, extra in ipairs(frame.extraFrames) do
