@@ -362,6 +362,7 @@ local nameKeyedAllyCaches = { allySpecCache, allyClassCache, allyRoleCache }
 local includeNPCsInCounting = false
 
 local IsAuraSpellTrackable = BR.Restrictions.IsAuraSpellTrackable
+local CooldownsRestricted = BR.Restrictions.CooldownsRestricted
 
 ---Determine if a buff's detection method works in aura-restricted contexts (combat + M+ keystones).
 ---Non-aura detection (weapon enchants, inventory checks) is always safe.
@@ -2617,9 +2618,11 @@ local function RefreshCustom(isAuraRestricted, hideExpiring)
             if gateItemID and not HasItemByMode(gateItemID, buff.requireItemMode) then
                 shouldProcess = false
             end
-            if shouldProcess and gateItemID and buff.itemCooldownCondition then
+            if shouldProcess and gateItemID and buff.itemCooldownCondition and not CooldownsRestricted() then
+                -- pcall: gateItemID is user-entered and an invalid ID can throw.
                 local ok, _, duration = pcall(C_Item.GetItemCooldown, gateItemID)
-                if ok and duration then
+                duration = ok and Plain(duration) or nil
+                if duration then
                     local isReady = duration == 0
                     if
                         (buff.itemCooldownCondition == "offCooldown" and not isReady)

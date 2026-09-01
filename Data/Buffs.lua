@@ -582,11 +582,12 @@ BR.BUFF_TABLES = {
                 if CooldownsRestricted() then
                     return false
                 end
-                local ok, result = pcall(function()
-                    local info = C_Spell.GetSpellCooldown(20707)
-                    return not info or info.duration == 0
-                end)
-                return not ok or result
+                local info = C_Spell.GetSpellCooldown(20707)
+                if not info then
+                    return true
+                end
+                local duration = Plain(info.duration)
+                return duration == nil or duration == 0
             end,
             pinnedTarget = function()
                 local db = BR.profile
@@ -1383,11 +1384,12 @@ BR.BUFF_TABLES = {
                 if CooldownsRestricted() then
                     return false
                 end
-                local ok, result = pcall(function()
-                    local info = C_Spell.GetSpellCooldown(29893)
-                    return not info or info.duration == 0
-                end)
-                return not ok or result
+                local info = C_Spell.GetSpellCooldown(29893)
+                if not info then
+                    return true
+                end
+                local duration = Plain(info.duration)
+                return duration == nil or duration == 0
             end,
         },
         -- Refreshment table reminder (mage only, instance entry only). Spell 190336
@@ -1422,11 +1424,12 @@ BR.BUFF_TABLES = {
                 if CooldownsRestricted() then
                     return false
                 end
-                local ok, result = pcall(function()
-                    local info = C_Spell.GetSpellCooldown(190336)
-                    return not info or info.duration == 0
-                end)
-                return not ok or result
+                local info = C_Spell.GetSpellCooldown(190336)
+                if not info then
+                    return true
+                end
+                local duration = Plain(info.duration)
+                return duration == nil or duration == 0
             end,
         },
         -- Repair reminder: shows when any equipped item drops below the configured
