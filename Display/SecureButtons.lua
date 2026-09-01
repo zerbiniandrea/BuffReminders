@@ -946,9 +946,11 @@ local function HideSecureFramesForCatKey(catKey)
         return
     end
     for frame in pairs(secureHostFrames) do
-        -- A detached icon matches on its own buff key, not on a category.
+        -- A detached icon matches on its own buff key - or its groupId, since
+        -- grouped buffs store detach state under the group key.
         local effectiveCat = GetEffectiveCategory(frame)
-        if effectiveCat == catKey or frame.key == catKey then
+        local groupId = frame.buffDef and frame.buffDef.groupId
+        if effectiveCat == catKey or frame.key == catKey or groupId == catKey then
             if frame.actionButtons then
                 for _, btn in ipairs(frame.actionButtons) do
                     if btn._br_driver_active then

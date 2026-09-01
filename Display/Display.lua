@@ -488,23 +488,33 @@ local function IsCategorySplit(category)
     return db.splitCategories and db.splitCategories[category] == true
 end
 
+---Resolve the key detach state is stored under. The options drawer stores
+---detachment per setting key (the groupId for grouped buffs), while state
+---entries and frames carry the individual buff key.
+---@param key string Buff key or groupId
+---@return string
+local function GetDetachKey(key)
+    return buffKeyToSettingKey[key] or key
+end
+
 ---Check if an individual icon is detached from its container
----@param key string Buff key
+---@param key string Buff key or groupId
 ---@return boolean
 local function IsIconDetached(key)
     local db = BR.profile
-    return db.detachedIcons ~= nil and db.detachedIcons[key] ~= nil
+    return db.detachedIcons ~= nil and db.detachedIcons[GetDetachKey(key)] ~= nil
 end
 
 local DETACHED_DEFAULT_POS = { x = 0, y = 0 }
 
 ---Get the saved position for a detached icon
----@param key string Buff key
+---@param key string Buff key or groupId
 ---@return table position {x, y}
 local function GetDetachedPosition(key)
     local db = BR.profile
-    if db.detachedIcons and db.detachedIcons[key] then
-        return db.detachedIcons[key].position or DETACHED_DEFAULT_POS
+    local detachEntry = db.detachedIcons and db.detachedIcons[GetDetachKey(key)]
+    if detachEntry then
+        return detachEntry.position or DETACHED_DEFAULT_POS
     end
     return DETACHED_DEFAULT_POS
 end
@@ -1142,10 +1152,11 @@ end
 local function CreateBuffFrame(buff, category)
     local parent
     if IsIconDetached(buff.key) then
-        if not detachedFrames[buff.key] then
-            detachedFrames[buff.key] = CreateDetachedFrame(buff.key)
+        local detachKey = GetDetachKey(buff.key)
+        if not detachedFrames[detachKey] then
+            detachedFrames[detachKey] = CreateDetachedFrame(detachKey)
         end
-        parent = detachedFrames[buff.key]
+        parent = detachedFrames[detachKey]
     elseif category and IsCategorySplit(category) and categoryFrames[category] then
         parent = categoryFrames[category]
     else
@@ -1550,7 +1561,7 @@ local function PositionSplitCategories(visibleByCategory)
 end
 
 local function PositionDetachedIcon(key, frame)
-    local container = detachedFrames[key]
+    local container = detachedFrames[GetDetachKey(key)]
     if not container then
         return
     end
@@ -2722,7 +2733,16 @@ UpdateDisplay = function(refreshMode)
                                 ApplyConsumableDisplayMode(frame, entry, frames, frame:GetParent())
                             end
                         elseif category == "pet" then
-                            ApplyPetDisplayMode(frame, entry, frames)
+                            if IsIconDetached(entry.key) then
+                                -- Extras were not shown yet on the first positioning
+                                -- pass; re-run it so the container fits them.
+                                ApplyPetDisplayMode(frame, entry, nil)
+                                if shown then
+                                    PositionDetachedIcon(entry.key, frame)
+                                end
+                            else
+                                ApplyPetDisplayMode(frame, entry, frames)
+                            end
                         end
                     end
                 end
@@ -2752,7 +2772,14 @@ UpdateDisplay = function(refreshMode)
                                 ApplyConsumableDisplayMode(frame, entry, reusableMainBuffs, frame:GetParent())
                             end
                         elseif category == "pet" then
-                            ApplyPetDisplayMode(frame, entry, reusableMainBuffs)
+                            if IsIconDetached(entry.key) then
+                                ApplyPetDisplayMode(frame, entry, nil)
+                                if shown then
+                                    PositionDetachedIcon(entry.key, frame)
+                                end
+                            else
+                                ApplyPetDisplayMode(frame, entry, reusableMainBuffs)
+                            end
                         end
                     end
                 end
@@ -2774,8 +2801,20 @@ UpdateDisplay = function(refreshMode)
                         UpdatePetLabels(extra, nil)
                     end
                 end
-                if detachedFrames[key] then
-                    detachedFrames[key]:Hide()
+                local detachKey = GetDetachKey(key)
+                if detachedFrames[detachKey] then
+                    -- Grouped buffs share one container; keep it when another
+                    -- member of the group is still visible.
+                    local containerInUse = false
+                    for visibleKey in pairs(reusableVisibleKeys) do
+                        if GetDetachKey(visibleKey) == detachKey then
+                            containerInUse = true
+                            break
+                        end
+                    end
+                    if not containerInUse then
+                        detachedFrames[detachKey]:Hide()
+                    end
                 end
             end
         end
@@ -2971,10 +3010,11 @@ ReparentBuffFrames = function()
         local key = frame.key
         local category = frame.buffCategory
         if IsIconDetached(key) then
-            if not detachedFrames[key] then
-                detachedFrames[key] = CreateDetachedFrame(key)
+            local detachKey = GetDetachKey(key)
+            if not detachedFrames[detachKey] then
+                detachedFrames[detachKey] = CreateDetachedFrame(detachKey)
             end
-            frame:SetParent(detachedFrames[key])
+            frame:SetParent(detachedFrames[detachKey])
             frame:ClearAllPoints()
         elseif category and IsCategorySplit(category) and categoryFrames[category] then
             frame:SetParent(categoryFrames[category])

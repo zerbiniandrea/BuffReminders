@@ -108,11 +108,14 @@ to the 3s ticker. No strategy-level rework is needed.
 
 ### Restricted contexts
 
-Three contexts restrict the aura API identically (see also CLAUDE.md -> _Aura API
-Restrictions_): **combat lockdown**, **boss encounters** (ENCOUNTER_START->END), and
-**M+ keystones** (always, even out of combat). State.lua owns a single `inCombat` flag
-covering all three; the encounter-start gap (ENCOUNTER_START fires before
-`InCombatLockdown()` flips) is why `InCombatLockdown()` is never called in the refresh path.
+Four contexts restrict the aura API identically (see also CLAUDE.md -> _Aura API
+Restrictions_): **combat lockdown**, **boss encounters** (ENCOUNTER_START->END),
+**M+ keystones** (always, even out of combat), and **PvP instances** (always, prep phase
+included - verified live, see #3.11). `BuffState.IsRestricted()` is the single source of
+truth. State.lua owns one `inCombat` flag for the first two, and adds the difficulty key
+and content type as separate terms for the other two. The encounter-start gap
+(ENCOUNTER_START fires before `InCombatLockdown()` flips) is why `InCombatLockdown()` is
+never called in the refresh path.
 
 ---
 
@@ -532,12 +535,11 @@ state in an external weak-keyed table, and a restyle path that tolerates denial 
 button-level calls that failed and retry them when the restriction lifts, rather than assuming
 a style application always lands.
 
-**Restriction detection is worth revisiting separately.** Restricted state can be probed
-empirically - `pcall(C_UnitAuras.GetAuraDataByIndex, "player", 1, "HELPFUL")`, which throws in
-restricted contexts (#3.6) - instead of being derived from combat/encounter/M+ flags. That
-matters beyond containers: the 12.1 notes list **PvP matches** as a restricted context, but our
-model (§_Restricted contexts_ above, and CLAUDE.md -> _Aura API Restrictions_) only covers
-combat, encounters, and M+. A live gap, tracked in #5.
+**Restriction detection can be measured, not derived.** Two probes answer it directly:
+`C_Secrets.ShouldAurasBeSecret()`, and `pcall(C_UnitAuras.GetAuraDataByIndex, "player", 1,
+"HELPFUL")`, which throws in restricted contexts (#3.6). #3.11 ran both live. Each one agrees
+with `BuffState.IsRestricted()`, so the derived model is correct and the probes are available
+as a replacement.
 
 ### 3.10 Widget getters return secrets - `IsVisible()` included - _confirmed live, v6.4_
 
@@ -575,6 +577,51 @@ unknown counted as forbidden - a frame the sweep cannot ask about is one it must
 
 This is the first case where the secret system reached an API with **no aura in its
 signature**. Treat any getter on a frame of unknown origin as capable of returning a secret.
+
+### 3.11 PvP prep phase is restricted, and `C_Secrets` is real - _confirmed live, 2026-09-01_
+
+A user reported that shaman shield reminders stay hidden in the arena prep room, before the
+gates open, while Skyfury shows. The report is correct behavior. Two samples from a temporary
+`/br probe` command settle both open questions.
+
+Open world, out of combat:
+
+```
+zone: none | combat: false
+IsRestricted() = false
+enumerate player: OK spellId=72286
+C_Secrets.ShouldAurasBeSecret = false
+72286 Invincible | read: FOUND | -- | shouldBeSecret: false
+```
+
+Arena prep phase, out of combat, before the gates open:
+
+```
+zone: arena | combat: false
+IsRestricted() = true
+enumerate player: THREW
+C_Secrets.ShouldAurasBeSecret = true
+C_Secrets.ShouldUnitIdentityBeSecret = false
+```
+
+Four conclusions:
+
+- **A PvP instance restricts auras for its whole duration, prep phase included.** Combat is
+  not necessary. The blanket PvP term in `IsRestricted()` is correct, and a prep-phase
+  exemption is wrong. This closes the PvP question that #3.9 raised.
+- **`C_Secrets` exists on live and its answers match the derived model.**
+  `ShouldAurasBeSecret()` returned `false` in the open world and `true` in the arena, exactly
+  as `IsRestricted()` did. It can replace the whole derivation.
+- **`ShouldSpellAuraBeSecret(spellID)` returns real booleans**, not `nil`. It can replace
+  the hand-maintained `Data/AuraWhitelist.lua`. One measurement is still missing: its answer
+  for a non-whitelisted spell inside a restricted context.
+- **Unit identity stays plain while auras are secret.** `ShouldUnitIdentityBeSecret("player")`
+  returned `false` in the arena prep phase. The identity guards of #3.8 can ask instead of
+  assume, which matters for the `UnitIsUnit(sourceUnit, "player")` reads that now fail closed.
+
+The reminder that a whitelisted buff stays readable holds: Skyfury (462854) shows in the prep
+room, and the shields (974, 192106, 52127, 383648) do not. Silence there is the correct
+result, because a non-whitelisted read cannot tell "not buffed" from "cannot see".
 
 ---
 
@@ -709,28 +756,24 @@ liberally as the first line of any branch that touches combat data.
   That commit squashed the old gate-removal, so there's no standalone commit to revert.
 - **`C_Secrets` / `C_CurveUtil` / `C_DurationUtil` / `C_RestrictedActions` signatures** -
   sourced from a community-reconstructed reference (April 2026). `issecretvalue()` and the
-  general model are solid; the exact namespace signatures are **verify-before-use**. The
-  display primitives are likely never needed (see #2), but `C_RestrictedActions.IsRestricted`
-  is worth confirming as a cleaner replacement for the combat/encounter/M+ gating.
-- **`C_Secrets` has the two functions that would replace our derivations - NOT ADOPTED, needs
-  a PTR/live check.** Shipping addons call `C_Secrets.ShouldAurasBeSecret()` and
-  `C_Secrets.ShouldSpellAuraBeSecret(spellID)` today, so the namespace is real and these two
-  members exist. `ShouldAurasBeSecret()` is a first-class answer for restricted-context
-  detection and would retire the combat/encounter/M+ derivation together with the PvP gap
-  below. `ShouldSpellAuraBeSecret(spellID)` is a runtime answer for one spell and would retire
-  the hand-maintained `Data/AuraWhitelist.lua`. Neither is adopted. Confirm the return values
-  match our model in all four restricted contexts before swapping either one in - a wrong
-  answer from `ShouldSpellAuraBeSecret` turns every buff into a false "missing".
-  `HasSecretRestrictions`, `ShouldUnitIdentityBeSecret` and `CanCompareUnitTokens` are also in
-  use in the wild and are worth the same look for #3.8's identity guards.
-- **PvP matches are a restricted context we do not model (open, #3.9).** The 12.1 notes name
-  combat, encounters, M+ **and PvP matches**; our `isAuraRestricted` covers the first three, so
-  a non-whitelisted buff may read `nil` in a battleground or arena and surface as a false
-  "missing". Two candidate fixes, both needing a PTR check: add an explicit PvP-match term, or
-  replace the whole derivation with an empirical probe (`pcall` on `GetAuraDataByIndex`, throws
-  ⇒ restricted) / `C_RestrictedActions.IsRestricted` if it proves real. Note #3.2 tested a
-  battleground and found whitelisted auras still readable, so this is about the
-  **non**-whitelisted path and the gating flag, not the whitelist itself.
+  general model are solid. The exact namespace signatures stay **verify-before-use**, except
+  the four `C_Secrets` members that #3.11 confirmed. The display primitives are likely never
+  needed (see #2), but `C_RestrictedActions.IsRestricted` is worth a look as a second answer
+  for the restriction gate.
+- **`C_Secrets` - VERIFIED LIVE, NOT ADOPTED (#3.11).** The namespace exists on live.
+  `ShouldAurasBeSecret()` agreed with `IsRestricted()` in the open world and in an arena prep
+  phase, so it can retire the whole derivation. `ShouldSpellAuraBeSecret(spellID)` returns
+  real booleans and can retire `Data/AuraWhitelist.lua`. `HasSecretRestrictions` and
+  `ShouldUnitIdentityBeSecret` also answer. Neither replacement is adopted yet. One
+  measurement is still missing before the whitelist swap: the answer of
+  `ShouldSpellAuraBeSecret` for a **non-whitelisted** spell inside a restricted context. A
+  wrong answer there turns every buff into a false "missing".
+- **~~PvP matches are a restricted context we do not model~~ - RESOLVED (2026-09-01, #3.11).**
+  A PvP instance restricts auras for its whole duration, prep phase included, with no combat
+  needed. The blanket PvP term in `IsRestricted()` is correct. A prep-phase exemption shipped
+  once (commit `6e7f4bb`). Commit `53f3d99` removed it, and that removal is now confirmed.
+  Left here as a record, because the visible result - a shield reminder that stays silent in
+  the arena while Skyfury shows - reads like a bug and gets reported as one.
 - **Aura struct secrecy scope - partly RESOLVED (#3.6).** Out of combat everything reads
   plain; in restricted contexts enumeration throws while whitelisted targeted queries stay
   plain. So "always fully secret" is not literally true for the targeted path. Remaining
