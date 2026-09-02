@@ -30,8 +30,6 @@ local RemoveCustomBuffFrame = BR.CustomBuffs.Remove
 local UpdateCustomBuffFrame = BR.CustomBuffs.UpdateFrame
 
 local tinsert = table.insert
-local tremove = table.remove
-local tconcat = table.concat
 local ceil, floor, max = math.ceil, math.floor, math.max
 
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
@@ -333,7 +331,7 @@ local function BuildBuffTab(ctx, frame)
             for i, other in ipairs(ctx.spellRows) do
                 if other == row then
                     rowFrame:Hide()
-                    tremove(ctx.spellRows, i)
+                    table.remove(ctx.spellRows, i)
                     break
                 end
             end
@@ -1294,7 +1292,7 @@ local function Show(existingKey, refreshPanelCallback)
                 parts[#parts + 1] = ctx.loadConditions.levelFilter == "maxLevel" and L["CustomBuff.Level.Max"]
                     or L["CustomBuff.Level.BelowMax"]
             end
-            subtitle:SetText(tconcat(parts, SEPARATOR))
+            subtitle:SetText(table.concat(parts, SEPARATOR))
         else
             subtitle:SetText(L["CustomBuff.NoSpellYet"])
         end

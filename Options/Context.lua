@@ -127,8 +127,6 @@ BR.Options.StaticCategories = BR.STATIC_CATEGORIES
 -- ============================================================================
 
 local ceil = math.ceil
-local abs = math.abs
-local tinsert = table.insert
 local L = BR.L
 local Components = BR.Components
 local Helpers = BR.Options.Helpers
@@ -290,7 +288,7 @@ function Helpers.AddOverrideRow(parent, layout, opts)
         end
     end
     refreshState()
-    tinsert(BR.RefreshableComponents, { Refresh = refreshState })
+    table.insert(BR.RefreshableComponents, { Refresh = refreshState })
 
     layout:Add(holder, nil, COMPONENT_GAP)
     return holder
@@ -421,7 +419,7 @@ function Helpers.ListEditor(content, scrollFrame, config)
     emptyText:Hide()
 
     local function UpdateContentHeight()
-        content:SetHeight(abs(listTopY) + listContainer:GetHeight() + 30)
+        content:SetHeight(math.abs(listTopY) + listContainer:GetHeight() + 30)
     end
 
     local function AcquireRow(index)
@@ -475,7 +473,7 @@ function Helpers.ListEditor(content, scrollFrame, config)
     function refreshHook:Refresh()
         Render()
     end
-    tinsert(BR.RefreshableComponents, refreshHook)
+    table.insert(BR.RefreshableComponents, refreshHook)
 
     return Render
 end

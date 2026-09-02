@@ -27,9 +27,6 @@ local LayoutSectionNote = BR.Options.Helpers.LayoutSectionNote
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local DROPDOWN_EXTRA = BR.Options.Constants.DROPDOWN_EXTRA
 
-local abs = math.abs
-local tinsert = table.insert
-
 BR.Options.BuffSections = BR.Options.BuffSections or {}
 
 local SLIDERS = {
@@ -121,7 +118,7 @@ local function AddOverrideRow(parent, layout)
         end
     end
     refreshState()
-    tinsert(BR.RefreshableComponents, { Refresh = refreshState })
+    table.insert(BR.RefreshableComponents, { Refresh = refreshState })
 
     layout:Add(holder, nil, COMPONENT_GAP)
 end
@@ -282,7 +279,7 @@ local function Build(ctx, layout)
     })
     layout:Add(tooltipHolder, nil, COMPONENT_GAP)
 
-    parent:SetHeight(abs(layout:GetY()) + (ctx.appearancePadding or 30))
+    parent:SetHeight(math.abs(layout:GetY()) + (ctx.appearancePadding or 30))
     if ctx.onAppearanceResize then
         ctx.onAppearanceResize()
     end

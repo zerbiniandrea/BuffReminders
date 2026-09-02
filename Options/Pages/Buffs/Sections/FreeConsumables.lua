@@ -17,8 +17,6 @@ local UpdateDisplay = BR.Display.Update
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local SECTION_GAP = BR.Options.Constants.SECTION_GAP
 
-local tinsert = table.insert
-
 BR.Options.BuffSections = BR.Options.BuffSections or {}
 
 local FREE_VISIBILITY_DEFAULT = {
@@ -109,7 +107,7 @@ local function Build(ctx, layout)
             btn:EnableMouse(enabled)
         end
     end
-    tinsert(BR.RefreshableComponents, freeVisToggles)
+    table.insert(BR.RefreshableComponents, freeVisToggles)
     layout:Add(freeVisToggles, nil, COMPONENT_GAP)
 
     layout:SetX(layout:GetX() - INDENT)

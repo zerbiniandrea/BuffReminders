@@ -18,10 +18,6 @@ local BUFF_TABLES = BR.BUFF_TABLES
 local COL_PADDING = BR.Options.Constants.COL_PADDING
 local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
 
-local floor = math.floor
-local max = math.max
-local abs = math.abs
-
 -- Vertical gap between header text and the description below it. The gap must
 -- keep the header descenders (g/p/y) clear of the note's caps.
 local HEADER_TO_NOTE_GAP = 15
@@ -106,7 +102,7 @@ end
 
 local function Build(content, scrollFrame)
     local contentWidth = scrollFrame:GetContentWidth()
-    local colWidth = floor((contentWidth - COL_PADDING * 3) / 2)
+    local colWidth = math.floor((contentWidth - COL_PADDING * 3) / 2)
     local leftX = COL_PADDING
     local rightX = COL_PADDING + colWidth + COL_PADDING
 
@@ -117,7 +113,7 @@ local function Build(content, scrollFrame)
     local leftEndY = RenderColumn(content, leftX, startY, LEFT_SECTIONS, colWidth)
     local rightEndY = RenderColumn(content, rightX, startY, RIGHT_SECTIONS, colWidth)
 
-    content:SetHeight(max(abs(leftEndY), abs(rightEndY)) + 16)
+    content:SetHeight(math.max(math.abs(leftEndY), math.abs(rightEndY)) + 16)
 end
 
 BR.Options.Pages.allBuffs = {

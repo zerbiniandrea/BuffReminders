@@ -22,8 +22,6 @@ local UpdateDisplay = BR.Display.Update
 
 local TEXCOORD_INSET = BR.TEXCOORD_INSET
 
-local tinsert = table.insert
-local tsort = table.sort
 local C_ClassColor = C_ClassColor
 
 local ROW_HEIGHT = 28
@@ -151,9 +149,9 @@ local function GetSortedRules()
     local rules = BR.profile.loadoutReminders or {}
     local items = {}
     for key, rule in pairs(rules) do
-        tinsert(items, { key = key, rule = rule })
+        table.insert(items, { key = key, rule = rule })
     end
-    tsort(items, function(a, b)
+    table.sort(items, function(a, b)
         return (a.rule.name or a.key) < (b.rule.name or b.key)
     end)
     return items

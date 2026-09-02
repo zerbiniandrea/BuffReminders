@@ -43,10 +43,7 @@ local ACCENT_R, ACCENT_G, ACCENT_B = unpack(BR.Colors.Accent)
 
 -- Lua stdlib locals (avoid repeated global lookups in hot paths)
 local floor, ceil, max, min = math.floor, math.ceil, math.max, math.min
-local format = string.format
-local rad = math.rad
 local tinsert = table.insert
-local tremove = table.remove
 
 local L = BR.L
 local Components = BR.Components
@@ -1428,7 +1425,7 @@ local function CreateDropdownCore(parent, width, options, initialValue, onChange
     arrow:SetSize(12, 12)
     arrow:SetPoint("RIGHT", -6, 0)
     arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
-    arrow:SetRotation(rad(-90)) -- points down
+    arrow:SetRotation(math.rad(-90)) -- points down
 
     -- ==================== MENU ====================
     -- Parent to the dropdown parent so the menu scrolls with the container.
@@ -2425,7 +2422,12 @@ function Components.VisibilityToggles(parent, config)
             showDiffBar(mapping.contentKey)
         end)
         local toggle = CONTENT_TOGGLE_DEFS[mapping.btnIndex]
-        SetupTooltip(btn, toggle.tooltip.title, format(L["Content.ClickToFilter"], toggle.tooltip.title), "ANCHOR_TOP")
+        SetupTooltip(
+            btn,
+            toggle.tooltip.title,
+            string.format(L["Content.ClickToFilter"], toggle.tooltip.title),
+            "ANCHOR_TOP"
+        )
     end
 
     refreshAll = function()
@@ -3686,7 +3688,7 @@ function Components.RefreshAll()
     for i = #RefreshableComponents, 1, -1 do
         local component = RefreshableComponents[i]
         if component.GetParent and component:GetParent() == nil then
-            tremove(RefreshableComponents, i)
+            table.remove(RefreshableComponents, i)
         elseif component.Refresh then
             component:Refresh()
         end
@@ -3710,7 +3712,7 @@ function Components.Unregister(holder)
     end
     for i = #RefreshableComponents, 1, -1 do
         if RefreshableComponents[i] == holder then
-            tremove(RefreshableComponents, i)
+            table.remove(RefreshableComponents, i)
             return
         end
     end
@@ -4001,7 +4003,7 @@ function Components.CollapsibleSection(parent, config)
             contentBg:Hide()
             holder:SetHeight(HEADER_HEIGHT)
         else
-            indicator:SetRotation(rad(-90)) -- points down
+            indicator:SetRotation(math.rad(-90)) -- points down
             contentBg:Show()
             holder:SetHeight(HEADER_HEIGHT + contentHeight + CONTENT_PADDING * 2)
         end

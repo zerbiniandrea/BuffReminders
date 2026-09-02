@@ -26,8 +26,6 @@ local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local COL_PADDING = BR.Options.Constants.COL_PADDING
 local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
 
-local abs = math.abs
-
 -- One declarative row per HideWhen toggle. `default` is the value the getter
 -- returns when the key is unset. Some keys default on and some default off, so
 -- each row carries its own value.
@@ -271,7 +269,7 @@ local function Build(content)
     BuildTrackingSection(content, layout)
     BuildTrackingOverridesSection(content, layout)
 
-    content:SetHeight(abs(layout:GetY()) + 20)
+    content:SetHeight(math.abs(layout:GetY()) + 20)
 end
 
 BR.Options.Pages.visibility = {

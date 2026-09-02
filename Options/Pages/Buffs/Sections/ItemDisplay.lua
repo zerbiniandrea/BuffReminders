@@ -19,8 +19,6 @@ local MakeCategorySetter = Helpers.MakeCategorySetter
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local SECTION_GAP = BR.Options.Constants.SECTION_GAP
 
-local tinsert = table.insert
-
 BR.Options.BuffSections = BR.Options.BuffSections or {}
 
 local function Build(ctx, layout)
@@ -193,7 +191,7 @@ local function Build(ctx, layout)
     function previewHolder:Refresh()
         updateDisplayModePreview(BR.Config.Get("defaults.consumableDisplayMode"))
     end
-    tinsert(BR.RefreshableComponents, previewHolder)
+    table.insert(BR.RefreshableComponents, previewHolder)
 
     local subIconSideHolder = Components.Dropdown(parent, {
         label = L["Options.SubIconSide"],

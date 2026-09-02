@@ -20,8 +20,6 @@ local Sounds = BR.Sounds
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 
 local tinsert = table.insert
-local format = string.format
-local abs = math.abs
 local wipe = wipe
 
 -- Focused-editor default width. A section that names an editor module gets the
@@ -655,7 +653,7 @@ local function OpenEditor(info)
     local layout = Components.VerticalLayout(editorBody, { x = 0, y = 0 })
     BuildSpecial(section, layout)
 
-    local h = abs(layout:GetY())
+    local h = math.abs(layout:GetY())
     editorBody:SetHeight(h)
     editor:SetHeight(EDITOR_BODY_TOP + h + 16)
     BR.ApplyDialogScale(editor)
@@ -798,7 +796,7 @@ local function OpenDrawer(title, icon, anchor, fill, width)
     local layout = Components.VerticalLayout(drawerBody, { x = 0, y = 0 })
     fill(layout, drawerBody, bodyW)
 
-    local h = abs(layout:GetY())
+    local h = math.abs(layout:GetY())
     drawerBody:SetHeight(h)
     drawer:SetHeight(DRAWER_BODY_TOP + h + 12)
     -- The height decides the scale clamp, and a reopen on an already-shown
@@ -848,7 +846,7 @@ local function Show(info, anchor)
             if module then
                 local editBtn = CreateButton(
                     drawerBody,
-                    format(L["BuffPanel.EditOption"], module.Name or key),
+                    string.format(L["BuffPanel.EditOption"], module.Name or key),
                     function()
                         HideDrawer()
                         OpenEditor(info)

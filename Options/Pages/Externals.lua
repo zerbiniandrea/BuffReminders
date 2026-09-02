@@ -23,12 +23,8 @@ local ITEM_HEIGHT = BR.Options.Constants.ITEM_HEIGHT
 
 local TEXCOORD_INSET = BR.TEXCOORD_INSET
 
-local floor = math.floor
-local max = math.max
 local abs = math.abs
 local format = string.format
-local tinsert = table.insert
-local tremove = table.remove
 
 local GOLD = { 1, 0.8, 0 }
 
@@ -566,8 +562,6 @@ local AuraByIndex = BR.Secret.AuraByIndex
 local AuraField = BR.Secret.AuraField
 
 local ceil = math.ceil
-local min = math.min
-local tconcat = table.concat
 local type = type
 local wipe = wipe
 
@@ -644,7 +638,7 @@ local function DescribeSpellIDs(ids, exceptKey)
             parts[#parts + 1] = format(ICON_MARKUP, iconID or FALLBACK_ICON) .. name .. suffix
         end
     end
-    return tconcat(parts, NAME_GAP)
+    return table.concat(parts, NAME_GAP)
 end
 
 ---Helpful auras on the player that no entry covers yet.
@@ -709,7 +703,7 @@ local function OpenBuffPicker(anchor, OnPick)
             return
         end
 
-        local shown = min(#buffs, GRAB_LIMIT)
+        local shown = math.min(#buffs, GRAB_LIMIT)
         for index = 1, shown do
             local buff = buffs[index]
             local row = CreateFrame("Button", nil, body)
@@ -963,7 +957,7 @@ local function OpenEntryDrawer(key, anchor, OnChanged, withBlankRow)
             local removable = #def.spellIDs > 1
             for index, spellID in ipairs(def.spellIDs) do
                 local row = CreateEntryIDRow(body, width, spellID, key, removable and function()
-                    tremove(def.spellIDs, index)
+                    table.remove(def.spellIDs, index)
                     BuffPanel.HideDrawer()
                     Reopen(false)
                 end or nil)
@@ -1164,7 +1158,7 @@ local function CreateCustomSection(parent, x, topY, colWidth, ctx)
             BR.ShowTooltip(
                 self,
                 BR.GetExternalLabel(entry),
-                format(L["Externals.Custom.RowTooltip"], tconcat(entry.spellIDs, ", ")),
+                format(L["Externals.Custom.RowTooltip"], table.concat(entry.spellIDs, ", ")),
                 "ANCHOR_RIGHT"
             )
         end
@@ -1382,10 +1376,10 @@ local function Build(content, scrollFrame)
     ---@param bottom number Distance from the content top to the section's last row
     function ctx.SetCustomExtent(bottom)
         customExtent = bottom
-        content:SetHeight(max(abs(leftEndY), customExtent) + 16)
+        content:SetHeight(math.max(abs(leftEndY), customExtent) + 16)
     end
 
-    local colWidth = floor((contentWidth - COL_PADDING * 3) / 2)
+    local colWidth = math.floor((contentWidth - COL_PADDING * 3) / 2)
     local startY = layout:GetY()
     leftEndY = RenderColumn(content, COL_PADDING, startY, LEFT_SECTIONS, colWidth, ctx)
     local rightX = COL_PADDING + colWidth + COL_PADDING
@@ -1398,7 +1392,7 @@ local function Build(content, scrollFrame)
     -- Persistent hook rather than per-widget `enabled`: a glyph is a plain button,
     -- not a component holder, so RefreshAll never reaches it. A re-render of the
     -- custom section here also picks up an entry list a profile switch replaced.
-    tinsert(BR.RefreshableComponents, {
+    table.insert(BR.RefreshableComponents, {
         Refresh = function()
             custom.Render()
             ctx.Repaint()

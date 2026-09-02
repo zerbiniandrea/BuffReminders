@@ -25,7 +25,6 @@ local GetBuffIcons = BR.Helpers.GetBuffIcons
 local TEXCOORD_INSET = BR.TEXCOORD_INSET
 
 local tinsert = table.insert
-local tsort = table.sort
 
 local ROW_HEIGHT = 28
 local ICON_SIZE = 20
@@ -121,7 +120,7 @@ local function GetSortedBuffs()
     for key, buff in pairs(buffs) do
         tinsert(items, { key = key, buff = buff })
     end
-    tsort(items, function(a, b)
+    table.sort(items, function(a, b)
         return (a.buff.name or a.key) < (b.buff.name or b.key)
     end)
     return items

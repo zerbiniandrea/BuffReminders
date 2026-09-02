@@ -18,8 +18,6 @@ local LayoutSectionHeader = BR.Options.Helpers.LayoutSectionHeader
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local SECTION_GAP = BR.Options.Constants.SECTION_GAP
 
-local tinsert = table.insert
-
 BR.Options.BuffSections = BR.Options.BuffSections or {}
 
 local function Build(ctx, layout)
@@ -133,7 +131,7 @@ local function Build(ctx, layout)
     function petPreviewHolder:Refresh()
         updatePetDisplayModePreview(BR.Config.Get("defaults.petDisplayMode"))
     end
-    tinsert(BR.RefreshableComponents, petPreviewHolder)
+    table.insert(BR.RefreshableComponents, petPreviewHolder)
 
     local petLabelsHolder = Components.Checkbox(parent, {
         label = L["Options.PetLabels"],
@@ -233,7 +231,7 @@ local function Build(ctx, layout)
             btn.UpdateVisual()
         end
     end
-    tinsert(BR.RefreshableComponents, petClassBarRefreshHolder)
+    table.insert(BR.RefreshableComponents, petClassBarRefreshHolder)
 
     -- The zone and the offsets move the pet *name* text only. The family and
     -- spirit-beast lines keep their relative anchors below the name.

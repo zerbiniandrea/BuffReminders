@@ -30,8 +30,6 @@ local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local DROPDOWN_EXTRA = BR.Options.Constants.DROPDOWN_EXTRA
 local COL_PADDING = BR.Options.Constants.COL_PADDING
 
-local abs = math.abs
-
 BR.Options.BuffSections = BR.Options.BuffSections or {}
 
 local APPEARANCE_KEYS = {
@@ -289,7 +287,7 @@ local function Build(ctx, layout)
     layout:SetX(COL_PADDING)
 
     -- This section is last on the page and owns the parent's final height.
-    parent:SetHeight(abs(layout:GetY()) + (ctx.appearancePadding or 30))
+    parent:SetHeight(math.abs(layout:GetY()) + (ctx.appearancePadding or 30))
     if ctx.onAppearanceResize then
         ctx.onAppearanceResize()
     end

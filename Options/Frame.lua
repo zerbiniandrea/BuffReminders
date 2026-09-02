@@ -9,7 +9,6 @@ local _, BR = ...
 -- Each page is registered as BR.Options.Pages.<id> = { title, Build = fn(content), showMasqueBanner = bool }.
 
 local max, min = math.max, math.min
-local tinsert = table.insert
 
 local L = BR.L
 local Components = BR.Components
@@ -657,7 +656,7 @@ local function CreateOptionsPanel()
         self:SetActive(on)
     end
     testToggle:Refresh()
-    tinsert(BR.RefreshableComponents, testToggle)
+    table.insert(BR.RefreshableComponents, testToggle)
     panel.testToggle = testToggle
 
     local lockToggle = CreateFooterToggle(sidebar, {
@@ -676,7 +675,7 @@ local function CreateOptionsPanel()
         self:SetActive(not locked)
     end
     lockToggle:Refresh()
-    tinsert(BR.RefreshableComponents, lockToggle)
+    table.insert(BR.RefreshableComponents, lockToggle)
 
     local footerSep = sidebar:CreateTexture(nil, "ARTWORK")
     footerSep:SetHeight(1)
