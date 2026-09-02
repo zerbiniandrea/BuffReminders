@@ -17,8 +17,6 @@ local UpdateDisplay = BR.Display.Update
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local SECTION_GAP = BR.Options.Constants.SECTION_GAP
 
-BR.Options.BuffSections = BR.Options.BuffSections or {}
-
 local FREE_VISIBILITY_DEFAULT = {
     openWorld = false,
     scenario = true,

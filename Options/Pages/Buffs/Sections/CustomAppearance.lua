@@ -30,8 +30,6 @@ local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local DROPDOWN_EXTRA = BR.Options.Constants.DROPDOWN_EXTRA
 local COL_PADDING = BR.Options.Constants.COL_PADDING
 
-BR.Options.BuffSections = BR.Options.BuffSections or {}
-
 local APPEARANCE_KEYS = {
     "iconSize",
     "iconWidth",

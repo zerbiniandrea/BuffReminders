@@ -18,8 +18,6 @@ local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 
 local mfloor, mmax = math.floor, math.max
 
-BR.Options.BuffSections = BR.Options.BuffSections or {}
-
 -- The position writes to defaults.textPositions.buffReminder. That key is
 -- global because only the raid category renders the buffReminder item.
 local function Build(ctx, layout)

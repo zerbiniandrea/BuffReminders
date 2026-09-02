@@ -26,8 +26,6 @@ local wipe = wipe
 -- width that module declares instead.
 local PANEL_W = 378
 
-BR.Options.Dialogs = BR.Options.Dialogs or {}
-
 local drawer, drawerBody, drawerIcon, drawerTitle, catcher
 local editor, editorBody, editorIcon, editorTitle
 -- Active build surface. A build must first point body, bodyW and bodyHolders at

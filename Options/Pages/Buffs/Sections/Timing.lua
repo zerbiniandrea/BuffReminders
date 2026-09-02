@@ -18,8 +18,6 @@ local LayoutSectionHeader = BR.Options.Helpers.LayoutSectionHeader
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local COL_PADDING = BR.Options.Constants.COL_PADDING
 
-BR.Options.BuffSections = BR.Options.BuffSections or {}
-
 local function Build(ctx, layout)
     local category = ctx.category
     local parent = ctx.content

@@ -27,8 +27,6 @@ local LayoutSectionNote = BR.Options.Helpers.LayoutSectionNote
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local DROPDOWN_EXTRA = BR.Options.Constants.DROPDOWN_EXTRA
 
-BR.Options.BuffSections = BR.Options.BuffSections or {}
-
 local SLIDERS = {
     { key = "iconZoom", labelKey = "Appearance.Zoom", min = 0, max = 40, suffix = "%", default = 0, inherited = true },
     {

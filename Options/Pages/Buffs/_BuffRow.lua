@@ -24,8 +24,6 @@ local ITEM_HEIGHT = BR.Options.Constants.ITEM_HEIGHT
 
 local tinsert = table.insert
 
-BR.Options.BuffRow = BR.Options.BuffRow or {}
-
 -- Clickable-link affordance on the trailing link. Plain ASCII ">" renders in
 -- every client font - the U+203A chevron is tofu in the CJK/Cyrillic bundled
 -- fonts. It stays in code, not in the locale strings, so translators never

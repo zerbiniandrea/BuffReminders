@@ -18,8 +18,6 @@ local LayoutSectionHeader = BR.Options.Helpers.LayoutSectionHeader
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local SECTION_GAP = BR.Options.Constants.SECTION_GAP
 
-BR.Options.BuffSections = BR.Options.BuffSections or {}
-
 local function Build(ctx, layout)
     local parent = ctx.content
 

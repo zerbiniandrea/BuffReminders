@@ -11,7 +11,6 @@ local _, BR = ...
 --
 -- This module owns state and lifecycle only. Each dot is drawn where its UI lives.
 
-BR.Options = BR.Options or {}
 BR.Options.WhatsNew = {}
 local WhatsNew = BR.Options.WhatsNew
 

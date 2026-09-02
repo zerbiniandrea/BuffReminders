@@ -6,6 +6,8 @@ BR.Options = BR.Options or {}
 BR.Options.Dialogs = BR.Options.Dialogs or {}
 BR.Options.Pages = BR.Options.Pages or {}
 BR.Options.Helpers = BR.Options.Helpers or {}
+BR.Options.BuffSections = {}
+BR.Options.BuffRow = {}
 
 -- ============================================================================
 -- SHARED CONSTANTS
