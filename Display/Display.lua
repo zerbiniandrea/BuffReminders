@@ -2924,7 +2924,7 @@ local function WireLoadoutFrameClick(frame)
         local db = BR.profile
         local rule = db and db.loadoutReminders and db.loadoutReminders[self.key]
         if rule and rule.clickToFix then
-            BR.Loadouts.ApplyFix(rule)
+            BR.LoadoutActions.ApplyFix(rule)
         end
     end)
     -- Mouseover highlight, matching the click-to-cast overlay (no opt-in).
@@ -3749,6 +3749,7 @@ eventHandlers.PLAYER_ENTERING_WORLD = function()
     BR.BuffState.SetPvPPrepPhase(inPvPZone and isPrep)
     BR.BuffState.SetInVehicle(UnitInVehicle("player") == true)
     BR.StateHelpers.ScanEatingState()
+    BR.Loadouts.EnsureAddonsReady(LoadoutRules)
     DisplayFonts.Resolve()
     if not mainFrame then
         InitializeFrames()
@@ -4065,11 +4066,14 @@ eventHandlers.PLAYER_SPECIALIZATION_CHANGED = function(arg1)
     BR.SecureButtons.InvalidateConsumableCache()
     BR.SecureButtons.RefreshOverlaySpells()
     UpdateDisplay() -- cache invalidation + immediate feedback
-    -- Spells can become available shortly after spec swap; refresh once more
+    -- Spells can become available shortly after spec swap; refresh once more.
+    -- The loadout verdicts go too: an external loadout addon rebuilds its own list
+    -- on a short delay, so the verdict read on the event itself can be stale.
     C_Timer.After(0.5, function()
         if not InCombatLockdown() then
             BR.SecureButtons.RefreshOverlaySpells()
         end
+        BR.BuffState.InvalidateLoadoutCache()
         SetDirty()
     end)
 end
@@ -4085,6 +4089,13 @@ eventHandlers.TRAIT_CONFIG_UPDATED = function()
     BR.PetHelpers.InvalidatePetActions()
     BR.SecureButtons.RefreshOverlaySpells()
     SetDirty()
+    -- An external loadout addon answers from a list it rebuilds on a short delay of
+    -- its own. The verdict read now can hold the previous build, so drop it and ask
+    -- again once that rebuild lands.
+    C_Timer.After(0.5, function()
+        BR.BuffState.InvalidateLoadoutCache()
+        SetDirty()
+    end)
 end
 
 eventHandlers.SPELLS_CHANGED = function()

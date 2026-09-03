@@ -60,7 +60,9 @@ Core\Sounds.lua
 Core\ChatRequest.lua
 Core\ConsumableMemory.lua
 Core\TargetMemory.lua
+Core\TalentLoadoutEx.lua
 Core\Loadouts.lua
+Core\LoadoutActions.lua
 Core\State.lua
 UI\Components.lua
 UI\Glow.lua

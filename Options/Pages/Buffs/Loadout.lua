@@ -161,7 +161,7 @@ local function Build(content, scrollFrame)
     -- Name Talent Loadout Ex only when it is installed. Other users must see no
     -- mention of an addon they do not have.
     local note = L["Category.LoadoutNote"]
-    if BR.Loadouts.IsTLXAvailable() then
+    if BR.TalentLoadoutEx.IsAvailable() then
         note = note .. "\n" .. L["Category.LoadoutTLXNote"]
     end
 

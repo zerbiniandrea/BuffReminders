@@ -241,8 +241,15 @@ local cachedRepairSources = nil
 -- (IsSatisfied / GetRuleIcon) are read-only WoW lookups whose answers only change
 -- on spec / talent / equipment / equipment-set events, so they are cached here and
 -- reused on the 3s fallback ticker instead of re-queried every full refresh.
----@type table<string, { satisfied: boolean, icon: number|string }>
+-- An unsettled answer stays out of the cache: no event announces the moment an
+-- external loadout addon becomes able to answer.
+---@type table<string, { satisfied: boolean, icon: number|string? }>
 local cachedLoadoutState = {}
+
+-- Shared verdict for a rule that needs no reminder. Only the unsatisfied path
+-- reads an icon, so a satisfied rule must not pay to resolve one. Never mutated,
+-- so every satisfied rule can hold this one table.
+local SATISFIED_LOADOUT_STATE = { satisfied = true }
 
 -- Wrong-demon-pet cache (nil = unknown/unresolved, recomputed next Refresh).
 ---@type boolean|nil
@@ -2681,8 +2688,12 @@ local function RefreshLoadout()
         then
             local state = cachedLoadoutState[rule.key]
             if not state then
-                state = { satisfied = Loadouts.IsSatisfied(rule), icon = Loadouts.GetRuleIcon(rule) }
-                cachedLoadoutState[rule.key] = state
+                local satisfied, known = Loadouts.IsSatisfied(rule)
+                state = satisfied and SATISFIED_LOADOUT_STATE
+                    or { satisfied = false, icon = Loadouts.GetRuleIcon(rule) }
+                if known then
+                    cachedLoadoutState[rule.key] = state
+                end
             end
             if not state.satisfied then
                 entry.dynamicIcon = state.icon

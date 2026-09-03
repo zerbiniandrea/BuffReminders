@@ -13,13 +13,14 @@ local _, BR = ...
 
 local Loadouts = {}
 
+local TalentLoadoutEx = BR.TalentLoadoutEx
+
 local IsSpellKnownOrOverridesKnown = IsSpellKnownOrOverridesKnown
 local IsPlayerSpell = IsPlayerSpell
 local GetSpecialization = GetSpecialization
 local GetSpecializationInfo = GetSpecializationInfo
 local GetSpecializationInfoByID = GetSpecializationInfoByID
 local UnitName = UnitName
-local UnitClass = UnitClass
 local GetRealmName = GetRealmName
 local LOCALIZED_CLASS_NAMES_MALE = LOCALIZED_CLASS_NAMES_MALE
 local C_ClassTalents = C_ClassTalents
@@ -27,8 +28,6 @@ local C_Traits = C_Traits
 local C_EquipmentSet = C_EquipmentSet
 local C_ChallengeMode = C_ChallengeMode
 local C_Spell = C_Spell
-local C_Timer = C_Timer
-local Enum = Enum
 
 local DEFAULT_TALENT_ICON = 133741 -- inv_misc_book_09: generic talent/loadout book icon, last resort
 local DEFAULT_GEAR_ICON = 7539422 -- ui-transmog-showequippedgear: fallback for sets with no icon
@@ -199,92 +198,30 @@ function Loadouts.IsLoadoutActive(specID, name)
     return ok and active or false
 end
 
--- Whether Talent Loadout Ex is installed and exposes its API. Memoized once
--- positive: an addon cannot unload mid-session. Re-probed while absent, because the
--- TLEx load order relative to BuffReminders is not guaranteed. An early probe must
--- not poison the result into skipping forever.
-local tlxAvailable = false
-local function IsTLXAvailable()
-    if tlxAvailable then
-        return true
-    end
-    ---@diagnostic disable-next-line: undefined-field
-    local TLX = _G.TLX
-    tlxAvailable = TLX ~= nil and TLX.GetLoadedData ~= nil
-    return tlxAvailable
-end
-Loadouts.IsTLXAvailable = IsTLXAvailable
+-- Marks a rule whose loadout is stored by Talent Loadout Ex rather than by WoW.
+-- A WoW loadout carries a configID instead and stores no source.
+local TLX_SOURCE = "tlex"
+Loadouts.TLX_SOURCE = TLX_SOURCE
 
--- Resolve TLEx's stored loadout list for the current class + spec. TLEx keys its DB
--- account-wide by class token + spec INDEX (not spec ID). Returns nil when TLEx is
--- absent or has nothing saved for this spec. Callers wrap this in pcall.
-local function GetTLXSpecTable()
-    ---@diagnostic disable-next-line: undefined-field
-    local db = _G.TalentLoadoutEx
-    if not db then
-        return nil
-    end
-    local _, class = UnitClass("player")
-    local specIndex = GetSpecialization and GetSpecialization()
-    if not class or not specIndex then
-        return nil
-    end
-    return db[class] and db[class][specIndex]
-end
-
-local function ResolveTLXLoadoutIconBody(name)
-    local specTable = GetTLXSpecTable()
-    if not specTable then
-        return nil
-    end
-    for _, data in ipairs(specTable) do
-        if data.text and data.name == name then
-            return data.icon
-        end
-    end
-    return nil
-end
-
--- Live-resolve a TLEx loadout's icon by name. The icon is a fileID number or an
--- atlas/path string. Returns nil when TLEx is absent or the name is not found, so
--- callers fall back to the rule's snapshotted icon / the spec icon.
-local function ResolveTLXLoadoutIcon(name)
-    if not name or not IsTLXAvailable() then
-        return nil
-    end
-    local ok, icon = pcall(ResolveTLXLoadoutIconBody, name)
-    return ok and icon or nil
-end
-
-local function ResolveTLXLoadoutActive(name)
-    if not IsTLXAvailable() then
-        return false
-    end
-    -- GetLoadedData() varargs the loadouts TLEx holds as loaded. It diffs each stored
-    -- talent string against the active config. The pack makes the result scannable,
-    -- and stays empty when TLEx computes none.
-    ---@diagnostic disable-next-line: undefined-field
-    local loaded = { _G.TLX.GetLoadedData() }
-    for _, data in ipairs(loaded) do
-        if data and data.name == name then
-            return true
-        end
-    end
-    return false
-end
-
----Whether a Talent Loadout Ex loadout (matched by name within the current spec)
----is the one currently loaded. Talent Loadout Ex loadouts are NOT WoW named
----loadouts, so `C_ClassTalents` cannot see them. Detection goes through the TLEx
----public API. Returns false when TLEx is absent or holds no loaded state.
----@param name string?
+---Whether a rule points at a Talent Loadout Ex loadout.
+---@param rule LoadoutRule
 ---@return boolean
-function Loadouts.IsTLXLoadoutActive(name)
-    if not name then
-        return true
+local function IsTLXRule(rule)
+    return rule.require == "loadout" and rule.loadout ~= nil and rule.loadout.source == TLX_SOURCE
+end
+Loadouts.IsTLXRule = IsTLXRule
+
+---Prepare the external addons the given rules depend on. Runs one time for each
+---session, and only for a rule set that asks an external addon a question: the
+---load it needs is a client-wide one, so an unrelated profile must not pay for it.
+---@param rules LoadoutRule[]
+function Loadouts.EnsureAddonsReady(rules)
+    for _, rule in ipairs(rules) do
+        if IsTLXRule(rule) then
+            TalentLoadoutEx.EnsureReady()
+            return
+        end
     end
-    local ok, active = pcall(ResolveTLXLoadoutActive, name)
-    return ok and active or false
 end
 
 local function ResolveSetEquipped(setID)
@@ -304,24 +241,27 @@ function Loadouts.IsSetEquipped(setID)
 end
 
 ---Whether the rule's expectation is currently met (no reminder needed).
+---The second return value reports whether the answer is settled. Callers must not
+---cache an unsettled answer, because no event announces the moment it settles.
 ---@param rule LoadoutRule
----@return boolean
+---@return boolean satisfied
+---@return boolean known
 function Loadouts.IsSatisfied(rule)
     if rule.require == "gear" then
-        return Loadouts.IsSetEquipped(rule.gear and rule.gear.setID)
+        return Loadouts.IsSetEquipped(rule.gear and rule.gear.setID), true
     elseif rule.require == "talent" then
-        return Loadouts.IsTalentKnown(rule.spellID)
+        return Loadouts.IsTalentKnown(rule.spellID), true
     elseif rule.require == "loadout" then
         -- Loadouts are per-spec: a rule for another spec does not apply now.
         if rule.specID and rule.specID ~= GetCurrentSpecID() then
-            return true
+            return true, true
         end
-        if rule.loadout and rule.loadout.source == "tlex" then
-            return Loadouts.IsTLXLoadoutActive(rule.loadout.name)
+        if IsTLXRule(rule) then
+            return TalentLoadoutEx.IsLoadoutActive(rule.loadout.name)
         end
-        return Loadouts.IsLoadoutActive(rule.specID, rule.loadout and rule.loadout.name)
+        return Loadouts.IsLoadoutActive(rule.specID, rule.loadout and rule.loadout.name), true
     end
-    return true
+    return true, true
 end
 
 -- ----------------------------------------------------------------------------
@@ -376,30 +316,6 @@ function Loadouts.ListLoadouts(specID)
             local info = C_Traits.GetConfigInfo(cfgID)
             if info and info.name then
                 out[#out + 1] = { name = info.name, configID = cfgID }
-            end
-        end
-    end)
-    return out
-end
-
----List the Talent Loadout Ex loadouts saved for the current class + spec. TLEx
----stores account-wide keyed by class token + spec INDEX (not spec ID); group
----headers (entries without a `.text` talent string) are skipped. Returns an empty
----list when TLEx is absent, so the picker self-gates on its presence.
----@return { name: string, icon: number|string? }[]
-function Loadouts.ListTLXLoadouts()
-    local out = {}
-    if not IsTLXAvailable() then
-        return out
-    end
-    pcall(function()
-        local specTable = GetTLXSpecTable()
-        if not specTable then
-            return
-        end
-        for _, data in ipairs(specTable) do
-            if data.text and data.name then
-                out[#out + 1] = { name = data.name, icon = data.icon }
             end
         end
     end)
@@ -491,11 +407,11 @@ function Loadouts.GetRuleIcon(rule)
         end
         return DEFAULT_GEAR_ICON
     elseif rule.require == "loadout" then
-        -- TLEx loadouts carry their own icon. Resolve it live by name, so an external
-        -- re-icon in TalentLoadoutEx shows up. Falls back to the rule's snapshot when
-        -- TLEx is absent or the loadout is deleted.
-        if rule.loadout and rule.loadout.source == "tlex" then
-            local live = ResolveTLXLoadoutIcon(rule.loadout.name)
+        -- A Talent Loadout Ex loadout carries its own icon. Resolve it live by name,
+        -- so a re-icon inside that addon shows up. Falls back to the rule's snapshot
+        -- when the addon is absent or the loadout is deleted.
+        if IsTLXRule(rule) then
+            local live = TalentLoadoutEx.GetLoadoutIcon(rule.loadout.name)
             if live and live ~= QUESTION_MARK_ICON then
                 return live
             end
@@ -516,124 +432,6 @@ function Loadouts.GetRuleIcon(rule)
         return rule.icon
     end
     return DEFAULT_TALENT_ICON
-end
-
--- The talent UI's loadout dropdown reflects the spec's "last selected saved config".
--- That stamp only sticks after the config commits. A swap that changes points returns
--- LoadInProgress and runs the "Changing Talents" cast. A stamp before that commit is
--- lost: the talent frame re-derives the dropdown on commit and shows the OLD loadout.
--- So the in-progress case defers the stamp to the next TRAIT_CONFIG_UPDATED. A
--- generation token and a timeout stop a pending stamp from landing on an unrelated
--- later commit when the cast never completes.
-local dropdownSyncFrame = CreateFrame("Frame")
-local pendingSync
-local syncGen = 0
-
-local function StampLastSelected(specID, configID)
-    if C_ClassTalents.UpdateLastSelectedSavedConfigID then
-        pcall(C_ClassTalents.UpdateLastSelectedSavedConfigID, specID, configID)
-    end
-    -- Blizzard bug: an ALREADY-OPEN talent frame does not re-read the last-selected
-    -- config after an API change, so its loadout dropdown keeps the previous set until
-    -- /reload. If the frame is loaded, nudge its dropdown with the same SetSelectionID
-    -- the UI uses internally. PlayerSpellsFrame is load-on-demand and nil until the
-    -- first open; an unloaded dropdown reads fresh on the next open.
-    local tab = PlayerSpellsFrame and PlayerSpellsFrame.TalentsFrame
-    local dropdown = tab and tab.LoadSystem
-    if dropdown and dropdown.SetSelectionID then
-        pcall(dropdown.SetSelectionID, dropdown, configID)
-    end
-end
-
-dropdownSyncFrame:SetScript("OnEvent", function(self)
-    self:UnregisterEvent("TRAIT_CONFIG_UPDATED")
-    local sync = pendingSync
-    pendingSync = nil
-    if sync then
-        StampLastSelected(sync.specID, sync.configID)
-    end
-end)
-
-local function QueueDropdownSync(specID, configID)
-    syncGen = syncGen + 1
-    local myGen = syncGen
-    pendingSync = { specID = specID, configID = configID }
-    dropdownSyncFrame:RegisterEvent("TRAIT_CONFIG_UPDATED")
-    C_Timer.After(8, function()
-        -- A newer queue bumps syncGen, so clear only a stamp from this generation.
-        if myGen == syncGen and pendingSync then
-            pendingSync = nil
-            dropdownSyncFrame:UnregisterEvent("TRAIT_CONFIG_UPDATED")
-        end
-    end)
-end
-
--- Load a WoW named talent loadout in place. Re-resolve the configID by name for
--- the current spec first: configIDs are per-character, so the id snapshotted on the
--- rule can be stale on an alt that shares the loadout name. Falls back to the stored
--- id, and returns false when no configID resolves.
----@param rule LoadoutRule
----@return boolean
-local function LoadWoWLoadout(rule)
-    if not (C_ClassTalents and C_ClassTalents.LoadConfig) then
-        return false
-    end
-    local specID = rule.specID or GetCurrentSpecID()
-    local name = rule.loadout and rule.loadout.name
-    local configID
-    if name then
-        for _, entry in ipairs(Loadouts.ListLoadouts(specID)) do
-            if entry.name == name then
-                configID = entry.configID
-                break
-            end
-        end
-    end
-    configID = configID or (rule.loadout and rule.loadout.configID)
-    if not configID then
-        return false
-    end
-    local result = C_ClassTalents.LoadConfig(configID, true)
-    if result == nil or result == Enum.LoadConfigResult.Error then
-        return false
-    end
-    if result == Enum.LoadConfigResult.LoadInProgress then
-        QueueDropdownSync(specID, configID)
-    else
-        StampLastSelected(specID, configID) -- Ready / NoChangesNecessary: applied synchronously
-    end
-    return true
-end
-
----Act on a clicked reminder: equip the gear set, load the talent loadout, or open
----the talent UI. Gear swaps and talent edits are blocked in combat by the client;
----guard early so the user gets a clear message instead of a silent no-op.
----@param rule LoadoutRule
-function Loadouts.ApplyFix(rule)
-    if InCombatLockdown() then
-        UIErrorsFrame:AddMessage(BR.L["Loadout.CombatBlocked"], 1, 0.3, 0.3)
-        return
-    end
-    if rule.require == "gear" and rule.gear and rule.gear.setID then
-        pcall(C_EquipmentSet.UseEquipmentSet, rule.gear.setID)
-        return
-    end
-    -- WoW named loadout: load it in place. TLEx loadouts are not WoW configs, so
-    -- they fall through to opening the UI.
-    if rule.require == "loadout" and rule.loadout and rule.loadout.source ~= "tlex" then
-        local ok, loaded = pcall(LoadWoWLoadout, rule)
-        if ok and loaded then
-            return
-        end
-    end
-    -- talent / TLEx loadout / unresolved: open the talent UI so the user finishes by hand.
-    pcall(function()
-        if PlayerSpellsUtil and PlayerSpellsUtil.OpenToClassTalentsTab then
-            PlayerSpellsUtil.OpenToClassTalentsTab()
-        elseif ToggleTalentFrame then
-            ToggleTalentFrame()
-        end
-    end)
 end
 
 BR.Loadouts = Loadouts
