@@ -1211,6 +1211,16 @@ local function Show(existingKey, refreshPanelCallback)
             })
         end)
         deleteBtn:SetPoint("BOTTOMLEFT", MARGIN, 12)
+
+        -- Exports what is saved, not what the open dialog holds.
+        local exportBtn = CreateButton(dialog, L["CustomBuff.Share.Export"], function()
+            BR.Options.Dialogs.CustomBuffShare.ShowExport(existingKey)
+        end)
+        exportBtn:SetPoint("LEFT", deleteBtn, "RIGHT", 8, 0)
+
+        -- The hint reaches this far left in a locale with a long string, and it
+        -- does not wrap. Bound it so it truncates instead of covering the button.
+        saveHint:SetPoint("LEFT", exportBtn, "RIGHT", 8, 0)
     end
 
     -- ---- tabs ------------------------------------------------------------

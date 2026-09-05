@@ -1015,6 +1015,19 @@ english["CustomBuff.Action.SpellHint"] = "This can differ from the tracked spell
 english["CustomBuff.Save"] = "Save"
 english["CustomBuff.ValidateError"] = "Add one valid spell ID to save."
 
+-- Share one custom buff
+english["CustomBuff.Share.Export"] = "Export"
+english["CustomBuff.Share.ExportTitle"] = "Export Custom Buff"
+english["CustomBuff.Share.ExportDesc"] = "Copy the string below and give it to another player."
+english["CustomBuff.Share.Import"] = "Import"
+english["CustomBuff.Share.ImportTitle"] = "Import Custom Buff"
+english["CustomBuff.Share.ImportDesc"] = "Paste a custom buff string below. The import adds a new entry."
+english["CustomBuff.Share.Invalid"] = "This is not a custom buff string."
+english["CustomBuff.Share.ImportDisabled"] = "Paste a custom buff string first."
+english["CustomBuff.Share.MacroWarning"] = "A click on this buff runs the macro above. Import it only from a source you trust."
+english["CustomBuff.Share.Spells"] = "Spells:"
+english["CustomBuff.Share.Runs"] = "Click runs:"
+
 -- Custom buff status
 english["CustomBuff.NotFound"] = "Not found"
 english["CustomBuff.NotFoundRetry"] = "Not found (try again)"

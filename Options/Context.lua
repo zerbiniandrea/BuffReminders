@@ -371,6 +371,7 @@ end
 ---  addLabel    string   - Add button label
 ---  addWidth?   number   - Add button width (default 160)
 ---  onAdd       function(render) - opens the editor dialog; pass render as its refresh cb
+---  secondaryButton? table {label, width?, onClick(render)} - button right of Add
 ---  rowHeight   number   - fixed row height in px
 ---  emptyText   string   - placeholder shown when the list is empty
 ---  createRow?  function(parent)->row - row frame factory (default: plain hover strip)
@@ -402,6 +403,14 @@ function Helpers.ListEditor(content, scrollFrame, config)
     end)
     addBtn:SetSize(config.addWidth or 160, LIST_ADD_BUTTON_HEIGHT)
     layout:Add(addBtn, LIST_ADD_BUTTON_HEIGHT, SECTION_GAP)
+
+    if config.secondaryButton then
+        local secondary = BR.CreateButton(content, config.secondaryButton.label, function()
+            config.secondaryButton.onClick(Render)
+        end)
+        secondary:SetSize(config.secondaryButton.width or 100, LIST_ADD_BUTTON_HEIGHT)
+        secondary:SetPoint("LEFT", addBtn, "RIGHT", COMPONENT_GAP, 0)
+    end
 
     local listX = layout:GetX()
     local listWidth = contentWidth - listX - COL_PADDING

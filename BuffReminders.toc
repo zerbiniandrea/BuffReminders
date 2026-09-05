@@ -80,6 +80,7 @@ Options\Context.lua
 Options\WhatsNew.lua
 Options\Dialogs\Glow.lua
 Options\Dialogs\CustomBuff.lua
+Options\Dialogs\CustomBuffShare.lua
 Options\Dialogs\LoadoutReminder.lua
 Options\Dialogs\RoguePoison.lua
 Options\Dialogs\Runeforge.lua

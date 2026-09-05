@@ -2019,6 +2019,10 @@ local CONTENT_TOGGLE_DEFS = {
     },
 }
 
+-- The set of content and difficulty keys a visibility table can hold. Exported
+-- so import validation needs no second copy of the same list.
+Components.ContentToggleDefs = CONTENT_TOGGLE_DEFS
+
 local contentToggleByKey = {}
 local DIFF_MAPPINGS = {}
 for i, toggle in ipairs(CONTENT_TOGGLE_DEFS) do

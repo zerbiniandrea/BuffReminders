@@ -252,7 +252,18 @@ end
 ---@return string
 local function GenerateCustomBuffKey(spellID)
     local id = type(spellID) == "table" and spellID[1] or spellID
-    return "custom_" .. id .. "_" .. time()
+    local base = "custom_" .. id .. "_" .. time()
+    -- time() has one-second resolution, so two buffs added in the same second
+    -- get the same base key. The second one must not replace the first.
+    local existing = BR.profile and BR.profile.customBuffs
+    if not existing or not existing[base] then
+        return base
+    end
+    local suffix = 2
+    while existing[base .. "_" .. suffix] do
+        suffix = suffix + 1
+    end
+    return base .. "_" .. suffix
 end
 
 ---Validate a spell ID exists via GetSpellInfo
