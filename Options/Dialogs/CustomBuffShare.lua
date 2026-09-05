@@ -7,6 +7,10 @@ local _, BR = ...
 -- Import decodes before it commits and shows what the string adds, because a
 -- click action can carry a macro that runs on the importing player's character.
 --
+-- The shell and both bodies are built one time and reused: a frame is never
+-- destroyed, so a panel rebuilt per open would accumulate for the session. The
+-- two bodies share the shell and only one of them is ever shown.
+--
 -- The dialog opens over the custom buff editor, so its frame level sits above
 -- the shared dialog level.
 
@@ -27,43 +31,68 @@ local TEXT_AREA_H = 64
 local PREVIEW_ICON = 24
 local FOOTER_H = 44
 local BOX_PAD = 8
+local BUTTON_W = 90
+local BUTTON_H = 22
 local SHARE_LEVEL = BR.Options.Constants.DIALOG_LEVEL + 40
 
-local shareDialog
+local shell, shellTitle
+local exportUI, importUI
 
-local function CreateShell(titleText)
-    if shareDialog then
-        shareDialog:Hide()
+-- ============================================================================
+-- SHELL
+-- ============================================================================
+
+local function EnsureShell()
+    if shell then
+        return shell
     end
 
-    local dialog = CreatePanel("BuffRemindersCustomBuffShare", DIALOG_W, 100, {
+    shell = CreatePanel("BuffRemindersCustomBuffShare", DIALOG_W, 100, {
         level = SHARE_LEVEL,
         dialog = true,
     })
-    shareDialog = dialog
+    -- CreateFrame returns a shown frame, and the body is built after this.
+    shell:Hide()
 
-    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -12)
-    title:SetText(titleText)
+    shellTitle = shell:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    shellTitle:SetPoint("TOP", 0, -12)
 
-    BR.Options.Helpers.AddCloseButton(dialog)
+    BR.Options.Helpers.AddCloseButton(shell)
 
-    dialog.editBoxes = {}
-    dialog:SetScript("OnHide", function(self)
+    shell:SetScript("OnHide", function()
         -- A focused edit box on a hidden frame keeps swallowing keystrokes.
-        for _, editBox in ipairs(self.editBoxes) do
-            editBox:ClearFocus()
+        if exportUI then
+            exportUI.textArea:ClearFocus()
         end
-        if shareDialog == self then
-            shareDialog = nil
+        if importUI then
+            importUI.textArea:ClearFocus()
         end
     end)
 
-    return dialog, Components.VerticalLayout(dialog, { x = MARGIN, y = LAYOUT_TOP })
+    return shell
 end
 
-local function AddNote(dialog, layout, text)
-    local note = dialog:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+---Show one body and hide the other. Returns the body frame.
+local function ActivateBody(ui, titleText)
+    shellTitle:SetText(titleText)
+    if exportUI then
+        exportUI.body:SetShown(ui == exportUI)
+    end
+    if importUI then
+        importUI.body:SetShown(ui == importUI)
+    end
+    return ui.body
+end
+
+local function CreateBody()
+    local body = CreateFrame("Frame", nil, EnsureShell())
+    body:SetAllPoints()
+    body:Hide()
+    return body, Components.VerticalLayout(body, { x = MARGIN, y = LAYOUT_TOP })
+end
+
+local function AddNote(body, layout, text)
+    local note = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     note:SetWidth(CONTENT_W)
     note:SetJustifyH("LEFT")
     note:SetText(text)
@@ -174,48 +203,61 @@ end
 -- EXPORT
 -- ============================================================================
 
+local function EnsureExportUI()
+    if exportUI then
+        return exportUI
+    end
+
+    local body, layout = CreateBody()
+    AddNote(body, layout, L["CustomBuff.Share.ExportDesc"])
+
+    local textArea = Components.TextArea(body, { width = CONTENT_W, height = TEXT_AREA_H })
+    layout:Add(textArea, TEXT_AREA_H, 8)
+
+    local closeBtn = CreateButton(body, L["Dialog.Close"], function()
+        shell:Hide()
+    end)
+    closeBtn:SetSize(BUTTON_W, BUTTON_H)
+    closeBtn:SetPoint("BOTTOMRIGHT", shell, "BOTTOMRIGHT", -MARGIN, 12)
+
+    exportUI = { body = body, textArea = textArea, height = -layout:GetY() + FOOTER_H }
+    return exportUI
+end
+
 local function ShowExport(key)
     local exportString, err = ImportExport.ExportCustomBuff(key)
 
-    local dialog, layout = CreateShell(L["CustomBuff.Share.ExportTitle"])
-    AddNote(dialog, layout, L["CustomBuff.Share.ExportDesc"])
+    local ui = EnsureExportUI()
+    ActivateBody(ui, L["CustomBuff.Share.ExportTitle"])
+    ui.textArea:SetText(exportString or (L["CustomBuff.Error"] .. " " .. (err or "")))
 
-    local textArea = Components.TextArea(dialog, {
-        width = CONTENT_W,
-        height = TEXT_AREA_H,
-    })
-    layout:Add(textArea, TEXT_AREA_H, 8)
-    dialog.editBoxes[1] = textArea.editBox
-    textArea:SetText(exportString or (L["CustomBuff.Error"] .. " " .. (err or "")))
-
-    local closeBtn = CreateButton(dialog, L["Dialog.Close"], function()
-        dialog:Hide()
-    end)
-    closeBtn:SetSize(90, 22)
-    closeBtn:SetPoint("BOTTOMRIGHT", -MARGIN, 12)
-
-    dialog:SetHeight(-layout:GetY() + FOOTER_H)
-    BR.ApplyDialogScale(dialog)
-    dialog:Show()
+    shell:SetHeight(ui.height)
+    BR.ApplyDialogScale(shell)
+    shell:Show()
 
     -- An edit box in a hidden frame takes no focus, so this must follow Show.
-    textArea:SetFocus()
-    textArea:HighlightText()
+    ui.textArea:SetFocus()
+    ui.textArea:HighlightText()
 end
 
 -- ============================================================================
 -- IMPORT
 -- ============================================================================
 
-local function ShowImport(onImported)
-    local dialog, layout = CreateShell(L["CustomBuff.Share.ImportTitle"])
-    AddNote(dialog, layout, L["CustomBuff.Share.ImportDesc"])
+local function EnsureImportUI()
+    if importUI then
+        return importUI
+    end
 
-    local preview = CreatePreview(dialog)
-    local importBtn
-    local Relayout -- set once the preview position is known
+    local body, layout = CreateBody()
+    AddNote(body, layout, L["CustomBuff.Share.ImportDesc"])
 
-    local textArea = Components.TextArea(dialog, {
+    local ui = { body = body }
+
+    local preview = CreatePreview(body)
+    ui.preview = preview
+
+    local textArea = Components.TextArea(body, {
         width = CONTENT_W,
         height = TEXT_AREA_H,
         onTextChanged = function(text)
@@ -224,12 +266,12 @@ local function ShowImport(onImported)
                 preview:SetBuff(decoded)
             end
             preview:SetShown(decoded ~= nil)
-            importBtn:SetEnabled(decoded ~= nil)
-            Relayout(text ~= "" and not decoded)
+            ui.importBtn:SetEnabled(decoded ~= nil)
+            ui.Relayout(text ~= "" and not decoded)
         end,
     })
     layout:Add(textArea, TEXT_AREA_H, 8)
-    dialog.editBoxes[1] = textArea.editBox
+    ui.textArea = textArea
 
     -- The preview and the error share the slot under the paste box, and only one
     -- of them ever occupies it. Everything above that slot is a fixed height.
@@ -237,15 +279,15 @@ local function ShowImport(onImported)
     local baseHeight = -slotY + FOOTER_H
     layout:Add(preview, 0, 0)
 
-    local errorText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    errorText:SetPoint("TOPLEFT", dialog, "TOPLEFT", MARGIN, slotY)
-    errorText:SetPoint("RIGHT", dialog, "RIGHT", -MARGIN, 0)
+    local errorText = body:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    errorText:SetPoint("TOPLEFT", body, "TOPLEFT", MARGIN, slotY)
+    errorText:SetPoint("RIGHT", body, "RIGHT", -MARGIN, 0)
     errorText:SetJustifyH("LEFT")
     errorText:SetTextColor(0.9, 0.4, 0.4)
     errorText:SetText(L["CustomBuff.Share.Invalid"])
     errorText:Hide()
 
-    Relayout = function(showError)
+    function ui.Relayout(showError)
         errorText:SetShown(showError or false)
         local slotHeight = 0
         if preview:IsShown() then
@@ -253,39 +295,51 @@ local function ShowImport(onImported)
         elseif errorText:IsShown() then
             slotHeight = math.ceil(errorText:GetStringHeight()) + BOX_PAD
         end
-        dialog:SetHeight(baseHeight + slotHeight)
-        BR.ApplyDialogScale(dialog)
+        shell:SetHeight(baseHeight + slotHeight)
+        BR.ApplyDialogScale(shell)
     end
 
-    importBtn = CreateButton(dialog, L["CustomBuff.Share.Import"], function()
+    local importBtn = CreateButton(body, L["CustomBuff.Share.Import"], function()
         local key = ImportExport.ImportCustomBuff(textArea:GetText())
         if not key then
             preview:Hide()
-            importBtn:SetEnabled(false)
-            Relayout(true)
+            ui.importBtn:SetEnabled(false)
+            ui.Relayout(true)
             return
         end
-        dialog:Hide()
+        shell:Hide()
         BR.Display.Update()
-        if onImported then
-            onImported(key)
+        if ui.onImported then
+            ui.onImported(key)
         end
     end)
-    importBtn:SetSize(90, 22)
-    importBtn:SetPoint("BOTTOMRIGHT", -MARGIN, 12)
-    importBtn:SetEnabled(false)
+    importBtn:SetSize(BUTTON_W, BUTTON_H)
+    importBtn:SetPoint("BOTTOMRIGHT", shell, "BOTTOMRIGHT", -MARGIN, 12)
     importBtn:SetDisabledReason(L["CustomBuff.Share.ImportDisabled"])
+    ui.importBtn = importBtn
 
-    local cancelBtn = CreateButton(dialog, L["Dialog.Cancel"], function()
-        dialog:Hide()
+    local cancelBtn = CreateButton(body, L["Dialog.Cancel"], function()
+        shell:Hide()
     end)
-    cancelBtn:SetSize(90, 22)
+    cancelBtn:SetSize(BUTTON_W, BUTTON_H)
     cancelBtn:SetPoint("RIGHT", importBtn, "LEFT", -8, 0)
 
-    Relayout()
+    importUI = ui
+    return ui
+end
 
-    dialog:Show()
-    textArea:SetFocus()
+local function ShowImport(onImported)
+    local ui = EnsureImportUI()
+    ActivateBody(ui, L["CustomBuff.Share.ImportTitle"])
+
+    ui.onImported = onImported
+    ui.preview:Hide()
+    ui.importBtn:SetEnabled(false)
+    ui.textArea:SetText("")
+    ui.Relayout(false)
+
+    shell:Show()
+    ui.textArea:SetFocus()
 end
 
 BR.Options.Dialogs.CustomBuffShare = {

@@ -3,7 +3,6 @@ local _, BR = ...
 local L = BR.L
 local Components = BR.Components
 local CreateButton = BR.CreateButton
-local CreatePanel = BR.CreatePanel
 local StyleEditBox = BR.StyleEditBox
 
 local UpdateDisplay = BR.Display.Update
@@ -37,7 +36,23 @@ local function LoadoutEntryId(source, key)
     return source .. ":" .. tostring(key)
 end
 
-local loadoutDialog = nil
+-- The dynamic scope region rebuilds its own children, so they never reach the
+-- controller's tracker. RenderDynamic releases the batch it replaces; this holds
+-- the last one, which no later render replaces.
+local dynChildren = {}
+
+local Dialog = BR.Options.Helpers.CreateDialog({
+    name = "BuffRemindersLoadoutDialog",
+    width = DIALOG_WIDTH,
+    height = 360,
+    level = 200,
+    onTearDown = function()
+        for _, holder in ipairs(dynChildren) do
+            BR.Components.Unregister(holder)
+        end
+        wipe(dynChildren)
+    end,
+})
 
 local LOADOUT_SCOPES = BR.Options.LoadoutScopes
 
@@ -85,25 +100,15 @@ StaticPopupDialogs["BUFFREMINDERS_DELETE_LOADOUT"] = {
     preferredIndex = 3,
 }
 
-local function Show(existingKey, refreshPanelCallback)
-    if loadoutDialog then
-        loadoutDialog:Hide()
-    end
+local function Track(holder)
+    return Dialog:Track(holder)
+end
 
+local function Show(existingKey, refreshPanelCallback)
     ---@type LoadoutRule?
     local editingRule = existingKey and BR.profile.loadoutReminders[existingKey] or nil
 
-    local dialog = CreatePanel("BuffRemindersLoadoutDialog", DIALOG_WIDTH, 360, {
-        level = 200,
-        dialog = true,
-    })
-    loadoutDialog = dialog
-
-    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -12)
-    title:SetText(editingRule and L["Loadout.Edit"] or L["Loadout.Add"])
-
-    BR.Options.Helpers.AddCloseButton(dialog)
+    local body, dialog = Dialog:Open(editingRule and L["Loadout.Edit"] or L["Loadout.Add"])
 
     -- ---- editable state (read on save) ----------------------------------
     local requireType = (editingRule and editingRule.require) or "gear"
@@ -167,24 +172,25 @@ local function Show(existingKey, refreshPanelCallback)
         return nil
     end
 
-    local layout = Components.VerticalLayout(dialog, { x = CONTENT_LEFT, y = -44 })
+    local layout = Components.VerticalLayout(body, { x = CONTENT_LEFT, y = -44 })
 
     -- Name
-    local nameHolder = Components.TextInput(dialog, {
+    local nameHolder = Components.TextInput(body, {
         label = L["Loadout.Name"],
         value = editingRule and editingRule.name or "",
         width = 260,
         labelWidth = LABEL_W,
     })
     layout:Add(nameHolder, 20, COMPONENT_GAP)
+    Track(nameHolder)
     local nameBox = nameHolder.editBox
 
     -- ---- EXPECT: requirement type + target -------------------------------
-    LayoutSectionHeader(layout, dialog, L["Loadout.Expect"])
+    LayoutSectionHeader(layout, body, L["Loadout.Expect"])
 
     local UpdateTargetVisibility -- forward decl
 
-    local requireDropdown = Components.Dropdown(dialog, {
+    local requireDropdown = Components.Dropdown(body, {
         label = L["Loadout.Requirement"],
         labelWidth = LABEL_W,
         width = DROPDOWN_W,
@@ -204,8 +210,9 @@ local function Show(existingKey, refreshPanelCallback)
         end,
     })
     layout:Add(requireDropdown, nil, COMPONENT_GAP)
+    Track(requireDropdown)
 
-    local targetSlot = CreateFrame("Frame", nil, dialog)
+    local targetSlot = CreateFrame("Frame", nil, body)
     targetSlot:SetSize(CONTENT_W, TARGET_SLOT_H)
     layout:Add(targetSlot, TARGET_SLOT_H, COMPONENT_GAP)
 
@@ -304,9 +311,9 @@ local function Show(existingKey, refreshPanelCallback)
 
     -- ---- APPLIES TO: content scope + dynamic difficulty / instances ------
     layout:Space(SECTION_GAP)
-    LayoutSeparator(layout, dialog)
+    LayoutSeparator(layout, body)
     layout:Space(8)
-    LayoutSectionHeader(layout, dialog, L["Loadout.Applies"])
+    LayoutSectionHeader(layout, body, L["Loadout.Applies"])
 
     local RenderDynamic, RecomputeHeight -- forward decls
 
@@ -314,7 +321,7 @@ local function Show(existingKey, refreshPanelCallback)
     for _, tier in ipairs(LOADOUT_SCOPES) do
         contentOpts[#contentOpts + 1] = { value = tier.value, label = L[tier.labelKey] }
     end
-    local contentDropdown = Components.Dropdown(dialog, {
+    local contentDropdown = Components.Dropdown(body, {
         label = L["Loadout.Content"],
         labelWidth = LABEL_W,
         width = DROPDOWN_W,
@@ -331,21 +338,21 @@ local function Show(existingKey, refreshPanelCallback)
         end,
     })
     layout:Add(contentDropdown, nil, COMPONENT_GAP)
+    Track(contentDropdown)
 
     -- Everything below the content dropdown is rebuilt when the scope changes, so the
     -- difficulty row and instance list always match the selected content. The container
     -- is created once at build time and only its children are swapped; a frame created
     -- at runtime here renders nothing.
     local dynTopY = layout:GetY()
-    local dynFrame = CreateFrame("Frame", nil, dialog)
+    local dynFrame = CreateFrame("Frame", nil, body)
     dynFrame:SetPoint("TOPLEFT", CONTENT_LEFT, dynTopY)
     dynFrame:SetSize(CONTENT_W, 1)
-    local dynChildren = {}
 
     -- Ready-check filter: independent of content scope, so it lives outside the
     -- rebuilt region. Anchored to the dynamic frame's bottom edge, it rides along
     -- as the difficulty / instance content grows and shrinks.
-    local readyToggle = Components.Toggle(dialog, {
+    local readyToggle = Components.Toggle(body, {
         label = L["CustomBuff.ReadyCheckOnly"],
         checked = readyCheckOnly,
         onChange = function(checked)
@@ -353,6 +360,7 @@ local function Show(existingKey, refreshPanelCallback)
         end,
     })
     readyToggle:SetPoint("TOPLEFT", dynFrame, "BOTTOMLEFT", 0, -SECTION_GAP)
+    Track(readyToggle)
     local READY_H = readyToggle:GetHeight()
 
     RenderDynamic = function()
@@ -443,12 +451,12 @@ local function Show(existingKey, refreshPanelCallback)
     RecomputeHeight()
 
     -- ---- bottom buttons -------------------------------------------------
-    local cancelBtn = CreateButton(dialog, L["Dialog.Cancel"], function()
+    local cancelBtn = CreateButton(body, L["Dialog.Cancel"], function()
         dialog:Hide()
     end)
     cancelBtn:SetSize(90, 22)
 
-    local saveBtn = CreateButton(dialog, L["CustomBuff.Save"], function()
+    local saveBtn = CreateButton(body, L["CustomBuff.Save"], function()
         local typedName = nameBox:GetText()
         typedName = typedName and typedName:gsub("^%s*(.-)%s*$", "%1") or ""
 
@@ -551,7 +559,7 @@ local function Show(existingKey, refreshPanelCallback)
     cancelBtn:SetPoint("RIGHT", saveBtn, "LEFT", -10, 0)
 
     if existingKey then
-        local deleteBtn = CreateButton(dialog, L["Options.Delete"], function()
+        local deleteBtn = CreateButton(body, L["Options.Delete"], function()
             dialog:Hide()
             StaticPopup_Show("BUFFREMINDERS_DELETE_LOADOUT", (editingRule and editingRule.name) or existingKey, nil, {
                 key = existingKey,

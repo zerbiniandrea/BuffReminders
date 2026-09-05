@@ -3678,6 +3678,46 @@ function Components.SetEditBoxesRef(editBoxes)
     panelEditBoxes = editBoxes
 end
 
+---True when nothing in the frame's ancestry reaches UIParent, which is how a
+---dialog signals that it tore its body down (SetParent(nil) on the body).
+local function IsDetached(frame)
+    local node = frame
+    while node do
+        if node == UIParent then
+            return false
+        end
+        node = node.GetParent and node:GetParent() or nil
+    end
+    return true
+end
+
+---Drop tracked edit boxes whose dialog body is gone. Every edit box a factory
+---builds registers here, including the ones in a dialog that rebuilds its body
+---per open, so without this the list grows for the whole session. Call it from
+---a dialog teardown after the body is unparented. Mirrors the auto-prune in
+---RefreshAll. Iterate in reverse so table.remove during the walk is safe.
+function Components.PruneEditBoxes()
+    if not panelEditBoxes then
+        return
+    end
+    for i = #panelEditBoxes, 1, -1 do
+        if IsDetached(panelEditBoxes[i]) then
+            table.remove(panelEditBoxes, i)
+        end
+    end
+end
+
+---Clear focus on every tracked edit box that is still attached.
+function Components.ClearEditBoxFocus()
+    Components.PruneEditBoxes()
+    if not panelEditBoxes then
+        return
+    end
+    for _, editBox in ipairs(panelEditBoxes) do
+        editBox:ClearFocus()
+    end
+end
+
 ---Refresh all registered components (call on panel OnShow)
 ---
 ---Auto-prunes orphaned component frames as it goes: any holder that has been

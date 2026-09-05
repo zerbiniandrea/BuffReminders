@@ -33,21 +33,14 @@ BR.Options.Constants = {
     DROPDOWN_EXTRA = 8, -- extra clearance after dropdowns (menu overlay space)
     PAGE_TOP_PADDING = -16, -- y offset where each page's top VerticalLayout cursor starts
 
-    -- Dialog shell metrics (see Helpers.CreateDialogShell). Widths bucketed by
-    -- content density: NARROW for 1-3 simple controls, MEDIUM for dropdown +
-    -- helpers, WIDE/ULTRA for multi-column layouts (poison/runeforge).
-    DIALOG_WIDTH_NARROW = 340,
-    DIALOG_WIDTH_MEDIUM = 360,
-    DIALOG_WIDTH_WIDE = 520,
-    DIALOG_WIDTH_ULTRA = 560,
+    -- Dialog shell metrics. A dialog declares its own width; these cover the
+    -- chrome Helpers.CreateDialog draws around it.
     DIALOG_MARGIN = 16, -- inner padding for dialog content
     DIALOG_TITLE_TOP = -12, -- y offset of the dialog title FontString from TOP
-    DIALOG_LAYOUT_TOP = -36, -- y offset where the content layout cursor starts
-    DIALOG_ACCENT_OFFSET = 32, -- distance from top to the title separator (CreatePanel); body starts below it
     DIALOG_CLOSE_SIZE = 22, -- close-button square size
     DIALOG_CLOSE_INSET = -5, -- close-button TOPRIGHT inset (x and y)
-    DIALOG_ICON_SIZE = 18, -- optional header icon square (CreateDialogShell opts.icon)
-    DIALOG_MIN_HEIGHT = 80, -- floor for dialogs with very few controls
+    DIALOG_ICON_SIZE = 18, -- optional header icon square
+    DIALOG_MIN_HEIGHT = 80, -- height a dialog starts at before its body sizes it
     DIALOG_LEVEL = 200, -- frame level used by all dialogs
 }
 
@@ -643,83 +636,137 @@ end
 -- DIALOG SHELL HELPERS
 -- ============================================================================
 
--- CreateDialogShell builds the boilerplate every small dialog repeats: backdrop
--- panel, title FontString, close-x button, and a VerticalLayout whose cursor
--- starts beneath the title. Callers add their content via the returned layout
--- and call shell:Finalize() to size the dialog.
+-- CreateDialog owns the lifecycle a reusable dialog needs, so no caller has to
+-- repeat it. A frame is never destroyed, so the shell is built on the first open
+-- and kept for the session; the body is replaced on each open and released on
+-- close. Releasing matters as much as reusing: every component a body builds
+-- registers itself, and RefreshAll only drops a holder whose parent is nil.
 --
--- opts.titleText overrides the localized title. opts.titleColor wraps the title
--- in a color escape. opts.width defaults to DIALOG_WIDTH_NARROW; pass a
--- Constants.DIALOG_WIDTH_* for a wider bucket. opts.icon (a texture path or
--- fileID) adds a small icon at the left of the header and left-aligns the title
--- next to it. Without opts.icon the title stays centered.
----@class DialogShell
----@field dialog table panel frame (also returned as the first table value)
----@field layout table VerticalLayout anchored under the title
----@field title table title FontString (so callers can retint or rewrite it)
----@field closeButton table x button
----@field Finalize fun(self: table, extraPadding?: number) sizes dialog:SetHeight
-function Helpers.CreateDialogShell(name, titleKey, opts)
-    opts = opts or {}
+-- Track every component holder the body creates. Anything untracked keeps
+-- answering :Refresh() out of a dialog the user already closed.
+--
+-- Use it for a dialog whose body differs per invocation. A dialog whose bodies
+-- are fixed in structure can build each one time and toggle between them, which
+-- releases nothing because nothing is ever discarded.
+---@class DialogController
+---@field dialog table? panel frame; nil until the first Open
+---@field Open fun(self: table, titleText?: string): table, table body, dialog
+---@field Track fun(self: table, holder: table): table
+---@field SetIcon fun(self: table, texture: string|number|nil)
+---@field Close fun(self: table)
+
+---@param config table {
+---  name       string  - global frame name
+---  width      number  - panel width
+---  height?    number  - initial panel height (a caller that sizes per open may omit)
+---  level?     number  - frame level (default DIALOG_LEVEL)
+---  strata?    string
+---  titleY?    number  - title offset from TOP (default DIALOG_TITLE_TOP)
+---  icon?      boolean - reserve a header icon; set it per open with :SetIcon
+---  bodyInset? table   - {x, y} TOPLEFT inset for the body (default: fills the panel)
+---  onTearDown? function - runs before the body is released, for a caller that
+---                         keeps its own per-open state instead of :Track
+--- }
+---@return DialogController
+function Helpers.CreateDialog(config)
     local C = BR.Options.Constants
-    local CreatePanel = BR.CreatePanel
+    local controller = { holders = {} }
+    local dialog, titleFS, iconTex, body
 
-    local dialog = CreatePanel(name, opts.width or C.DIALOG_WIDTH_NARROW, 1, {
-        level = opts.level or C.DIALOG_LEVEL,
-        strata = opts.strata,
-        dialog = true,
-    })
-
-    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    local titleText = opts.titleText or BR.L[titleKey]
-    if opts.titleColor then
-        titleText = "|cff" .. opts.titleColor .. titleText .. "|r"
-    end
-    title:SetText(titleText)
-
-    if opts.icon then
-        local icon = dialog:CreateTexture(nil, "OVERLAY")
-        icon:SetSize(C.DIALOG_ICON_SIZE, C.DIALOG_ICON_SIZE)
-        -- LEFT anchor = vertical center. Pin it to the midpoint of the 30px
-        -- header strip (top inset 2 + 15), so the icon and the title that hangs
-        -- off it stay centered in the header band.
-        icon:SetPoint("LEFT", dialog, "TOPLEFT", C.DIALOG_MARGIN, -17)
-        icon:SetTexture(opts.icon)
-        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) -- trim the default icon border
-        title:SetPoint("LEFT", icon, "RIGHT", 8, 0)
-    else
-        title:SetPoint("TOP", 0, C.DIALOG_TITLE_TOP)
+    local function TearDown()
+        if config.onTearDown then
+            config.onTearDown()
+        end
+        for _, holder in ipairs(controller.holders) do
+            Components.Unregister(holder)
+        end
+        wipe(controller.holders)
+        if body then
+            body:Hide()
+            body:SetParent(nil)
+            body = nil
+            Components.PruneEditBoxes()
+        end
     end
 
-    local closeBtn = Helpers.AddCloseButton(dialog)
+    local function Ensure()
+        if dialog then
+            return dialog
+        end
 
-    local layoutTop = opts.layoutY or C.DIALOG_LAYOUT_TOP
-    local layout = BR.Components.VerticalLayout(dialog, {
-        x = opts.layoutX or C.DIALOG_MARGIN,
-        y = layoutTop,
-    })
+        dialog = BR.CreatePanel(config.name, config.width, config.height or C.DIALOG_MIN_HEIGHT, {
+            level = config.level or C.DIALOG_LEVEL,
+            strata = config.strata,
+            dialog = true,
+        })
+        -- CreateFrame returns a shown frame, and the body is built after this.
+        dialog:Hide()
 
-    local shell = {
-        dialog = dialog,
-        layout = layout,
-        title = title,
-        closeButton = closeBtn,
-    }
-    function shell:Finalize(extraPadding)
-        local pad = extraPadding or C.DIALOG_MARGIN
-        local contentBottom = layout:GetY()
-        local height = math.max(-contentBottom + pad, C.DIALOG_MIN_HEIGHT)
-        dialog:SetHeight(height)
-        BR.ApplyDialogScale(dialog)
+        if config.icon then
+            iconTex = BR.CreateBuffIcon(dialog, C.DIALOG_ICON_SIZE)
+            iconTex:SetPoint("TOPLEFT", (config.bodyInset and config.bodyInset.x) or C.DIALOG_MARGIN, -7)
+        end
 
-        -- Center the content in the body region: from the title separator down
-        -- to the bottom edge. A single short control then sits in the middle of
-        -- the min-height body, not at its top.
-        local bodyCenter = (-C.DIALOG_ACCENT_OFFSET - height) / 2
-        local contentCenter = (layoutTop + contentBottom) / 2
-        layout:ShiftAllBy(bodyCenter - contentCenter)
+        titleFS = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        if iconTex then
+            titleFS:SetPoint("LEFT", iconTex, "RIGHT", 8, 0)
+        else
+            titleFS:SetPoint("TOP", 0, config.titleY or C.DIALOG_TITLE_TOP)
+        end
+
+        Helpers.AddCloseButton(dialog)
+        dialog:SetScript("OnHide", TearDown)
+
+        controller.dialog = dialog
+        return dialog
     end
-    return shell
+
+    ---Discard the previous body and start a fresh one. Parent every widget of
+    ---this open to the returned body, never to the dialog.
+    function controller:Open(titleText)
+        Ensure()
+        -- Hide first: OnHide releases the previous body.
+        dialog:Hide()
+        TearDown()
+
+        if titleText then
+            titleFS:SetText(titleText)
+        end
+
+        body = CreateFrame("Frame", nil, dialog)
+        local inset = config.bodyInset
+        if inset then
+            body:SetPoint("TOPLEFT", inset.x, -inset.y)
+            body:SetSize(config.width - inset.x * 2, 1)
+        else
+            body:SetAllPoints()
+        end
+        return body, dialog
+    end
+
+    ---Register a component holder for release on close.
+    function controller:Track(holder)
+        controller.holders[#controller.holders + 1] = holder
+        return holder
+    end
+
+    function controller:SetIcon(texture)
+        if not iconTex then
+            return
+        end
+        iconTex:SetShown(texture ~= nil)
+        if texture then
+            iconTex:SetTexture(texture)
+        end
+    end
+
+    function controller:Close()
+        if dialog then
+            dialog:Hide()
+        end
+    end
+
+    return controller
 end
 
 -- SingletonDialog wraps a builder so the dialog frame is created on first show

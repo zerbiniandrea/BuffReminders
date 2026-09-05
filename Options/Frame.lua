@@ -300,13 +300,12 @@ local function CreateOptionsPanel()
     local panel = CreatePanel("BuffRemindersOptions", PANEL_WIDTH, PANEL_HEIGHT, { escClose = true })
     panel:Hide()
 
-    -- EditBox tracker so panel-wide hide clears focus.
+    -- EditBox tracker so panel-wide hide clears focus. Components owns the
+    -- pruning; every edit box a factory builds lands here, dialogs included.
     local panelEditBoxes = {}
     Components.SetEditBoxesRef(panelEditBoxes)
     panel:SetScript("OnHide", function()
-        for _, editBox in ipairs(panelEditBoxes) do
-            editBox:ClearFocus()
-        end
+        Components.ClearEditBoxFocus()
         -- A panel close acknowledges this release's additions. Persist first,
         -- then recompute the snapshot, so the next open shows no dots.
         BR.Options.WhatsNew.MarkSeen()

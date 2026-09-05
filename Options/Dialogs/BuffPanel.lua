@@ -27,7 +27,7 @@ local wipe = wipe
 local PANEL_W = 378
 
 local drawer, drawerBody, drawerIcon, drawerTitle, catcher
-local editor, editorBody, editorIcon, editorTitle
+local editor, editorBody
 -- Active build surface. A build must first point body, bodyW and bodyHolders at
 -- the drawer body or at the editor body. The shared row helpers write to these.
 local body
@@ -600,51 +600,37 @@ end
 
 -- ---- Focused editor (poison / runeforge) --------------------------------------
 
-local function EnsureEditor()
-    if editor then
-        return
-    end
-    editor = BR.CreatePanel("BuffRemindersBuffEditor", PANEL_W, 200, { dialog = true, level = 220 })
-
-    -- 18px icon centered in the 32px header strip, so it clears the -32 title
-    -- separator.
-    editorIcon = BR.CreateBuffIcon(editor, 18)
-    editorIcon:SetPoint("TOPLEFT", EDITOR_BODY_X, -7)
-    editorTitle = editor:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    editorTitle:SetPoint("LEFT", editorIcon, "RIGHT", 8, 0)
-
-    BR.Options.Helpers.AddCloseButton(editor)
-end
-
-local function TearDownEditorBody()
-    for _, holder in ipairs(editorHolders) do
-        Components.Unregister(holder)
-    end
-    wipe(editorHolders)
-    if editorBody then
-        editorBody:Hide()
-        editorBody:SetParent(nil)
+local EditorDialog = BR.Options.Helpers.CreateDialog({
+    name = "BuffRemindersBuffEditor",
+    width = PANEL_W,
+    height = 200,
+    level = 220,
+    icon = true,
+    bodyInset = { x = EDITOR_BODY_X, y = EDITOR_BODY_TOP },
+    onTearDown = function()
+        for _, holder in ipairs(editorHolders) do
+            Components.Unregister(holder)
+        end
+        wipe(editorHolders)
         editorBody = nil
-    end
-end
+    end,
+})
 
 local function OpenEditor(info)
-    EnsureEditor()
-    TearDownEditorBody()
-
     local key = info.key
-    editorTitle:SetText("|cffffcc00" .. (info.displayName or key) .. "|r")
-    editorIcon:SetTexture(info.icons and info.icons[1] or 134400)
-
     local section = SPECIAL_SECTIONS[key]
     local module = EditorModule(section)
     local panelW = module and module.Width or PANEL_W
-    editor:SetWidth(panelW)
 
+    editorBody = EditorDialog:Open("|cffffcc00" .. (info.displayName or key) .. "|r")
+    editor = EditorDialog.dialog
+    EditorDialog:SetIcon(info.icons and info.icons[1] or 134400)
+
+    -- The width varies per section, so the body is resized after Open sized it
+    -- from the configured default.
+    editor:SetWidth(panelW)
     bodyW = panelW - EDITOR_BODY_X * 2
-    editorBody = CreateFrame("Frame", nil, editor)
-    editorBody:SetPoint("TOPLEFT", EDITOR_BODY_X, -EDITOR_BODY_TOP)
-    editorBody:SetSize(bodyW, 100)
+    editorBody:SetWidth(bodyW)
     body = editorBody
     bodyHolders = editorHolders
 
@@ -664,6 +650,19 @@ end
 local function HideDrawer()
     if drawer then
         drawer:Hide()
+    end
+end
+
+local function TearDownDrawerBody()
+    for _, holder in ipairs(drawerHolders) do
+        Components.Unregister(holder)
+    end
+    wipe(drawerHolders)
+    if drawerBody then
+        drawerBody:Hide()
+        drawerBody:SetParent(nil)
+        drawerBody = nil
+        Components.PruneEditBoxes()
     end
 end
 
@@ -742,19 +741,10 @@ local function EnsureDrawer()
         if catcher then
             catcher:Hide()
         end
+        -- Release on close, not on the next open: the drawer opens from every
+        -- buff row, so a deferred teardown holds one dead body per click.
+        TearDownDrawerBody()
     end)
-end
-
-local function TearDownDrawerBody()
-    for _, holder in ipairs(drawerHolders) do
-        Components.Unregister(holder)
-    end
-    wipe(drawerHolders)
-    if drawerBody then
-        drawerBody:Hide()
-        drawerBody:SetParent(nil)
-        drawerBody = nil
-    end
 end
 
 ---Open the drawer with a body built by `fill`. Header, sizing and the slide-in
@@ -908,8 +898,6 @@ BR.Options.Dialogs.BuffPanel = {
         if drawer then
             drawer:Hide()
         end
-        if editor then
-            editor:Hide()
-        end
+        EditorDialog:Close()
     end,
 }
