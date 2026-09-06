@@ -81,6 +81,7 @@ BR.EXTERNALS = {
             90355, -- Ancient Hysteria
             264667, -- Primal Rage
             390386, -- Fury of the Aspects
+            466904, -- Harrier's Cry
         },
     },
     { key = "innervate", section = "boosts", spellIDs = { 29166 } }, -- Druid
