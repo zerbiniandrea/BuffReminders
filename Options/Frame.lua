@@ -88,6 +88,8 @@ StaticPopupDialogs["BUFFREMINDERS_NEW_PROFILE"] = {
     button2 = L["Dialog.Cancel"],
     hasEditBox = true,
     editBoxWidth = 200,
+    -- AceDB rejects a profile name longer than 50 characters.
+    maxLetters = 50,
     OnAccept = function(self)
         CreateNewProfile(self.EditBox:GetText():trim())
     end,
