@@ -405,7 +405,7 @@ english["Page.CustomAnchors"] = "Custom Anchors"
 english["Section.Tracking"] = "Tracking"
 english["Section.TrackingOverrides"] = "Tracking Overrides"
 english["Section.TrackingOverrides.Desc"] =
-    "Narrow the tracking mode in specific situations. Leave a situation on Default to always use the mode above. When several apply at once (e.g. fighting while leveling), the most restrictive one wins."
+    "Narrow the tracking mode for one situation. Default keeps the mode above. If two apply, the strictest wins."
 english["DisabledReason.PvPDisabled"] = "This category is hidden in PvP entirely (see the Visibility page)."
 
 -- ============================================================================
@@ -422,7 +422,7 @@ english["Options.GlobalDefaults.Note"] = "(All categories inherit these unless o
 english["Options.Default"] = "Default"
 english["Options.Text"] = "Text"
 english["Options.Text.Note"] =
-    "(Size and color can be overridden per category; font, outline and position always apply everywhere)"
+    "(Per category: size and color. Everywhere: font, outline, position.)"
 english["Options.Font"] = "Font"
 english["Options.TextOutline"] = "Outline"
 english["Options.TextOutline.None"] = "None"
@@ -437,7 +437,7 @@ english["Options.TextOutline.ThickMono"] = "Thick + Monochrome"
 -- ============================================================================
 english["Options.GlowReminderIcons.Title"] = "Glow Reminder Icons"
 english["Options.GlowReminderIcons.CpuWarning"] =
-    "Glow animates every frame for each icon on screen, so it uses more CPU. If an icon stays up for a long time (e.g. a buff you don't rebuff mid-fight), that cost is continuous. Disabled by default for this reason."
+    "Glow animates every frame, so it costs CPU for as long as an icon is up. Off by default."
 english["Options.GlowKind.Expiring"] = "Expiring"
 english["Options.GlowKind.Missing"] = "Missing"
 english["Options.ExpiringGlow"] = "Expiring glow"
@@ -501,7 +501,7 @@ english["Options.Repair.Threshold.Desc"] =
     "Show the repair reminder when any equipped item's durability drops below this percentage."
 english["Options.RepairHideInCombat"] = "Hide in combat"
 english["Options.RepairHideInCombat.Desc"] =
-    "Hide the repair reminder while in combat. You can't visit a merchant to repair mid-fight, so it's only actionable out of combat."
+    "Hide the repair reminder in combat. You cannot repair during a fight."
 
 -- ============================================================================
 -- OPTIONS: SOULSTONE
@@ -544,7 +544,7 @@ english["Options.TextPositions.OffsetY.Short"] = "Y"
 english["Options.TextPositions.Size"] = "Size"
 english["Options.TextPositions.MainText"] = "Main text"
 english["Options.TextPositions.MainText.Note"] =
-    "Position of the big text on the icon - group counts like 17/20, countdowns, and labels like NO FLASK."
+    "Position of the big text: counts, countdowns and labels."
 english["Options.TextPositions.StackCount"] = "Stack count"
 english["Options.TextPositions.StatLabel"] = "Stat label"
 english["Options.TextPositions.Badge"] = "Badge (H / F)"
@@ -665,17 +665,17 @@ english["Options.SubIconSide.Right"] = "Right"
 english["Options.ShowWithoutItems"] = "Show when not in bags"
 english["Options.ShowWithoutItems.Title"] = "Show consumables without items"
 english["Options.ShowWithoutItems.Desc"] =
-    "When enabled, consumable reminders are shown even if you don't have the item in your bags. When disabled, only consumables you actually carry are shown."
+    "Show consumable reminders for items you do not carry."
 english["Options.ShowWithoutItemsReadyCheckOnly"] = "Only on ready check"
 english["Options.ShowWithoutItemsReadyCheckOnly.Title"] = "Show missing items only on ready check"
 english["Options.ShowWithoutItemsReadyCheckOnly.Desc"] =
-    "When enabled, consumables not in your bags are only shown during a ready check. Useful for a quick reminder to restock before a pull."
+    "Show consumables you do not carry only during a ready check."
 english["Options.DelveFoodOnly"] = "Only delve food in delves"
 english["Options.DelveFoodOnly.Desc"] = "When inside a delve, hide all consumable reminders except delve food."
 english["Options.HideLegacyConsumables"] = "Hide legacy consumables"
 english["Options.HideLegacyConsumables.Title"] = "Hide legacy consumables"
 english["Options.HideLegacyConsumables.Desc"] =
-    "When enabled, food, flasks, and runes from previous expansions are filtered out of the action buttons. Disable if you still use older consumables for Timewalking, old-raid farming, or undergeared alts."
+    "Hide food, flasks and runes from past expansions. Keep them for Timewalking or old raids."
 english["Options.PreferReusableRunes"] = "Prefer reusable augment runes"
 english["Options.PreferReusableRunes.Title"] = "Prefer reusable augment runes"
 english["Options.PreferReusableRunes.Desc"] =
@@ -705,13 +705,13 @@ english["Options.PoisonReset"] = "Reset to Default"
 -- ============================================================================
 english["Options.BronzeHideInCombat"] = "Hide in combat"
 english["Options.BronzeHideInCombat.Desc"] =
-    "Hide the Blessing of the Bronze reminder during combat. This buff is less critical and you may not want to rebuff mid-fight."
+    "Hide the Blessing of the Bronze reminder in combat."
 english["Options.DruidIgnoreTravelForm"] = "Ignore while traveling"
 english["Options.DruidIgnoreTravelForm.Desc"] =
-    "Hide the wrong-form reminder while in Travel Form (ground, aquatic, flight, or Mount Form) or while mounted, so it doesn't nag you when you're intentionally traveling."
+    "Hide the wrong-form reminder in Travel Form, Mount Form or while mounted."
 english["Options.DelveFoodTimer"] = "Auto-hide after 30 seconds"
 english["Options.DelveFoodTimer.Desc"] =
-    "When enabled, the delve food reminder only appears for 30 seconds after entering a delve, then hides automatically. When disabled, the reminder stays visible as long as you are in a delve and missing the buff."
+    "The delve food reminder hides 30 seconds after you enter a delve."
 
 -- ============================================================================
 -- OPTIONS: LAYOUT
@@ -760,7 +760,7 @@ english["BuffPanel.CasterAlways.Desc"] =
 english["DisabledReason.NotDetached"] = "This buff isn't detached - it sits inside its category frame."
 english["DisabledReason.CasterAlways"] = 'Only applies in ready-check mode. Switch "Show" back to ready check first.'
 english["Options.DisplayOrder.Note"] =
-    "How categories stack inside the combined frame, from top to bottom. Split categories live in their own frames and don't participate."
+    "Order inside the combined frame, top to bottom. Split categories are not listed."
 
 -- Detached Icons
 english["DetachedIcons.Reattach"] = "Return to category"
@@ -846,7 +846,7 @@ english["Options.BuffTracking.Override.OutsideInstances.Desc"] =
     "Tracking mode to use in the open world. The mode selected above is still used inside dungeons, raids, scenarios, and PvP."
 english["Options.BuffTracking.Override.Combat"] = "In combat"
 english["Options.BuffTracking.Override.Combat.Desc"] =
-    "Tracking mode to use while in combat. For example, narrowing to 'Only my buffs' keeps reminders for buffs from other classes visible out of combat so you can call them out, but hides them once the fight starts."
+    "Tracking mode for combat. Default keeps the mode above."
 english["Options.BuffTracking.Override.Leveling"] = "While leveling"
 english["Options.BuffTracking.Override.Leveling.Desc"] =
     "Tracking mode to use below max level. Once you reach max level, the mode selected above is used."
@@ -919,7 +919,7 @@ english["CustomBuff.Add"] = "Add Custom Buff"
 english["CustomBuff.AddButton"] = "+ Add Custom Buff"
 english["CustomBuff.Empty"] = "No custom buffs yet. Add one below."
 english["CustomBuff.RestrictedNote"] =
-    "Hidden in combat, boss encounters and Mythic+ - WoW blocks aura reads there. Bar glow detection works in combat."
+    "WoW blocks aura reads in combat, boss fights and Mythic+. Glow tracking still works."
 english["CustomBuff.SpellIDs"] = "Spell IDs"
 english["CustomBuff.AddSpellID"] = "+ Add Spell ID"
 english["CustomBuff.Text"] = "Overlay text"
@@ -1051,9 +1051,9 @@ english["Options.SupportKofi.Desc"] = "Enjoying BuffReminders?\nConsider support
 -- OPTIONS: CUSTOM ANCHOR FRAMES
 -- ============================================================================
 english["Options.CustomAnchorFrames.Desc"] =
-    "Add global frame names to the anchor dropdown (e.g. MyAddon_PlayerFrame). \nFrames that don't exist in-game are silently skipped."
+    "Add a global frame name (e.g. MyAddon_PlayerFrame) to the anchor dropdown. Missing frames are skipped."
 english["Options.CustomAnchorFrames.PickNote"] =
-    "Every frame you pick with the Pick button lands here, so it stays one click away."
+    "The Pick button adds frames to this list."
 english["Options.Add"] = "Add"
 english["Options.New"] = "New"
 english["Options.ResetToDefaults"] = "Reset to Defaults"
