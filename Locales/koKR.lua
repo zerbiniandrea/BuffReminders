@@ -354,9 +354,9 @@ L["Externals.DurationSize"] = "쿨타임 크기"
 L["Externals.Appearance"] = "외형"
 L["Externals.AppearanceNote"] =
     "전투 중 변경한 사항은 전투 종료 후 즉시 적용됩니다. 프레임 잠금을 해제하면 버프 줄을 이동할 수 있습니다."
-L["Externals.ShowSwipe"] = "쿨타임 애니메이션 표시"
+L["Externals.ShowSwipe"] = "쿨타임 회전 표시"
 L["Externals.ShowSwipe.Desc"] =
-    "아이콘에 어두운 회전 애니메이션을 그립니다. 아이콘 상 애니메이션은 버프 남은 시간에 맞춰 사라집니다."
+    "아이콘을 덮는 어두운 회전 애니메이션을 그립니다. 회전은 버프 남은 시간에 맞춰서 사라집니다."
 L["Externals.ShowTooltips"] = "툴팁 표시"
 L["Externals.ShowTooltips.Desc"] =
     "아이콘에 마우스를 올리면 게임 내 버프 툴팁을 표시합니다. 아이콘은 마우스 이동에만 반응하며 클릭은 동작하지 않습니다."
