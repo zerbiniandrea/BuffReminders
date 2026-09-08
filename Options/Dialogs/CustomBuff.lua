@@ -16,7 +16,6 @@ local _, BR = ...
 local L = BR.L
 local Components = BR.Components
 local CreateButton = BR.CreateButton
-local CreatePanel = BR.CreatePanel
 local CreateBuffIcon = BR.CreateBuffIcon
 local StyleEditBox = BR.StyleEditBox
 
@@ -30,8 +29,6 @@ local RemoveCustomBuffFrame = BR.CustomBuffs.Remove
 local UpdateCustomBuffFrame = BR.CustomBuffs.UpdateFrame
 
 local tinsert = table.insert
-local tremove = table.remove
-local tconcat = table.concat
 local ceil, floor, max = math.ceil, math.floor, math.max
 
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
@@ -110,7 +107,28 @@ local CLASS_LABEL_KEYS = {
     WARRIOR = "Class.Warrior",
 }
 
-local customBuffDialog = nil
+-- Holders live on the per-open ctx, so the controller releases them through
+-- onTearDown rather than its own tracker.
+local activeCtx = nil
+
+local Dialog = BR.Options.Helpers.CreateDialog({
+    name = "BuffRemindersCustomBuffDialog",
+    width = DIALOG_W,
+    height = DIALOG_H,
+    titleY = -11,
+    onTearDown = function()
+        if not activeCtx then
+            return
+        end
+        for _, editBox in ipairs(activeCtx.editBoxes) do
+            editBox:ClearFocus()
+        end
+        for _, holder in ipairs(activeCtx.holders) do
+            BR.Components.Unregister(holder)
+        end
+        activeCtx = nil
+    end,
+})
 
 -- ============================================================================
 -- LAYOUT HELPERS
@@ -333,7 +351,7 @@ local function BuildBuffTab(ctx, frame)
             for i, other in ipairs(ctx.spellRows) do
                 if other == row then
                     rowFrame:Hide()
-                    tremove(ctx.spellRows, i)
+                    table.remove(ctx.spellRows, i)
                     break
                 end
             end
@@ -1069,10 +1087,6 @@ local function CopyLoadConditions(editing)
 end
 
 local function Show(existingKey, refreshPanelCallback)
-    if customBuffDialog then
-        customBuffDialog:Hide()
-    end
-
     local editing = existingKey and BR.profile.customBuffs[existingKey] or nil
 
     local ctx = {
@@ -1086,19 +1100,11 @@ local function Show(existingKey, refreshPanelCallback)
         w = {},
     }
 
-    local dialog = CreatePanel("BuffRemindersCustomBuffDialog", DIALOG_W, DIALOG_H, {
-        level = BR.Options.Constants.DIALOG_LEVEL,
-        dialog = true,
-    })
-
-    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -11)
-    title:SetText(editing and L["CustomBuff.Edit"] or L["CustomBuff.Add"])
-
-    BR.Options.Helpers.AddCloseButton(dialog)
+    local body, dialog = Dialog:Open(editing and L["CustomBuff.Edit"] or L["CustomBuff.Add"])
+    activeCtx = ctx
 
     -- ---- header: preview + name ------------------------------------------
-    local header = CreateFrame("Frame", nil, dialog)
+    local header = CreateFrame("Frame", nil, body)
     header:SetPoint("TOPLEFT", 2, -TITLE_H)
     header:SetPoint("TOPRIGHT", -2, -TITLE_H)
     header:SetHeight(HEADER_H)
@@ -1159,7 +1165,7 @@ local function Show(existingKey, refreshPanelCallback)
     subtitle:SetWordWrap(false)
 
     -- ---- body ------------------------------------------------------------
-    local scrollFrame = Components.ScrollableContainer(dialog, {
+    local scrollFrame = Components.ScrollableContainer(body, {
         width = BODY_W,
         scrollbarWidth = SCROLLBAR_W,
         contentHeight = BODY_H,
@@ -1179,7 +1185,7 @@ local function Show(existingKey, refreshPanelCallback)
     end
 
     -- ---- footer ----------------------------------------------------------
-    local saveBtn = CreateButton(dialog, L["CustomBuff.Save"], function()
+    local saveBtn = CreateButton(body, L["CustomBuff.Save"], function()
         if SaveBuff(ctx) then
             dialog:Hide()
             if refreshPanelCallback then
@@ -1191,12 +1197,12 @@ local function Show(existingKey, refreshPanelCallback)
     saveBtn:SetPoint("BOTTOMRIGHT", -MARGIN, 12)
     saveBtn:SetDisabledReason(L["CustomBuff.ValidateError"])
 
-    local cancelBtn = CreateButton(dialog, L["Dialog.Cancel"], function()
+    local cancelBtn = CreateButton(body, L["Dialog.Cancel"], function()
         dialog:Hide()
     end)
     cancelBtn:SetPoint("RIGHT", saveBtn, "LEFT", -8, 0)
 
-    local saveHint = dialog:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    local saveHint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     saveHint:SetPoint("RIGHT", cancelBtn, "LEFT", -10, 0)
     saveHint:SetWidth(210)
     saveHint:SetJustifyH("RIGHT")
@@ -1205,7 +1211,7 @@ local function Show(existingKey, refreshPanelCallback)
 
     if existingKey and editing then
         local buffName = editing.name or existingKey
-        local deleteBtn = CreateButton(dialog, L["Options.Delete"], function()
+        local deleteBtn = CreateButton(body, L["Options.Delete"], function()
             dialog:Hide()
             StaticPopup_Show("BUFFREMINDERS_DELETE_CUSTOM", buffName, nil, {
                 key = existingKey,
@@ -1213,6 +1219,16 @@ local function Show(existingKey, refreshPanelCallback)
             })
         end)
         deleteBtn:SetPoint("BOTTOMLEFT", MARGIN, 12)
+
+        -- Exports what is saved, not what the open dialog holds.
+        local exportBtn = CreateButton(body, L["CustomBuff.Share.Export"], function()
+            BR.Options.Dialogs.CustomBuffShare.ShowExport(existingKey)
+        end)
+        exportBtn:SetPoint("LEFT", deleteBtn, "RIGHT", 8, 0)
+
+        -- The hint reaches this far left in a locale with a long string, and it
+        -- does not wrap. Bound it so it truncates instead of covering the button.
+        saveHint:SetPoint("LEFT", exportBtn, "RIGHT", 8, 0)
     end
 
     -- ---- tabs ------------------------------------------------------------
@@ -1239,7 +1255,7 @@ local function Show(existingKey, refreshPanelCallback)
 
     local prevTab, firstTab
     for _, id in ipairs(TAB_IDS) do
-        local tab = Components.Tab(dialog, { name = id, label = TAB_LABELS[id], width = 64 })
+        local tab = Components.Tab(body, { name = id, label = TAB_LABELS[id], width = 64 })
         tab:SetScript("OnClick", function()
             Activate(id)
         end)
@@ -1253,7 +1269,7 @@ local function Show(existingKey, refreshPanelCallback)
         tabs[id] = tab
         prevTab = tab
     end
-    Components.TabBaseline(dialog, firstTab, BODY_W)
+    Components.TabBaseline(body, firstTab, BODY_W)
 
     -- ---- live state ------------------------------------------------------
     function ctx.Sync()
@@ -1294,7 +1310,7 @@ local function Show(existingKey, refreshPanelCallback)
                 parts[#parts + 1] = ctx.loadConditions.levelFilter == "maxLevel" and L["CustomBuff.Level.Max"]
                     or L["CustomBuff.Level.BelowMax"]
             end
-            subtitle:SetText(tconcat(parts, SEPARATOR))
+            subtitle:SetText(table.concat(parts, SEPARATOR))
         else
             subtitle:SetText(L["CustomBuff.NoSpellYet"])
         end
@@ -1324,25 +1340,12 @@ local function Show(existingKey, refreshPanelCallback)
         ctx.AddSpellRow(nil)
     end
 
-    dialog:SetScript("OnHide", function()
-        for _, editBox in ipairs(ctx.editBoxes) do
-            editBox:ClearFocus()
-        end
-        for _, holder in ipairs(ctx.holders) do
-            Components.Unregister(holder)
-        end
-        if customBuffDialog == dialog then
-            customBuffDialog = nil
-        end
-    end)
-
     -- Components read their enabled state through Refresh, so the item and
     -- expiration controls need one pass before the dialog is visible.
     Components.RefreshAll()
     ctx.Sync()
     Activate("buff")
 
-    customBuffDialog = dialog
     dialog:Show()
 end
 

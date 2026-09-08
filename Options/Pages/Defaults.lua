@@ -28,7 +28,6 @@ local COL_PADDING = BR.Options.Constants.COL_PADDING
 local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
 
 local tinsert = table.insert
-local abs = math.abs
 
 -- Every control in the Text section ends on the same right edge. Font and
 -- Outline are single dropdowns of TEXT_DD_W. The zone pair must fit the same
@@ -321,7 +320,7 @@ local function Build(content)
     })
     layout:Add(preKeyThresholdHolder, nil, COMPONENT_GAP)
 
-    content:SetHeight(abs(layout:GetY()) + 20)
+    content:SetHeight(math.abs(layout:GetY()) + 20)
 end
 
 BR.Options.Pages.defaults = {

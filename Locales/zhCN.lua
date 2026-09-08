@@ -329,14 +329,8 @@ L["Externals.GroupBuffs"] = "团队增益"
 L["Externals.Movement"] = "移动加速"
 L["Externals.Aggro"] = "仇恨转移"
 L["Externals.Augmentation"] = "增效"
-L["Externals.Bloodlust"] = "嗜血/英勇"
-L["Externals.MassBarrier"] = "群体屏障"
-L["Externals.BlessingOfSeasons"] = "四季祝福"
 L["Externals.DurationSize"] = "倒计时文字大小"
 L["Externals.Appearance"] = "外观"
-L["Externals.AppearanceNote"] =
-    "由于这些增益为受限数据，游戏禁止对其图标样式进行重绘。在战斗中所做的更改将在脱离战斗后生效。解锁框体可拖动整排图标。"
-L["Externals.MasqueNote"] = "Masque 无法美化这些图标：它们的尺寸读取结果为秘密值。"
 
 -- Page titles
 L["Page.General"] = "常规"
@@ -567,9 +561,6 @@ L["Options.PetLabels.SizePct"] = "尺寸占比 %"
 -- ============================================================================
 -- OPTIONS: CONSUMABLE DISPLAY
 -- ============================================================================
-L["Options.ConsumableTextScale"] = "文本缩放"
-L["Options.ConsumableTextScale.Title"] = "消耗品文本大小"
-L["Options.ConsumableTextScale.Desc"] = "物品数量和品质（1星/2星/3星）标签相对于图标大小的字体缩放比例。"
 L["Options.ConsumableBadgeOnSubIcons"] = "在子图标上显示品质标签"
 L["Options.ConsumableBadgeOnSubIcons.Title"] = "子图标品质标签"
 L["Options.ConsumableBadgeOnSubIcons.Desc"] = "在每个子图标上也显示食物品质字母（例如“丰”代表丰盛，“飞”代表飞逝），而不仅在主图标上显示。"

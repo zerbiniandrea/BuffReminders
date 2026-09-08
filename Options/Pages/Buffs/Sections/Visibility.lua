@@ -20,8 +20,6 @@ local MakeCategoryGetter = Helpers.MakeCategoryGetter
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local SECTION_GAP = BR.Options.Constants.SECTION_GAP
 
-BR.Options.BuffSections = BR.Options.BuffSections or {}
-
 local function Build(ctx, layout)
     local category = ctx.category
     local parent = ctx.content

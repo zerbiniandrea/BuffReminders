@@ -3,24 +3,24 @@ local L = BR.L
 
 -- ============================================================================
 -- SECURE BUTTONS & CLICK-TO-CAST OVERLAYS
--- Consumable action buttons (sub-icons, expanded), click-to-cast spell overlays,
--- and all secure frame positioning logic. Separated from the display layer to
--- keep combat-lockdown-sensitive code isolated.
+-- Consumable action buttons, click-to-cast overlays, and the position sync for
+-- both. Kept out of the display layer to isolate the code that combat lockdown
+-- restricts.
 -- ============================================================================
 
 -- Lua stdlib locals (avoid repeated global lookups in hot paths)
 local floor, max, min = math.floor, math.max, math.min
 local tsort = table.sort
+local wipe = wipe
 
 local _, playerClass = UnitClass("player")
 local GetCategorySettings = BR.Helpers.GetCategorySettings
 local IsCategorySplit = BR.Helpers.IsCategorySplit
 
--- Chat-request prefix/message resolution lives in Core/ChatRequest.lua so this
--- file and the options page share one definition.
 local ChatRequest = BR.ChatRequest
 
 local GetTime = GetTime
+local Plain = BR.Secret.Plain
 
 -- ============================================================================
 -- SPELL HELPERS
@@ -46,9 +46,8 @@ end
 
 local FEL_DOMINATION_ID = 333889
 
--- Fel Domination macros memoized per pet spell: the names never change once the
--- client resolves them, and this runs on every display cycle for warlocks.
--- Unresolved names (early login) are not cached so the next cycle retries.
+-- Spell names never change once the client resolves them. An unresolved name at
+-- login is not cached, so the next display cycle retries it.
 local felDomMacroCache = {}
 
 local function GetFelDomPetMacro(petSpellID)
@@ -66,7 +65,6 @@ local function GetFelDomPetMacro(petSpellID)
     return macro
 end
 
--- Pre-filter a buff's spell by talent/spec requirements, then find a castable spell ID.
 ---@param buff table The buff definition table
 ---@return number?
 local function GetActionSpellID(buff)
@@ -85,8 +83,7 @@ local function GetActionSpellID(buff)
             end
         end
     end
-    -- When icons.byRole is present, prefer the role-appropriate spell so the cast matches
-    -- the displayed icon (e.g., Water Shield for healers, not Lightning Shield).
+    -- Prefer the role spell so the cast matches the icon the player sees.
     if not buff.castSpellID and buff.icons and buff.icons.byRole then
         local role = BR.BuffState.GetPlayerRole()
         local roleSpell = role and buff.icons.byRole[role]
@@ -97,9 +94,7 @@ local function GetActionSpellID(buff)
     return GetCastableSpellID(buff.castSpellID or buff.spellID)
 end
 
----Resolve the click action for a custom buff.
----Priority: castMacro > castItemID > castSpellID > spellID[1] (if player knows it).
----Kept separate from GetActionSpellID to avoid leaking category awareness into shared code.
+---Priority: castMacro > castItemID > castSpellID > spellID[1] that the player knows.
 ---@param buff table The custom buff definition
 ---@return string? actionType "spell"|"item"|"macro" or nil
 ---@return any actionValue The spell ID, item string, or macro text
@@ -129,7 +124,6 @@ local function ResolveCustomClickAction(buff)
     return nil, nil
 end
 
----Check whether a custom buff definition has a per-buff click action configured
 ---@param def table? Buff definition from the custom buff table
 ---@return boolean
 local function HasCustomClickAction(def)
@@ -142,15 +136,14 @@ end
 -- ============================================================================
 -- LAST TARGET TOOLTIP
 -- ============================================================================
--- Custom styled tooltip. It shows the last known target name for targeted buffs.
+-- Shows the last known target name for targeted buffs.
 
 local lastTargetTooltip
 
----Show the last target tooltip anchored below the given frame
 ---@param anchor table Frame to anchor to
 ---@param name string Character name
 ---@param class? string English class token
----@param hint? string Gray auxiliary text appended after the name (e.g. "(not in group)")
+---@param hint? string Gray text shown after the name, such as "(not in group)"
 local function ShowLastTargetTooltip(anchor, name, class, hint)
     if not lastTargetTooltip then
         local tip = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
@@ -175,7 +168,7 @@ local function ShowLastTargetTooltip(anchor, name, class, hint)
             r, g, b = c.r, c.g, c.b
         end
     end
-    -- Color escapes in the hint override SetTextColor for just that portion
+    -- A color escape in the hint overrides SetTextColor for that part only.
     tip.name:SetText(hint and (name .. " |cff888888" .. hint .. "|r") or name)
     tip.name:SetTextColor(r, g, b)
     local textWidth, textHeight = BR.DisplayFonts.GetStringSize(tip.name)
@@ -185,7 +178,6 @@ local function ShowLastTargetTooltip(anchor, name, class, hint)
     tip:Show()
 end
 
----Hide the last target tooltip
 local function HideLastTargetTooltip()
     if lastTargetTooltip then
         lastTargetTooltip:Hide()
@@ -196,13 +188,26 @@ end
 -- CLICK-TO-CAST OVERLAY
 -- ============================================================================
 
--- Right-click on a clickable consumable snoozes reminders instead of using the item. The right
--- button's secure action is neutralised (empty type2 so it resolves to no handler) and the button
--- is flagged; its PostClick then performs the snooze. Left-click still uses the item. `on == false`
--- restores the default (right-click uses the item), for overlays that switch to a non-item action
--- (e.g. chat request) and for users who turn `defaults.rightClickSnooze` off. Self-gated on the last
--- applied value, so callers can re-apply on every display cycle. Must run out of combat - callers
--- already are. See BR.SnoozeConsumables.
+-- The secure resolver reads `type<button>` for the mouse button that was clicked.
+-- It does not reliably fall back to the bare `type`, so a click resolves to no
+-- action unless every variant carries the type. This overwrites type2, so it
+-- clears the snooze tracker and the next SetRightClickSnooze re-applies.
+---@param button table Secure button (click overlay or consumable action button)
+---@param actionType string "macro" | "item" | "spell"
+local function SetActionType(button, actionType)
+    button._br_action_type = actionType
+    button:SetAttribute("type", actionType)
+    for i = 1, 5 do
+        button:SetAttribute("type" .. i, actionType)
+    end
+    button._br_snoozeRightClick = nil
+end
+
+-- Neutralise the right button with an empty type2, which resolves to no handler.
+-- PostClick reads the flag and snoozes instead. `on == false` gives the button's
+-- own action back to the right click. Call it after SetActionType, which
+-- overwrites type2. Self-gated, so callers can re-apply on every display cycle.
+-- Must run out of combat.
 local function SetRightClickSnooze(button, on)
     if not button then
         return
@@ -212,78 +217,201 @@ local function SetRightClickSnooze(button, on)
         return
     end
     button._br_snoozeRightClick = on
-    button:SetAttribute("type2", on and "" or nil)
+    button:SetAttribute("type2", on and "" or button._br_action_type)
 end
 
--- Dirty-gated secure attribute writers. UpdateActionButtons re-wires every frame
--- in a category on every display cycle, but the resolved action rarely changes -
--- these writers remember what was last applied (kind + identifying values) and
--- skip the SetAttribute calls when re-applying the same action. Any kind switch
--- rewrites in full. PreClick's dynamic click-macro rebuild is unaffected: it
--- writes macrotext directly at click time and is keyed off _br_clickMacroFn,
--- not these trackers.
+-- ============================================================================
+-- SECURE ACTIONS
+-- ============================================================================
+-- ResolveAction turns a buff frame into a plain action table. ApplyAction is the
+-- only place that writes secure attributes. A new attribute concern belongs in
+-- ApplyAction, never at a call site.
 
----Apply macro-type attributes only when (kind, macrotext) changed.
----@param overlay table SecureActionButton overlay
----@param kind string Tracker tag distinguishing the macro source
+---@class BRSecureAction
+---@field kind "macro"|"item"|"spell" Secure action type
+---@field tag string Namespace for the dirty gate. Two actions of one kind from
+---different sources must not compare equal.
+---@field id any Identity within the tag
+---@field macrotext string? Macro text, when it does not depend on live state
+---@field itemID number? Item behind the action, also for tooltips and click memory
+---@field slot number? Weapon slot the macro applies the item to
+---@field spellID number? kind == "spell"
+---@field unit string? Cast target (nil = default targeting)
+---@field snooze boolean? Right-click snoozes reminders instead of running the action
+---@field macroFn function? Builds the macro text, also re-run by PreClick
+---@field macroSpellID number? Argument for macroFn
+---@field prefix string? Chat channel command in front of chatMsg
+---@field chatKey string? Buff key when the action is a chat request
+---@field chatMsg string? Request text without the channel prefix
+
+-- Every resolver fills this one table, and ApplyAction copies what it needs before
+-- the next fill. A resolve runs for every frame on every display cycle, so it must
+-- not allocate.
+local scratchAction = {}
+
+---@param kind "macro"|"item"|"spell"
+---@param tag string
+---@param id any
+---@return BRSecureAction
+local function NewAction(kind, tag, id)
+    wipe(scratchAction)
+    scratchAction.kind = kind
+    scratchAction.tag = tag
+    scratchAction.id = id
+    return scratchAction
+end
+
+---@param a BRSecureAction?
+---@param b BRSecureAction?
+---@return boolean
+local function SameAction(a, b)
+    return a ~= nil
+        and b ~= nil
+        and a.kind == b.kind
+        and a.tag == b.tag
+        and a.id == b.id
+        and a.unit == b.unit
+        and a.slot == b.slot
+        and a.prefix == b.prefix
+end
+
+---A macro action that depends on live state carries its inputs, not its text, so a
+---resolve never pays the concat. The write path builds the text.
+---@param action BRSecureAction
+---@return string?
+local function MacroText(action)
+    if action.macroFn then
+        return action.macroFn(action.macroSpellID)
+    end
+    if action.prefix then
+        return action.prefix .. action.chatMsg
+    end
+    if action.slot then
+        return "/use item:" .. action.itemID .. "\n/use " .. action.slot
+    end
+    return action.macrotext
+end
+
+---Copy the scratch action into the button's own table, which SameAction reads on
+---the next cycle. The table is created once per button and reused.
+---@param button table
+---@param action BRSecureAction
+local function StoreAction(button, action)
+    local stored = button._br_action
+    if stored then
+        wipe(stored)
+    else
+        stored = {}
+        button._br_action = stored
+    end
+    for key, value in pairs(action) do
+        stored[key] = value
+    end
+end
+
+---Wire an action onto a secure button. UpdateActionButtons resolves every frame on
+---every display cycle, but the action rarely changes, so SameAction gates the
+---attribute writes. The snooze write stays outside that gate, because the option
+---can change while the action does not.
+---@param button table Secure button (click overlay or consumable action button)
+---@param action BRSecureAction
+local function ApplyAction(button, action)
+    button._br_has_action = true
+    button.itemID = action.itemID
+    button._br_clickMacroFn = action.macroFn
+    button._br_clickMacroSpellID = action.macroSpellID
+    button._br_chatRequestKey = action.chatKey
+    button._br_chatRequestMsg = action.chatMsg
+    if not action.chatKey then
+        button._br_chatRequestCooldownUntil = nil
+    end
+    if not SameAction(button._br_action, action) then
+        SetActionType(button, action.kind)
+        if action.kind == "macro" then
+            button:SetAttribute("macrotext", MacroText(action))
+        elseif action.kind == "item" then
+            button:SetAttribute("item", "item:" .. action.itemID)
+        else
+            button:SetAttribute("spell", action.spellID)
+            -- Always write unit, because nil clears it. A stale "player" from a
+            -- previous action retargets the cast onto the player.
+            button:SetAttribute("unit", action.unit)
+        end
+        StoreAction(button, action)
+    end
+    SetRightClickSnooze(button, action.snooze)
+end
+
+---@param itemID number
+---@param slot number? 16 or 17 for a weapon buff, nil otherwise
+---@param snooze boolean Right-click snoozes instead of using the item
+---@param tag string? Overrides the dirty-gate namespace
+---@return BRSecureAction
+local function ItemAction(itemID, slot, snooze, tag)
+    local action = NewAction(slot and "macro" or "item", tag or (slot and "weaponitem" or "item"), itemID)
+    action.itemID = itemID
+    action.slot = slot
+    action.snooze = snooze
+    return action
+end
+
+---@param spellID number
+---@param unit string? Cast target (nil = default targeting)
+---@param snooze boolean? Right-click snoozes instead of casting
+---@return BRSecureAction
+local function SpellAction(spellID, unit, snooze)
+    local action = NewAction("spell", "spell", spellID)
+    action.spellID = spellID
+    action.unit = unit
+    action.snooze = snooze
+    return action
+end
+
+---A macro the resolver can spell out in full. The text is then also the identity,
+---unless a smaller `id` describes it.
+---@param tag string
 ---@param macrotext string
-local function ApplyMacroAction(overlay, kind, macrotext)
-    if overlay._br_attr_kind == kind and overlay._br_attr_value == macrotext then
-        return
-    end
-    overlay._br_attr_kind = kind
-    overlay._br_attr_value = macrotext
-    overlay:SetAttribute("type", "macro")
-    overlay:SetAttribute("macrotext", macrotext)
+---@param id any?
+---@return BRSecureAction
+local function MacroAction(tag, macrotext, id)
+    local action = NewAction("macro", tag, id or macrotext)
+    action.macrotext = macrotext
+    return action
 end
 
----Apply spell-type attributes only when the spell (or unit) changed.
----@param overlay table SecureActionButton overlay
----@param spellID number|string
----@param unit string? Cast target unit (nil = default targeting). Only the raid
----generic path passes "player"; other paths pass nil.
-local function ApplySpellAction(overlay, spellID, unit)
-    if overlay._br_attr_kind == "spell" and overlay._br_attr_value == spellID and overlay._br_attr_unit == unit then
-        return
+---@param frame table The buff frame
+---@return number? slot 16 (main hand) or 17 (off hand), or nil
+local function GetWeaponSlot(frame)
+    if frame.key == "weaponBuff" then
+        return 16
     end
-    overlay._br_attr_kind = "spell"
-    overlay._br_attr_value = spellID
-    overlay._br_attr_unit = unit
-    overlay:SetAttribute("type", "spell")
-    overlay:SetAttribute("spell", spellID)
-    -- Always write unit (nil clears): a stale "player" from a previous state
-    -- silently retargets type="spell" casts onto the player.
-    overlay:SetAttribute("unit", unit)
+    if frame.key == "weaponBuffOH" then
+        return 17
+    end
+    return nil
 end
 
--- Frames that own any secure child (click overlay, action buttons, or an extra
--- frame with a click overlay). SyncSecureButtons and the hide-all paths iterate
--- this set instead of every buff frame - most frames never get a secure child.
--- Weak keys are only a backstop: a frame with an overlay is pinned by the
--- overlay's script closures (the overlay itself is UIParent-parented and
--- permanent), so removal paths call UnregisterSecureHost explicitly. In-combat
--- custom-buff deletions deliberately stay registered so the next sync can hide
--- their orphaned overlay once out of combat.
+-- Buff frames that own a secure child. Most frames never get one, so the sync
+-- and hide-all paths iterate this set instead of every frame.
+-- Weak keys are only a backstop: an overlay's script closures pin its frame, so
+-- removal paths call UnregisterSecureHost. A custom buff deleted in combat stays
+-- registered on purpose, so the next sync hides its orphaned overlay.
 local secureHostFrames = setmetatable({}, { __mode = "k" })
 
----Register the buff frame that hosts a secure child (extra frames register
----their main frame, which is what SyncSecureButtons iterates).
+---An extra frame registers its main frame, which is what SyncSecureButtons iterates.
 ---@param frame table The frame a secure child was created for
 local function RegisterSecureHost(frame)
     secureHostFrames[frame.isExtraFrame and frame.mainFrame or frame] = true
 end
 
----Drop a destroyed frame from the secure-host set (see the note above on why
----weak keys alone never release it).
 ---@param frame table
 local function UnregisterSecureHost(frame)
     secureHostFrames[frame] = nil
 end
 
--- Create a SecureActionButton overlay for click-to-cast on a buff frame.
--- Parented to UIParent with NO anchors to the buff frame hierarchy. A layout
--- dependency on that hierarchy makes it protected/secure.
--- Position is synced manually by SyncSecureButtons() after each layout pass.
+-- The overlay is parented to UIParent with NO anchor to the buff frame hierarchy:
+-- a layout dependency on that hierarchy makes the hierarchy protected.
+-- SyncSecureButtons positions it after each layout pass.
 ---@param frame table The parent buff frame
 local function CreateClickOverlay(frame)
     RegisterSecureHost(frame)
@@ -291,41 +419,32 @@ local function CreateClickOverlay(frame)
     overlay:RegisterForClicks("AnyDown", "AnyUp")
     overlay:EnableMouse(false)
     overlay:Hide()
-    -- Auto-hide in combat (secure state driver), auto-show after
     RegisterStateDriver(overlay, "visibility", "[combat] hide; show")
-    -- When state driver re-shows after combat, hide if the buff frame is not visible.
-    -- Uses IsVisible() (not IsShown()) to check entire parent chain - the frame's own
-    -- shown state can be true while its parent container is hidden.
+    -- IsVisible(), not IsShown(): the frame's own shown state can be true while
+    -- its parent container is hidden.
     overlay:SetScript("OnShow", function(self)
         if not frame:IsVisible() then
             self:Hide()
         end
     end)
-    -- IMPORTANT: do NOT SetAttribute("macrotext") for chat-request overlays
-    -- inside PreClick - the secure dispatcher can read the attribute snapshot
-    -- before PreClick's write propagates, leaking a stale prefix (e.g. "/say"
-    -- after joining a group). Chat macrotext is kept current by
-    -- SetupChatRequestOverlay and RefreshChatRequestMacros (GROUP_ROSTER_UPDATE).
+    -- Never write macrotext for a chat-request overlay here. The secure dispatcher
+    -- can read the attribute snapshot before the write propagates, which sends a
+    -- stale channel prefix. RefreshChatRequestMacros rewires those overlays instead.
     overlay:SetScript("PreClick", function(self)
-        -- Re-evaluate dynamic click macros before each click (e.g. rogue poisons
-        -- that depend on weapon slot).
         if self._br_clickMacroFn and not self._br_chatRequestKey then
             self:SetAttribute("macrotext", self._br_clickMacroFn(self._br_clickMacroSpellID))
         end
     end)
     overlay:SetScript("PostClick", function(self, button, down)
-        -- Consumable right-click snoozes reminders (the cast is neutralised via type2).
-        -- Fire once, on the up event, and skip the item-consumed refresh below.
+        -- Fire the snooze once, on the up event, and skip the refresh below.
         if button == "RightButton" and not down and self._br_snoozeRightClick then
             BR.SnoozeConsumables()
             return
         end
         if self._br_chatRequestKey then
-            -- Anti-spam: disable mouse + show cooldown swirl for 5s. Gated by
-            -- BR.profile.chatRequestCooldown (default true). Some users in
-            -- restricted contexts (M+ / encounters) report that this breaks
-            -- chat dispatch. The cause is not known. Those users can turn the
-            -- cooldown off on the Chat Requests options page.
+            -- Anti-spam gate. Some players report that it stops the chat dispatch
+            -- in restricted contexts. The cause is not known, so the Chat Requests
+            -- page can turn it off.
             if BR.profile.chatRequestCooldown ~= false then
                 self._br_chatRequestCooldownUntil = GetTime() + 5
                 self:EnableMouse(false)
@@ -339,12 +458,11 @@ local function CreateClickOverlay(frame)
                 end
                 self._br_chatRequestCooldown:SetCooldown(GetTime(), 5)
                 C_Timer.After(5, function()
-                    -- DisableOverlay/ClearChatRequestState clear the flag, so a
-                    -- stale fire after a role change is a safe no-op.
-                    -- Skip the direct EnableMouse if combat started during the
-                    -- 5s window: it is protected on secure frames during combat
-                    -- lockdown. After combat, SetupChatRequestOverlay re-enables
-                    -- mouse explicitly, so recovery is automatic.
+                    -- ApplyAction and DisableOverlay clear the flag, so a stale
+                    -- fire after a role change does nothing.
+                    -- If combat started inside the window, skip EnableMouse: it is
+                    -- protected during lockdown. UpdateActionButtons re-enables the
+                    -- mouse after combat.
                     if self._br_chatRequestKey then
                         self._br_chatRequestCooldownUntil = nil
                         if not InCombatLockdown() then
@@ -363,7 +481,7 @@ local function CreateClickOverlay(frame)
                 BR.Display.Update()
             end
         end)
-        -- Delayed refresh for cast-time spells (e.g. rogue poisons ~1.5s)
+        -- Second refresh for spells with a cast time, such as rogue poisons.
         if self._br_clickMacroFn then
             C_Timer.After(2, function()
                 if not InCombatLockdown() then
@@ -378,18 +496,16 @@ local function CreateClickOverlay(frame)
     overlay.highlight:SetAllPoints()
     overlay.highlight:SetTexCoord(BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET, BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET)
     overlay.highlight:SetColorTexture(1, 1, 1, 0.2)
-    -- Tooltip: show last target name for targeted buffs, or item tooltip for consumables
     overlay:HookScript("OnEnter", function()
         if frame.buffDef and (frame.buffCategory == "targeted" or frame.buffDef.castOnOthers) then
-            -- Only the caster class has a meaningful last-target (e.g. Soulstone: warlocks only)
+            -- Only the caster class has a meaningful last target.
             if frame.buffDef.class and frame.buffDef.class ~= playerClass then
                 return
             end
             local name, class = BR.TargetMemory.Get(frame.buffDef.key)
-            -- A user-pinned target overrides the automatic memory. The class
-            -- color is known only when the pin matches the remembered player.
-            -- If the pinned player is not in the group, the click macro does
-            -- nothing, so the tooltip shows a hint.
+            -- A pinned target overrides the automatic memory. The class color is
+            -- known only when the pin matches the remembered player. If the pinned
+            -- player is not in the group, the click macro does nothing.
             local hint
             local pinned = frame.buffDef.pinnedTarget and frame.buffDef.pinnedTarget()
             if pinned then
@@ -420,9 +536,8 @@ local function CreateClickOverlay(frame)
             end
             return
         end
-        -- Raid/presence: spell tooltip + "Provided by <class>" line, gated by
-        -- defaults.showBuffTooltips. The anchor is the overlay: the cursor is
-        -- over the overlay, not over the buff frame underneath.
+        -- The anchor is the overlay: the cursor is over the overlay, not over the
+        -- buff frame below it.
         if frame.buffCategory == "raid" or frame.buffCategory == "presence" then
             if BR.Display.ShowBuffSpellTooltip then
                 BR.Display.ShowBuffSpellTooltip(frame, overlay)
@@ -441,9 +556,9 @@ end
 -- ============================================================================
 -- PET SPEC ICON HOVER
 -- ============================================================================
--- On hover, swaps a pet frame's icon to the spec ability icon (Cunning/Ferocity/Tenacity).
--- Hooks are installed once per overlay; the spec icon reference is read from the
--- buff frame at event time so it stays in sync with display updates.
+-- On hover, a pet frame shows its spec ability icon. Each overlay is hooked once.
+-- The event handler reads the spec icon from the buff frame, so it stays current
+-- across display updates.
 
 ---@param overlay table SecureActionButton overlay
 ---@param frame table The buff frame whose icon to swap
@@ -473,8 +588,8 @@ local function HookPetSpecIconHover(overlay, frame)
     end)
 end
 
---- Re-apply pet spec icon if the overlay is currently hovered (called after display updates).
---- The display code just set the real icon, so this function saves it before the swap.
+--- Call after a display update: it saves the icon the update applied, then puts the
+--- spec icon back if the cursor is still on the overlay.
 ---@param frame table The buff frame to check
 local function ReapplyPetSpecIconIfHovered(frame)
     local overlay = frame.clickOverlay
@@ -496,42 +611,36 @@ local ACTION_ICON_SCALE = 0.45
 local ACTION_ICON_MIN = 18
 local ACTION_ICON_OFFSET = -6
 
--- Badge text -> color for buff frame middle-left overlay (quality uses atlas icons separately)
 local BADGE_COLORS = {
     [L["Badge.Hearty"]] = { r = 0.4, g = 0.7, b = 1 },
     [L["Badge.Fleeting"]] = { r = 0.4, g = 0.7, b = 1 },
 }
 
----Compute consumable text font size from scale percentage.
 ---@param mainIconSize number The consumable category's main icon size
+---@param item string? A BR.TextPositions.SizedItems key; nil uses the shared base
 ---@return number fontSize
-local function ComputeConsumableFontSize(mainIconSize)
-    local d = BR.profile and BR.profile.defaults
-    local scale = d and d.consumableTextScale or 25
-    return max(6, floor(mainIconSize * scale / 100))
+local function ComputeConsumableFontSize(mainIconSize, item)
+    return max(6, floor(mainIconSize * BR.TextPositions.GetSizePercent(item) / 100))
 end
 
----Create a small SecureActionButton for the consumable item row.
----Parented to UIParent with NO anchors to buff frames (avoids taint).
----Position synced by SyncSecureButtons().
+---Parented to UIParent with NO anchor to a buff frame: an anchor taints it.
+---SyncSecureButtons positions it.
 ---@return table btn The created button
 local function CreateActionButton()
     local btn = CreateFrame("Button", nil, UIParent, "SecureActionButtonTemplate")
     btn:RegisterForClicks("AnyDown", "AnyUp")
     btn:Hide()
-    -- Start hidden - state driver activated by SyncSecureButtons() after positioning
+    -- Starts hidden. SyncSecureButtons swaps in the combat driver after it positions
+    -- the button.
     RegisterStateDriver(btn, "visibility", "hide")
-    -- When state driver re-shows after combat, hide if the buff frame is not visible.
-    -- Uses IsVisible() to check entire parent chain (see CreateClickOverlay comment)
     btn:SetScript("OnShow", function(self)
         local bf = self._br_buff_frame
         if not bf or not bf:IsVisible() then
             self:Hide()
         end
     end)
-    -- Refresh display shortly after click so the consumed buff disappears quickly
+    -- The refresh runs shortly after the click so the consumed buff disappears fast.
     btn:SetScript("PostClick", function(self, button, down)
-        -- Consumable right-click snoozes reminders (the cast is neutralised via type2).
         if button == "RightButton" and not down and self._br_snoozeRightClick then
             BR.SnoozeConsumables()
             return
@@ -579,23 +688,56 @@ local function CreateActionButton()
     return btn
 end
 
--- Consumable item cache: only rescan bags when BAG_UPDATE_DELAYED fires
-local consumableCache = {} -- key -> items array (or nil)
+-- The bags are rescanned only when BAG_UPDATE_DELAYED fires.
+local consumableCache = {}
 local consumableCacheDirty = true
 
 local function InvalidateConsumableCache()
     consumableCacheDirty = true
 end
 
--- hideLegacyConsumables changes only the arrays in consumableCache, not the bag
--- scan. Invalidate the arrays so the next render rebuilds them with the new filter.
+-- The item filters change the cached arrays, not the bag scan. Invalidate them so
+-- the next render rebuilds them with the new filter.
 BR.CallbackRegistry:RegisterCallback("SettingChanged", function(_, path)
-    if path == "defaults.hideLegacyConsumables" then
+    if path == "defaults.hideLegacyConsumables" or path == "defaults.preferReusableRunes" then
         consumableCacheDirty = true
     end
 end)
 
----Scan bags for all consumable categories and populate the cache.
+---Stack count text for a bag item. A permanent item shows none.
+---@param item table?
+---@return string
+local function FormatStackCount(item)
+    if not item or item.permanent then
+        return ""
+    end
+    return tostring(item.count)
+end
+
+---Cooldown of a bag item, or nil when it has none. C_Item.GetItemCooldown throws
+---in a restricted context, and its returns can be secret values, so a failed or
+---secret read yields nil.
+---@param itemID number?
+---@return number? start
+---@return number? duration
+local function GetItemCooldown(itemID)
+    if not itemID then
+        return nil
+    end
+    if BR.Restrictions.CooldownsRestricted() then
+        return nil
+    end
+    local ok, start, duration = pcall(C_Item.GetItemCooldown, itemID)
+    if not ok then
+        return nil
+    end
+    start, duration = Plain(start), Plain(duration)
+    if not start or not duration or duration <= 0 then
+        return nil
+    end
+    return start, duration
+end
+
 local function RefreshConsumableCache()
     if not consumableCacheDirty then
         return
@@ -609,13 +751,12 @@ local function RefreshConsumableCache()
 
     local specId = BR.StateHelpers and BR.StateHelpers.GetPlayerSpecId()
     local itemSets = BR.CONSUMABLE_ITEMS or {}
-    local hideLegacy = (BR.profile and BR.profile.defaults or {}).hideLegacyConsumables ~= false
-    -- Scan all bags once, bucket items by consumable category
-    local buckets = {} -- category -> itemID -> bucket
-    local maxBags = NUM_BAG_SLOTS or 4
-    for bag = 0, maxBags do
-        local slots = C_Container.GetContainerNumSlots(bag)
-        for slot = 1, slots do
+    local defs = BR.profile and BR.profile.defaults or {}
+    local hideLegacy = defs.hideLegacyConsumables ~= false
+    local preferReusableRunes = defs.preferReusableRunes == true
+    local buckets = {}
+    for bag = 0, (NUM_BAG_SLOTS or 4) do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local itemID = C_Container.GetContainerItemID(bag, slot)
             if itemID then
                 for category, allowedSet in pairs(itemSets) do
@@ -638,7 +779,7 @@ local function RefreshConsumableCache()
                                 bucket.statLabel = allowedEntry.label
                                 bucket.badge = allowedEntry.badge
                             end
-                            -- Parse crafted quality atlas from item link (e.g. Quality-Tier3, Quality-12-Tier2)
+                            -- The item link carries the crafted quality tier.
                             local hyperlink = info and info.hyperlink
                             if hyperlink then
                                 local suffix = hyperlink:match("Quality%-[%w%-]*Tier%d")
@@ -646,7 +787,7 @@ local function RefreshConsumableCache()
                                     bucket.qualityAtlas = "Professions-Icon-" .. suffix
                                 end
                             end
-                            -- Store the spell this item casts (for auto-remember reverse lookup)
+                            -- ConsumableMemory looks the item up by the spell it casts.
                             local okSpell, _, useSpellID = pcall(GetItemSpell, itemID)
                             if okSpell and useSpellID then
                                 bucket.useSpellID = useSpellID
@@ -659,25 +800,35 @@ local function RefreshConsumableCache()
         end
     end
 
-    -- Auto-remember food/weapon consumed outside addon (count-delta tracking)
     BR.ConsumableMemory.DetectConsumedItems(buckets, specId)
 
-    -- Apply the legacy filter here, not during the bag scan, so ConsumableMemory
-    -- sees unfiltered data and the consumption counts stay correct.
+    -- The legacy filter runs here, not during the bag scan: ConsumableMemory must
+    -- see unfiltered data or its consumption counts go wrong.
     wipe(consumableCache)
     for category, entries in pairs(buckets) do
         local items = {}
         local allowedSet = itemSets[category]
+        local runeFallback = preferReusableRunes and category == "rune" and {} or nil
         for itemID, item in pairs(entries) do
             local entry = allowedSet and allowedSet[itemID]
+            item.permanent = type(entry) == "table" and entry.permanent or nil
             if not (hideLegacy and type(entry) == "table" and entry.legacy) then
-                items[#items + 1] = item
+                if runeFallback and not item.permanent then
+                    runeFallback[#runeFallback + 1] = item
+                else
+                    items[#items + 1] = item
+                end
             end
+        end
+        -- The preference must never leave the player with nothing to click. With no
+        -- reusable rune in the bags, the consumed runes come back.
+        if runeFallback and #items == 0 then
+            items = runeFallback
         end
         if #items > 0 then
             local rememberedSpell = BR.ConsumableMemory.GetRemembered(specId, category)
             tsort(items, function(a, b)
-                -- If items have priority values, sort by priority first (lower = better).
+                -- A lower priority value sorts first.
                 local aPri = allowedSet and allowedSet[a.itemID]
                 local bPri = allowedSet and allowedSet[b.itemID]
                 local aNum = type(aPri) == "number" and aPri or (type(aPri) == "table" and aPri.priority) or nil
@@ -688,7 +839,6 @@ local function RefreshConsumableCache()
                 if aNum and bNum and aNum ~= bNum then
                     return aNum < bNum
                 end
-                -- Remembered consumable spell for this spec sorts above non-remembered
                 if rememberedSpell then
                     local aRem = a.useSpellID == rememberedSpell
                     local bRem = b.useSpellID == rememberedSpell
@@ -704,15 +854,11 @@ local function RefreshConsumableCache()
             consumableCache[category] = items
         end
     end
-
-    -- Snapshot current counts for next delta comparison
     BR.ConsumableMemory.SnapshotCounts(buckets)
 end
 
--- Map buff key -> CONSUMABLE_ITEMS category key (derived from buff definitions in Data/Buffs.lua)
 local BUFF_KEY_TO_CATEGORY = BR.BUFF_KEY_TO_CATEGORY
 
----Get cached consumable items for a buff definition.
 ---@param buff table The buff definition table
 ---@return table[]? items Array of { itemID, count, icon } sorted by count desc, or nil
 local function GetConsumableActionItems(buff)
@@ -728,12 +874,11 @@ local function GetConsumableActionItems(buff)
     return items and #items > 0 and items or nil
 end
 
----Create/update the item icons for a consumable buff frame.
----Sets attributes, textures, and marks buttons visible. Positioning is handled
----separately by SyncSecureButtons() (no anchors to avoid taint).
+---Create or update the item icons for a consumable buff frame. SyncSecureButtons
+---positions them.
 ---@param frame table The buff frame
 ---@param actionItems table[]? Array of { itemID, count, icon }
----@param clickable boolean? Whether buttons should accept mouse input
+---@param clickable boolean? True when the buttons accept mouse input
 ---@param startIndex? number First index in actionItems to show (default 1)
 local function UpdateConsumableButtons(frame, actionItems, clickable, startIndex)
     if InCombatLockdown() then
@@ -766,26 +911,13 @@ local function UpdateConsumableButtons(frame, actionItems, clickable, startIndex
             frame.actionButtons[btnIndex] = btn
         end
 
-        btn.itemID = item.itemID
         btn.icon:SetTexture(item.icon or 134400)
-        -- Dirty tracking: skip redundant SetAttribute calls
-        if btn._br_action_item ~= item.itemID then
-            if frame.key == "weaponBuff" or frame.key == "weaponBuffOH" then
-                local slot = frame.key == "weaponBuffOH" and 17 or 16
-                btn:SetAttribute("type", "macro")
-                btn:SetAttribute("macrotext", "/use item:" .. tostring(item.itemID) .. "\n/use " .. slot)
-            else
-                btn:SetAttribute("type", "item")
-                btn:SetAttribute("item", "item:" .. tostring(item.itemID))
-            end
-            btn._br_action_item = item.itemID
-        end
-        -- Outside the dirty gate: the snooze option can change while the item does not.
-        SetRightClickSnooze(btn, true)
+        ApplyAction(btn, ItemAction(item.itemID, GetWeaponSlot(frame), true))
 
         btn:EnableMouse(clickable == true)
         btn._br_visible = true
         btn._br_count = item.count
+        btn._br_permanent = item.permanent
         btn._br_qualityAtlas = item.qualityAtlas
         btn._br_badge = item.badge
         btn._br_needs_sync = true
@@ -801,7 +933,7 @@ end
 -- SECURE FRAME SYNC
 -- ============================================================================
 
----Get the effective category for a buff frame (split or "main")
+---@return string category The frame's own category when it is split, else "main"
 local function GetEffectiveCategory(frame)
     if frame.buffCategory and IsCategorySplit(frame.buffCategory) then
         return frame.buffCategory
@@ -809,16 +941,17 @@ local function GetEffectiveCategory(frame)
     return "main"
 end
 
--- Hide secure frames (action buttons + overlays) for frames belonging to a specific catKey.
--- Used during mover drag to prevent sub-icons from lingering at old positions.
+-- A mover drag calls this. Without it, sub-icons stay at the old position.
 local function HideSecureFramesForCatKey(catKey)
     if InCombatLockdown() then
         return
     end
     for frame in pairs(secureHostFrames) do
-        -- Match by effective category OR by individual buff key (for detached icons)
+        -- A detached icon matches on its own buff key - or its groupId, since
+        -- grouped buffs store detach state under the group key.
         local effectiveCat = GetEffectiveCategory(frame)
-        if effectiveCat == catKey or frame.key == catKey then
+        local groupId = frame.buffDef and frame.buffDef.groupId
+        if effectiveCat == catKey or frame.key == catKey or groupId == catKey then
             if frame.actionButtons then
                 for _, btn in ipairs(frame.actionButtons) do
                     if btn._br_driver_active then
@@ -848,7 +981,7 @@ local function HideSecureFramesForCatKey(catKey)
     end
 end
 
--- Safe to call at any time; skips if in combat lockdown.
+-- Safe to call at any time. It does nothing during combat lockdown.
 local function HideAllSecureFrames()
     if InCombatLockdown() then
         return
@@ -882,14 +1015,14 @@ local function HideAllSecureFrames()
     end
 end
 
--- Sync all secure button positions/sizes/visibility with their buff frames.
--- Uses screen coordinates (no anchors) so secure frames never taint the buff hierarchy.
--- Safe to call at any time; skips if in combat lockdown.
+-- Secure buttons are placed in screen coordinates, never anchored, so they cannot
+-- taint the buff frame hierarchy. Safe to call at any time. It does nothing during
+-- combat lockdown.
 local function SyncSecureButtons()
     if InCombatLockdown() then
         return
     end
-    -- Hide all clickable overlays during test mode to prevent desync
+    -- Test mode shows frames that no real buff state backs.
     if BR.Display.IsTestMode() then
         HideAllSecureFrames()
         return
@@ -904,9 +1037,12 @@ local function SyncSecureButtons()
                 and BR.profile.categorySettings
                 and BR.profile.categorySettings[frame.buffCategory]
             local clickable = cs and cs.clickable == true
-            -- Custom buffs with per-buff click actions are individually clickable
-            if not clickable and frame.buffCategory == "custom" then
-                clickable = HasCustomClickAction(frame.buffDef)
+            -- Click to cast governs casting. A chat request answers its own toggle
+            -- on the Chat Requests page, and a custom buff its own click action, so
+            -- both stay clickable where the category turned click-to-cast off.
+            if not clickable then
+                clickable = overlay._br_chatRequestKey ~= nil
+                    or (frame.buffCategory == "custom" and HasCustomClickAction(frame.buffDef))
             end
             if frame:IsVisible() then
                 if not clickable or not overlay._br_has_action then
@@ -916,7 +1052,6 @@ local function SyncSecureButtons()
                 else
                     local left, bottom, width, height = frame:GetRect()
                     if left then
-                        -- Skip if position unchanged (avoids redundant ClearAllPoints/SetPoint)
                         if
                             overlay._br_left ~= left
                             or overlay._br_bottom ~= bottom
@@ -933,10 +1068,8 @@ local function SyncSecureButtons()
                             overlay._br_width = width
                             overlay._br_height = height
                         end
-                        -- Honor the chat-request cooldown gate while the
-                        -- timestamp is set and the feature is enabled. The
-                        -- cooldown timer clears the timestamp when it expires.
-                        -- The next sync run then re-enables mouse.
+                        -- The cooldown timer clears the timestamp when it expires.
+                        -- The next sync run then re-enables the mouse.
                         local cdEnabled = BR.profile.chatRequestCooldown ~= false
                         local cdUntil = cdEnabled and overlay._br_chatRequestCooldownUntil
                         if cdUntil and cdUntil > GetTime() then
@@ -962,10 +1095,9 @@ local function SyncSecureButtons()
                 if left then
                     local effectiveCat = GetEffectiveCategory(frame)
                     local catSettings = GetCategorySettings(effectiveCat)
-                    local consumableSettings = GetCategorySettings("consumable")
                     local size = max(ACTION_ICON_MIN, floor((catSettings.iconSize or 64) * ACTION_ICON_SCALE))
                     local btnSpacing = max(2, floor(size * 0.2))
-                    local subIconSide = consumableSettings.subIconSide or "BOTTOM"
+                    local subIconSide = GetCategorySettings("consumable").subIconSide or "BOTTOM"
                     local visibleCount = 0
                     for _, btn in ipairs(frame.actionButtons) do
                         if btn._br_visible then
@@ -973,7 +1105,9 @@ local function SyncSecureButtons()
                         end
                     end
                     if visibleCount > 0 then
-                        local cFontSize = ComputeConsumableFontSize(catSettings.iconSize or 64)
+                        local baseIconSize = catSettings.iconSize or 64
+                        local stackFontSize = ComputeConsumableFontSize(baseIconSize, "stackCount")
+                        local badgeFontSize = ComputeConsumableFontSize(baseIconSize, "badge")
                         local showSubIconBadge = BR.Config.Get("defaults.consumableBadgeOnSubIcons") == true
                         local idx = 0
                         for _, btn in ipairs(frame.actionButtons) do
@@ -1007,14 +1141,15 @@ local function SyncSecureButtons()
                                         btnY = bottom + ACTION_ICON_OFFSET - size - row * (size + btnSpacing)
                                     end
                                 end
-                                -- Size and outline stamps let the dirty check catch
-                                -- font setting changes. Face changes need no stamp:
-                                -- linked fontstrings follow the shared object.
+                                -- The size and outline stamps let the dirty check see
+                                -- a font setting change. A face change needs no stamp:
+                                -- linked fontstrings follow the shared font object.
                                 local needsUpdate = btn._br_needs_sync
                                     or btn._br_x ~= btnX
                                     or btn._br_y ~= btnY
                                     or btn._br_size ~= size
-                                    or btn._br_font_size ~= cFontSize
+                                    or btn._br_font_size ~= stackFontSize
+                                    or btn._br_badge_font_size ~= badgeFontSize
                                     or btn._br_font_outline ~= outlineFlag
                                 if needsUpdate then
                                     btn:ClearAllPoints()
@@ -1026,10 +1161,10 @@ local function SyncSecureButtons()
                                     btn._br_y = btnY
                                     btn._br_size = size
                                     btn.count:SetText(
-                                        btn._br_count and btn._br_count > 1 and tostring(btn._br_count) or ""
+                                        (btn._br_count and not btn._br_permanent) and tostring(btn._br_count) or ""
                                     )
-                                    ApplyFont(btn.count, cFontSize)
-                                    -- Quality atlas icon (holder frame at +10 to draw above borders/glows)
+                                    ApplyFont(btn.count, stackFontSize)
+                                    -- The holder sits at +10 to draw above borders and glows.
                                     if btn._br_qualityAtlas then
                                         if not btn._br_qualityIcon then
                                             local qHolder = CreateFrame("Frame", nil, btn)
@@ -1047,7 +1182,6 @@ local function SyncSecureButtons()
                                     elseif btn._br_qualityIcon then
                                         btn._br_qualityIcon:Hide()
                                     end
-                                    -- Badge text (e.g. "H" hearty, "F" fleeting) at top-left
                                     local bc = showSubIconBadge and btn._br_badge and BADGE_COLORS[btn._br_badge]
                                     if bc then
                                         if not btn._br_badgeLabel then
@@ -1055,18 +1189,37 @@ local function SyncSecureButtons()
                                         end
                                         btn._br_badgeLabel:ClearAllPoints()
                                         btn._br_badgeLabel:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
-                                        ApplyFont(btn._br_badgeLabel, cFontSize)
+                                        ApplyFont(btn._br_badgeLabel, badgeFontSize)
                                         btn._br_badgeLabel:SetTextColor(bc.r, bc.g, bc.b, 1)
                                         btn._br_badgeLabel:SetText(btn._br_badge)
                                         btn._br_badgeLabel:Show()
                                     elseif btn._br_badgeLabel then
                                         btn._br_badgeLabel:Hide()
                                     end
-                                    btn._br_font_size = cFontSize
+                                    btn._br_font_size = stackFontSize
+                                    btn._br_badge_font_size = badgeFontSize
                                     btn._br_font_outline = outlineFlag
                                     btn._br_needs_sync = false
                                 end
-                                -- Activate combat state driver on first show (buttons start with "hide" driver)
+                                do
+                                    local cdStart, cdDuration
+                                    if btn._br_permanent then
+                                        cdStart, cdDuration = GetItemCooldown(btn.itemID)
+                                    end
+                                    if cdStart then
+                                        if not btn._br_cooldown then
+                                            local cd = CreateFrame("Cooldown", nil, btn, "CooldownFrameTemplate")
+                                            cd:SetAllPoints()
+                                            cd:SetDrawEdge(true)
+                                            cd:EnableMouse(false)
+                                            btn._br_cooldown = cd
+                                        end
+                                        btn._br_cooldown:SetCooldown(cdStart, cdDuration)
+                                    elseif btn._br_cooldown then
+                                        btn._br_cooldown:Clear()
+                                    end
+                                end
+                                -- A new button starts on the "hide" driver.
                                 if not btn._br_driver_active then
                                     RegisterStateDriver(btn, "visibility", "[combat] hide; show")
                                     btn._br_driver_active = true
@@ -1148,7 +1301,7 @@ local function SyncSecureButtons()
     end
 end
 
--- Schedule secure button sync for the next frame (after layout has been calculated)
+-- The sync runs on the next frame, after the layout pass calculates the rects.
 local syncPending = false
 local function ScheduleSecureSync()
     if syncPending then
@@ -1161,126 +1314,84 @@ local function ScheduleSecureSync()
     end)
 end
 
--- ============================================================================
--- SHARED HELPERS
--- ============================================================================
-
----Get the weapon equipment slot for a buff frame, if applicable.
----@param frame table The buff frame
----@return number? slot 16 (main hand) or 17 (off hand), or nil
-local function GetWeaponSlot(frame)
-    if frame.key == "weaponBuff" then
-        return 16
-    end
-    if frame.key == "weaponBuffOH" then
-        return 17
-    end
-    return nil
-end
-
----Set up a click overlay as a chat-request button for buffs the player cannot cast.
----@param frame table The buff frame
----@param showHighlight boolean Whether to show the hover highlight
-local function SetupChatRequestOverlay(frame, showHighlight)
-    if not frame.clickOverlay then
-        CreateClickOverlay(frame)
-    end
-    local overlay = frame.clickOverlay
-    overlay._br_has_action = true
-    overlay._br_clickMacroFn = nil
-    overlay._br_clickMacroSpellID = nil
-    overlay.itemID = nil
-    overlay._br_chatRequestKey = frame.key
-    local msg = ChatRequest.ResolveMessage(frame.key, frame.displayName)
-    local prefix = ChatRequest.GetPrefix()
-    -- Skip the attribute writes (and the macrotext concat) when nothing changed.
-    -- RefreshChatRequestMacros keeps these trackers current when it rewrites the
-    -- macrotext on roster/profile changes.
-    if overlay._br_attr_kind ~= "chat" or overlay._br_chatRequestMsg ~= msg or overlay._br_attr_prefix ~= prefix then
-        overlay._br_attr_kind = "chat"
-        overlay._br_attr_value = nil
-        overlay._br_attr_prefix = prefix
-        overlay:SetAttribute("type", "macro")
-        overlay:SetAttribute("macrotext", prefix .. msg)
-    end
-    overlay._br_chatRequestMsg = msg
-    overlay:EnableMouse(true)
-    if overlay.highlight then
-        overlay.highlight:SetShown(showHighlight)
-    end
-end
-
----Clear chat-request state from an overlay being repurposed for a non-chat
----action (consumable / pet / spell / custom / clickMacro). PreClick skips the
----dynamic click-macro write when _br_chatRequestKey is set, and PostClick
----enters the anti-spam cooldown branch on it. A stale flag suppresses
----legitimate click-macro updates and disables the overlay mouse for 5s on
----every click. RefreshChatRequestMacros also iterates by this flag.
----This is the single place that lists the chat-request fields - DisableOverlay
----delegates here so a new field never has to be cleared in two spots.
-local function ClearChatRequestState(overlay)
-    overlay._br_chatRequestKey = nil
-    overlay._br_chatRequestMsg = nil
-    overlay._br_chatRequestCooldownUntil = nil
-end
-
----Disable a click overlay: mark inactive, disable mouse, hide, clear position cache.
 ---@param overlay table SecureActionButton overlay
 local function DisableOverlay(overlay)
     overlay._br_has_action = false
     overlay._br_clickMacroFn = nil
     overlay._br_clickMacroSpellID = nil
-    ClearChatRequestState(overlay)
+    overlay._br_chatRequestKey = nil
+    overlay._br_chatRequestMsg = nil
+    overlay._br_chatRequestCooldownUntil = nil
     overlay.itemID = nil
     overlay:EnableMouse(false)
     overlay:Hide()
     overlay._br_left = nil
 end
 
----Set pet summon spell or Fel Domination macro attributes on an overlay.
----@param overlay table SecureActionButton overlay
----@param spellID number The pet summon spell ID
+---Summon a pet, wrapped in Fel Domination when the warlock has the option on.
+---@param spellID number Pet summon spell ID
 ---@param db table The profile database
-local function SetPetSpellAttributes(overlay, spellID, db)
+---@return BRSecureAction
+local function PetAction(spellID, db)
     local felMacro = (db.defaults or {}).useFelDomination
         and IsPlayerSpell(FEL_DOMINATION_ID)
         and GetFelDomPetMacro(spellID)
     if felMacro then
-        ApplyMacroAction(overlay, "petmacro", felMacro)
-    else
-        ApplySpellAction(overlay, spellID)
+        return MacroAction("petmacro", felMacro)
     end
+    return SpellAction(spellID)
 end
 
----Set item-use or weapon-buff macro attributes on an overlay.
----@param overlay table SecureActionButton overlay
----@param itemID number The consumable item ID
----@param weaponSlot number? 16 or 17, or nil for non-weapon consumables
-local function SetItemAttributes(overlay, itemID, weaponSlot)
-    overlay.itemID = itemID
-    -- Before the dirty gate: the snooze option can change while the item does not.
-    SetRightClickSnooze(overlay, true)
-    -- Skip the attribute writes when the item and the slot are unchanged
-    if overlay._br_attr_kind == "item" and overlay._br_attr_value == itemID and overlay._br_attr_slot == weaponSlot then
-        return
+---Run a macro whose text depends on state that PreClick reads at click time, such
+---as the weapon slot a poison applies to. The identity is the spell, because
+---PreClick rebuilds the text on every click.
+---@param macroFn function Builds the macro text from a spell ID
+---@param spellID number
+---@param snooze boolean Right-click snoozes instead of running the macro
+---@return BRSecureAction
+local function ClickMacroAction(macroFn, spellID, snooze)
+    local action = NewAction("macro", "clickmacro", spellID)
+    action.macroFn = macroFn
+    action.macroSpellID = spellID
+    action.snooze = snooze
+    return action
+end
+
+---Ask the group for a buff the player cannot cast.
+---@param frame table The buff frame
+---@return BRSecureAction? action nil when the buff resolves no request text
+local function ChatAction(frame)
+    local msg = ChatRequest.ResolveMessage(frame.key, frame.displayName)
+    if not msg then
+        return nil
     end
-    overlay._br_attr_kind = "item"
-    overlay._br_attr_value = itemID
-    overlay._br_attr_slot = weaponSlot
-    if weaponSlot then
-        overlay:SetAttribute("type", "macro")
-        overlay:SetAttribute("macrotext", "/use item:" .. itemID .. "\n/use " .. weaponSlot)
-    else
-        overlay:SetAttribute("type", "item")
-        overlay:SetAttribute("item", "item:" .. itemID)
+    -- The prefix is compared, not folded into the identity: a group change must
+    -- rewrite the macro, and the concat belongs on the write path.
+    local action = NewAction("macro", "chat", msg)
+    action.prefix = ChatRequest.GetPrefix()
+    action.chatKey = frame.key
+    action.chatMsg = msg
+    return action
+end
+
+-- A custom macro body stores its line breaks as a literal backslash-n. The
+-- resolver runs on every display cycle, but the bodies do not change. The cache
+-- holds every body the profile has used this session: weak keys release nothing,
+-- because Lua 5.1 never removes strings from a weak table.
+local expandedCustomMacros = {}
+local function ExpandCustomMacro(raw)
+    local text = expandedCustomMacros[raw]
+    if not text then
+        text = (raw:gsub("\\n", "\n"))
+        expandedCustomMacros[raw] = text
     end
+    return text
 end
 
 -- ============================================================================
 -- SUB-ELEMENT HANDLERS
 -- ============================================================================
 
----Update consumable sub-elements: sub-icon button clickability and expanded mode extra frame overlays.
 ---@param frame table The buff frame
 ---@param actionItems table[]? Cached consumable items
 ---@param showHighlight boolean Category-level highlight setting
@@ -1301,17 +1412,13 @@ local function UpdateConsumableSubElements(frame, actionItems, showHighlight, fr
     if displayMode == "expanded" and frame.extraFrames and actionItems then
         local weaponSlot = GetWeaponSlot(frame)
         for idx, extra in ipairs(frame.extraFrames) do
-            local itemIdx = idx + 1 -- extra[1] = items[2], etc.
+            local itemIdx = idx + 1 -- The main frame owns items[1].
             if extra:IsShown() and actionItems[itemIdx] then
                 if not extra.clickOverlay then
                     CreateClickOverlay(extra)
                 end
                 local eOverlay = extra.clickOverlay
-                eOverlay._br_has_action = true
-                eOverlay._br_clickMacroFn = nil
-                eOverlay._br_clickMacroSpellID = nil
-                ClearChatRequestState(eOverlay)
-                SetItemAttributes(eOverlay, actionItems[itemIdx].itemID, weaponSlot)
+                ApplyAction(eOverlay, ItemAction(actionItems[itemIdx].itemID, weaponSlot, true))
                 eOverlay:EnableMouse(true)
                 if eOverlay.highlight then
                     eOverlay.highlight:SetShown(frameHighlight)
@@ -1329,8 +1436,8 @@ local function UpdateConsumableSubElements(frame, actionItems, showHighlight, fr
     end
 end
 
----Update click overlays on pet extra frames (each has its own summon spell).
----No-ops for frames without extraFrames (non-pet, non-consumable categories).
+---Each pet extra frame has its own summon spell. A frame with no extra frames is
+---safe to pass: the function does nothing.
 ---@param frame table The main buff frame
 ---@param frameHighlight boolean Whether to show the highlight texture
 ---@param db table The profile database
@@ -1344,12 +1451,7 @@ local function UpdateExtraFrameOverlays(frame, frameHighlight, db)
                 CreateClickOverlay(extra)
             end
             local eOverlay = extra.clickOverlay
-            eOverlay._br_has_action = true
-            eOverlay._br_clickMacroFn = nil
-            eOverlay._br_clickMacroSpellID = nil
-            eOverlay.itemID = nil
-            ClearChatRequestState(eOverlay)
-            SetPetSpellAttributes(eOverlay, extra._br_pet_spell, db)
+            ApplyAction(eOverlay, PetAction(extra._br_pet_spell, db))
             eOverlay:EnableMouse(true)
             if eOverlay.highlight then
                 eOverlay.highlight:SetShown(frameHighlight)
@@ -1363,14 +1465,13 @@ local function UpdateExtraFrameOverlays(frame, frameHighlight, db)
     end
 end
 
----Disable the main overlay, sub-icon buttons, and extra frame overlays for a frame.
 ---@param frame table The buff frame
 ---@param db table The profile database
 local function DisableFrameAndChildren(frame, db)
     if frame.clickOverlay then
         DisableOverlay(frame.clickOverlay)
     end
-    -- Sub-icon buttons: disable mouse but keep visible if mode is sub_icons
+    -- Sub-icons stay on screen in sub_icons mode. Only the mouse goes off.
     if frame.actionButtons then
         local displayMode = (db.defaults or {}).consumableDisplayMode or "sub_icons"
         for _, btn in ipairs(frame.actionButtons) do
@@ -1399,17 +1500,103 @@ end
 -- UPDATE ACTION BUTTONS (CLICK-TO-CAST WIRING)
 -- ============================================================================
 
----Wire up click-to-cast overlays for all buff frames in a category.
----For consumables, also sets up consumable action items and expanded mode.
----For spells, checks talent/spec requirements and castability.
+---Resolve the click action for a buff frame. Reads buff data and config only:
+---no frame writes, no secure API. The branch order is the action priority.
+---@param frame table The buff frame
+---@param category string
+---@param db table The profile database
+---@return BRSecureAction? action nil when the frame has no click action
+---@return table[]? actionItems Consumable items behind the action (consumable category only)
+local function ResolveAction(frame, category, db)
+    local def = frame.buffDef
+
+    if category == "consumable" then
+        local actionItems = GetConsumableActionItems(def)
+        if actionItems then
+            return ItemAction(actionItems[1].itemID, GetWeaponSlot(frame), true), actionItems
+        end
+        -- Nothing in the bags. Cast the creation spell if the player knows one.
+        if def and (not def.casterClass or def.casterClass == playerClass) then
+            local castableID = def.castSpellID or def.spellID
+            if def.clickMacro then
+                return ClickMacroAction(def.clickMacro, castableID, true), actionItems
+            end
+            if def.castSpellID then
+                return SpellAction(def.castSpellID, nil, true), actionItems
+            end
+        end
+        -- The player cannot create the consumable and carries none. Ask the
+        -- provider class in chat, as raid and presence buffs do. The right click
+        -- sends the request here instead of a snooze.
+        if def and def.chatRequestable and db.requestBuffInChat then
+            return ChatAction(frame), actionItems
+        end
+        return nil, actionItems
+    end
+
+    if frame.key == "petPassive" then
+        return MacroAction("petassist", "/petassist")
+    end
+
+    if frame.key == "repairGear" then
+        -- Outdoors, the macro summons the vendor mount. Indoors, it uses the repair
+        -- item. The two conditions exclude each other, so one click never spends
+        -- both. A player who owns neither gets an inert icon.
+        local sources = BR.BuffState.GetRepairSources()
+        local mountName = sources.mountSpellID and BR.GetSpellName(sources.mountSpellID)
+        local itemID = sources.itemID
+        local macro
+        if mountName and itemID then
+            macro = "/use [indoors] item:" .. itemID .. "\n/cast [outdoors] " .. mountName
+        elseif mountName then
+            macro = "/cast " .. mountName
+        elseif itemID then
+            macro = "/use item:" .. itemID
+        else
+            return nil
+        end
+        return MacroAction("repair", macro)
+    end
+
+    local castableID
+    if frame._br_pet_spell then
+        castableID = frame._br_pet_spell
+    elseif category == "custom" then
+        local customType, customValue = ResolveCustomClickAction(def)
+        if customType == "spell" then
+            castableID = customValue
+        elseif customType == "macro" then
+            return MacroAction("custommacro", ExpandCustomMacro(customValue), customValue)
+        elseif customType == "item" then
+            return ItemAction(customValue, nil, false, "customitem")
+        end
+    else
+        castableID = GetActionSpellID(def)
+    end
+
+    if castableID and not (def and def.noClickToCast) then
+        if def and def.clickMacro then
+            return ClickMacroAction(def.clickMacro, castableID, false)
+        end
+        if frame._br_pet_spell then
+            return PetAction(castableID, db)
+        end
+        return SpellAction(castableID, category == "raid" and "player" or nil)
+    end
+
+    if db.requestBuffInChat and def and def.chatRequestable and not frame.isPlayerBuff then
+        return ChatAction(frame)
+    end
+    return nil
+end
+
 ---@param category string
 local function UpdateActionButtons(category)
     if InCombatLockdown() or BR.Display.IsTestMode() then
         return
     end
 
-    -- Per-category bucket: skip the whole pass (including the sync scheduling)
-    -- when the category has no frames at all (e.g. no custom buffs defined).
+    -- A category with no frames skips the whole pass, the sync included.
     local frames = BR.Display.framesByCategory and BR.Display.framesByCategory[category]
     if not frames or not next(frames) then
         return
@@ -1420,289 +1607,73 @@ local function UpdateActionButtons(category)
     local enabled = cs and cs.clickable == true
     local showHighlight = enabled and (cs.clickableHighlight ~= false)
 
+    -- A category with click-to-cast off still resolves its frames when it can host
+    -- a chat request: only the resolver knows whether a given frame lands on one.
+    local mayOverride = enabled or category == "custom" or ChatRequest.WantsCategory(category)
+
     for _, frame in pairs(frames) do
         if frame.buffCategory == category then
-            -- Custom buffs define click actions per-buff; treat as enabled when an action is set
+            local action, actionItems
+            if mayOverride then
+                action, actionItems = ResolveAction(frame, category, db)
+            end
+
             local frameEnabled = enabled
             local frameHighlight = showHighlight
-            if not frameEnabled and category == "custom" and HasCustomClickAction(frame.buffDef) then
+            -- Click to cast governs casting. A chat request answers its own toggle
+            -- on the Chat Requests page, and a custom buff its own click action, so
+            -- both stay clickable where the category turned click-to-cast off.
+            if not frameEnabled and action and (action.chatKey or category == "custom") then
                 frameEnabled = true
                 frameHighlight = true
             end
 
-            if frameEnabled then
-                if category == "consumable" then
-                    local actionItems = GetConsumableActionItems(frame.buffDef)
-                    local def = frame.buffDef
-
-                    if actionItems and #actionItems > 0 then
-                        if not frame.clickOverlay then
-                            CreateClickOverlay(frame)
-                        end
-                        local overlay = frame.clickOverlay
-                        overlay._br_has_action = true
-                        overlay._br_clickMacroFn = nil
-                        overlay._br_clickMacroSpellID = nil
-                        ClearChatRequestState(overlay)
-                        SetItemAttributes(overlay, actionItems[1].itemID, GetWeaponSlot(frame))
-                        overlay:EnableMouse(true)
-                        if overlay.highlight then
-                            overlay.highlight:SetShown(showHighlight)
-                        end
-                    elseif def and def.clickMacro and (not def.casterClass or def.casterClass == playerClass) then
-                        -- No consumable in bags but has clickMacro - cast the creation spell
-                        if not frame.clickOverlay then
-                            CreateClickOverlay(frame)
-                        end
-                        local overlay = frame.clickOverlay
-                        local castableID = def.castSpellID or def.spellID
-                        overlay._br_has_action = true
-                        overlay.itemID = nil
-                        overlay._br_clickMacroFn = def.clickMacro
-                        overlay._br_clickMacroSpellID = castableID
-                        ClearChatRequestState(overlay)
-                        -- Skip regenerating the macro when fn+spell are unchanged;
-                        -- PreClick rebuilds the macrotext at click time anyway.
-                        if overlay._br_attr_kind ~= "clickmacro" or overlay._br_attr_value ~= castableID then
-                            overlay._br_attr_kind = "clickmacro"
-                            overlay._br_attr_value = castableID
-                            overlay:SetAttribute("type", "macro")
-                            overlay:SetAttribute("macrotext", def.clickMacro(castableID))
-                        end
-                        SetRightClickSnooze(overlay, true)
-                        overlay:EnableMouse(true)
-                        if overlay.highlight then
-                            overlay.highlight:SetShown(showHighlight)
-                        end
-                    elseif def and def.castSpellID and (not def.casterClass or def.casterClass == playerClass) then
-                        -- No consumable in bags but has castSpellID - cast the creation spell
-                        if not frame.clickOverlay then
-                            CreateClickOverlay(frame)
-                        end
-                        local overlay = frame.clickOverlay
-                        overlay._br_has_action = true
-                        overlay.itemID = nil
-                        overlay._br_clickMacroFn = nil
-                        overlay._br_clickMacroSpellID = nil
-                        ClearChatRequestState(overlay)
-                        ApplySpellAction(overlay, def.castSpellID)
-                        SetRightClickSnooze(overlay, true)
-                        overlay:EnableMouse(true)
-                        if overlay.highlight then
-                            overlay.highlight:SetShown(showHighlight)
-                        end
-                    elseif def and def.chatRequestable and db.requestBuffInChat then
-                        -- Player can neither create the consumable nor has one in
-                        -- bags - ask the provider class in chat (e.g. non-warlock
-                        -- requesting a healthstone), just like raid/presence buffs.
-                        -- Right-click stays the chat request here (not snooze); clear any
-                        -- leftover suppression from a previous item state on this overlay.
-                        SetupChatRequestOverlay(frame, frameHighlight)
-                        SetRightClickSnooze(frame.clickOverlay, false)
-                    elseif frame.clickOverlay then
-                        -- No action resolved; clear fields but do not Hide() - let
-                        -- SyncSecureButtons handle visibility via _br_has_action check.
-                        frame.clickOverlay._br_has_action = false
-                        frame.clickOverlay._br_clickMacroFn = nil
-                        frame.clickOverlay._br_clickMacroSpellID = nil
-                        frame.clickOverlay.itemID = nil
-                        ClearChatRequestState(frame.clickOverlay)
-                        SetRightClickSnooze(frame.clickOverlay, false)
-                        frame.clickOverlay:EnableMouse(false)
-                    end
-                    UpdateConsumableSubElements(frame, actionItems, showHighlight, frameHighlight, db)
-                elseif frame.key == "petPassive" then
-                    -- Pet passive: click to switch pet to Assist stance
+            if not frameEnabled then
+                DisableFrameAndChildren(frame, db)
+            else
+                if action then
                     if not frame.clickOverlay then
                         CreateClickOverlay(frame)
                     end
                     local overlay = frame.clickOverlay
-                    overlay._br_has_action = true
-                    overlay.itemID = nil
-                    overlay._br_clickMacroFn = nil
-                    overlay._br_clickMacroSpellID = nil
-                    ClearChatRequestState(overlay)
-                    ApplyMacroAction(overlay, "petassist", "/petassist")
+                    ApplyAction(overlay, action)
                     overlay:EnableMouse(true)
                     if overlay.highlight then
                         overlay.highlight:SetShown(frameHighlight)
                     end
-                elseif frame.key == "repairGear" then
-                    -- Repair: summon the vendor mount outdoors, use the repair item
-                    -- where mounting is blocked. The conditionals are mutually
-                    -- exclusive so one click never spends both.
-                    local sources = BR.BuffState.GetRepairSources()
-                    local mountName = sources.mountSpellID and BR.GetSpellName(sources.mountSpellID)
-                    local itemID = sources.itemID
-                    if mountName or itemID then
-                        if not frame.clickOverlay then
-                            CreateClickOverlay(frame)
-                        end
-                        local overlay = frame.clickOverlay
-                        overlay._br_has_action = true
-                        overlay._br_clickMacroFn = nil
-                        overlay._br_clickMacroSpellID = nil
-                        overlay.itemID = nil
-                        ClearChatRequestState(overlay)
-                        local macro
-                        if mountName and itemID then
-                            macro = "/use [indoors] item:" .. itemID .. "\n/cast [outdoors] " .. mountName
-                        elseif mountName then
-                            macro = "/cast " .. mountName
-                        else
-                            macro = "/use item:" .. itemID
-                        end
-                        ApplyMacroAction(overlay, "repair", macro)
-                        overlay:EnableMouse(true)
-                        if overlay.highlight then
-                            overlay.highlight:SetShown(frameHighlight)
-                        end
-                    elseif frame.clickOverlay then
-                        -- Nothing owned to repair with: leave the icon inert rather
-                        -- than arming a click that does nothing.
-                        DisableOverlay(frame.clickOverlay)
+                    if frame._br_pet_spec_icon then
+                        HookPetSpecIconHover(overlay, frame)
                     end
+                elseif frame.clickOverlay then
+                    DisableOverlay(frame.clickOverlay)
+                end
+
+                if category == "consumable" then
+                    UpdateConsumableSubElements(frame, actionItems, showHighlight, frameHighlight, db)
                 else
-                    -- Spells / Custom: check castability before creating overlay
-                    local castableID
-                    local customActionType, customActionValue
-                    if frame._br_pet_spell then
-                        castableID = frame._br_pet_spell
-                    elseif category == "custom" then
-                        customActionType, customActionValue = ResolveCustomClickAction(frame.buffDef)
-                        if customActionType == "spell" then
-                            castableID = customActionValue
-                            customActionType = nil -- handled by spell path below
-                        end
-                    else
-                        castableID = GetActionSpellID(frame.buffDef)
-                    end
-
-                    if customActionType then
-                        -- Custom buff with item/macro action
-                        if not frame.clickOverlay then
-                            CreateClickOverlay(frame)
-                        end
-                        local overlay = frame.clickOverlay
-                        overlay._br_has_action = true
-                        overlay.itemID = nil
-                        overlay._br_clickMacroFn = nil
-                        overlay._br_clickMacroSpellID = nil
-                        ClearChatRequestState(overlay)
-                        if customActionType == "macro" then
-                            -- Guard on the raw macro text so the gsub only runs on change
-                            if
-                                overlay._br_attr_kind ~= "custommacro"
-                                or overlay._br_attr_value ~= customActionValue
-                            then
-                                overlay._br_attr_kind = "custommacro"
-                                overlay._br_attr_value = customActionValue
-                                overlay:SetAttribute("type", "macro")
-                                overlay:SetAttribute("macrotext", (customActionValue:gsub("\\n", "\n")))
-                            end
-                        elseif customActionType == "item" then
-                            if overlay._br_attr_kind ~= "customitem" or overlay._br_attr_value ~= customActionValue then
-                                overlay._br_attr_kind = "customitem"
-                                overlay._br_attr_value = customActionValue
-                                overlay:SetAttribute("type", "item")
-                                overlay:SetAttribute("item", "item:" .. customActionValue)
-                            end
-                            overlay.itemID = customActionValue
-                        end
-                        overlay:EnableMouse(true)
-                        if overlay.highlight then
-                            overlay.highlight:SetShown(frameHighlight)
-                        end
-                    elseif castableID and not (frame.buffDef and frame.buffDef.noClickToCast) then
-                        if not frame.clickOverlay then
-                            CreateClickOverlay(frame)
-                        end
-                        local overlay = frame.clickOverlay
-                        overlay._br_has_action = true
-                        overlay.itemID = nil
-                        ClearChatRequestState(overlay)
-                        if frame.buffDef and frame.buffDef.clickMacro then
-                            overlay._br_clickMacroFn = frame.buffDef.clickMacro
-                            overlay._br_clickMacroSpellID = castableID
-                            -- Skip regenerating the macro when the spell is unchanged;
-                            -- PreClick rebuilds the macrotext at click time anyway.
-                            if overlay._br_attr_kind ~= "clickmacro" or overlay._br_attr_value ~= castableID then
-                                overlay._br_attr_kind = "clickmacro"
-                                overlay._br_attr_value = castableID
-                                overlay:SetAttribute("type", "macro")
-                                overlay:SetAttribute("macrotext", frame.buffDef.clickMacro(castableID))
-                            end
-                        elseif frame._br_pet_spell then
-                            overlay._br_clickMacroFn = nil
-                            overlay._br_clickMacroSpellID = nil
-                            SetPetSpellAttributes(overlay, castableID, db)
-                        else
-                            overlay._br_clickMacroFn = nil
-                            overlay._br_clickMacroSpellID = nil
-                            ApplySpellAction(overlay, castableID, category == "raid" and "player" or nil)
-                        end
-                        overlay:EnableMouse(true)
-                        if overlay.highlight then
-                            overlay.highlight:SetShown(frameHighlight)
-                        end
-                        if frame._br_pet_spec_icon then
-                            HookPetSpecIconHover(overlay, frame)
-                        end
-                    elseif
-                        db.requestBuffInChat
-                        and frame.buffDef
-                        and frame.buffDef.chatRequestable
-                        and not frame.isPlayerBuff
-                    then
-                        SetupChatRequestOverlay(frame, frameHighlight)
-                    elseif frame.clickOverlay then
-                        DisableOverlay(frame.clickOverlay)
-                    end
-
                     UpdateExtraFrameOverlays(frame, frameHighlight, db)
                 end
-            else
-                DisableFrameAndChildren(frame, db)
             end
         end
     end
     ScheduleSecureSync()
 end
 
--- Refresh chat-request overlays after group-type changes (party↔raid, instance
--- group transitions) and per-profile message changes. The macrotext must be
--- current before the click, because PreClick cannot write it in time.
+-- ChatAction puts the channel prefix inside the macrotext, and PreClick cannot
+-- rewrite it in time. Only a new resolve makes the prefix current after the
+-- player changes group or profile.
 local function RefreshChatRequestMacros()
-    -- Before the first PLAYER_ENTERING_WORLD initializes frames, the host set
-    -- is empty and the loop does nothing.
-    if InCombatLockdown() then
-        return
-    end
-    local prefix = ChatRequest.GetPrefix()
-    for frame in pairs(secureHostFrames) do
-        local overlay = frame.clickOverlay
-        if overlay and overlay._br_chatRequestKey then
-            -- Re-resolve message from the current profile (a profile switch can
-            -- change chatRequestMessages[key] after setup).
-            -- Guard against nil msg (the frame.displayName fallback can be missing).
-            local msg = ChatRequest.ResolveMessage(frame.key, frame.displayName)
-            overlay._br_chatRequestMsg = msg
-            if msg then
-                overlay._br_attr_prefix = prefix
-                overlay:SetAttribute("macrotext", prefix .. msg)
-            end
-        end
+    for _, cat in ipairs(ChatRequest.Categories()) do
+        UpdateActionButtons(cat)
     end
 end
 
--- Refresh overlay spell attributes for all frames (e.g., after spec change).
 local function RefreshOverlaySpells()
     if InCombatLockdown() or BR.Display.IsTestMode() then
         return
     end
 
-    -- Frames can be absent if an event fires before the first
-    -- PLAYER_ENTERING_WORLD initializes them.
+    -- An event can fire before the first PLAYER_ENTERING_WORLD builds the frames.
     local framesByCategory = BR.Display.framesByCategory
     if not framesByCategory then
         return
@@ -1710,7 +1681,7 @@ local function RefreshOverlaySpells()
     local db = BR.profile
     for cat in pairs(framesByCategory) do
         local cs = db.categorySettings and db.categorySettings[cat]
-        if (cs and cs.clickable == true) or cat == "custom" then
+        if (cs and cs.clickable == true) or cat == "custom" or ChatRequest.WantsCategory(cat) then
             UpdateActionButtons(cat)
         end
     end
@@ -1728,6 +1699,8 @@ BR.SecureButtons = {
     HideSecureFramesForCatKey = HideSecureFramesForCatKey,
     ScheduleSecureSync = ScheduleSecureSync,
     ComputeConsumableFontSize = ComputeConsumableFontSize,
+    FormatStackCount = FormatStackCount,
+    GetItemCooldown = GetItemCooldown,
     BADGE_COLORS = BADGE_COLORS,
     ReapplyPetSpecIconIfHovered = ReapplyPetSpecIconIfHovered,
 }

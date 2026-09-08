@@ -147,16 +147,10 @@ local inVehicle = false
 -- Consumables dismissed state (transient, resets on instance change / reload)
 local consumablesDismissed = false
 
--- Combat/encounter state (set via SetInCombat by the Display layer)
--- This flag is the single source of truth for "are aura queries restricted?"
--- within State.lua. It covers BOTH combat lockdown AND boss encounters.
---
--- InCombatLockdown() alone is not sufficient. ENCOUNTER_START fires BEFORE
--- InCombatLockdown() returns true - the player is not in combat until their first
--- hostile action lands on the boss. During that window (hundreds of ms while a
--- spell travels) the aura API is already restricted, but InCombatLockdown() still
--- returns false. Non-whitelisted spells (e.g. Devotion Aura 465) silently return
--- nil from C_UnitAuras.GetUnitAuraBySpellID, which causes false "missing" flashes.
+-- Combat/encounter state (set via SetInCombat by the Display layer). It covers
+-- both combat lockdown and boss encounters (ENCOUNTER_START fires before
+-- InCombatLockdown() turns true). The flag gates fighting-dependent behavior
+-- only; restriction detection is measured in IsRestricted().
 local inCombat = false
 
 -- ============================================================================
@@ -188,26 +182,22 @@ local GetDifficultyIDCached -- forward declaration (defined next to GetCurrentCo
 -- flag does NOT affect IsRestricted().
 local inPvPPrepPhase = false
 
-local DUNGEON_DIFFICULTY_KEYS = {
-    [1] = "normal", -- Normal
-    [2] = "heroic", -- Heroic
-    [23] = "mythic", -- Mythic
-    [8] = "mythicPlus", -- Mythic Keystone
-    [24] = "timewalking", -- Timewalking
-    [205] = "follower", -- Follower Dungeon
-}
-
-local RAID_DIFFICULTY_KEYS = {
-    [17] = "lfr", -- Looking for Raid
-    [14] = "normal", -- Normal
-    [15] = "heroic", -- Heroic
-    [16] = "mythic", -- Mythic
-}
-
 -- Maps content type to its difficulty-key lookup table
 local CONTENT_DIFFICULTY_TABLES = {
-    dungeon = DUNGEON_DIFFICULTY_KEYS,
-    raid = RAID_DIFFICULTY_KEYS,
+    dungeon = {
+        [1] = "normal", -- Normal
+        [2] = "heroic", -- Heroic
+        [23] = "mythic", -- Mythic
+        [8] = "mythicPlus", -- Mythic Keystone
+        [24] = "timewalking", -- Timewalking
+        [205] = "follower", -- Follower Dungeon
+    },
+    raid = {
+        [17] = "lfr", -- Looking for Raid
+        [14] = "normal", -- Normal
+        [15] = "heroic", -- Heroic
+        [16] = "mythic", -- Mythic
+    },
 }
 
 -- Maps content type to the DB key holding its difficulty sub-filter
@@ -251,8 +241,15 @@ local cachedRepairSources = nil
 -- (IsSatisfied / GetRuleIcon) are read-only WoW lookups whose answers only change
 -- on spec / talent / equipment / equipment-set events, so they are cached here and
 -- reused on the 3s fallback ticker instead of re-queried every full refresh.
----@type table<string, { satisfied: boolean, icon: number|string }>
+-- An unsettled answer stays out of the cache: no event announces the moment an
+-- external loadout addon becomes able to answer.
+---@type table<string, { satisfied: boolean, icon: number|string? }>
 local cachedLoadoutState = {}
+
+-- Shared verdict for a rule that needs no reminder. Only the unsatisfied path
+-- reads an icon, so a satisfied rule must not pay to resolve one. Never mutated,
+-- so every satisfied rule can hold this one table.
+local SATISFIED_LOADOUT_STATE = { satisfied = true }
 
 -- Wrong-demon-pet cache (nil = unknown/unresolved, recomputed next Refresh).
 ---@type boolean|nil
@@ -367,12 +364,12 @@ local nameKeyedAllyCaches = { allySpecCache, allyClassCache, allyRoleCache }
 -- True in follower dungeons and delves where NPC companions can receive buffs.
 local includeNPCsInCounting = false
 
--- Aura-safe spell whitelist loaded from Data/AuraWhitelist.lua
-local AURA_WHITELIST = BR.AURA_WHITELIST
+local IsAuraSpellTrackable = BR.Restrictions.IsAuraSpellTrackable
+local CooldownsRestricted = BR.Restrictions.CooldownsRestricted
 
 ---Determine if a buff's detection method works in aura-restricted contexts (combat + M+ keystones).
 ---Non-aura detection (weapon enchants, inventory checks) is always safe.
----Aura-based detection requires all queried spell IDs to be in the Blizzard whitelist.
+---Aura-based detection requires every queried spell ID to classify as never secret.
 ---@param buff table Any buff table entry (RaidBuff, SelfBuff, ConsumableBuff, etc.)
 ---@return boolean
 local function ComputeAuraTrackable(buff)
@@ -402,21 +399,22 @@ local function ComputeAuraTrackable(buff)
     end
 
     if type(idsToCheck) == "number" then
-        return AURA_WHITELIST[idsToCheck] ~= nil
+        return IsAuraSpellTrackable(idsToCheck)
     end
     for _, id in ipairs(idsToCheck) do
-        if not AURA_WHITELIST[id] then
+        if not IsAuraSpellTrackable(id) then
             return false
         end
     end
     return true
 end
 
--- Memoized ComputeAuraTrackable: pure function of the (static) buff def and the
--- static whitelist, but called 1-3x per buff on every refresh. Weak-keyed side
+-- Memoized ComputeAuraTrackable: a function of the buff def and the per-spell
+-- secrecy classification, called 1-3x per buff on every refresh. Weak-keyed side
 -- table rather than a field on the def - custom buff / loadout defs are the live
 -- SavedVariables tables, so a cache field leaks into the user's DB. Edited
 -- custom buffs are new table objects, so they miss the cache and recompute.
+-- InvalidateAuraTrackableCache resets it together with the classification cache.
 ---@type table<table, boolean>
 local auraTrackableCache = setmetatable({}, { __mode = "k" })
 
@@ -1633,10 +1631,6 @@ local function ShouldShowTargetedBuff(spellIDs, requiredClass, beneficiaryRole, 
     return not isActive, remaining
 end
 
--- Categories that skip the "player knows this spell" check.
--- Custom buffs track buffs the user *receives*, not necessarily casts.
-local SKIP_SPELL_KNOWN_CATEGORIES = { custom = true }
-
 ---Check if player should cast their self buff or weapon imbue (returns true if missing)
 ---@param spellID SpellID
 ---@param requiredClass ClassName
@@ -1788,16 +1782,17 @@ local function GetEatingExpirationTime()
     return exp
 end
 
----Check if a consumable buff is free/reusable (freeConsumable flag or permanent rune in bags)
+---Check if a consumable buff is free/reusable (freeConsumable flag, or a permanent item of its category in bags)
 ---@param buff ConsumableBuff
 ---@return boolean
 local function IsFreeConsumable(buff)
     if buff.freeConsumable then
         return true
     end
-    if buff.permanentRuneItemIDs then
-        for _, itemID in ipairs(buff.permanentRuneItemIDs) do
-            if HasItemByMode(itemID) then
+    local items = buff.consumableCategory and BR.CONSUMABLE_ITEMS[buff.consumableCategory]
+    if items then
+        for itemID, entry in pairs(items) do
+            if type(entry) == "table" and entry.permanent and HasItemByMode(itemID) then
                 return true
             end
         end
@@ -1863,8 +1858,7 @@ end
 ---@return number? itemCount total count of items in inventory (for item-based consumables)
 local function ShouldShowConsumableBuff(buff)
     if buff.spellID then
-        local spellList = AsSpellList(buff.spellID)
-        for _, id in ipairs(spellList) do
+        for _, id in ipairs(AsSpellList(buff.spellID)) do
             local hasBuff, remaining = UnitHasBuff("player", id)
             if hasBuff then
                 local CM = BR.ConsumableMemory
@@ -2123,22 +2117,31 @@ end
 local cachedIsSpellGlowing = nil
 
 ---Check if any of a buff's spell IDs are glowing on the action bar (via Display layer)
+---This path replaces ShouldShow* in restricted contexts, so it repeats the spec
+---and spell-known gates. Without them a glow flag for an uncastable spell shows
+---a reminder.
 ---@param buff table Buff entry with spellID field
 ---@return boolean
 local function IsAnySpellGlowing(buff)
     if not cachedIsSpellGlowing then
         return false
     end
+    if buff.requireSpecId and GetPlayerSpecId() ~= buff.requireSpecId then
+        return false
+    end
     local spellID = buff.spellID
+    if not spellID then
+        return false
+    end
     if type(spellID) == "table" then
         for _, id in ipairs(spellID) do
-            if cachedIsSpellGlowing(id) then
+            if IsPlayerSpellCached(id) and cachedIsSpellGlowing(id) then
                 return true
             end
         end
         return false
     end
-    return cachedIsSpellGlowing(spellID)
+    return IsPlayerSpellCached(spellID) and cachedIsSpellGlowing(spellID)
 end
 
 -- Coverage category: the reminder counts how many group members miss the buff.
@@ -2583,7 +2586,6 @@ end
 -- User-defined buffs. They take the same path as self and pet buffs.
 local function RefreshCustom(isAuraRestricted, hideExpiring)
     local _, customMissGlow = GetCategoryGlowSettings("custom")
-    local skipSpellKnown = SKIP_SPELL_KNOWN_CATEGORIES["custom"]
     for i, buff in ipairs(CustomBuffs) do
         local entry = GetOrCreateEntry(buff.key, "custom", i)
         local settingKey = buff.groupId or buff.key
@@ -2613,9 +2615,11 @@ local function RefreshCustom(isAuraRestricted, hideExpiring)
             if gateItemID and not HasItemByMode(gateItemID, buff.requireItemMode) then
                 shouldProcess = false
             end
-            if shouldProcess and gateItemID and buff.itemCooldownCondition then
+            if shouldProcess and gateItemID and buff.itemCooldownCondition and not CooldownsRestricted() then
+                -- pcall: gateItemID is user-entered and an invalid ID can throw.
                 local ok, _, duration = pcall(C_Item.GetItemCooldown, gateItemID)
-                if ok and duration then
+                duration = ok and Plain(duration) or nil
+                if duration then
                     local isReady = duration == 0
                     if
                         (buff.itemCooldownCondition == "offCooldown" and not isReady)
@@ -2645,7 +2649,7 @@ local function RefreshCustom(isAuraRestricted, hideExpiring)
                 buff.buffIdOverride,
                 buff.customCheck,
                 buff.requireSpecId,
-                skipSpellKnown,
+                true, -- custom buffs track buffs the player receives, not casts
                 buff.requiresBuffWithEnchant
             )
             local wantPresent = buff.showWhenPresent
@@ -2684,8 +2688,12 @@ local function RefreshLoadout()
         then
             local state = cachedLoadoutState[rule.key]
             if not state then
-                state = { satisfied = Loadouts.IsSatisfied(rule), icon = Loadouts.GetRuleIcon(rule) }
-                cachedLoadoutState[rule.key] = state
+                local satisfied, known = Loadouts.IsSatisfied(rule)
+                state = satisfied and SATISFIED_LOADOUT_STATE
+                    or { satisfied = false, icon = Loadouts.GetRuleIcon(rule) }
+                if known then
+                    cachedLoadoutState[rule.key] = state
+                end
             end
             if not state.satisfied then
                 entry.dynamicIcon = state.icon
@@ -2903,7 +2911,7 @@ function BuffState.GetConsumablesDismissed()
     return consumablesDismissed
 end
 
----Set the combat/encounter state (single source of truth for aura restrictions)
+---Set the combat/encounter state.
 ---Called by the Display layer on ENCOUNTER_START, PLAYER_REGEN_DISABLED, etc.
 ---@param state boolean
 function BuffState.SetInCombat(state)
@@ -2919,13 +2927,10 @@ end
 ---Raw difficultyID from GetInstanceInfo (cached; invalidated with content type)
 BuffState.GetDifficultyID = GetDifficultyIDCached
 
----Whether the player is in a restricted context (combat, M+ keystone, or any PvP instance).
----A PvP instance is restricted for its entire duration, prep included: Blizzard
----gates the aura API the whole time the player is inside the BG or arena.
----@return boolean
-function BuffState.IsRestricted()
-    return inCombat or GetCurrentDifficultyKey() == "mythicPlus" or GetCurrentContentType() == "pvp"
-end
+---Whether the player is in a restricted context: aura queries return secret
+---values. Measured through C_Secrets.ShouldAurasBeSecret.
+---@type fun(): boolean
+BuffState.IsRestricted = BR.Restrictions.AurasRestricted
 
 ---Whether the player has no allies in the group (open-world solo or scenario solo).
 ---Live check: covers both open-world solo (groupSize 0) and scenario solo such as
@@ -3038,6 +3043,13 @@ function BuffState.InvalidateContentTypeCache()
     -- inPvPPrepPhase is NOT reset here - SetPvPPrepPhase() manages it explicitly.
     -- A reset here clobbers the prep state when the deferred
     -- ZONE_CHANGED_NEW_AREA invalidation fires 0.5s after entry to a PvP instance.
+end
+
+---Invalidate the aura-trackable caches (call on PLAYER_ENTERING_WORLD).
+---Blizzard can reclassify a spell's secrecy in a mid-session hotfix.
+function BuffState.InvalidateAuraTrackableCache()
+    auraTrackableCache = setmetatable({}, { __mode = "k" })
+    BR.Restrictions.InvalidateSpellSecrecyCache()
 end
 
 ---Invalidate spec ID cache (call on PLAYER_ENTERING_WORLD, PLAYER_SPECIALIZATION_CHANGED)

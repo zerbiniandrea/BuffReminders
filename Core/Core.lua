@@ -399,6 +399,7 @@ local DefaultSettingKeys = {
     rightClickSnooze = "DisplayRefresh", -- Re-wires the consumable buttons' type2 attribute
     showBuffTooltips = "VisualsRefresh", -- Toggles raid/presence hover capture vs click-through
     hideLegacyConsumables = "DisplayRefresh",
+    preferReusableRunes = "DisplayRefresh",
     -- Pet display mode
     petDisplayMode = "DisplayRefresh",
     petLabels = "DisplayRefresh",
@@ -465,8 +466,7 @@ local function ValidatePath(segments)
     local root = segments[1]
 
     -- Check root-level settings (false = valid but no refresh event)
-    local isRootSetting = RootSettings[root] ~= nil
-    if isRootSetting then
+    if RootSettings[root] ~= nil then
         if #segments == 1 then
             return true, RootSettings[root]
         end
@@ -491,6 +491,10 @@ local function ValidatePath(segments)
         end
         -- defaults.textPositions.<item>.<field> (zone | offsetX | offsetY)
         if segments[2] == "textPositions" and #segments == 4 then
+            return true, "VisualsRefresh"
+        end
+        -- defaults.textSizes.<item>; nil clears the override
+        if segments[2] == "textSizes" and #segments == 3 then
             return true, "VisualsRefresh"
         end
         return false, nil

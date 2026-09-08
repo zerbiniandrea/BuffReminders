@@ -329,14 +329,8 @@ L["Externals.GroupBuffs"] = "그룹 버프"
 L["Externals.Movement"] = "이동기"
 L["Externals.Aggro"] = "위협 수준 이전"
 L["Externals.Augmentation"] = "증강"
-L["Externals.Bloodlust"] = "피의 욕망"
-L["Externals.MassBarrier"] = "단체 보호막"
-L["Externals.BlessingOfSeasons"] = "계절의 축복"
 L["Externals.DurationSize"] = "초읽기 텍스트 크기"
 L["Externals.Appearance"] = "외형"
-L["Externals.AppearanceNote"] =
-    "이들 버프는 비밀 상태이고 게임에서 아이콘 외형을 재구성하는 것을 금지하고 있어서 전투 중에 변경한 사항은 전투가 끝난 뒤에 적용됩니다. 줄을 드래그하려면 프레임 잠금을 해제하세요."
-L["Externals.MasqueNote"] = "Masque는 이 카테고리의 아이콘들은 스킨을 입힐 수 없습니다: 크기 정보를 읽으면 비밀 값으로 반환됩니다."
 
 -- Page titles
 L["Page.General"] = "일반"
@@ -574,10 +568,6 @@ L["Options.PetLabels.SizePct"] = "크기 %"
 -- ============================================================================
 -- OPTIONS: CONSUMABLE DISPLAY
 -- ============================================================================
-L["Options.ConsumableTextScale"] = "텍스트 크기"
-L["Options.ConsumableTextScale.Title"] = "소모품 텍스트 크기"
-L["Options.ConsumableTextScale.Desc"] =
-    "아이콘 크기 대비 아이템 수량 및 등급(R1/R2/R3) 라벨의 폰트 크기 비율입니다."
 L["Options.ConsumableBadgeOnSubIcons"] = "하위 아이콘에 등급 표시"
 L["Options.ConsumableBadgeOnSubIcons.Title"] = "하위 아이콘 등급 표시"
 L["Options.ConsumableBadgeOnSubIcons.Desc"] =

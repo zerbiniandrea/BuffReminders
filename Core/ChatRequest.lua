@@ -17,21 +17,22 @@ local CATEGORY_ORDER = BR.STATIC_CATEGORIES
 
 local buffList
 local categoryList
+local categorySet
 
 -- BR.BUFF_TABLES is static after load (custom buffs are not scanned), so one
 -- build is safe to cache for the session.
 local function build()
     buffList = {}
     categoryList = {}
-    local seenCat = {}
+    categorySet = {}
     for _, cat in ipairs(CATEGORY_ORDER) do
         local tbl = BR.BUFF_TABLES[cat]
         if tbl then
             for _, def in ipairs(tbl) do
                 if def.chatRequestable then
                     buffList[#buffList + 1] = def
-                    if not seenCat[cat] then
-                        seenCat[cat] = true
+                    if not categorySet[cat] then
+                        categorySet[cat] = true
                         categoryList[#categoryList + 1] = cat
                     end
                 end
@@ -56,6 +57,22 @@ function ChatRequest.Categories()
         build()
     end
     return categoryList
+end
+
+--- True when the category can produce a chat request for the current profile.
+--- The click-to-cast setting of the category does not gate a request: the player
+--- asked for one on the Chat Requests page, so the wiring paths that skip a
+--- non-clickable category must still visit this one.
+---@param category string
+---@return boolean
+function ChatRequest.WantsCategory(category)
+    if BR.profile.requestBuffInChat ~= true then
+        return false
+    end
+    if not categorySet then
+        build()
+    end
+    return categorySet[category] == true
 end
 
 --- Slash-command prefix for the current group context (instance > raid > party > say).

@@ -19,10 +19,6 @@ local CreateButton = BR.CreateButton
 local UpdateDisplay = BR.Display.Update
 
 local tinsert = table.insert
-local tsort = table.sort
-local ceil = math.ceil
-local max = math.max
-local huge = math.huge
 
 local ROW_HEIGHT = 24
 local NOTE_TO_LABEL_GAP = 8
@@ -106,7 +102,7 @@ local function BuildInline(parent, opts)
     note:SetWidth(width)
     note:SetJustifyH("LEFT")
     note:SetText(L["Options.RoguePoisonNote"])
-    local noteH = max(ceil(note:GetStringHeight()), 12)
+    local noteH = math.max(math.ceil(note:GetStringHeight()), 12)
 
     local labelY = y - noteH - NOTE_TO_LABEL_GAP
     local lethalLabel = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -212,7 +208,7 @@ local function BuildInline(parent, opts)
     end
 
     -- Rows bind to their entry table by closure, and entry identity survives
-    -- tsort. The row frames reorder to match the sorted prefs.
+    -- table.sort. The row frames reorder to match the sorted prefs.
     local function ResetToDefaults()
         for _, category in ipairs({ "lethal", "nonLethal" }) do
             local catDefaults = BR.DEFAULT_POISON_PREFERENCES[category]
@@ -220,8 +216,8 @@ local function BuildInline(parent, opts)
             for i, e in ipairs(catDefaults) do
                 defaultIndex[e.spellID] = i
             end
-            tsort(prefs[category], function(a, b)
-                return (defaultIndex[a.spellID] or huge) < (defaultIndex[b.spellID] or huge)
+            table.sort(prefs[category], function(a, b)
+                return (defaultIndex[a.spellID] or math.huge) < (defaultIndex[b.spellID] or math.huge)
             end)
             for _, entry in ipairs(prefs[category]) do
                 entry.enabled = true
@@ -244,7 +240,7 @@ local function BuildInline(parent, opts)
         ApplyChange()
     end
 
-    local maxRows = max(#prefs.lethal, #prefs.nonLethal)
+    local maxRows = math.max(#prefs.lethal, #prefs.nonLethal)
     local rowsBottom = rowsTop - maxRows * ROW_HEIGHT
 
     -- CreateButton auto-sizes to its text (height 22); just anchor it.

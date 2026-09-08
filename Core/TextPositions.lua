@@ -8,8 +8,11 @@ local _, BR = ...
 -- optional pixel nudge. Display sites must call Apply() instead of SetPoint,
 -- so the user can re-arrange overlapping text from Options.
 --
--- Storage is global only: defaults.textPositions[item]. Each item has exactly
--- one realistic consumer, so there is no per-category override.
+-- Icon-overlay items also carry an optional size, stored as a percentage of the
+-- icon size in defaults.textSizes[item].
+--
+-- Storage is global only. Each item has exactly one realistic consumer, so
+-- there is no per-category override.
 
 BR.TextPositions = {}
 
@@ -112,6 +115,39 @@ local DEFAULT_ZONES = {
     petLabel = "BELOW_C",
 }
 BR.TextPositions.DefaultZones = DEFAULT_ZONES
+
+-- Icon-overlay text items that carry an independent size. The stored value is a
+-- percentage of the icon size. An absent value follows consumableTextScale.
+local SIZED_ITEMS = {
+    statLabel = true,
+    badge = true,
+    stackCount = true,
+}
+BR.TextPositions.SizedItems = SIZED_ITEMS
+
+---Stored size override for an item, or nil while the item follows the base.
+---@param item string? A key from BR.TextPositions.SizedItems
+---@return number?
+function BR.TextPositions.GetSizeOverride(item)
+    if not item or not SIZED_ITEMS[item] then
+        return nil
+    end
+    local defaults = BR.profile and BR.profile.defaults
+    local sizes = defaults and defaults.textSizes
+    return sizes and sizes[item]
+end
+
+---Effective size percentage for an icon-overlay text item.
+---@param item string? nil returns the shared base
+---@return number percent
+function BR.TextPositions.GetSizePercent(item)
+    local own = BR.TextPositions.GetSizeOverride(item)
+    if own then
+        return own
+    end
+    local defaults = BR.profile and BR.profile.defaults
+    return (defaults and defaults.consumableTextScale) or BR.defaults.defaults.consumableTextScale
+end
 
 ---Resolve a zone name to its SetPoint descriptor. Falls back to INSIDE_C.
 ---@param zone string?

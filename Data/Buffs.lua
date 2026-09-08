@@ -18,6 +18,9 @@ local _, playerClass = UnitClass("player")
 local AuraField = BR.Secret.AuraField
 local Plain = BR.Secret.Plain
 
+-- Restriction predicate for the cooldown domain (see Core/Restrictions.lua)
+local CooldownsRestricted = BR.Restrictions.CooldownsRestricted
+
 -- ============================================================================
 -- BUFF DATA TABLES
 -- ============================================================================
@@ -156,7 +159,6 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
 ---@field consumableCategory? string Category key in BR.CONSUMABLE_ITEMS for bag scanning (only set when items exist)
 ---@field freeConsumable? boolean Bypass content gates (always show when enabled)
----@field permanentRuneItemIDs? number[] Item IDs that, if in bags, make this a free consumable (bypass content gates)
 ---@field showOnInstanceEntry? boolean Only show briefly when entering an instance
 ---@field disabledInCompetitivePvP? boolean Unusable in arenas and rated BGs
 ---@field ignoresReadyCheckFilter? boolean Ignore the consumable category ready-check-only filter (still respects content gates)
@@ -358,11 +360,8 @@ local function RefreshPoisonCache()
     end
     poisonCache.time = now
 
-    local lethalList = GetEnabledPoisons("lethal")
-    local nonLethalList = GetEnabledPoisons("nonLethal")
-
-    local activeL, knownL, missingL, minRemL, expIDL = ScanPoisonCategory(lethalList, now)
-    local activeNL, knownNL, missingNL, minRemNL, expIDNL = ScanPoisonCategory(nonLethalList, now)
+    local activeL, knownL, missingL, minRemL, expIDL = ScanPoisonCategory(GetEnabledPoisons("lethal"), now)
+    local activeNL, knownNL, missingNL, minRemNL, expIDNL = ScanPoisonCategory(GetEnabledPoisons("nonLethal"), now)
 
     poisonCache.activeL = activeL
     poisonCache.activeNL = activeNL
@@ -568,7 +567,7 @@ BR.BUFF_TABLES = {
             readyCheckOnly = true,
             castOnOthers = true,
             noExpirationGlow = true,
-            customCheck = function(isRestricted)
+            customCheck = function()
                 if playerClass ~= "WARLOCK" then
                     return nil
                 end
@@ -576,14 +575,16 @@ BR.BUFF_TABLES = {
                 if not (db.defaults and db.defaults.soulstoneHideCooldown) then
                     return nil -- Setting off: no opinion, rely on aura presence
                 end
-                if isRestricted then
+                -- C_Spell.GetSpellCooldown returns secret values when cooldowns are restricted
+                if CooldownsRestricted() then
                     return false
                 end
-                local ok, result = pcall(function()
-                    local info = C_Spell.GetSpellCooldown(20707)
-                    return not info or info.duration == 0
-                end)
-                return not ok or result
+                local info = C_Spell.GetSpellCooldown(20707)
+                if not info then
+                    return true
+                end
+                local duration = Plain(info.duration)
+                return duration == nil or duration == 0
             end,
             pinnedTarget = function()
                 local db = BR.profile
@@ -662,6 +663,7 @@ BR.BUFF_TABLES = {
             groupId = "beacons",
             requireSpecId = 65, -- Holy only
             glowDetectable = true,
+            excludeSpellID = 200025, -- Hide when Beacon of Virtue is known
             clickMacro = TargetedClickMacro("beaconOfFaith"),
         },
         {
@@ -1190,7 +1192,6 @@ BR.BUFF_TABLES = {
             key = "rune",
             name = L["Buff.AugmentRune"],
             overlayText = L["Overlay.NoRune"],
-            permanentRuneItemIDs = { 243191, 259085 }, -- Ethereal (TWW), Void-Touched (Midnight)
             groupId = "rune",
             consumableCategory = "rune",
             disabledInCompetitivePvP = true,
@@ -1375,16 +1376,17 @@ BR.BUFF_TABLES = {
                 desc = L["Tooltip.InstanceEntryReminder.Desc"],
                 atlas = "auctionhouse-icon-clock", -- clock reads "timed reminder", not the generic "!" info icon
             },
-            customCheck = function(isRestricted)
-                -- Cooldown API returns tainted values during combat/encounters/M+
-                if isRestricted then
+            customCheck = function()
+                -- C_Spell.GetSpellCooldown returns secret values when cooldowns are restricted
+                if CooldownsRestricted() then
                     return false
                 end
-                local ok, result = pcall(function()
-                    local info = C_Spell.GetSpellCooldown(29893)
-                    return not info or info.duration == 0
-                end)
-                return not ok or result
+                local info = C_Spell.GetSpellCooldown(29893)
+                if not info then
+                    return true
+                end
+                local duration = Plain(info.duration)
+                return duration == nil or duration == 0
             end,
         },
         -- Refreshment table reminder (mage only, instance entry only). Spell 190336
@@ -1405,21 +1407,26 @@ BR.BUFF_TABLES = {
                 atlas = "auctionhouse-icon-clock", -- clock reads "timed reminder", not the generic "!" info icon
             },
             customCheck = function(isRestricted)
-                -- Cooldown API returns tainted values during combat/encounters/M+
+                -- Role reads stay plain only outside aura-restricted contexts, so
+                -- this gate must come before HasHealerInGroup.
                 if isRestricted then
                     return false
                 end
                 -- Only mana users drink from the table, so the reminder needs a healer
-                -- in the party. The scan comes after the isRestricted gate, which keeps
-                -- the role read plain.
+                -- in the party.
                 if not BR.BuffState.HasHealerInGroup() then
                     return false
                 end
-                local ok, result = pcall(function()
-                    local info = C_Spell.GetSpellCooldown(190336)
-                    return not info or info.duration == 0
-                end)
-                return not ok or result
+                -- C_Spell.GetSpellCooldown returns secret values when cooldowns are restricted
+                if CooldownsRestricted() then
+                    return false
+                end
+                local info = C_Spell.GetSpellCooldown(190336)
+                if not info then
+                    return true
+                end
+                local duration = Plain(info.duration)
+                return duration == nil or duration == 0
             end,
         },
         -- Repair reminder: shows when any equipped item drops below the configured

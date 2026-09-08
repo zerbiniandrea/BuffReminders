@@ -19,10 +19,6 @@ local COL_PADDING = BR.Options.Constants.COL_PADDING
 local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
 
 local strtrim = strtrim
-local tinsert = table.insert
-local tremove = table.remove
-local mmax = math.max
-local abs = math.abs
 local wipe = wipe
 
 ---Build the tab body. Every rebuild sets the frame height. BuildTab then calls
@@ -97,19 +93,19 @@ local function BuildTab(frame, contentWidth, onResize)
             removeBtn:SetNormalFontObject("GameFontRedSmall")
             removeBtn:SetText("x")
             removeBtn:SetScript("OnClick", function()
-                tremove(names, i)
+                table.remove(names, i)
                 if #names == 0 then
                     db.customAnchorFrames = nil
                 end
                 BR.CallbackRegistry:TriggerEvent("CustomAnchorsChanged")
             end)
 
-            tinsert(entries, row)
+            table.insert(entries, row)
             entryY = entryY + 22
         end
 
-        list:SetHeight(mmax(1, entryY))
-        frame:SetHeight(abs(layout:GetY()) + entryY + 16)
+        list:SetHeight(math.max(1, entryY))
+        frame:SetHeight(math.abs(layout:GetY()) + entryY + 16)
         onResize()
     end
 
@@ -153,7 +149,7 @@ local function BuildTab(frame, contentWidth, onResize)
     BR.CallbackRegistry:RegisterCallback("CustomAnchorsChanged", Rebuild)
 
     -- A profile switch replaces the list, so the tab renders again on show.
-    tinsert(BR.RefreshableComponents, {
+    table.insert(BR.RefreshableComponents, {
         Refresh = function()
             if frame:IsVisible() then
                 Rebuild()

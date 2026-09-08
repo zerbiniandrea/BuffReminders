@@ -21,7 +21,6 @@ local COL_PADDING = BR.Options.Constants.COL_PADDING
 local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
 
 local strtrim = strtrim
-local abs = math.abs
 
 local ICON_SIZE = 20
 local ICON_GAP = 6
@@ -123,6 +122,7 @@ local function Build(content, scrollFrame)
         end
         RefreshChatActions()
     end)
+    resetBtn:BindEnabled(isToggleOn)
     layout:Add(resetBtn, nil, COMPONENT_GAP)
 
     -- Checked = cooldown on, which is the default. A client bug drops the chat
@@ -147,7 +147,7 @@ local function Build(content, scrollFrame)
     local cooldownHint = LayoutSubsectionNote(layout, content, L["Options.ChatRequest.Cooldown.Hint"])
     cooldownHint:SetTextColor(1, 0.82, 0)
 
-    content:SetHeight(abs(layout:GetY()) + 20)
+    content:SetHeight(math.abs(layout:GetY()) + 20)
 end
 
 BR.Options.Pages.chatRequests = {

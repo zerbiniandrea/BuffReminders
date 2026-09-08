@@ -28,10 +28,6 @@ local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
 local SCROLLBAR_WIDTH = BR.Options.Constants.SCROLLBAR_WIDTH
 
 local tinsert = table.insert
-local tsort = table.sort
-local abs = math.abs
-local rad = math.rad
-local format = string.format
 
 local ALL_CATEGORIES = BR.CATEGORY_ORDER
 
@@ -74,7 +70,7 @@ local function GetCombinedOrder()
     for i, cat in ipairs(ALL_CATEGORIES) do
         declarationIndex[cat] = i
     end
-    tsort(list, function(a, b)
+    table.sort(list, function(a, b)
         local pa, pb = GetPriority(a), GetPriority(b)
         if pa == pb then
             return declarationIndex[a] < declarationIndex[b]
@@ -128,7 +124,7 @@ local function CreateOrderArrowButton(parent, direction, onClick)
     arrow:SetSize(ORDER_ARROW_TEX_SIZE, ORDER_ARROW_TEX_SIZE)
     arrow:SetPoint("CENTER", 0, 0)
     arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
-    arrow:SetRotation(direction == "up" and rad(90) or rad(-90))
+    arrow:SetRotation(direction == "up" and math.rad(90) or math.rad(-90))
 
     local enabled = true
 
@@ -284,7 +280,7 @@ local function BuildOrderTab(frame, contentWidth)
     local listWidth = contentWidth - COL_PADDING * 2
     local orderList, orderHeight = BuildDisplayOrderList(frame, listWidth)
     layout:Add(orderList, orderHeight, COMPONENT_GAP)
-    frame:SetHeight(abs(layout:GetY()) + TAB_BOTTOM_PADDING)
+    frame:SetHeight(math.abs(layout:GetY()) + TAB_BOTTOM_PADDING)
 end
 
 local function BuildDetachedTab(frame, contentWidth, onResize)
@@ -306,7 +302,7 @@ local function BuildDetachedTab(frame, contentWidth, onResize)
         for key in pairs(detached) do
             tinsert(keys, key)
         end
-        tsort(keys, function(a, b)
+        table.sort(keys, function(a, b)
             return GetDetachedDisplayName(a) < GetDetachedDisplayName(b)
         end)
 
@@ -329,7 +325,7 @@ local function BuildDetachedTab(frame, contentWidth, onResize)
                 local posFS = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
                 posFS:SetPoint("LEFT", nameFS, "RIGHT", 8, 0)
                 local pos = detached[key] and detached[key].position
-                posFS:SetText(pos and format("%d · %d", pos.x or 0, pos.y or 0) or "")
+                posFS:SetText(pos and string.format("%d · %d", pos.x or 0, pos.y or 0) or "")
 
                 local returnBtn = CreateButton(row, L["DetachedIcons.Reattach"], function()
                     ReattachIcon(key)
@@ -348,7 +344,7 @@ local function BuildDetachedTab(frame, contentWidth, onResize)
             end
         end
 
-        local dynHeight = abs(dyn:GetY())
+        local dynHeight = math.abs(dyn:GetY())
         -- A frame with one anchor point and no height has an unresolved rect,
         -- and WoW does not render the subtree of an unresolved frame.
         dynContent:SetHeight(dynHeight)

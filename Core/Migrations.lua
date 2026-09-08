@@ -22,7 +22,7 @@ local max = math.max
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 52
+BR.Migrations.DB_VERSION = 54
 
 -- Run pending migrations against the profile `db`, using code `defaults` for
 -- fallbacks. `ctx` carries the Display.lua file-scope values the migrations
@@ -1054,10 +1054,43 @@ function BR.Migrations.Run(db, defaults, ctx)
                 end
             end
         end,
+        -- [53] Aura Mastery leaves the curated externals list: aura 31821 lands on
+        -- the paladin who casts it, not on the group, so the entry can never fire
+        -- for the player it was offered to. Nothing walks a tracked key without a
+        -- matching entry, so this pass only clears the dead saved keys.
+        [53] = function()
+            local externals = db.externals
+            if not externals then
+                return
+            end
+            if externals.entries then
+                externals.entries.auraMastery = nil
+            end
+            if externals.sounds then
+                externals.sounds.auraMastery = nil
+            end
+        end,
+        -- [54] Luminous Barrier and Earthen Wall Totem leave the curated externals
+        -- list: the game removed both abilities, so auras 271466 and 201633 can never
+        -- apply. Nothing walks a tracked key without a matching entry, so this pass
+        -- only clears the dead saved keys.
+        [54] = function()
+            local externals = db.externals
+            if not externals then
+                return
+            end
+            if externals.entries then
+                externals.entries.luminousBarrier = nil
+                externals.entries.earthenWall = nil
+            end
+            if externals.sounds then
+                externals.sounds.luminousBarrier = nil
+                externals.sounds.earthenWall = nil
+            end
+        end,
     }
 
-    local currentVersion = db.dbVersion or 0
-    for version = currentVersion + 1, BR.Migrations.DB_VERSION do
+    for version = (db.dbVersion or 0) + 1, BR.Migrations.DB_VERSION do
         if migrations[version] then
             migrations[version]()
         end

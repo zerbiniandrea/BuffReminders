@@ -23,9 +23,6 @@ local UpdateDisplay = BR.Display.Update
 local ITEM_HEIGHT = BR.Options.Constants.ITEM_HEIGHT
 
 local tinsert = table.insert
-local min = math.min
-
-BR.Options.BuffRow = BR.Options.BuffRow or {}
 
 -- Clickable-link affordance on the trailing link. Plain ASCII ">" renders in
 -- every client font - the U+203A chevron is tofu in the CJK/Cyrillic bundled
@@ -214,7 +211,7 @@ local function CreateBuffRow(
         - GLYPH_RESERVE
         - LINK_GAP
     if holder.label:GetStringWidth() > maxLabelW then
-        holder.label:SetWidth(min(maxLabelW, holder.label:GetStringWidth()))
+        holder.label:SetWidth(math.min(maxLabelW, holder.label:GetStringWidth()))
         holder.label:SetJustifyH("LEFT")
     end
 

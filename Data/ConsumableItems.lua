@@ -8,6 +8,7 @@ local L = BR.L
 ---@field badge? string Bottom-left overlay text
 ---@field priority? number Sort order. The lowest number sorts first.
 ---@field legacy? boolean Item of a prior expansion. The hideLegacyConsumables setting hides it.
+---@field permanent? boolean A use does not consume the item. It has no meaningful stack count.
 
 ---@type table<string, table<number, ConsumableItemInfo|boolean>>
 BR.CONSUMABLE_ITEMS = {
@@ -250,8 +251,8 @@ BR.CONSUMABLE_ITEMS = {
         -- Tidesworn is conjured and free, so it spends before Void-Touched
         [274797] = { priority = 1 }, -- Tidesworn Augment Rune (Midnight, CN-only)
         [259085] = { priority = 2 }, -- Void-Touched Augment Rune (Midnight)
-        -- Ethereal is TWW but permanent/infinite (see permanentRuneItemIDs in Buffs.lua), so not flagged legacy
-        [243191] = { priority = 3 }, -- Ethereal Augment Rune (TWW permanent)
+        -- Ethereal is TWW but permanent, so it is not flagged legacy
+        [243191] = { priority = 3, permanent = true }, -- Ethereal Augment Rune (TWW permanent)
         -- TWW (legacy)
         [246492] = { priority = 4, legacy = true }, -- Soulgorged Augment Rune (TWW, persists through death)
         [224572] = { priority = 5, legacy = true }, -- Crystallized Augment Rune (TWW single use)

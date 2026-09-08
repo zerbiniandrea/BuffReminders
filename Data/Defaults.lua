@@ -148,6 +148,7 @@ BR.defaults = {
         rightClickSnooze = true,
         showBuffTooltips = false,
         hideLegacyConsumables = true,
+        preferReusableRunes = false,
         petDisplayMode = "generic", -- "generic" or "expanded"
         petLabels = true,
         petLabelScale = 100,
@@ -159,6 +160,12 @@ BR.defaults = {
             MAGE = true,
         },
         useFelDomination = false,
+        -- Per-text-item size override, as a percentage of the icon size. An
+        -- absent key follows consumableTextScale. Like every key in this table,
+        -- the __index metatable serves it and DeepCopyDefault never copies it
+        -- into the profile, so write it only through BR.Config.Set - a direct
+        -- write lands in this shared table and leaks across profiles.
+        textSizes = {},
         -- Per-text-item placement (zone + pixel nudge). See Core/TextPositions.lua
         -- for zone constants. Defaults preserve the prior hard-coded anchors so
         -- existing users see no visual change until they edit a value.

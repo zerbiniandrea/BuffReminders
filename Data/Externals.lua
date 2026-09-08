@@ -11,15 +11,17 @@ local _, BR = ...
 -- buffs on assistable units". A harmful aura on yourself can never be tracked, so
 -- this list is buffs-you-receive by construction.
 --
--- `section` buckets an entry under a heading in the options list. `labelKey` is only
--- needed when one entry spans spells with different names, since single-name entries
--- take their label from the spell itself and localize for free. `labelSpellID` names
--- an entry after the ability that grants the aura, for auras whose own name misleads.
+-- `section` buckets an entry under a heading in the options list. An entry is named
+-- after its first spell, so the label is the client's own. `labelSpellID` names it after
+-- the granting ability instead, when the aura's own name misleads. `labelSpellIDs` joins
+-- several names, for an effect the game names once per faction.
 
 ---Display groupings, in the order the options page renders them.
 BR.EXTERNAL_SECTIONS = {
-    { key = "defensives", titleKey = "Externals.Defensives" },
-    { key = "groupBuffs", titleKey = "Externals.GroupBuffs" },
+    { key = "personal", titleKey = "Externals.PersonalDefensives" },
+    { key = "groupDefensives", titleKey = "Externals.GroupDefensives" },
+    { key = "minorGroupDefensives", titleKey = "Externals.MinorGroupDefensives" },
+    { key = "boosts", titleKey = "Externals.Boosts" },
     { key = "movement", titleKey = "Externals.Movement" },
     { key = "aggro", titleKey = "Externals.Aggro" },
     { key = "augmentation", titleKey = "Externals.Augmentation" },
@@ -28,39 +30,39 @@ BR.EXTERNAL_SECTIONS = {
 -- Within a section, entries are ordered by their English name: the options page
 -- renders them in this order, so the list reads alphabetically with no sort.
 BR.EXTERNALS = {
-    { key = "ancestralProtection", section = "defensives", spellIDs = { 207498 } }, -- Shaman
-    { key = "antiMagicZone", section = "defensives", spellIDs = { 145629 } }, -- Death Knight
-    { key = "auraMastery", section = "defensives", spellIDs = { 31821 } }, -- Paladin
-    { key = "blessingOfProtection", section = "defensives", spellIDs = { 1022 } }, -- Paladin
-    { key = "blessingOfSacrifice", section = "defensives", spellIDs = { 6940 } }, -- Paladin
-    { key = "blessingOfSpellwarding", section = "defensives", spellIDs = { 204018 } }, -- Paladin
-    { key = "darkness", section = "defensives", spellIDs = { 209426 } }, -- Demon Hunter
-    { key = "earthenWall", section = "defensives", spellIDs = { 201633 } }, -- Shaman
-    { key = "guardianSpirit", section = "defensives", spellIDs = { 47788 } }, -- Priest
-    { key = "intervene", section = "defensives", spellIDs = { 147833 } }, -- Warrior
-    { key = "ironbark", section = "defensives", spellIDs = { 102342 } }, -- Druid
-    { key = "lifeCocoon", section = "defensives", spellIDs = { 116849 } }, -- Monk
-    { key = "luminousBarrier", section = "defensives", spellIDs = { 271466 } }, -- Priest
+    { key = "blessingOfProtection", section = "personal", spellIDs = { 1022 } }, -- Paladin
+    { key = "blessingOfSacrifice", section = "personal", spellIDs = { 6940 } }, -- Paladin
+    { key = "blessingOfSpellwarding", section = "personal", spellIDs = { 204018 } }, -- Paladin
+    { key = "guardianSpirit", section = "personal", spellIDs = { 47788 } }, -- Priest
+    { key = "intervene", section = "personal", spellIDs = { 147833 } }, -- Warrior
+    { key = "ironbark", section = "personal", spellIDs = { 102342 } }, -- Druid
+    { key = "lifeCocoon", section = "personal", spellIDs = { 116849 } }, -- Monk
+    { key = "painSuppression", section = "personal", spellIDs = { 33206 } }, -- Priest
+    { key = "timeDilation", section = "personal", spellIDs = { 357170 } }, -- Evoker
+
+    { key = "ancestralProtection", section = "groupDefensives", spellIDs = { 207498 } }, -- Shaman
+    { key = "antiMagicZone", section = "groupDefensives", spellIDs = { 145629 } }, -- Death Knight
+    { key = "darkness", section = "groupDefensives", spellIDs = { 209426 } }, -- Demon Hunter
+    { key = "powerWordBarrier", section = "groupDefensives", spellIDs = { 81782 } }, -- Priest
+    { key = "rallyingCry", section = "groupDefensives", spellIDs = { 97463 } }, -- Warrior
+
     {
         key = "massBarrier", -- Mage
-        section = "defensives",
-        labelKey = "Externals.MassBarrier",
+        section = "minorGroupDefensives",
+        labelSpellID = 414660,
         spellIDs = {
             414661, -- Ice Barrier
             414662, -- Blazing Barrier
             414663, -- Prismatic Barrier
         },
     },
-    { key = "painSuppression", section = "defensives", spellIDs = { 33206 } }, -- Priest
-    { key = "powerWordBarrier", section = "defensives", spellIDs = { 81782 } }, -- Priest
-    { key = "timeDilation", section = "defensives", spellIDs = { 357170 } }, -- Evoker
-    { key = "zephyr", section = "defensives", spellIDs = { 374227 } }, -- Evoker
+    { key = "zephyr", section = "minorGroupDefensives", spellIDs = { 374227 } }, -- Evoker
 
     {
         key = "blessingOfSeasons", -- Paladin
         defaultSound = false,
-        section = "groupBuffs",
-        labelKey = "Externals.BlessingOfSeasons",
+        section = "boosts",
+        labelSpellID = 395355,
         spellIDs = {
             388007, -- Blessing of Summer
             388010, -- Blessing of Autumn
@@ -70,8 +72,8 @@ BR.EXTERNALS = {
     },
     {
         key = "bloodlust", -- Shaman + the cross-class variants
-        section = "groupBuffs",
-        labelKey = "Externals.Bloodlust",
+        section = "boosts",
+        labelSpellIDs = { 2825, 32182 },
         spellIDs = {
             2825, -- Bloodlust
             32182, -- Heroism
@@ -79,14 +81,15 @@ BR.EXTERNALS = {
             90355, -- Ancient Hysteria
             264667, -- Primal Rage
             390386, -- Fury of the Aspects
+            466904, -- Harrier's Cry
         },
     },
-    { key = "innervate", section = "groupBuffs", spellIDs = { 29166 } }, -- Druid
-    { key = "powerInfusion", section = "groupBuffs", spellIDs = { 10060 } }, -- Priest
-    { key = "rallyingCry", section = "groupBuffs", spellIDs = { 97463 } }, -- Warrior
-    { key = "spatialParadox", section = "groupBuffs", spellIDs = { 406789 } }, -- Evoker
+    { key = "innervate", section = "boosts", spellIDs = { 29166 } }, -- Druid
+    { key = "powerInfusion", section = "boosts", spellIDs = { 10060 } }, -- Priest
 
     { key = "blessingOfFreedom", section = "movement", spellIDs = { 1044 } }, -- Paladin
+    { key = "piercingHowl", section = "movement", spellIDs = { 1244157 } }, -- Warrior
+    { key = "spatialParadox", section = "movement", spellIDs = { 406789 } }, -- Evoker
     { key = "stampedingRoar", section = "movement", spellIDs = { 106898, 77761, 77764 } }, -- Druid
     { key = "tigersLust", section = "movement", spellIDs = { 116841 } }, -- Monk
     {
@@ -134,6 +137,7 @@ function BR.AreExternalsEnabled()
 end
 
 local floor = math.floor
+local tconcat = table.concat
 
 -- Appearance keys that follow the global `defaults` table while
 -- externals.useCustomAppearance is off. durationSize and growDirection are
@@ -193,17 +197,19 @@ function BR.IsExternalSoundOverridden(key)
     return sounds ~= nil and sounds[key] ~= nil
 end
 
----Display label for an entry: the player's own name when set, an explicit key when
----the entry spans differently-named spells, otherwise the (already localized) name
----of labelSpellID or the spell itself.
 ---@param entry table
 ---@return string
 function BR.GetExternalLabel(entry)
     if entry.name then
         return entry.name
     end
-    if entry.labelKey then
-        return BR.L[entry.labelKey] or entry.key
+    local ids = entry.labelSpellIDs
+    if ids then
+        local names = {}
+        for i = 1, #ids do
+            names[i] = BR.GetSpellName(ids[i]) or tostring(ids[i])
+        end
+        return tconcat(names, "/")
     end
     local spellID = entry.labelSpellID or entry.spellIDs[1]
     return BR.GetSpellName(spellID) or tostring(spellID)
