@@ -400,6 +400,7 @@ local DefaultSettingKeys = {
     showBuffTooltips = "VisualsRefresh", -- Toggles raid/presence hover capture vs click-through
     hideLegacyConsumables = "DisplayRefresh",
     preferReusableRunes = "DisplayRefresh",
+    feastAtPlayer = "DisplayRefresh",
     -- Pet display mode
     petDisplayMode = "DisplayRefresh",
     petLabels = "DisplayRefresh",

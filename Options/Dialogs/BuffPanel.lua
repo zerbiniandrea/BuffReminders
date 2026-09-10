@@ -350,6 +350,21 @@ local SPECIAL_SECTIONS = {
         end,
     },
 
+    food = {
+        build = function(layout)
+            AddSpecialCheckbox(layout, {
+                label = L["Options.FeastAtPlayer"],
+                get = function()
+                    return BR.Config.Get("defaults.feastAtPlayer") ~= false
+                end,
+                tooltip = { title = L["Options.FeastAtPlayer"], desc = L["Options.FeastAtPlayer.Desc"] },
+                onChange = function(checked)
+                    BR.Config.Set("defaults.feastAtPlayer", checked)
+                end,
+            })
+        end,
+    },
+
     delveFood = {
         build = function(layout)
             AddSpecialCheckbox(layout, {
@@ -901,3 +916,5 @@ BR.Options.Dialogs.BuffPanel = {
         EditorDialog:Close()
     end,
 }
+
+BR.Options.WhatsNew.Register({ cohort = "6.8.2", pageId = "allBuffs", key = "food" })

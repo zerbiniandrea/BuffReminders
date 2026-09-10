@@ -149,6 +149,7 @@ BR.defaults = {
         showBuffTooltips = false,
         hideLegacyConsumables = true,
         preferReusableRunes = false,
+        feastAtPlayer = true,
         petDisplayMode = "generic", -- "generic" or "expanded"
         petLabels = true,
         petLabelScale = 100,
