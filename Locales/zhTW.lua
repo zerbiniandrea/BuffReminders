@@ -401,7 +401,7 @@ L["Page.CustomAnchors"] = "自訂義定位"
 L["Section.Tracking"] = "追蹤"
 L["Section.TrackingOverrides"] = "追蹤覆蓋"
 L["Section.TrackingOverrides.Desc"] =
-    "在特定情況下縮小追蹤模式。將情況保留為“預設”以始終使用上述模式。當幾個同時適用時（例如，在練級時戰鬥），限制最嚴格的那個獲勝。"
+    "縮小一種情況的追蹤模式。預設保留上述模式。如果有兩個同時適用時，限制最嚴格的那個獲勝。"
 L["DisabledReason.PvPDisabled"] = "此類別在PvP中完全隱藏 (請看可見性頁面)。"
 
 -- ============================================================================
@@ -418,7 +418,7 @@ L["Options.GlobalDefaults.Note"] = "（套用於所有類別，除非被自定�
 L["Options.Default"] = "預設"
 L["Options.Text"] = "文字"
 L["Options.Text.Note"] =
-    "(每個類別都可以覆蓋大小和顏色；字體、外框樣式和位置始終適用於任何地方)"
+    "(每個類別：尺寸和顏色。任何地方：字體、外框、位置。)"
 L["Options.Font"] = "字體"
 L["Options.TextOutline"] = "外框樣式"
 L["Options.TextOutline.None"] = "無"
@@ -433,7 +433,7 @@ L["Options.TextOutline.ThickMono"] = "粗外框 + 單色"
 -- ============================================================================
 L["Options.GlowReminderIcons.Title"] = "提示圖示發光"
 L["Options.GlowReminderIcons.CpuWarning"] =
-    "為螢幕上每個圖示的每偵發光動畫，所以這會使用較多的CPU。如果圖示長時間保持開啟狀態 (例如一個你在戰鬥中不會重上的增益)，該耗費是連續的。由於這個原因預設情況下會停用。"
+    "每偵發光動畫，因此只要圖示處於開啟狀態，就會消耗CPU資源。預設關閉。"
 L["Options.GlowKind.Expiring"] = "即將過期"
 L["Options.GlowKind.Missing"] = "缺失"
 L["Options.ExpiringGlow"] = "過期發光"
@@ -497,7 +497,7 @@ L["Options.Repair.Threshold"] = "低於多少警告"
 L["Options.Repair.Threshold.Desc"] = "當裝備的物品耐久度低於多少百分比時顯示修理提醒。"
 L["Options.RepairHideInCombat"] = "戰鬥中隱藏"
 L["Options.RepairHideInCombat.Desc"] =
-    "在戰鬥中時隱藏修理提醒。你無法在戰鬥中拜訪商店來修理，所以它只能在非戰鬥狀態下進行。"
+    "在戰鬥中時隱藏修理提醒。戰鬥中你無法修理。"
 
 -- ============================================================================
 -- OPTIONS: SOULSTONE
@@ -540,7 +540,7 @@ L["Options.TextPositions.OffsetY.Short"] = "Y"
 L["Options.TextPositions.Size"] = "大小"
 L["Options.TextPositions.MainText"] = "主文字"
 L["Options.TextPositions.MainText.Note"] =
-    "圖示上大文字的位置 - 群組計數，例如 17/20、倒數計時和標籤，例如無精煉。"
+    "大文字的位置：計數、倒數計時和標籤。"
 L["Options.TextPositions.StackCount"] = "堆疊計數"
 L["Options.TextPositions.StatLabel"] = "屬性標籤"
 L["Options.TextPositions.Badge"] = "標誌 (H / F)"
@@ -659,21 +659,24 @@ L["Options.SubIconSide.Right"] = "右側"
 L["Options.ShowWithoutItems"] = "背包中沒有也顯示"
 L["Options.ShowWithoutItems.Title"] = "沒有物品也顯示"
 L["Options.ShowWithoutItems.Desc"] =
-    "啟用後，即使背包中沒有該物品，也會顯示消耗品提示。禁用後，僅顯示實際擁有的消耗品。"
+    "顯示您未攜帶的物品的消耗品提醒。"
 L["Options.ShowWithoutItemsReadyCheckOnly"] = "只有在準備確認"
 L["Options.ShowWithoutItemsReadyCheckOnly.Title"] = "只在準備確認時顯示缺失的物品"
 L["Options.ShowWithoutItemsReadyCheckOnly.Desc"] =
-    "當啟用後，不在您背包中的消耗品僅在準備確認時顯示。對於在拉怪前快速提醒補充庫存很有用。"
+    "僅在準備檢查時顯示您未攜帶的消耗品。"
 L["Options.DelveFoodOnly"] = "在探究中僅顯示探究食物"
 L["Options.DelveFoodOnly.Desc"] = "在探究中隱藏除探究食物外的所有消耗品提示。"
 L["Options.HideLegacyConsumables"] = "隱藏舊版消耗品"
 L["Options.HideLegacyConsumables.Title"] = "隱藏舊版消耗品"
 L["Options.HideLegacyConsumables.Desc"] =
-    "啟用後，先前資料片中的食物、精煉和符文將從動作按鈕中過濾掉。如果您仍然使用舊版消耗品進行時光漫遊、農舊團隊副本或裝備不足的替代品，請停用。"
+    "隱藏過去資料片中的食物、精鍊和符文。保留它們用於時光漫遊或舊團隊副本。"
 L["Options.PreferReusableRunes"] = "偏好可重複使用的增強符文"
 L["Options.PreferReusableRunes.Title"] = "偏好可重複使用的增強符文"
 L["Options.PreferReusableRunes.Desc"] =
     "如果您有可重複使用的增強符文，僅顯示該符文。如果沒有，顯示其他符文。"
+L["Options.FeastAtPlayer"] = "將大餐放在腳下"
+L["Options.FeastAtPlayer.Desc"] =
+    "點擊大餐圖示將大餐放置在您的位置。如果此選項關閉，您必須選擇地面上的一個點。"
 
 -- ============================================================================
 -- OPTIONS: DK RUNEFORGE PREFERENCES
@@ -699,13 +702,13 @@ L["Options.PoisonReset"] = "重置回預設"
 -- ============================================================================
 L["Options.BronzeHideInCombat"] = "戰鬥中隱藏"
 L["Options.BronzeHideInCombat.Desc"] =
-    "當戰鬥中隱藏青銅龍的祝福的提醒。這個增益不太重要，你可能不想在戰鬥中補上。"
+    "當戰鬥中隱藏青銅龍的祝福的提醒。"
 L["Options.DruidIgnoreTravelForm"] = "當旅行中忽略"
 L["Options.DruidIgnoreTravelForm.Desc"] =
-    "當於旅行型態或上坐騎時時隱藏錯誤型態的提醒 (地面、水中、飛行或坐騎型態)，因此當您有意旅行時，它不會打擾您。"
+    "隱藏上坐騎時錯誤的旅行型態或坐騎型態的提醒。"
 L["Options.DelveFoodTimer"] = "30秒後自動隱藏"
 L["Options.DelveFoodTimer.Desc"] =
-    "當啟用後，進入探究後，探究食物提醒僅出現30秒，然後自動隱藏。當停用後，只要您位於探究並且缺少增益效果，該提醒就會保持可見。"
+    "進入探究後30秒，探究食物的提醒將隱藏。"
 
 -- ============================================================================
 -- OPTIONS: LAYOUT
@@ -723,7 +726,7 @@ L["Layout.NoDetached"] =
 L["Layout.FrameNotFound"] =
     "該框架目前在遊戲中不存在。 \n一旦其插件創建它，它將出現在定位點下拉列表中。"
 
--- Buff panel (uniform per-buff settings dialog)
+-- Buff panel
 L["BuffPanel.SettingsLink"] = "設定"
 L["BuffRow.SettingsLink.Tooltip"] = "此增益的聲音警報、顯示模式和分離選項。"
 L["BuffRow.Extras"] = "附加功能"
@@ -1005,6 +1008,19 @@ L["CustomBuff.Action.SpellHint"] = "這可能與被追蹤的法術不同。追�
 L["CustomBuff.Save"] = "保存"
 L["CustomBuff.ValidateError"] = "加入一個有效的法術ID進行儲存。"
 
+-- Share one custom buff
+L["CustomBuff.Share.Export"] = "導出"
+L["CustomBuff.Share.ExportTitle"] = "導出自訂增益"
+L["CustomBuff.Share.ExportDesc"] = "複製下面的字串並將其交給其他玩家。"
+L["CustomBuff.Share.Import"] = "導入"
+L["CustomBuff.Share.ImportTitle"] = "導入自訂增益"
+L["CustomBuff.Share.ImportDesc"] = "在下面貼上自訂增益字串。導入會新增一個新條目。"
+L["CustomBuff.Share.Invalid"] = "這不是自訂增益的字串。"
+L["CustomBuff.Share.ImportDisabled"] = "請先貼上一個自訂增益字串。"
+L["CustomBuff.Share.MacroWarning"] = "點擊此增益即可運行上面的巨集。僅從您信任的來源匯入它。"
+L["CustomBuff.Share.Spells"] = "法術:"
+L["CustomBuff.Share.Runs"] = "點擊運行:"
+
 -- Custom buff status
 L["CustomBuff.NotFound"] = "未找到"
 L["CustomBuff.NotFoundRetry"] = "未找到 (重試)"
@@ -1130,10 +1146,10 @@ L["Content.ShowIn"] = "顯示在:"
 -- Content toggle definitions
 L["Content.OpenWorld"] = "野外"
 L["Content.Housing"] = "房屋"
-L["Content.Scenarios"] = "場景戰役"
-L["Content.Dungeons"] = "地下城"
+L["Content.Scenarios"] = "場景戰役(探究、挑戰等)"
+L["Content.Dungeons"] = "地下城(包含M+)"
 L["Content.Raids"] = "團隊副本"
-L["Content.PvP"] = "PvP"
+L["Content.PvP"] = "PvP(競技場與戰場)"
 
 -- Scenario difficulty
 L["Content.Delves"] = "探究"
