@@ -659,7 +659,7 @@ L["Options.SubIconSide.Right"] = "오른쪽"
 L["Options.ShowWithoutItems"] = "소지품에 없을 때도 표시"
 L["Options.ShowWithoutItems.Title"] = "가지고 있지 않은 소모품 표시"
 L["Options.ShowWithoutItems.Desc"] =
-    "활성화 시, 소지품에 아이템이 없어도 소모품 알림이 표시됩니다. 비활성화 시, 실제 보유한 소모품만 표시됩니다."
+    "활성화하면 소지품에 아이템이 없어도 소모품 알림이 표시됩니다. 비활성화하면 실제 보유한 소모품만 표시됩니다."
 L["Options.ShowWithoutItemsReadyCheckOnly"] = "전투 준비 시에만"
 L["Options.ShowWithoutItemsReadyCheckOnly.Title"] = "전투 준비 시 없는 아이템 표시"
 L["Options.ShowWithoutItemsReadyCheckOnly.Desc"] =
@@ -674,6 +674,9 @@ L["Options.PreferReusableRunes"] = "무한 증강 룬 우선"
 L["Options.PreferReusableRunes.Title"] = "무한 증강 룬 우선"
 L["Options.PreferReusableRunes.Desc"] =
     "무한 증강 룬이 있을 경우 그것만 표시합니다. 없을 경우엔 다른 룬을 표시합니다."
+L["Options.FeastAtPlayer"] = "내 위치에 잔칫상 깔기"
+L["Options.FeastAtPlayer.Desc"] =
+    "잔칫상 아이콘을 클릭하면 내 위치에 바로 깔립니다. 이 옵션을 끄면 깔 자리를 직접 찍어야 합니다."
 
 -- ============================================================================
 -- OPTIONS: DK RUNEFORGE PREFERENCES
