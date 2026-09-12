@@ -235,6 +235,7 @@ end
 ---@field macrotext string? Macro text, when it does not depend on live state
 ---@field itemID number? Item behind the action, also for tooltips and click memory
 ---@field slot number? Weapon slot the macro applies the item to
+---@field atPlayer boolean? The macro uses the item at the player location
 ---@field spellID number? kind == "spell"
 ---@field unit string? Cast target (nil = default targeting)
 ---@field snooze boolean? Right-click snoozes reminders instead of running the action
@@ -288,6 +289,9 @@ local function MacroText(action)
     end
     if action.slot then
         return "/use item:" .. action.itemID .. "\n/use " .. action.slot
+    end
+    if action.atPlayer then
+        return "/use [@player] item:" .. action.itemID
     end
     return action.macrotext
 end
@@ -389,6 +393,22 @@ local function GetWeaponSlot(frame)
         return 17
     end
     return nil
+end
+
+---A bag item from the consumable scan. A feast drops at the player location when
+---the feastAtPlayer setting is on, because a ground target needs a second click.
+---@param item table Scan entry with itemID and feast
+---@param frame table The buff frame
+---@return BRSecureAction
+local function ConsumableItemAction(item, frame)
+    if item.feast and BR.profile.defaults.feastAtPlayer ~= false then
+        local action = NewAction("macro", "feastitem", item.itemID)
+        action.itemID = item.itemID
+        action.atPlayer = true
+        action.snooze = true
+        return action
+    end
+    return ItemAction(item.itemID, GetWeaponSlot(frame), true)
 end
 
 -- Buff frames that own a secure child. Most frames never get one, so the sync
@@ -812,6 +832,7 @@ local function RefreshConsumableCache()
         for itemID, item in pairs(entries) do
             local entry = allowedSet and allowedSet[itemID]
             item.permanent = type(entry) == "table" and entry.permanent or nil
+            item.feast = type(entry) == "table" and entry.feast or nil
             if not (hideLegacy and type(entry) == "table" and entry.legacy) then
                 if runeFallback and not item.permanent then
                     runeFallback[#runeFallback + 1] = item
@@ -912,7 +933,7 @@ local function UpdateConsumableButtons(frame, actionItems, clickable, startIndex
         end
 
         btn.icon:SetTexture(item.icon or 134400)
-        ApplyAction(btn, ItemAction(item.itemID, GetWeaponSlot(frame), true))
+        ApplyAction(btn, ConsumableItemAction(item, frame))
 
         btn:EnableMouse(clickable == true)
         btn._br_visible = true
@@ -1410,7 +1431,6 @@ local function UpdateConsumableSubElements(frame, actionItems, showHighlight, fr
     end
 
     if displayMode == "expanded" and frame.extraFrames and actionItems then
-        local weaponSlot = GetWeaponSlot(frame)
         for idx, extra in ipairs(frame.extraFrames) do
             local itemIdx = idx + 1 -- The main frame owns items[1].
             if extra:IsShown() and actionItems[itemIdx] then
@@ -1418,7 +1438,7 @@ local function UpdateConsumableSubElements(frame, actionItems, showHighlight, fr
                     CreateClickOverlay(extra)
                 end
                 local eOverlay = extra.clickOverlay
-                ApplyAction(eOverlay, ItemAction(actionItems[itemIdx].itemID, weaponSlot, true))
+                ApplyAction(eOverlay, ConsumableItemAction(actionItems[itemIdx], frame))
                 eOverlay:EnableMouse(true)
                 if eOverlay.highlight then
                     eOverlay.highlight:SetShown(frameHighlight)
@@ -1513,7 +1533,7 @@ local function ResolveAction(frame, category, db)
     if category == "consumable" then
         local actionItems = GetConsumableActionItems(def)
         if actionItems then
-            return ItemAction(actionItems[1].itemID, GetWeaponSlot(frame), true), actionItems
+            return ConsumableItemAction(actionItems[1], frame), actionItems
         end
         -- Nothing in the bags. Cast the creation spell if the player knows one.
         if def and (not def.casterClass or def.casterClass == playerClass) then
@@ -1539,15 +1559,22 @@ local function ResolveAction(frame, category, db)
     end
 
     if frame.key == "repairGear" then
-        -- Outdoors, the macro summons the vendor mount. Indoors, it uses the repair
-        -- item. The two conditions exclude each other, so one click never spends
-        -- both. A player who owns neither gets an inert icon.
+        -- The macro summons the vendor mount where it can be summoned, and uses the
+        -- repair item everywhere else. The conditions exclude each other, so one
+        -- click never spends both. A player who owns neither gets an inert icon.
         local sources = BR.BuffState.GetRepairSources()
         local mountName = sources.mountSpellID and BR.GetSpellName(sources.mountSpellID)
         local itemID = sources.itemID
         local macro
         if mountName and itemID then
-            macro = "/use [indoors] item:" .. itemID .. "\n/cast [outdoors] " .. mountName
+            -- Where the mount is blocked, the item takes the whole macro: an area
+            -- can block mounts and still read as outdoors, and the conditional
+            -- would send the click to a cast that fails.
+            if BR.BuffState.IsRepairMountUsable() then
+                macro = "/use [indoors] item:" .. itemID .. "\n/cast [outdoors] " .. mountName
+            else
+                macro = "/use item:" .. itemID
+            end
         elseif mountName then
             macro = "/cast " .. mountName
         elseif itemID then

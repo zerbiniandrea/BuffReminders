@@ -680,6 +680,9 @@ english["Options.PreferReusableRunes"] = "Prefer reusable augment runes"
 english["Options.PreferReusableRunes.Title"] = "Prefer reusable augment runes"
 english["Options.PreferReusableRunes.Desc"] =
     "If you have a reusable augment rune, show only that one. If you have none, show the other runes."
+english["Options.FeastAtPlayer"] = "Drop feasts at your feet"
+english["Options.FeastAtPlayer.Desc"] =
+    "Click the feast icon to place the feast at your position. If this is off, you must select a point on the ground."
 
 -- ============================================================================
 -- OPTIONS: DK RUNEFORGE PREFERENCES
