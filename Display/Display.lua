@@ -3669,6 +3669,8 @@ SlashCmdList["BUFFREMINDERS"] = SlashHandler
 eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+eventFrame:RegisterEvent("ZONE_CHANGED")
+eventFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
 eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 eventFrame:RegisterEvent("GROUP_FORMED")
 eventFrame:RegisterEvent("PLAYER_ROLES_ASSIGNED")
@@ -3726,6 +3728,20 @@ ClearDelveEntryState = function()
         delveEntryTimer = nil
     end
     BR.BuffState.SetDelveEntryState(false)
+end
+
+-- The repair macro branches on whether the repair mount can be summoned here, and
+-- that answer follows the subzone. Subzone crossings are frequent, so the secure
+-- rebuild waits for a changed verdict. A verdict that changes in combat still
+-- lands: PLAYER_REGEN_ENABLED rebuilds every action button.
+local lastRepairMountUsable
+local function RefreshRepairAction()
+    local usable = BR.BuffState.IsRepairMountUsable()
+    if usable == lastRepairMountUsable then
+        return
+    end
+    lastRepairMountUsable = usable
+    BR.SecureButtons.UpdateActionButtons("utility")
 end
 
 -- Event handlers keyed by event name.
@@ -3790,6 +3806,10 @@ eventHandlers.PLAYER_ENTERING_WORLD = function()
     -- Instance entry can flip IsInGroup(2) without firing GROUP_ROSTER_UPDATE
     -- (e.g. solo dungeon entry); refresh chat-request prefix here too.
     BR.SecureButtons.RefreshChatRequestMacros()
+    -- IsIndoors() still answers for the old zone while the loading screen runs, so
+    -- the repair macro waits for the zone to settle.
+    lastRepairMountUsable = nil
+    C_Timer.After(1, RefreshRepairAction)
     SeedGlowingSpells() -- Catch glows that were active before event registration
     if not inCombat then
         StartUpdates()
@@ -3869,8 +3889,13 @@ eventHandlers.ZONE_CHANGED_NEW_AREA = function()
         else
             ClearDelveEntryState()
         end
+        RefreshRepairAction()
     end)
 end
+
+-- A subzone can block mounts on its own, so the repair macro tracks both events.
+eventHandlers.ZONE_CHANGED = RefreshRepairAction
+eventHandlers.ZONE_CHANGED_INDOORS = RefreshRepairAction
 
 eventHandlers.GROUP_ROSTER_UPDATE = function()
     BR.BuffState.InvalidateHealerCache()
@@ -3931,6 +3956,8 @@ end
 
 eventHandlers.PLAYER_UNGHOST = function()
     SetDirty("full")
+    -- A ghost cannot mount, so a corpse run resolves the repair macro to the item.
+    RefreshRepairAction()
 end
 
 eventHandlers.UNIT_AURA = function(arg1, arg2)

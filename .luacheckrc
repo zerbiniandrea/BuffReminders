@@ -93,6 +93,7 @@ read_globals = {
     "IsInInstance",
     "IsInGroup",
     "IsInRaid",
+    "IsIndoors",
     "IsMounted",
     "IsResting",
     "IsMouseButtonDown",

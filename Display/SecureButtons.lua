@@ -1559,15 +1559,22 @@ local function ResolveAction(frame, category, db)
     end
 
     if frame.key == "repairGear" then
-        -- Outdoors, the macro summons the vendor mount. Indoors, it uses the repair
-        -- item. The two conditions exclude each other, so one click never spends
-        -- both. A player who owns neither gets an inert icon.
+        -- The macro summons the vendor mount where it can be summoned, and uses the
+        -- repair item everywhere else. The conditions exclude each other, so one
+        -- click never spends both. A player who owns neither gets an inert icon.
         local sources = BR.BuffState.GetRepairSources()
         local mountName = sources.mountSpellID and BR.GetSpellName(sources.mountSpellID)
         local itemID = sources.itemID
         local macro
         if mountName and itemID then
-            macro = "/use [indoors] item:" .. itemID .. "\n/cast [outdoors] " .. mountName
+            -- Where the mount is blocked, the item takes the whole macro: an area
+            -- can block mounts and still read as outdoors, and the conditional
+            -- would send the click to a cast that fails.
+            if BR.BuffState.IsRepairMountUsable() then
+                macro = "/use [indoors] item:" .. itemID .. "\n/cast [outdoors] " .. mountName
+            else
+                macro = "/use item:" .. itemID
+            end
         elseif mountName then
             macro = "/cast " .. mountName
         elseif itemID then

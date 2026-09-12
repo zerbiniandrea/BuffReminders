@@ -234,7 +234,7 @@ local cachedLowestDurability = nil
 -- Resolved repair click sources (mount to summon / item to use). Mount collection
 -- and bag contents only change on their own events, so the pair is resolved once.
 -- Only ever holds a positive answer (see GetRepairSources).
----@type { mountSpellID: number?, itemID: number? }|nil
+---@type { mountSpellID: number?, mountID: number?, itemID: number? }|nil
 local cachedRepairSources = nil
 
 -- Loadout state cache: rule.key -> { satisfied, icon }. The detection calls
@@ -3186,7 +3186,7 @@ end
 ---Best repair sources for the repair reminder's click action: a collected repair
 ---mount and/or a usable repair item. Both answers only change on collection and
 ---bag events, so the resolved pair is memoized.
----@return { mountSpellID: number?, itemID: number? }
+---@return { mountSpellID: number?, mountID: number?, itemID: number? }
 function BuffState.GetRepairSources()
     if cachedRepairSources then
         return cachedRepairSources
@@ -3198,6 +3198,7 @@ function BuffState.GetRepairSources()
             local _, _, _, _, _, _, _, _, _, _, isCollected = C_MountJournal.GetMountInfoByID(mountID)
             if isCollected then
                 sources.mountSpellID = spellID
+                sources.mountID = mountID
                 break
             end
         end
@@ -3221,6 +3222,20 @@ function BuffState.GetRepairSources()
         cachedRepairSources = sources
     end
     return sources
+end
+
+---Whether the collected repair mount can be summoned where the player stands.
+---The `[outdoors]` macro conditional cannot answer this: an outdoor area that
+---blocks mounts still reads as outdoors, so the click spends nothing. The mount
+---journal knows the real restriction. The answer follows the subzone, so it is
+---never cached - the macro that reads it is rebuilt on every zone change.
+---@return boolean
+function BuffState.IsRepairMountUsable()
+    local mountID = BuffState.GetRepairSources().mountID
+    if not mountID then
+        return false
+    end
+    return C_MountJournal.GetMountUsabilityByID(mountID, IsIndoors()) == true
 end
 
 ---Invalidate the repair source cache (call on BAG_UPDATE_DELAYED, NEW_MOUNT_ADDED,
