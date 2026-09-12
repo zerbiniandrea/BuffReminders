@@ -3157,20 +3157,28 @@ function BuffState.GetLowestDurability()
         return cachedLowestDurability
     end
     local lowest = 1
+    local readable = false
     for slot = 1, 18 do
         local cur, max = GetInventoryItemDurability(slot)
         if cur and max and max > 0 then
+            readable = true
             local pct = cur / max
             if pct < lowest then
                 lowest = pct
             end
         end
     end
-    cachedLowestDurability = lowest
+    -- Only a readable answer is cached: a zone change answers nil for every slot
+    -- while the inventory resolves, and a frozen "nothing is damaged" hides the
+    -- repair reminder until the next durability event.
+    if readable then
+        cachedLowestDurability = lowest
+    end
     return lowest
 end
 
----Invalidate the durability cache (call on UPDATE_INVENTORY_DURABILITY, PLAYER_EQUIPMENT_CHANGED)
+---Invalidate the durability cache (call on UPDATE_INVENTORY_DURABILITY,
+---PLAYER_EQUIPMENT_CHANGED, PLAYER_ENTERING_WORLD)
 function BuffState.InvalidateDurabilityCache()
     cachedLowestDurability = nil
 end
