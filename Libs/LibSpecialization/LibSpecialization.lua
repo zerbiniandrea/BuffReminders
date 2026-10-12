@@ -3,13 +3,7 @@ local wowID = WOW_PROJECT_ID
 local isRetail = wowID == 1
 local isCata = wowID == 14
 local isMists = wowID == 19
-local isForever = false
-do
-	local _, _, _, version = GetBuildInfo()
-	if version > 16000 and version < 20000 then
-		isForever = true
-	end
-end
+local isForever = wowID == 18
 if not isRetail and not isCata and not isMists and not isForever then return end -- Retail, Cata, Mists, Forever
 
 local LS, oldminor = LibStub:NewLibrary("LibSpecialization", 28)
