@@ -297,6 +297,20 @@ local currentWeaponEnchants = {
     permanentOH = nil, -- permanent enchant ID from item link (OH)
 }
 
+---Seconds left on a temporary weapon enchant, from whichever hand carries it.
+---Weapon enchant info is not an aura read, so it is safe in restricted contexts.
+---@param enchantID number
+---@return number? remaining nil when neither hand carries the enchant
+local function GetWeaponEnchantRemaining(enchantID)
+    local expiration
+    if currentWeaponEnchants.mainHandID == enchantID then
+        expiration = currentWeaponEnchants.mainHandExpiration
+    elseif currentWeaponEnchants.offHandID == enchantID then
+        expiration = currentWeaponEnchants.offHandExpiration
+    end
+    return expiration and expiration / 1000 or nil
+end
+
 -- Valid group members for current refresh cycle (set once per BuffState.Refresh()).
 -- Includes phased / out-of-broadcast-range allies (tagged via `isPhased`) so an
 -- already-active buff on an unreachable ally still registers as covered.
@@ -2225,13 +2239,16 @@ local function RefreshSelf(isAuraRestricted, hideExpiring)
                         elseif
                             shouldShow == false
                             and not wantPresent
-                            and not buff.enchantID
                             and not buff.noExpirationGlow
                             and not hideExpiring
                         then
                             -- Buff present: check whether it expires soon.
+                            -- Weapon imbues (paladin rites, shaman imbues) time
+                            -- out on the enchant, not an aura.
                             local remaining, expiringCastID
-                            if buff.getExpirationInfo then
+                            if buff.enchantID then
+                                remaining = GetWeaponEnchantRemaining(buff.enchantID)
+                            elseif buff.getExpirationInfo then
                                 remaining, expiringCastID = buff.getExpirationInfo()
                             elseif buff.buffIdOverride or buff.spellID then
                                 _, remaining = UnitHasBuff("player", buff.buffIdOverride or buff.spellID)
