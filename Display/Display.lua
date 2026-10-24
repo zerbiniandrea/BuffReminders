@@ -181,6 +181,7 @@ local _, BR = ...
 ---@field isExtraFrame? boolean
 ---@field mainFrame? BuffFrame
 ---@field _br_pet_spell? string             -- Localized spell name for pet click-to-cast
+---@field _br_item? table                   -- Consumable item an expanded extra frame shows
 ---@field _br_pet_spec_icon? number        -- Pet spec ability icon texture for hover swap
 ---@field _br_pet_label_key? string        -- Cache key for pet label updates
 ---@field _br_count_scale? number          -- Font scale the count text was last written with
@@ -188,6 +189,7 @@ local _, BR = ...
 ---@field _br_pet_family_text? FontString  -- Pet spec label below name
 ---@field _br_pet_extra_text? FontString   -- Spirit Beast label below spec
 ---@field _cachedItems? table|false         -- Per-cycle cache for GetConsumableActionItems result
+---@field _sameStatItems? table             -- Reused list for the expiring fan-out (GetSameStatItems)
 
 -- Lua stdlib locals (avoid repeated global lookups in hot paths)
 local floor, max, min = math.floor, math.max, math.min
@@ -1859,6 +1861,31 @@ local function GetCachedItems(frame)
     return items
 end
 
+-- items[1] followed by the other bag items that share its stat label, in bag sort
+-- order. An unlabeled item has no "same" variant. The list is reused per frame.
+---@param frame BuffFrame
+---@param items table[]
+---@return table[]
+local function GetSameStatItems(frame, items)
+    local list = frame._sameStatItems
+    if not list then
+        list = {}
+        frame._sameStatItems = list
+    end
+    wipe(list)
+    local first = items[1]
+    list[1] = first
+    local label = first and first.statLabel
+    if label then
+        for i = 2, #items do
+            if items[i].statLabel == label then
+                list[#list + 1] = items[i]
+            end
+        end
+    end
+    return list
+end
+
 -- Drop the memo so the next read rescans the bags.
 ---@param frame BuffFrame
 local function InvalidateCachedItems(frame)
@@ -2048,9 +2075,10 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
         end
     end
 
-    -- The variant icons fan out only when the buff is fully gone. An expiring buff, or
-    -- food that the player eats now, keeps one icon so the row width stays the same.
-    if entry.displayType ~= "text" or entry.isEating then
+    -- Every variant fans out when the buff is fully gone. An expiring buff fans out
+    -- only the other qualities of the stat it refreshes; food being eaten keeps one icon.
+    local expiring = entry.displayType == "expiring"
+    if (entry.displayType ~= "text" and not expiring) or entry.isEating then
         BR.SecureButtons.UpdateConsumableButtons(frame, nil)
         return
     end
@@ -2060,6 +2088,9 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
 
     local displayMode = (BR.profile.defaults or {}).consumableDisplayMode or "sub_icons"
     local items = GetCachedItems(frame)
+    if expiring and items then
+        items = GetSameStatItems(frame, items)
+    end
 
     if displayMode == "sub_icons" then
         if testMode and items and #items > 1 then
@@ -2138,6 +2169,7 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
             local stackFontSize = BR.SecureButtons.ComputeConsumableFontSize(expandedSize, "stackCount")
             for i = 2, #items do
                 local extra = GetOrCreateExtraFrame(frame, i - 1)
+                extra._br_item = items[i] -- The click overlay uses the item this frame shows.
                 extra:SetParent(parentFrame)
                 extra:SetSize(expandedSize, frame:GetHeight())
                 extra.icon:SetTexture(items[i].icon)

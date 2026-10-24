@@ -1461,14 +1461,14 @@ local function UpdateConsumableSubElements(frame, actionItems, showHighlight, fr
     end
 
     if displayMode == "expanded" and frame.extraFrames and actionItems then
-        for idx, extra in ipairs(frame.extraFrames) do
-            local itemIdx = idx + 1 -- The main frame owns items[1].
-            if extra:IsShown() and actionItems[itemIdx] then
+        for _, extra in ipairs(frame.extraFrames) do
+            -- Display sets _br_item: an expiring buff shows a subset of actionItems.
+            if extra:IsShown() and extra._br_item then
                 if not extra.clickOverlay then
                     CreateClickOverlay(extra)
                 end
                 local eOverlay = extra.clickOverlay
-                ApplyAction(eOverlay, ConsumableItemAction(actionItems[itemIdx], frame))
+                ApplyAction(eOverlay, ConsumableItemAction(extra._br_item, frame))
                 eOverlay:EnableMouse(true)
                 if eOverlay.highlight then
                     eOverlay.highlight:SetShown(frameHighlight)
