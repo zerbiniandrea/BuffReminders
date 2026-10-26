@@ -6,7 +6,7 @@ local isMists = wowID == 19
 local isForever = wowID == 18
 if not isRetail and not isCata and not isMists and not isForever then return end -- Retail, Cata, Mists, Forever
 
-local LS, oldminor = LibStub:NewLibrary("LibSpecialization", 28)
+local LS, oldminor = LibStub:NewLibrary("LibSpecialization", 30)
 if not LS then return end -- No upgrade needed
 
 LS.callbackMapGroup = LS.callbackMapGroup or {}
@@ -56,6 +56,43 @@ local positionTable = isCata and {
 	[746] = "MELEE", -- Arms (DPS)
 	[815] = "MELEE", -- Fury (DPS)
 	[845] = "MELEE", -- Protection (Tank)
+} or isForever and {
+	-- Mage
+	[11582] = "RANGED", -- Arcane
+	[11594] = "RANGED", -- Fire
+	[11601] = "RANGED", -- Frost
+	-- Druid
+	[11328] = "RANGED", -- Balance (DPS Owl)
+	[11347] = "MELEE", -- Feral Combat (DPS Cat AND Tank Bear) >> talent checks incoming
+	[11340] = "RANGED", -- Restoration (Heal)
+	-- Hunter
+	[11372] = "RANGED", -- Beast Mastery
+	[11371] = "RANGED", -- Marksmanship
+	[11370] = "RANGED", -- Survival
+	-- Paladin
+	[11486] = "RANGED", -- Holy (Heal)
+	[11541] = "MELEE", -- Protection (Tank)
+	[11559] = "MELEE", -- Retribution (DPS)
+	-- Priest
+	[11608] = "RANGED", -- Discipline (Heal)
+	[11615] = "RANGED", -- Holy (Heal)
+	[11622] = "RANGED", -- Shadow Magic (DPS)
+	-- Rogue
+	[11580] = "MELEE", -- Assassination
+	[11573] = "MELEE", -- Combat
+	[11572] = "MELEE", -- Subtlety
+	-- Shaman
+	[11326] = "RANGED", -- Elemental Combat (DPS)
+	[11363] = "MELEE", -- Enhancement (DPS)
+	[11362] = "RANGED", -- Restoration (Heal)
+	-- Warlock
+	[11629] = "RANGED", -- Affliction
+	[11636] = "RANGED", -- Demonology
+	[11637] = "RANGED", -- Destruction
+	-- Warrior
+	[11650] = "MELEE", -- Arms (DPS)
+	[11657] = "MELEE", -- Fury (DPS)
+	[11670] = "MELEE", -- Protection (Tank)
 } or {
 	-- Death Knight
 	[250] = "MELEE", -- Blood (Tank)
@@ -119,7 +156,7 @@ local roleTable = isCata and {
 	[400] = "DAMAGER", -- Unholy (DPS)
 	-- Druid
 	[752] = "DAMAGER", -- Balance (DPS Owl)
-	[750] = "TANK", -- Feral Combat (DPS Cat AND Tank Bear) Oh noooooooooooooooooooooooooooooo, talent checks incoming
+	[750] = "TANK", -- Feral Combat (DPS Cat AND Tank Bear) >> talent checks incoming
 	[748] = "HEALER", -- Restoration (Heal)
 	-- Hunter
 	[811] = "DAMAGER", -- Beast Mastery
@@ -153,6 +190,43 @@ local roleTable = isCata and {
 	[746] = "DAMAGER", -- Arms (DPS)
 	[815] = "DAMAGER", -- Fury (DPS)
 	[845] = "TANK", -- Protection (Tank)
+} or isForever and {
+	-- Mage
+	[11582] = "DAMAGER", -- Arcane
+	[11594] = "DAMAGER", -- Fire
+	[11601] = "DAMAGER", -- Frost
+	-- Druid
+	[11328] = "DAMAGER", -- Balance (DPS Owl)
+	[11347] = "TANK", -- Feral Combat (DPS Cat AND Tank Bear) >> talent checks incoming
+	[11340] = "HEALER", -- Restoration (Heal)
+	-- Hunter
+	[11372] = "DAMAGER", -- Beast Mastery
+	[11371] = "DAMAGER", -- Marksmanship
+	[11370] = "DAMAGER", -- Survival
+	-- Paladin
+	[11486] = "HEALER", -- Holy (Heal)
+	[11541] = "TANK", -- Protection (Tank)
+	[11559] = "DAMAGER", -- Retribution (DPS)
+	-- Priest
+	[11608] = "HEALER", -- Discipline (Heal)
+	[11615] = "HEALER", -- Holy (Heal)
+	[11622] = "DAMAGER", -- Shadow Magic (DPS)
+	-- Rogue
+	[11580] = "DAMAGER", -- Assassination
+	[11573] = "DAMAGER", -- Combat
+	[11572] = "DAMAGER", -- Subtlety
+	-- Shaman
+	[11326] = "DAMAGER", -- Elemental Combat (DPS)
+	[11363] = "DAMAGER", -- Enhancement (DPS)
+	[11362] = "HEALER", -- Restoration (Heal)
+	-- Warlock
+	[11629] = "DAMAGER", -- Affliction
+	[11636] = "DAMAGER", -- Demonology
+	[11637] = "DAMAGER", -- Destruction
+	-- Warrior
+	[11650] = "DAMAGER", -- Arms (DPS)
+	[11657] = "DAMAGER", -- Fury (DPS)
+	[11670] = "TANK", -- Protection (Tank)
 } or {
 	-- Death Knight
 	[250] = "TANK", -- Blood (Tank)
@@ -377,6 +451,83 @@ elseif isMists then
 			end
 		end
 	end
+elseif isForever then
+	local C_Traits_GenerateImportString, C_Traits_GetConfigInfo = C_Traits.GenerateImportString, C_Traits.GetConfigInfo
+	local C_Traits_GetGroupDisplayInfoByTreeID, C_Traits_GetGroupCurrencyInfo = C_Traits.GetGroupDisplayInfoByTreeID, C_Traits.GetGroupCurrencyInfo
+	local C_ClassTalents_GetActiveConfigID = C_ClassTalents.GetActiveConfigID
+	local GetSpecialization, GetSpecializationInfo = C_SpecializationInfo.GetSpecialization, C_SpecializationInfo.GetSpecializationInfo
+	function GetInfo()
+		local spec = GetSpecialization()
+		if type(spec) == "number" and spec > 0 then
+			local specId = GetSpecializationInfo(spec)
+			if type(specId) == "number" and specId > 0 then
+				local position, role
+				local activeConfigID = C_ClassTalents_GetActiveConfigID()
+				if starterSpecs[specId] then -- Forever ONLY has starter specs
+					if activeConfigID then
+						local configInfoTbl = C_Traits_GetConfigInfo(activeConfigID)
+						local treeID = type(configInfoTbl) == "table" and type(configInfoTbl.treeIDs) == "table" and configInfoTbl.treeIDs[1] or nil
+						if type(treeID) == "number" then
+							local groupInfoTbl = C_Traits_GetGroupDisplayInfoByTreeID(treeID)
+							if type(groupInfoTbl) == "table" then
+								local groupIDTable = {}
+								for i = 1, #groupInfoTbl do
+									local groupID = groupInfoTbl[i].groupID
+									if type(groupID) == "number" then
+										if roleTable[groupID] then
+											groupIDTable[#groupIDTable+1] = groupID
+										else
+											geterrorhandler()(format("LibSpecialization: Unknown group ID %q", groupID))
+										end
+									end
+								end
+								local totals = {}
+								local hasSpent = false
+								for i = 1, #groupIDTable do
+									local currencyInfoTbl = C_Traits_GetGroupCurrencyInfo(activeConfigID, {groupIDTable[i]})
+									if type(currencyInfoTbl) == "table" and type(currencyInfoTbl[1]) == "table" and type(currencyInfoTbl[1].currencyInfos) == "table" then
+										local spent = type(currencyInfoTbl[1].currencyInfos[1]) == "table" and currencyInfoTbl[1].currencyInfos[1].spent or nil
+										if type(spent) == "number" then
+											if spent > 0 then
+												hasSpent = true
+											end
+											totals[groupIDTable[i]] = spent
+										else
+											totals[groupIDTable[i]] = 0
+										end
+									else
+										totals[groupIDTable[i]] = 0
+									end
+								end
+								if hasSpent then
+									table.sort(groupIDTable, function(a, b) return totals[a] > totals[b] end)
+									local groupIDDecidesRoleAndPosition = groupIDTable[1] -- The group ID with the most points spent decides the role and position
+									role = roleTable[groupIDDecidesRoleAndPosition]
+									position = positionTable[groupIDDecidesRoleAndPosition]
+									specId = groupIDDecidesRoleAndPosition
+								end
+							end
+						end
+					end
+				else
+					geterrorhandler()(format("LibSpecialization: Unknown spec ID %q", specId))
+				end
+
+				if position and role then
+					-- On Forever, each class only has 1 spec ID, so that's not useful.
+					-- Each class also only has 1 tree ID, which is also not useful.
+					-- But within each tree is multiple groups, and that's useful for differentiating specs.
+					-- The group ID is what we'd consider to be the "tree" e.g. "Arms" on a Warrior, but Blizz uses different terminology.
+					-- So on Forever we send the talent group ID instead of the spec ID or the tree ID.
+					if activeConfigID then
+						local talentString = C_Traits_GenerateImportString(activeConfigID)
+						return specId, role, position, talentString
+					end
+					return specId, role, position
+				end
+			end
+		end
+	end
 else
 	local C_Traits_GenerateImportString = C_Traits.GenerateImportString
 	local C_ClassTalents_GetActiveConfigID = C_ClassTalents.GetActiveConfigID
@@ -406,7 +557,13 @@ end
 LS.MySpecialization = GetInfo
 
 local throttleTimer = 3 -- Seconds
-local pName = UnitNameUnmodified("player")
+local pName
+if RegionalUniqueNamesEnabled and RegionalUniqueNamesEnabled() then
+	local name, surname = UnitNameUnmodified("player")
+	pName = name .. " " .. surname
+else
+	pName = UnitNameUnmodified("player")
+end
 local SendAddonMessage = C_ChatInfo.SendAddonMessage
 local IsInGroup = IsInGroup
 local CTimerNewTimer = C_Timer.NewTimer
@@ -660,7 +817,7 @@ do
 		LS.frame:RegisterEvent("PLAYER_TALENT_UPDATE")
 	elseif isMists then
 		LS.frame:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
-	else
+	else -- Retail & Forever
 		LS.frame:RegisterEvent("ACTIVE_COMBAT_CONFIG_CHANGED")
 		LS.frame:RegisterEvent("TRAIT_CONFIG_UPDATED")
 	end
