@@ -1,5 +1,7 @@
 local _, BR = ... -- luacheck: ignore 211
-if GetLocale() ~= "esMX" then
+-- If you add real translations, uncomment the next line. Then the Language setting lists this locale.
+-- BR.translatedLocales.esMX = "Español (Latinoamérica)"
+if BR.locale ~= "esMX" then
     return
 end
 

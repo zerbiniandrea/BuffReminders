@@ -5,6 +5,7 @@
 ## Author: zerbi
 ## Version: @project-version@
 ## SavedVariables: BuffRemindersDB
+## LoadSavedVariablesFirst: 1
 ## X-Curse-Project-ID: 1441094
 ## X-Wago-ID: qGYZZjNg
 ## OptionalDeps: Masque, LibCustomGlow-1.0

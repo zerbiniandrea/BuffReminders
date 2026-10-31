@@ -1,5 +1,6 @@
 local _, BR = ... -- luacheck: ignore 211
-if GetLocale() ~= "zhCN" then
+BR.translatedLocales.zhCN = "简体中文"
+if BR.locale ~= "zhCN" then
     return
 end
 

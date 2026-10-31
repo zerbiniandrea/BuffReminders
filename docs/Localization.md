@@ -9,6 +9,16 @@ text. A locale does not have to be complete.
 Three locales have real translations: `koKR`, `zhCN`, and `zhTW`. The other seven files are
 empty stubs.
 
+The Language setting on the General page lists only the locales with real translations. A
+locale file goes into the list when it registers its language name in `BR.translatedLocales`,
+in the line above its locale check:
+
+```lua
+BR.translatedLocales.zhCN = "简体中文"
+```
+
+If you translate a stub locale, add this line with the name of your language in your language.
+
 ---
 
 ## Translate a locale
@@ -31,7 +41,9 @@ Rules:
   and players on other realms read them in English.
 - If you want credit, add a comment at the top of the file.
 
-To see your translation in game, set the client to your locale. Then run `/reload`.
+To see your translation in game, set the client to your locale. Then run `/reload`. If your
+locale is in the Language setting on the General page, you can select it there. The game client
+does not have to change.
 
 ---
 

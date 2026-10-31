@@ -1,5 +1,7 @@
 local _, BR = ... -- luacheck: ignore 211
-if GetLocale() ~= "itIT" then
+-- If you add real translations, uncomment the next line. Then the Language setting lists this locale.
+-- BR.translatedLocales.itIT = "Italiano"
+if BR.locale ~= "itIT" then
     return
 end
 

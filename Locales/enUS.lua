@@ -14,6 +14,19 @@ local L = setmetatable({}, {
 ---@type table<string, string>
 BR.L = L
 
+-- The toc loads SavedVariables before this file, so the saved language override
+-- is readable here. Data files copy L strings at load time, so it cannot wait
+-- for ADDON_LOADED.
+local savedDB = BuffRemindersDB
+local override = type(savedDB) == "table" and type(savedDB.global) == "table" and savedDB.global.language
+---@type string
+BR.locale = type(override) == "string" and override or GetLocale()
+
+-- Locale code to the language name in that language. A locale file registers
+-- here before its gate only when it carries a real translation.
+---@type table<string, string>
+BR.translatedLocales = {}
+
 -- ============================================================================
 -- CATEGORY LABELS
 -- ============================================================================
@@ -815,6 +828,13 @@ english["Options.MasqueNote"] = "Zoom and Border settings are managed by Masque"
 -- ============================================================================
 english["Options.ShowLoginMessages"] = "Show login messages"
 english["Options.ShowMinimapButton"] = "Show minimap button"
+english["Options.Language"] = "Language"
+english["Options.Language.Auto"] = "Auto (game client)"
+english["Options.Language.Desc"] = "The language of the addon text. Auto uses the language of the game client. "
+    .. "Untranslated text shows in English."
+-- Each language names itself, so a reader finds their own language in any locale.
+-- Do not translate this.
+english["Language.enUS"] = "English"
 
 -- Hide when section
 english["Options.HideWhen"] = "Hide when"
@@ -917,6 +937,7 @@ english["Dialog.ResetProfile"] =
 english["Dialog.Reset"] = "Reset"
 english["Dialog.ReloadPrompt"] = "Settings imported successfully!\nReload UI to apply changes?"
 english["Dialog.Reload"] = "Reload"
+english["Dialog.ReloadLanguage"] = "The new language applies after a UI reload.\nReload now?"
 english["Dialog.NewProfilePrompt"] = "Enter a name for the new profile:"
 english["Dialog.Create"] = "Create"
 english["Dialog.DiscordPrompt"] = "Join the BuffReminders Discord!\nCopy the URL below (Ctrl+C):"

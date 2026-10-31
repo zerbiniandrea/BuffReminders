@@ -1,5 +1,6 @@
 local _, BR = ... -- luacheck: ignore 211
-if GetLocale() ~= "koKR" then
+BR.translatedLocales.koKR = "한국어"
+if BR.locale ~= "koKR" then
     return
 end
 
