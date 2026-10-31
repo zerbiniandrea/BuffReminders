@@ -1,5 +1,7 @@
 local _, BR = ... -- luacheck: ignore 211
-if GetLocale() ~= "deDE" then
+-- If you add real translations, uncomment the next line. Then the Language setting lists this locale.
+-- BR.translatedLocales.deDE = "Deutsch"
+if BR.locale ~= "deDE" then
     return
 end
 
