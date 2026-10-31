@@ -32,11 +32,58 @@ end
 TAB_CATEGORIES[#TAB_CATEGORIES + 1] = EXTERNALS_TAB
 
 local TAB_STRIP_H = 26
+local TAB_GAP = 4
+local ARROW_W = 16
 -- Bottom padding the terminal appearance section leaves under the tab body.
 local APPEARANCE_PADDING = 16
 -- How far below the content top the tab strip sits (positive magnitude, matching
 -- every other page's top padding). PAGE_TOP_PADDING is negative, so negate it.
 local STRIP_TOP = -PAGE_TOP_PADDING
+
+local ARROW_IDLE = { 0.7, 0.7, 0.7, 1 }
+local ARROW_DISABLED = { 0.4, 0.4, 0.4, 1 }
+
+---@param direction number -1 scrolls left, 1 scrolls right
+local function CreateScrollArrow(parent, direction, onStep)
+    local button = CreateFrame("Button", nil, parent)
+    button:SetSize(ARROW_W, 22)
+    local icon = button:CreateTexture(nil, "OVERLAY")
+    icon:SetSize(12, 12)
+    icon:SetPoint("CENTER")
+    icon:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
+    -- The texture points right.
+    if direction < 0 then
+        icon:SetRotation(math.pi)
+    end
+
+    local function UpdateColor(hovered)
+        if not button:IsEnabled() then
+            icon:SetVertexColor(unpack(ARROW_DISABLED))
+        elseif hovered then
+            icon:SetVertexColor(unpack(BR.Colors.Accent))
+        else
+            icon:SetVertexColor(unpack(ARROW_IDLE))
+        end
+    end
+
+    button:SetScript("OnEnter", function()
+        UpdateColor(true)
+    end)
+    button:SetScript("OnLeave", function()
+        UpdateColor(false)
+    end)
+    button:SetScript("OnEnable", function(self)
+        UpdateColor(self:IsMouseOver())
+    end)
+    button:SetScript("OnDisable", function()
+        UpdateColor(false)
+    end)
+    button:SetScript("OnClick", function()
+        onStep(direction)
+    end)
+    UpdateColor(false)
+    return button
+end
 
 local function Build(content, scrollFrame)
     local contentWidth = scrollFrame:GetContentWidth()
@@ -129,22 +176,28 @@ local function Build(content, scrollFrame)
     mask:SetAllPoints(strip)
     mask:SetColorTexture(0.09, 0.09, 0.107, 1)
 
-    local prev, firstTab
+    -- Translated labels can make the row wider than the strip. Then the row
+    -- scrolls inside a ScrollFrame, which clips both the drawing and the clicks.
+    local scroller = CreateFrame("ScrollFrame", nil, strip)
+    local row = CreateFrame("Frame", nil, scroller)
+    scroller:SetScrollChild(row)
+
+    local tabLefts, tabRights = {}, {}
+    local rowWidth, tabHeight = 0, 0
     for _, cat in ipairs(TAB_CATEGORIES) do
-        local tab = Components.Tab(strip, {
+        local tab = Components.Tab(row, {
             name = cat,
             label = tabLabels[cat],
             width = 40,
         })
-        tab:SetScript("OnClick", function()
-            Activate(cat)
-        end)
-        if prev then
-            tab:SetPoint("LEFT", prev, "RIGHT", 4, 0)
-        else
-            tab:SetPoint("TOPLEFT", strip, "TOPLEFT", COL_PADDING, -STRIP_TOP)
-            firstTab = tab
+        if rowWidth > 0 then
+            rowWidth = rowWidth + TAB_GAP
         end
+        tab:SetPoint("TOPLEFT", row, "TOPLEFT", rowWidth, 0)
+        tabLefts[cat] = rowWidth
+        rowWidth = rowWidth + tab:GetWidth()
+        tabRights[cat] = rowWidth
+        tabHeight = tab:GetHeight()
         if cat == EXTERNALS_TAB then
             -- A corner badge: the tab padding is too narrow for a dot after the text.
             local dot = BR.Options.WhatsNew.AttachDot(tab.text, "externals.casterName")
@@ -153,10 +206,76 @@ local function Build(content, scrollFrame)
             dot:SetPoint("TOPRIGHT", tab, "TOPRIGHT", 0, 0)
         end
         tabs[cat] = tab
-        prev = tab
+    end
+    row:SetSize(rowWidth, tabHeight)
+
+    local stripWidth = contentWidth - COL_PADDING * 2
+    local overflow = rowWidth > stripWidth
+    local inset = overflow and ARROW_W or 0
+    local viewWidth = stripWidth - inset * 2
+    local maxScroll = math.max(0, rowWidth - viewWidth)
+    scroller:SetPoint("TOPLEFT", strip, "TOPLEFT", COL_PADDING + inset, -STRIP_TOP)
+    scroller:SetSize(viewWidth, tabHeight)
+    Components.TabBaseline(strip, scroller, viewWidth)
+
+    local leftArrow, rightArrow
+
+    local function ScrollTo(offset)
+        offset = math.min(math.max(offset, 0), maxScroll)
+        scroller:SetHorizontalScroll(offset)
+        if overflow then
+            leftArrow:SetEnabled(offset > 0)
+            rightArrow:SetEnabled(offset < maxScroll)
+        end
     end
 
-    Components.TabBaseline(strip, firstTab, contentWidth - COL_PADDING * 2)
+    local function ScrollIntoView(cat)
+        local offset = scroller:GetHorizontalScroll()
+        if tabLefts[cat] < offset then
+            ScrollTo(tabLefts[cat])
+        elseif tabRights[cat] > offset + viewWidth then
+            ScrollTo(tabRights[cat] - viewWidth)
+        end
+    end
+
+    -- One step brings the next clipped tab fully into view.
+    local function Step(direction)
+        local offset = scroller:GetHorizontalScroll()
+        if direction < 0 then
+            for i = #TAB_CATEGORIES, 1, -1 do
+                local left = tabLefts[TAB_CATEGORIES[i]]
+                if left < offset - 0.5 then
+                    return ScrollTo(left)
+                end
+            end
+        else
+            for _, cat in ipairs(TAB_CATEGORIES) do
+                local right = tabRights[cat]
+                if right > offset + viewWidth + 0.5 then
+                    return ScrollTo(right - viewWidth)
+                end
+            end
+        end
+    end
+
+    for cat, tab in pairs(tabs) do
+        tab:SetScript("OnClick", function()
+            Activate(cat)
+            ScrollIntoView(cat)
+        end)
+    end
+
+    if overflow then
+        leftArrow = CreateScrollArrow(strip, -1, Step)
+        leftArrow:SetPoint("RIGHT", scroller, "LEFT", 0, 0)
+        rightArrow = CreateScrollArrow(strip, 1, Step)
+        rightArrow:SetPoint("LEFT", scroller, "RIGHT", 0, 0)
+        scroller:EnableMouseWheel(true)
+        scroller:SetScript("OnMouseWheel", function(_, delta)
+            Step(-delta)
+        end)
+        ScrollTo(0)
+    end
 
     Activate("raid")
 end
