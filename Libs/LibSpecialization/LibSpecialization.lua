@@ -6,7 +6,7 @@ local isMists = wowID == 19
 local isForever = wowID == 18
 if not isRetail and not isCata and not isMists and not isForever then return end -- Retail, Cata, Mists, Forever
 
-local LS, oldminor = LibStub:NewLibrary("LibSpecialization", 30)
+local LS, oldminor = LibStub:NewLibrary("LibSpecialization", 31)
 if not LS then return end -- No upgrade needed
 
 LS.callbackMapGroup = LS.callbackMapGroup or {}
@@ -327,7 +327,7 @@ end
 -- Handle groups (comms are automatic)
 function LS.RegisterGroup(addon, func)
 	if type(addon) ~= "table" or addon == LS then
-		error("LibSpecialization: The function lib.RegisterGroup expects your own addon object as the first arg.")
+		error("LibSpecialization: The function lib.RegisterGroup expects your own unique table as the first arg.")
 	end
 
 	local t = type(func)
@@ -340,7 +340,7 @@ end
 
 function LS.UnregisterGroup(addon)
 	if type(addon) ~= "table" or addon == LS then
-		error("LibSpecialization: The function lib.UnregisterGroup expects your own addon object.")
+		error("LibSpecialization: The function lib.UnregisterGroup expects the unique table you used during registration.")
 	end
 	callbackMapGroup[addon] = nil
 end
@@ -348,7 +348,7 @@ end
 -- Handle guilds (comms are on manual request)
 function LS.RegisterGuild(addon, func)
 	if type(addon) ~= "table" or addon == LS then
-		error("LibSpecialization: The function lib.RegisterGuild expects your own addon object as the first arg.")
+		error("LibSpecialization: The function lib.RegisterGuild expects your own unique table as the first arg.")
 	end
 
 	local t = type(func)
@@ -361,14 +361,14 @@ end
 
 function LS.UnregisterGuild(addon)
 	if type(addon) ~= "table" or addon == LS then
-		error("LibSpecialization: The function lib.UnregisterGuild expects your own addon object.")
+		error("LibSpecialization: The function lib.UnregisterGuild expects the unique table you used during registration.")
 	end
 	callbackMapGuild[addon] = nil
 end
 
 function LS.RegisterPlayerSpecChange(addon, func)
 	if type(addon) ~= "table" or addon == LS then
-		error("LibSpecialization: The function lib.RegisterPlayerSpecChange expects your own addon object as the first arg.")
+		error("LibSpecialization: The function lib.RegisterPlayerSpecChange expects your own unique table as the first arg.")
 	end
 
 	local t = type(func)
@@ -381,7 +381,7 @@ end
 
 function LS.UnregisterPlayerSpecChange(addon)
 	if type(addon) ~= "table" or addon == LS then
-		error("LibSpecialization: The function lib.UnregisterPlayerSpecChange expects your own addon object.")
+		error("LibSpecialization: The function lib.UnregisterPlayerSpecChange expects the unique table you used during registration.")
 	end
 	LS.callbackMapPlayerSpecChange[addon] = nil
 end
@@ -620,12 +620,14 @@ do
 			end
 			if IsInGroup(2) then
 				if currentRole then -- Cataclysm Feral Druids
-					local result = SendAddonMessage("LibSpec", format("%d,,%s", currentSpecId, currentRole), "INSTANCE_CHAT")
+					local msg = format("%d,,%s", currentSpecId, currentRole)
+					local result = SendAddonMessage("LibSpec", msg, "INSTANCE_CHAT")
 					if result == 3 or result == 8 or result == 9 then -- AddonMessageThrottle, ChannelThrottle, GeneralError
 						timerInstance = CTimerNewTimer(throttleTimer, SendToInstance)
 					end
 				else
-					local result = SendAddonMessage("LibSpec", format("%d,%s", currentSpecId, currentTalentString or ""), "INSTANCE_CHAT")
+					local msg = format("%d,%s", currentSpecId, currentTalentString or "")
+					local result = SendAddonMessage("LibSpec", msg, "INSTANCE_CHAT")
 					if result == 3 or result == 8 or result == 9 then -- AddonMessageThrottle, ChannelThrottle, GeneralError
 						timerInstance = CTimerNewTimer(throttleTimer, SendToInstance)
 					end
@@ -660,12 +662,14 @@ do
 			end
 			if IsInGroup(1) then
 				if currentRole then -- Cataclysm Feral Druids
-					local result = SendAddonMessage("LibSpec", format("%d,,%s", currentSpecId, currentRole), "RAID") -- RAID auto downgrades to PARTY as needed
+					local msg = format("%d,,%s", currentSpecId, currentRole)
+					local result = SendAddonMessage("LibSpec", msg, "RAID") -- RAID auto downgrades to PARTY as needed
 					if result == 3 or result == 8 or result == 9 then -- AddonMessageThrottle, ChannelThrottle, GeneralError
 						timerGroup = CTimerNewTimer(throttleTimer, SendToGroup)
 					end
 				else
-					local result = SendAddonMessage("LibSpec", format("%d,%s", currentSpecId, currentTalentString or ""), "RAID") -- RAID auto downgrades to PARTY as needed
+					local msg = format("%d,%s", currentSpecId, currentTalentString or "")
+					local result = SendAddonMessage("LibSpec", msg, "RAID") -- RAID auto downgrades to PARTY as needed
 					if result == 3 or result == 8 or result == 9 then -- AddonMessageThrottle, ChannelThrottle, GeneralError
 						timerGroup = CTimerNewTimer(throttleTimer, SendToGroup)
 					end
@@ -700,12 +704,14 @@ do
 			end
 			if IsInGuild() then
 				if currentRole then -- Cataclysm Feral Druids
-					local result = SendAddonMessage("LibSpec", format("%d,,%s", currentSpecId, currentRole), "GUILD")
+					local msg = format("%d,,%s", currentSpecId, currentRole)
+					local result = SendAddonMessage("LibSpec", msg, "GUILD")
 					if result == 3 or result == 8 or result == 9 then -- AddonMessageThrottle, ChannelThrottle, GeneralError
 						guildTimer = CTimerNewTimer(throttleTimer, SendToGuild)
 					end
 				else
-					local result = SendAddonMessage("LibSpec", format("%d,%s", currentSpecId, currentTalentString or ""), "GUILD")
+					local msg = format("%d,%s", currentSpecId, currentTalentString or "")
+					local result = SendAddonMessage("LibSpec", msg, "GUILD")
 					if result == 3 or result == 8 or result == 9 then -- AddonMessageThrottle, ChannelThrottle, GeneralError
 						guildTimer = CTimerNewTimer(throttleTimer, SendToGuild)
 					end
@@ -791,8 +797,8 @@ do
 			else
 				local specId, role, position, talentString = GetInfo()
 				if specId then
-					for _,func in next, callbackMapGroup do
-						securecallfunction(func, specId, role, position, pName, talentString) -- This allows us to show our own spec info when not grouped
+					for _,func in next, callbackMapGroup do -- This allows us to show our own spec info when not grouped
+						securecallfunction(func, specId, role, position, pName, talentString)
 					end
 				end
 			end
@@ -800,13 +806,19 @@ do
 			RequestGroupSpecialization()
 		elseif event == "PLAYER_LOGIN" then
 			RequestGroupSpecialization()
-			-- Calling this again will schedule a delayed request. We want to do this in case we logged into an active encounter, but InChatMessagingLockdown didn't signal this in the first check.
+			-- Calling this again will schedule a delayed request. We want to do this in case we requested group data
+			-- a millisecond too early, and not everyone in the group was out of chat lockdown to hear our request.
 			RequestGroupSpecialization()
+			-- Some addons don't care about group specs and only use the player callbacks, trigger those on log in
+			for _,func in next, LS.callbackMapPlayerSpecChange do
+				securecallfunction(func)
+			end
 		elseif event == "ADDON_RESTRICTION_STATE_CHANGED" then
 			if prefix == 5 and msg == 0 then -- [prefix=restrictionType] 5=Chat restriction, [msg=state] 0=Inactive
 				self:UnregisterEvent(event)
 				RequestGroupSpecialization()
-				-- Calling this again will schedule a delayed request. We want to do this in case we requested group data a millisecond too early, and not everyone in the group was out of chat lockdown to hear our request.
+				-- Calling this again will schedule a delayed request. We want to do this in case we requested group data
+				-- a millisecond too early, and not everyone in the group was out of chat lockdown to hear our request.
 				RequestGroupSpecialization()
 			end
 		end
@@ -860,4 +872,7 @@ end
 
 if IsLoggedIn() and not oldminor then -- Player is logged in and library isn't upgrading
 	RequestGroupSpecialization()
+	for _,func in next, LS.callbackMapPlayerSpecChange do
+		securecallfunction(func)
+	end
 end
