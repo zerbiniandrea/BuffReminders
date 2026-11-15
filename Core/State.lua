@@ -1857,7 +1857,7 @@ local function ShouldShowConsumableBuff(buff)
             local hasBuff, remaining = UnitHasBuff("player", id)
             if hasBuff then
                 local CM = BR.ConsumableMemory
-                if CM and category and not CM.IsFleetingSpell(id) then
+                if CM and category and not CM.IsUnrememberedSpell(id) then
                     CM.Remember(GetPlayerSpecId(), category, id, true)
                 end
                 if category then

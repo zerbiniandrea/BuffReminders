@@ -291,7 +291,8 @@ BR.CONSUMABLE_ITEMS = {
     },
 }
 
-BR.FLEETING_FLASK_ITEMS = {
+-- Flask items that never become the remembered flask choice.
+BR.UNREMEMBERED_FLASK_ITEMS = {
     [245926] = true, -- Fleeting Flask of Thalassian Resistance (quality 2)
     [245927] = true, -- Fleeting Flask of Thalassian Resistance
     [245928] = true, -- Fleeting Flask of the Shattered Sun (quality 2)
@@ -300,7 +301,7 @@ BR.FLEETING_FLASK_ITEMS = {
     [245931] = true, -- Fleeting Flask of the Blood Knights
     [245932] = true, -- Fleeting Flask of the Magisters (quality 2)
     [245933] = true, -- Fleeting Flask of the Magisters
-    -- A cauldron placement is not a flask preference
+    -- Cauldrons
     [241318] = true, -- Cauldron of Sin'dorei Flasks (quality 2)
     [241319] = true, -- Cauldron of Sin'dorei Flasks
 }

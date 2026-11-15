@@ -12,34 +12,34 @@ local BR = ns
 local GetItemSpell = C_Item.GetItemSpell
 
 -- ============================================================================
--- FLEETING FLASK DETECTION
+-- UNREMEMBERED FLASKS
 -- ============================================================================
--- Fleeting and cauldron flasks sort first by numeric priority. The module must
+-- Fleeting flasks and cauldrons sort first by numeric priority. The module must
 -- not remember them, because they overwrite the regular flask preference.
 
----Check if an item is a fleeting flask.
+---Check if the module must not remember an item.
 ---@param itemID number
 ---@return boolean
-local function IsFleetingItem(itemID)
-    return BR.FLEETING_FLASK_ITEMS and BR.FLEETING_FLASK_ITEMS[itemID] or false
+local function IsUnrememberedItem(itemID)
+    return BR.UNREMEMBERED_FLASK_ITEMS and BR.UNREMEMBERED_FLASK_ITEMS[itemID] or false
 end
 
-local fleetingSpellIDs = nil
+local unrememberedSpellIDs = nil
 
----Check if a spell ID corresponds to a fleeting flask.
+---Check if the module must not remember a spell.
 ---@param spellID number
 ---@return boolean
-local function IsFleetingSpell(spellID)
-    if not fleetingSpellIDs then
-        fleetingSpellIDs = {}
-        for itemID in pairs(BR.FLEETING_FLASK_ITEMS or {}) do
+local function IsUnrememberedSpell(spellID)
+    if not unrememberedSpellIDs then
+        unrememberedSpellIDs = {}
+        for itemID in pairs(BR.UNREMEMBERED_FLASK_ITEMS or {}) do
             local ok, _, sid = pcall(GetItemSpell, itemID)
             if ok and sid then
-                fleetingSpellIDs[sid] = true
+                unrememberedSpellIDs[sid] = true
             end
         end
     end
-    return fleetingSpellIDs[spellID] or false
+    return unrememberedSpellIDs[spellID] or false
 end
 
 -- ============================================================================
@@ -97,7 +97,7 @@ local function RememberChoice(itemID, buffFrame)
     if not itemID or not buffFrame or buffFrame.buffCategory ~= "consumable" then
         return
     end
-    if IsFleetingItem(itemID) then
+    if IsUnrememberedItem(itemID) then
         return
     end
     local ok, _, useSpellID = pcall(GetItemSpell, itemID)
@@ -184,8 +184,8 @@ end
 BR.ConsumableMemory = {
     Remember = Remember,
     GetRemembered = GetRemembered,
-    IsFleetingSpell = IsFleetingSpell,
-    IsFleetingItem = IsFleetingItem,
+    IsUnrememberedSpell = IsUnrememberedSpell,
+    IsUnrememberedItem = IsUnrememberedItem,
     RememberChoice = RememberChoice,
     DetectConsumedItems = DetectConsumedItems,
     SnapshotCounts = SnapshotCounts,
