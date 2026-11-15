@@ -292,6 +292,27 @@ function BR.Migrations.RunProfile(profile)
     profile.dbVersion = BR.Migrations.DB_VERSION
 end
 
+-- Export strings carry exportVersion from this DB_VERSION on.
+local FIRST_STAMPED_EXPORT = 59
+
+---Migrate decoded profile import data and stamp it, as RunProfile does. An unstamped
+---string predates v59 and replays every migration above the floor: [49]-[58] only clear
+---or convert keys that a newer string does not carry, and [59]-[61] apply as written.
+---@param data table Decoded import data
+---@param exportVersion number exportVersion of the string, 0 if absent
+function BR.Migrations.RunImport(data, exportVersion)
+    -- A NaN or infinite version comes only from a crafted string.
+    if exportVersion ~= exportVersion or exportVersion == math.huge then
+        exportVersion = 0
+    end
+    if exportVersion < FIRST_STAMPED_EXPORT then
+        data.dbVersion = BR.Migrations.MIN_DB_VERSION
+    else
+        data.dbVersion = math.floor(exportVersion)
+    end
+    BR.Migrations.RunProfile(data)
+end
+
 local function CopyTable(source)
     local copy = {}
     for k, v in pairs(source) do
