@@ -167,23 +167,19 @@ end
 -- DB_VERSION, so the migrations after it still convert these profiles.
 local UNVERSIONED_PROFILE_STAMP = 60
 
----Stamp each unversioned profile one time. A flat layout converted in this login
----keeps no version, because its data is from before versioning.
----@param skipName string? Profile that the flat layout conversion created
-function BR.Migrations.StampUnversionedProfiles(skipName)
-    local global = BR.aceDB.global
-    if global.unversionedProfilesStamped then
+---Stamp each unversioned raw profile, before AceDB:New. Safe on every login: this
+---build stamps a profile when it is created, so only an older build leaves one unversioned.
+---@param profiles table? Raw BuffRemindersDB.profiles
+---@param skipName string? Profile that the flat layout conversion created in this login
+function BR.Migrations.StampUnversionedProfiles(profiles, skipName)
+    if not profiles then
         return
     end
-    local profiles = BR.aceDB.sv.profiles
-    if profiles then
-        for name, profile in pairs(profiles) do
-            if type(profile) == "table" and profile.dbVersion == nil and name ~= skipName then
-                profile.dbVersion = UNVERSIONED_PROFILE_STAMP
-            end
+    for name, profile in pairs(profiles) do
+        if type(profile) == "table" and profile.dbVersion == nil and name ~= skipName then
+            profile.dbVersion = UNVERSIONED_PROFILE_STAMP
         end
     end
-    global.unversionedProfilesStamped = true
 end
 
 -- Run pending migrations against the profile `db`, using code `defaults` for
@@ -924,8 +920,7 @@ function BR.Migrations.Run(db, defaults, ctx)
 
         -- [40] Disable druidWrongForm by default. Nested defaults do not
         -- reliably merge once a profile has its own enabledBuffs table, so the
-        -- migration writes the value directly. It also drops the retired
-        -- legacyConsumablesNoticeShown global flag.
+        -- migration writes the value directly.
         [40] = function()
             if not db.enabledBuffs then
                 db.enabledBuffs = {}
@@ -933,9 +928,6 @@ function BR.Migrations.Run(db, defaults, ctx)
             if db.enabledBuffs.druidWrongForm == nil then
                 db.enabledBuffs.druidWrongForm = false
                 db.enabledBuffs.warriorWrongStance = false
-            end
-            if BR.aceDB and BR.aceDB.global then
-                BR.aceDB.global.legacyConsumablesNoticeShown = nil
             end
         end,
 
@@ -1053,13 +1045,8 @@ function BR.Migrations.Run(db, defaults, ctx)
             db.myBuffsOnlyWhileLeveling = nil
         end,
 
-        -- [45] Drop the retired selfOnlyOutsideNoticeShown global flag. The
-        -- one-time login notice it gated no longer exists.
-        [45] = function()
-            if BR.aceDB and BR.aceDB.global then
-                BR.aceDB.global.selfOnlyOutsideNoticeShown = nil
-            end
-        end,
+        -- [45] No-op.
+        [45] = function() end,
 
         -- [46] expirationThreshold is no longer an appearance key: it now uses
         -- the standard per-key fallback regardless of useCustomAppearance.
@@ -1155,14 +1142,9 @@ function BR.Migrations.Run(db, defaults, ctx)
         [48] = function() end,
 
         -- [49] Frame lock is now session-only (starts locked every login), so the
-        -- persisted `locked` field is dead - drop it. Also clears the retired
-        -- glowDefaultNoticeCount global flag (per-profile migration runs once each,
-        -- and one pass is enough for the shared global).
+        -- persisted `locked` field is dead - drop it.
         [49] = function()
             db.locked = nil
-            if BR.aceDB and BR.aceDB.global then
-                BR.aceDB.global.glowDefaultNoticeCount = nil
-            end
         end,
 
         -- [50] The entry set is the externals switch: a ticked buff is a tracked

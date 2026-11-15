@@ -56,6 +56,8 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
         rawset(BuffRemindersDB, "global", globalData)
     end
 
+    BR.Migrations.StampUnversionedProfiles(BuffRemindersDB.profiles, convertedFlatProfile)
+
     local aceDefaults = {
         profile = {},
         global = { minimap = defaults.minimap },
@@ -69,8 +71,6 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
     BR.Profiles.Initialize(aceDefaults)
 
     local db = BR.profile
-
-    BR.Migrations.StampUnversionedProfiles(convertedFlatProfile)
 
     -- ====================================================================
     -- Versioned migrations - dbVersion makes each migration run exactly once.
