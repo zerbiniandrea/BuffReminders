@@ -180,6 +180,9 @@ BR.CONSUMABLE_ITEMS = {
         [275264] = { label = L["Label.Feast"], feast = true }, -- Amani Cornucopia
         [275265] = { label = L["Label.Feast"], feast = true }, -- Loa's Gathering
         [275266] = { label = L["Label.Feast"], feast = true }, -- Feast of Knowledge
+        [275267] = { label = L["Label.Feast"], badge = L["Badge.Hearty"], feast = true }, -- Hearty Amani Cornucopia
+        [275268] = { label = L["Label.Feast"], badge = L["Badge.Hearty"], feast = true }, -- Hearty Loa's Gathering
+        [275269] = { label = L["Label.Feast"], badge = L["Badge.Hearty"], feast = true }, -- Hearty Feast of Knowledge
         -- Recovery-only (no Well Fed buff, just health/mana restore). Not tracked, listed here for reference.
         -- [260264] = true, -- Quel'Danas Rations
         -- [260275] = true, -- Mukleech Curry
