@@ -82,6 +82,32 @@ function BR.Migrations.RenameFeastAtPlayer(profile)
     profileDefaults.feastAtPlayer = nil
 end
 
+-- Versioning predates multiple profiles, and the single profile converted from the
+-- flat layout was the active one at its first login. So an unversioned profile was
+-- created in a session, in a version that did not stamp new profiles. Its data is
+-- current, and a replay from 1 overwrites player choices. 60 is the last released
+-- DB_VERSION, so the migrations after it still convert these profiles.
+local UNVERSIONED_PROFILE_STAMP = 60
+
+---Stamp each unversioned profile one time. A flat layout converted in this login
+---keeps no version, because its data is from before versioning.
+---@param skipName string? Profile that the flat layout conversion created
+function BR.Migrations.StampUnversionedProfiles(skipName)
+    local global = BR.aceDB.global
+    if global.unversionedProfilesStamped then
+        return
+    end
+    local profiles = BR.aceDB.sv.profiles
+    if profiles then
+        for name, profile in pairs(profiles) do
+            if type(profile) == "table" and profile.dbVersion == nil and name ~= skipName then
+                profile.dbVersion = UNVERSIONED_PROFILE_STAMP
+            end
+        end
+    end
+    global.unversionedProfilesStamped = true
+end
+
 -- Run pending migrations against the profile `db`, using code `defaults` for
 -- fallbacks. `ctx` carries the Display.lua file-scope values the migrations
 -- read (CATEGORIES).

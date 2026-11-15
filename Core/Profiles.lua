@@ -22,6 +22,8 @@ local suppressRefresh = false
 ---@param aceDefaults table AceDB defaults table with profile/global keys
 function BR.Profiles.Initialize(aceDefaults)
     BR.aceDB = LibStub("AceDB-3.0"):New("BuffRemindersDB", aceDefaults, true)
+    -- LibDualSpec can switch profiles inside EnhanceDatabase, so this callback must register first.
+    BR.aceDB.RegisterCallback(BR.Profiles, "OnNewProfile", "StampCurrentVersion")
 
     -- The proxy routes each read and write to the active AceDB profile. A closure
     -- that captures `local db = BR.profile` stays valid across profile switches.
@@ -42,7 +44,7 @@ function BR.Profiles.Initialize(aceDefaults)
 
     BR.aceDB.RegisterCallback(BR.Profiles, "OnProfileChanged", "OnProfileEvent")
     BR.aceDB.RegisterCallback(BR.Profiles, "OnProfileCopied", "OnProfileEvent")
-    BR.aceDB.RegisterCallback(BR.Profiles, "OnProfileReset", "OnProfileEvent")
+    BR.aceDB.RegisterCallback(BR.Profiles, "OnProfileReset", "OnProfileReset")
 end
 
 -- ============================================================================
@@ -55,6 +57,18 @@ function BR.Profiles.OnProfileEvent()
         return
     end
     BR.Profiles.RefreshAfterProfileChange()
+end
+
+---A profile that is new or reset holds current-format data. Without a dbVersion,
+---the next login replays every migration on it.
+---@param database table AceDB database object
+function BR.Profiles.StampCurrentVersion(_, _, database)
+    database.profile.dbVersion = BR.Migrations.DB_VERSION
+end
+
+function BR.Profiles.OnProfileReset(_, _, database)
+    BR.Profiles.StampCurrentVersion(nil, nil, database)
+    BR.Profiles.OnProfileEvent()
 end
 
 ---Suppress refresh callbacks for the duration of fn(), then fire one refresh.

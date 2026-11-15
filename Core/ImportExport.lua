@@ -238,6 +238,9 @@ local function ImportSettings(prefixedStr)
     end
     setmetatable(BR.profile.defaults, { __index = defaults.defaults })
 
+    -- An unversioned profile replays every migration at login, also on the imported data.
+    p.dbVersion = BR.Migrations.DB_VERSION
+
     return true
 end
 

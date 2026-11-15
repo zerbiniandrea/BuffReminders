@@ -33,9 +33,12 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
     -- Pre-AceDB migration: wrap the old flat SavedVariables layout (root-level
     -- iconSize/categorySettings/etc., no profiles) into the AceDB structure so
     -- AceDB:New() adopts the existing data and does not report a fresh install.
-    -- On first install the table is empty, so this block seeds an empty profile.
+    -- On first install the table is empty, so this block seeds an empty profile
+    -- at the current dbVersion.
     -- ====================================================================
+    local convertedFlatProfile
     if not rawget(BuffRemindersDB, "profiles") then
+        convertedFlatProfile = not isFirstInstall and "Default" or nil
         local profileData, globalData = {}, {}
         for k, v in pairs(BuffRemindersDB) do
             if k == "minimap" then
@@ -43,6 +46,9 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
             else
                 profileData[k] = v
             end
+        end
+        if isFirstInstall then
+            profileData.dbVersion = BR.Migrations.DB_VERSION
         end
         wipe(BuffRemindersDB)
         rawset(BuffRemindersDB, "profiles", { ["Default"] = profileData })
@@ -63,6 +69,8 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
     BR.Profiles.Initialize(aceDefaults)
 
     local db = BR.profile
+
+    BR.Migrations.StampUnversionedProfiles(convertedFlatProfile)
 
     -- ====================================================================
     -- Versioned migrations - dbVersion makes each migration run exactly once.
