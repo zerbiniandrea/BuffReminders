@@ -55,6 +55,7 @@ read_globals = {
     "EJ_GetCurrentTier",
     "EJ_GetInstanceByIndex",
     "EJ_SelectTier",
+    "geterrorhandler",
     "GetActionInfo",
     "GetFlyoutInfo",
     "GetFlyoutSlotInfo",

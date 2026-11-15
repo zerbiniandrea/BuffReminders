@@ -584,9 +584,8 @@ function BR.Config.Set(path, value)
     -- Level 1 reads through the BR.profile proxy metatable: the proxy is an empty
     -- shell, so rawget always misses and __newindex then overwrites real data.
     --
-    -- Levels 2+ use rawget. The metatable on db.defaults falls back to the shared
-    -- code-defaults table, and a plain index walks into it and mutates it. A write
-    -- must always land in the saved table of the user.
+    -- Levels 2+ use rawget, so a write never walks through a metatable into a
+    -- shared table. A write must always land in the saved table of the user.
     local parent = db
     for i = 1, #segments - 1 do
         local key = segments[i]

@@ -119,7 +119,7 @@ BR.defaults = {
     },
 
     -- Rogue poison preferences: ordered list per category, array index = priority (1 = highest).
-    -- Shared with Data/Buffs.lua; DeepCopyDefault produces an independent per-profile copy.
+    -- Shared with Data/Buffs.lua. Each profile gets its own copy from the AceDB defaults.
     roguePoisonPreferences = BR.DEFAULT_POISON_PREFERENCES,
 
     minimap = {
@@ -128,8 +128,8 @@ BR.defaults = {
 
     -- Externals: a present-based display, the inverse of the reminder pipeline.
     -- Rendered by Blizzard via an AuraContainer, so it works for auras the addon is
-    -- not allowed to read. Purely additive schema - DeepCopyDefault seeds it, so
-    -- no migration is needed.
+    -- not allowed to read. Purely additive schema - the AceDB defaults seed it,
+    -- so no migration is needed.
     externals = {
         -- Countdown size and direction have no `defaults` counterpart, so they
         -- always come from this table, even while the appearance inherits.
@@ -233,10 +233,7 @@ BR.defaults = {
         },
         warlockWrongDemon = true,
         -- Per-text-item size override, as a percentage of the icon size. An
-        -- absent key follows consumableTextScale. Like every key in this table,
-        -- the __index metatable serves it and DeepCopyDefault never copies it
-        -- into the profile, so write it only through BR.Config.Set - a direct
-        -- write lands in this shared table and leaks across profiles.
+        -- absent key follows consumableTextScale.
         textSizes = {},
         -- Per-text-item placement (zone + pixel nudge). See Core/TextPositions.lua
         -- for zone constants. Defaults preserve the prior hard-coded anchors so

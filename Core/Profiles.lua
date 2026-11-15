@@ -59,8 +59,7 @@ function BR.Profiles.OnProfileEvent()
     BR.Profiles.RefreshAfterProfileChange()
 end
 
----A profile that is new or reset holds current-format data. Without a dbVersion,
----the next login replays every migration on it.
+---A new or reset profile holds current-format data, so it carries the current dbVersion.
 ---@param database table AceDB database object
 function BR.Profiles.StampCurrentVersion(_, _, database)
     database.profile.dbVersion = BR.Migrations.DB_VERSION
@@ -196,19 +195,13 @@ end
 -- REFRESH AFTER PROFILE CHANGE
 -- ============================================================================
 
----Fill missing keys in `target` from code `source`, recursively.
----Skips `minimap` and the `defaults` sub-table.
+---Fill missing keys in `target` from code `source`, recursively. Skips `minimap`.
 ---@param source table code defaults (BR.defaults)
 ---@param target table profile table to fill
 local function DeepCopyDefault(source, target)
     for k, v in pairs(source) do
         if k == "minimap" then -- luacheck: ignore 542
             -- minimap lives in the AceDB global, not in the profile
-        elseif k == "defaults" then
-            -- The metatable __index serves the values, so only the table must exist
-            if target[k] == nil then
-                target[k] = {}
-            end
         elseif target[k] == nil then
             if type(v) == "table" then
                 target[k] = {}
@@ -221,27 +214,11 @@ local function DeepCopyDefault(source, target)
         end
     end
 end
-BR.Profiles.DeepCopyDefault = DeepCopyDefault
 
----Re-apply the defaults metatable on the active profile's defaults table
-function BR.Profiles.ReapplyDefaultsMetatable()
-    local codeDefaults = BR.defaults
-    if not codeDefaults then
-        return
-    end
-    local db = BR.profile
-    if not db.defaults then
-        ---@diagnostic disable-next-line: missing-fields
-        db.defaults = {}
-    end
-    setmetatable(db.defaults, { __index = codeDefaults.defaults })
-end
-
----Full display refresh after profile data changes (switch, copy, reset).
+---Full display refresh after profile data changes (switch, copy, reset, import).
 function BR.Profiles.RefreshAfterProfileChange()
-    BR.Profiles.ReapplyDefaultsMetatable()
-
-    -- The copy materializes the default keys, so pairs() iteration finds them.
+    -- An import replaces whole profile keys outside AceDB, so the defaults that the
+    -- string leaves out must be filled here.
     if BR.defaults then
         DeepCopyDefault(BR.defaults, BR.profile)
     end

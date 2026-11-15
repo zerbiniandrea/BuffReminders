@@ -33,6 +33,7 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
     end
 
     BR.Migrations.StampUnversionedProfiles(BuffRemindersDB.profiles)
+    BR.Migrations.RunAllProfiles(BuffRemindersDB.profiles)
 
     local aceDefaults = {
         profile = {},
@@ -47,10 +48,6 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
     BR.Profiles.Initialize(aceDefaults)
 
     local db = BR.profile
-
-    BR.Migrations.Run(BR.aceDB.profile)
-
-    BR.Profiles.DeepCopyDefault(defaults, db)
 
     if not db.customBuffs then
         db.customBuffs = {}
@@ -71,12 +68,6 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
 
     -- The glow registry reads the profile and the custom-buff array, so it must build after both.
     BR.GameContext.RebuildGlowRegistry()
-
-    if not db.defaults then
-        ---@diagnostic disable-next-line: missing-fields
-        db.defaults = {}
-    end
-    setmetatable(db.defaults, { __index = defaults.defaults })
 
     if not db.categoryVisibility then
         db.categoryVisibility = {}

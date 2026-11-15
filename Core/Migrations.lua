@@ -178,28 +178,23 @@ end
 ---Run the pending migrations on one raw profile table and stamp it. A profile below
 ---MIN_DB_VERSION resets to empty. A profile above DB_VERSION comes from a newer build
 ---and stays untouched.
----@param db table Raw profile table
-function BR.Migrations.Run(db)
-    local version = db.dbVersion or 0
+---@param profile table Raw profile table
+function BR.Migrations.RunProfile(profile)
+    local version = tonumber(profile.dbVersion) or 0
     if version > BR.Migrations.DB_VERSION then
         return
     end
     if version < BR.Migrations.MIN_DB_VERSION then
-        wipe(db)
-        db.dbVersion = BR.Migrations.DB_VERSION
+        wipe(profile)
+        profile.dbVersion = BR.Migrations.DB_VERSION
         return
     end
 
     local migrations = {
-        -- [48] (no-op, retired: repairGear/mageFood now ship off-by-default via the
-        -- buff def's `defaultEnabled = false`, resolved at read time by
-        -- StateHelpers.IsBuffEnabled - no per-profile seeding needed)
-        [48] = function() end,
-
         -- [49] Frame lock is now session-only (starts locked every login), so the
         -- persisted `locked` field is dead - drop it.
         [49] = function()
-            db.locked = nil
+            profile.locked = nil
         end,
 
         -- [50] The entry set is the externals switch: a ticked buff is a tracked
@@ -207,64 +202,47 @@ function BR.Migrations.Run(db)
         -- while that flag was off starts drawing them, which is what the ticks
         -- always asked for.
         [50] = function()
-            if db.externals then
-                db.externals.enabled = nil
+            if profile.externals then
+                profile.externals.enabled = nil
             end
         end,
         -- [51] Guardian of the Forgotten Queen leaves the curated externals list:
         -- it is a PvP talent, too niche to offer everyone
         -- (BR.Migrations.KeepForgottenQueen).
         [51] = function()
-            BR.Migrations.KeepForgottenQueen(db)
+            BR.Migrations.KeepForgottenQueen(profile)
         end,
         -- [52] The options panel zoom replaces a raw frame scale that held
-        -- PANEL_DENSITY at 100%. This pass covers every profile, not only `db`:
-        -- migrations never run against an inactive profile, so a stale profile
-        -- keeps the dead key and falls back to 100%.
+        -- PANEL_DENSITY at 100%.
         [52] = function()
-            local profiles = BR.aceDB and BR.aceDB.sv and BR.aceDB.sv.profiles
-            if not profiles then
-                return
+            if type(profile.optionsPanelScale) == "number" then
+                profile.optionsPanelZoom = BR.ZoomFromLegacyScale(profile.optionsPanelScale)
             end
-            for _, profile in pairs(profiles) do
-                if type(profile) == "table" then
-                    if type(profile.optionsPanelScale) == "number" then
-                        profile.optionsPanelZoom = BR.ZoomFromLegacyScale(profile.optionsPanelScale)
-                    end
-                    profile.optionsPanelScale = nil
-                end
-            end
+            profile.optionsPanelScale = nil
         end,
         -- [53] Aura Mastery leaves the curated externals list: aura 31821 lands on
         -- the paladin who casts it, not on the group, so the entry can never fire
         -- for the player it was offered to. Nothing walks a tracked key without a
         -- matching entry, so this pass only clears the dead saved keys.
         [53] = function()
-            BR.Migrations.ClearExternals(db, { "auraMastery" })
+            BR.Migrations.ClearExternals(profile, { "auraMastery" })
         end,
         -- [54] Luminous Barrier and Earthen Wall Totem leave the curated externals
         -- list: the game removed both abilities, so auras 271466 and 201633 can never
         -- apply. Nothing walks a tracked key without a matching entry, so this pass
         -- only clears the dead saved keys.
         [54] = function()
-            BR.Migrations.ClearExternals(db, { "luminousBarrier", "earthenWall" })
+            BR.Migrations.ClearExternals(profile, { "luminousBarrier", "earthenWall" })
         end,
         -- [55] The icon cache leaves the custom buff entries. The display code
         -- wrote `_iconsCache` onto each entry, so SavedVariables and profile
-        -- exports carried it. This pass covers every profile, not only `db`:
-        -- an inactive profile keeps the dead key and exports it.
+        -- exports carried it.
         [55] = function()
-            local profiles = BR.aceDB and BR.aceDB.sv and BR.aceDB.sv.profiles
-            if not profiles then
-                return
-            end
-            for _, profile in pairs(profiles) do
-                local customBuffs = type(profile) == "table" and profile.customBuffs
-                if type(customBuffs) == "table" then
-                    for _, buff in pairs(customBuffs) do
-                        if type(buff) == "table" then
-                            buff._iconsCache = nil
-                        end
+            local customBuffs = profile.customBuffs
+            if type(customBuffs) == "table" then
+                for _, buff in pairs(customBuffs) do
+                    if type(buff) == "table" then
+                        buff._iconsCache = nil
                     end
                 end
             end
@@ -273,97 +251,36 @@ function BR.Migrations.Run(db)
         -- [56] defaults.warlockDemon becomes defaults.warlockDemons
         -- (BR.Migrations.ConvertWarlockDemons).
         [56] = function()
-            local profiles = BR.aceDB and BR.aceDB.sv and BR.aceDB.sv.profiles
-            if not profiles then
-                return
-            end
-            for _, profile in pairs(profiles) do
-                if type(profile) == "table" then
-                    BR.Migrations.ConvertWarlockDemons(profile)
-                end
-            end
+            BR.Migrations.ConvertWarlockDemons(profile)
         end,
 
         -- [57] Ancestral Protection Totem leaves the curated externals list: the game
         -- removed the ability, so aura 207498 can never apply. Nothing walks a tracked
         -- key without a matching entry, so this pass only clears the dead saved keys.
-        -- It covers every profile, because an inactive profile keeps them otherwise.
         [57] = function()
-            local profiles = BR.aceDB and BR.aceDB.sv and BR.aceDB.sv.profiles
-            if not profiles then
-                return
-            end
-            local keys = { "ancestralProtection" }
-            for _, profile in pairs(profiles) do
-                if type(profile) == "table" then
-                    BR.Migrations.ClearExternals(profile, keys)
-                end
-            end
+            BR.Migrations.ClearExternals(profile, { "ancestralProtection" })
         end,
 
         -- [58] /br debug leaves: no code reads debugMode, so this pass clears the
-        -- dead flag in every profile.
+        -- dead flag.
         [58] = function()
-            local profiles = BR.aceDB and BR.aceDB.sv and BR.aceDB.sv.profiles
-            if not profiles then
-                return
-            end
-            for _, profile in pairs(profiles) do
-                if type(profile) == "table" then
-                    profile.debugMode = nil
-                end
-            end
+            profile.debugMode = nil
         end,
 
         -- [59] A category's direction moves from growDirection to layoutDirection
-        -- (BR.Migrations.MoveCategoryDirection). This pass covers every inactive
-        -- profile too, because an inactive profile otherwise keeps the old key. An
-        -- inactive profile below v58 is skipped: older migrations still read its
-        -- growDirection, and its own run reaches this step in order.
+        -- (BR.Migrations.MoveCategoryDirection).
         [59] = function()
-            BR.Migrations.MoveCategoryDirection(db.categorySettings)
-            local profiles = BR.aceDB and BR.aceDB.sv and BR.aceDB.sv.profiles
-            if not profiles then
-                return
-            end
-            local active = BR.aceDB.profile
-            for _, profile in pairs(profiles) do
-                if type(profile) == "table" and profile ~= active and (profile.dbVersion or 0) >= 58 then
-                    BR.Migrations.MoveCategoryDirection(profile.categorySettings)
-                end
-            end
+            BR.Migrations.MoveCategoryDirection(profile.categorySettings)
         end,
         -- [60] The buff tooltip toggle becomes per category
-        -- (BR.Migrations.SplitBuffTooltips). It covers inactive profiles by the
-        -- rule of [59].
+        -- (BR.Migrations.SplitBuffTooltips).
         [60] = function()
-            BR.Migrations.SplitBuffTooltips(db)
-            local profiles = BR.aceDB and BR.aceDB.sv and BR.aceDB.sv.profiles
-            if not profiles then
-                return
-            end
-            local active = BR.aceDB.profile
-            for _, profile in pairs(profiles) do
-                if type(profile) == "table" and profile ~= active and (profile.dbVersion or 0) >= 58 then
-                    BR.Migrations.SplitBuffTooltips(profile)
-                end
-            end
+            BR.Migrations.SplitBuffTooltips(profile)
         end,
         -- [61] defaults.feastAtPlayer becomes defaults.placeAtPlayer
-        -- (BR.Migrations.RenameFeastAtPlayer). No older migration reads the old key,
-        -- so every inactive profile converts, whatever its version.
+        -- (BR.Migrations.RenameFeastAtPlayer).
         [61] = function()
-            BR.Migrations.RenameFeastAtPlayer(db)
-            local profiles = BR.aceDB and BR.aceDB.sv and BR.aceDB.sv.profiles
-            if not profiles then
-                return
-            end
-            local active = BR.aceDB.profile
-            for _, profile in pairs(profiles) do
-                if type(profile) == "table" and profile ~= active then
-                    BR.Migrations.RenameFeastAtPlayer(profile)
-                end
-            end
+            BR.Migrations.RenameFeastAtPlayer(profile)
         end,
     }
 
@@ -372,5 +289,37 @@ function BR.Migrations.Run(db)
             migrations[step]()
         end
     end
-    db.dbVersion = BR.Migrations.DB_VERSION
+    profile.dbVersion = BR.Migrations.DB_VERSION
+end
+
+local function CopyTable(source)
+    local copy = {}
+    for k, v in pairs(source) do
+        copy[k] = type(v) == "table" and CopyTable(v) or v
+    end
+    return copy
+end
+
+---Migrate every raw profile below DB_VERSION, before AceDB:New. Each profile migrates
+---on a copy, so an error keeps the saved original and the other profiles still migrate.
+---@param profiles table? Raw BuffRemindersDB.profiles
+function BR.Migrations.RunAllProfiles(profiles)
+    if type(profiles) ~= "table" then
+        return
+    end
+    for name, profile in pairs(profiles) do
+        if type(profile) == "table" and (tonumber(profile.dbVersion) or 0) < BR.Migrations.DB_VERSION then
+            -- The handler runs at the error, so the error handler records the migration stack.
+            local ok, result = xpcall(function()
+                local copy = CopyTable(profile)
+                BR.Migrations.RunProfile(copy)
+                return copy
+            end, function(err)
+                geterrorhandler()(("BuffReminders: migration of profile %q failed: %s"):format(name, tostring(err)))
+            end)
+            if ok then
+                profiles[name] = result
+            end
+        end
+    end
 end

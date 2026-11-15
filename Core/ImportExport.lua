@@ -254,15 +254,6 @@ local function ImportSettings(prefixedStr)
         end
     end
 
-    -- Ensure defaults sub-table exists and has the metatable (DeepCopy produces
-    -- a plain table, and old export strings can omit the defaults key).
-    if not BR.profile.defaults then
-        ---@diagnostic disable-next-line: missing-fields
-        BR.profile.defaults = {}
-    end
-    setmetatable(BR.profile.defaults, { __index = defaults.defaults })
-
-    -- An unversioned profile replays every migration at login, also on the imported data.
     p.dbVersion = BR.Migrations.DB_VERSION
 
     return true
