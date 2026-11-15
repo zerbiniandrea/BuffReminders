@@ -3,16 +3,14 @@ local _, ns = ...
 local BR = ns
 
 -- ============================================================================
--- Versioned SavedVariables migrations.
+-- Versioned SavedVariables migrations. They run on raw profile tables before
+-- AceDB:New, so a key with a default reads nil and a nested table can be absent.
 --
--- Each entry runs exactly once, gated by db.dbVersion: on login the runner
--- executes every migration with an index in (db.dbVersion, DB_VERSION] in
--- order, then stamps db.dbVersion = DB_VERSION.
---
--- NEVER delete or renumber an existing migration: WoW has no forced upgrade,
--- so a profile can return from any historical dbVersion. An old profile then
--- skips the schema reshaping it still needs. Append new migrations at the end
--- and bump DB_VERSION.
+-- The runner runs each migration in (profile.dbVersion, DB_VERSION] in order,
+-- then stamps DB_VERSION. A profile below MIN_DB_VERSION resets to empty.
+-- Add a migration as a new numbered entry at the end and increase DB_VERSION.
+-- Never renumber an entry. To raise the floor, set MIN_DB_VERSION and delete
+-- the migrations at or below it.
 -- ============================================================================
 
 BR.Migrations = {}
@@ -154,11 +152,9 @@ function BR.Migrations.ConvertWarlockDemons(profile)
     profileDefaults.warlockDemon = nil
 end
 
--- Versioning predates multiple profiles, and the single profile converted from the
--- flat layout was the active one at its first login. So an unversioned profile was
--- created in a session, in a version that did not stamp new profiles. Its data is
--- current, and a replay from 1 overwrites player choices. 60 is the last released
--- DB_VERSION, so the migrations after it still convert these profiles.
+-- Versioning predates multiple profiles, so an unversioned profile comes from a build
+-- that did not stamp a new profile. Its data is current, and a reset deletes player
+-- choices. 60 is the last DB_VERSION of such a build, so the later migrations still apply.
 local UNVERSIONED_PROFILE_STAMP = 60
 
 ---Stamp each unversioned raw profile, before AceDB:New. Safe on every login: this
@@ -191,16 +187,15 @@ function BR.Migrations.RunProfile(profile)
     end
 
     local migrations = {
-        -- [49] Frame lock is now session-only (starts locked every login), so the
-        -- persisted `locked` field is dead - drop it.
+        -- [49] The frame lock is session-only and starts locked at every login, so
+        -- no code reads the saved `locked` field.
         [49] = function()
             profile.locked = nil
         end,
 
         -- [50] The entry set is the externals switch: a ticked buff is a tracked
-        -- buff, so the separate enable flag is gone. A profile that kept ticks
-        -- while that flag was off starts drawing them, which is what the ticks
-        -- always asked for.
+        -- buff, so no code reads the enable flag. A profile with ticks under a
+        -- disabled flag then shows those buffs.
         [50] = function()
             if profile.externals then
                 profile.externals.enabled = nil
@@ -296,8 +291,8 @@ end
 local FIRST_STAMPED_EXPORT = 59
 
 ---Migrate decoded profile import data and stamp it, as RunProfile does. An unstamped
----string predates v59 and replays every migration above the floor: [49]-[58] only clear
----or convert keys that a newer string does not carry, and [59]-[61] apply as written.
+---string comes from a DB_VERSION below 59 and runs every migration above the floor:
+---[49]-[58] only clear or convert keys that a newer string does not carry.
 ---@param data table Decoded import data
 ---@param exportVersion number exportVersion of the string, 0 if absent
 function BR.Migrations.RunImport(data, exportVersion)

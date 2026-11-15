@@ -581,11 +581,8 @@ function BR.Config.Set(path, value)
         print("|cff00ccffBuffReminders:|r Invalid config path: " .. path)
     end
 
-    -- Level 1 reads through the BR.profile proxy metatable: the proxy is an empty
-    -- shell, so rawget always misses and __newindex then overwrites real data.
-    --
-    -- Levels 2+ use rawget, so a write never walks through a metatable into a
-    -- shared table. A write must always land in the saved table of the user.
+    -- Level 1 must index the BR.profile proxy: the proxy is an empty table, so
+    -- rawget always misses and __newindex then overwrites real data.
     local parent = db
     for i = 1, #segments - 1 do
         local key = segments[i]
@@ -660,7 +657,7 @@ function BR.Config.SetMulti(changes)
                 print("|cff00ccffBuffReminders:|r Invalid config path: " .. path)
             end
 
-            -- See BR.Config.Set for why level 1 uses __index and levels 2+ use rawget.
+            -- See BR.Config.Set for why level 1 indexes the proxy.
             local parent = db
             for i = 1, #segments - 1 do
                 local key = segments[i]

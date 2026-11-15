@@ -148,8 +148,9 @@ Components.Slider(parent, {
 
 ### SavedVariables compatibility
 
-`BuffRemindersDB` keeps the settings of a user between sessions. Data from every version that
-shipped is still in use. Every change must stay compatible with that data.
+`BuffRemindersDB` keeps the settings of a user between sessions. Data from every version at or
+above `MIN_DB_VERSION` (`Core/Migrations.lua`) is still in use. Every change must stay
+compatible with that data. At login, a profile below `MIN_DB_VERSION` resets to empty.
 
 CAUTION: Do not rename or remove a database key without a migration. A bad migration crashes
 the addon for real users at login.
@@ -161,8 +162,10 @@ Rules:
   user can predate the field.
 - Set a removed field to `nil` to erase the stale data.
 
-Migrations run in `ADDON_LOADED`, after `DeepCopyDefault(defaults, BuffRemindersDB)` fills in
-the missing keys. A migration must do three things:
+Migrations run in `ADDON_LOADED` on the raw saved profiles, before AceDB fills in the default
+keys. In a migration, a key with a default reads `nil`. Add a migration as a new numbered entry
+at the end of `Core/Migrations.lua`, then increase `DB_VERSION`. A migration must do three
+things:
 
 1. Make sure that the old shape is present.
 2. Transform the old shape into the new shape.
@@ -170,9 +173,9 @@ the missing keys. A migration must do three things:
 
 ```lua
 -- Example: rename "showCount" -> "countDisplay" (string enum)
-if type(db.showCount) == "boolean" then
-    db.countDisplay = db.showCount and "fraction" or "none"
-    db.showCount = nil
+if type(profile.showCount) == "boolean" then
+    profile.countDisplay = profile.showCount and "fraction" or "none"
+    profile.showCount = nil
 end
 ```
 
