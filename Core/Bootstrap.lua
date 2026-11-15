@@ -24,39 +24,15 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
     bootstrapFrame:UnregisterEvent("ADDON_LOADED")
 
     BR.Display.SetPlayerClass((select(2, UnitClass("player"))))
-    local isFirstInstall = not BuffRemindersDB
+    -- A database without profiles and global predates AceDB and starts fresh.
+    local isFirstInstall = not BuffRemindersDB or (not BuffRemindersDB.profiles and not BuffRemindersDB.global)
     if not BuffRemindersDB then
         BuffRemindersDB = {}
-    end
-
-    -- ====================================================================
-    -- Pre-AceDB migration: wrap the old flat SavedVariables layout (root-level
-    -- iconSize/categorySettings/etc., no profiles) into the AceDB structure so
-    -- AceDB:New() adopts the existing data and does not report a fresh install.
-    -- On first install the table is empty, so this block seeds an empty profile
-    -- at the current dbVersion.
-    -- ====================================================================
-    local convertedFlatProfile
-    if not rawget(BuffRemindersDB, "profiles") then
-        convertedFlatProfile = not isFirstInstall and "Default" or nil
-        local profileData, globalData = {}, {}
-        for k, v in pairs(BuffRemindersDB) do
-            if k == "minimap" then
-                globalData[k] = v
-            else
-                profileData[k] = v
-            end
-        end
-        if isFirstInstall then
-            profileData.dbVersion = BR.Migrations.DB_VERSION
-        end
+    elseif isFirstInstall then
         wipe(BuffRemindersDB)
-        rawset(BuffRemindersDB, "profiles", { ["Default"] = profileData })
-        rawset(BuffRemindersDB, "profileKeys", {})
-        rawset(BuffRemindersDB, "global", globalData)
     end
 
-    BR.Migrations.StampUnversionedProfiles(BuffRemindersDB.profiles, convertedFlatProfile)
+    BR.Migrations.StampUnversionedProfiles(BuffRemindersDB.profiles)
 
     local aceDefaults = {
         profile = {},
@@ -72,12 +48,7 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
 
     local db = BR.profile
 
-    -- ====================================================================
-    -- Versioned migrations - dbVersion makes each migration run exactly once.
-    -- Core/Migrations.lua is append-only. Never delete or renumber a migration:
-    -- an old profile can return from any version.
-    -- ====================================================================
-    BR.Migrations.Run(db, defaults, { CATEGORIES = CATEGORIES })
+    BR.Migrations.Run(BR.aceDB.profile)
 
     BR.Profiles.DeepCopyDefault(defaults, db)
 

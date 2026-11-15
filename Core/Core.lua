@@ -713,8 +713,7 @@ local AppearanceKeys = {
 }
 -- NOTE: expirationThreshold is deliberately NOT an appearance key. It is a timing/behavior
 -- setting and uses the standard per-key fallback (category value if set, else defaults),
--- independent of useCustomAppearance. Stale pre-2.5 values stored while the appearance
--- flag was off are cleaned up in Migrations.lua.
+-- independent of useCustomAppearance.
 
 -- Keys that are glow-related (inherit from defaults when useCustomGlow is false).
 -- Includes the per-kind ENABLE flags: the Glow override owns both whether each
