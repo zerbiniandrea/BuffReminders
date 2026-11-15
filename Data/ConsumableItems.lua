@@ -252,8 +252,8 @@ BR.CONSUMABLE_ITEMS = {
         [245932] = { label = L["Label.Mastery"], badge = L["Badge.Fleeting"], priority = 1 }, -- Fleeting Flask of the Magisters (quality 2)
         [245933] = { label = L["Label.Mastery"], badge = L["Badge.Fleeting"], priority = 1 }, -- Fleeting Flask of the Magisters
         -- Midnight 12.0.1 (cauldron, 2 quality tiers). A held fleeting flask is free, so it spends first.
-        [241318] = { priority = 2, placed = true }, -- Cauldron of Sin'dorei Flasks (quality 2)
-        [241319] = { priority = 2, placed = true }, -- Cauldron of Sin'dorei Flasks
+        [241318] = { badge = L["Badge.Cauldron"], priority = 2, placed = true }, -- Cauldron of Sin'dorei Flasks (quality 2)
+        [241319] = { badge = L["Badge.Cauldron"], priority = 2, placed = true }, -- Cauldron of Sin'dorei Flasks
     },
     -- Rune order: Midnight > TWW > Dragonflight > Shadowlands
     rune = {

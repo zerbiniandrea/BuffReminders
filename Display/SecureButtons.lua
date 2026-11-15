@@ -635,6 +635,7 @@ local ACTION_ICON_OFFSET = -6
 local BADGE_COLORS = {
     [L["Badge.Hearty"]] = { r = 0.4, g = 0.7, b = 1 },
     [L["Badge.Fleeting"]] = { r = 0.4, g = 0.7, b = 1 },
+    [L["Badge.Cauldron"]] = { r = 0.4, g = 0.7, b = 1 },
 }
 
 ---@param mainIconSize number The consumable category's main icon size

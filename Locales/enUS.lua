@@ -194,6 +194,7 @@ english["Label.Ghoul"] = "Ghoul"
 english["Label.WaterElemental"] = "Water Elemental"
 english["Badge.Hearty"] = "H"
 english["Badge.Fleeting"] = "F"
+english["Badge.Cauldron"] = "C"
 
 -- ============================================================================
 -- BUFF NAMES
@@ -572,7 +573,7 @@ english["Options.TextPositions.MainText.Note"] =
     "Position of the big text: counts, countdowns and labels."
 english["Options.TextPositions.StackCount"] = "Stack count"
 english["Options.TextPositions.StatLabel"] = "Stat label"
-english["Options.TextPositions.Badge"] = "Badge (H / F)"
+english["Options.TextPositions.Badge"] = "Badge (H / F / C)"
 english["Options.TextSizes.Note"] =
     "Auto keeps the text at the base size. Set a value to size that text on its own, as a percentage of the icon."
 english["Options.TextPositions.Vertical.Above"] = "Above"
