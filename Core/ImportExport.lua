@@ -216,6 +216,10 @@ local function ImportSettings(prefixedStr)
     if exportVersion < 60 then
         BR.Migrations.SplitBuffTooltips(p)
     end
+    -- Pre-v61 strings carry defaults.feastAtPlayer (migration [61]).
+    if exportVersion < 61 then
+        BR.Migrations.RenameFeastAtPlayer(p)
+    end
 
     -- Pre-v55 strings carry a runtime icon cache on each custom buff (migration [55]).
     if type(p.customBuffs) == "table" then

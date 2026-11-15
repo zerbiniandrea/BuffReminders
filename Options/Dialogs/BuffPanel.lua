@@ -302,6 +302,19 @@ local function PoisonNeedsSetup()
     return noneEnabled("lethal") and noneEnabled("nonLethal")
 end
 
+local function AddPlaceAtPlayerCheckbox(layout)
+    AddSpecialCheckbox(layout, {
+        label = L["Options.PlaceAtPlayer"],
+        get = function()
+            return BR.Config.Get("defaults.placeAtPlayer") ~= false
+        end,
+        tooltip = { title = L["Options.PlaceAtPlayer"], desc = L["Options.PlaceAtPlayer.Desc"] },
+        onChange = function(checked)
+            BR.Config.Set("defaults.placeAtPlayer", checked)
+        end,
+    })
+end
+
 -- `build(layout)` appends this buff's extra controls to the panel body. A
 -- section too big for the drawer names an `editor` module instead: the drawer
 -- shows a door to the focused editor, which renders that module inline.
@@ -503,18 +516,11 @@ local SPECIAL_SECTIONS = {
     },
 
     food = {
-        build = function(layout)
-            AddSpecialCheckbox(layout, {
-                label = L["Options.FeastAtPlayer"],
-                get = function()
-                    return BR.Config.Get("defaults.feastAtPlayer") ~= false
-                end,
-                tooltip = { title = L["Options.FeastAtPlayer"], desc = L["Options.FeastAtPlayer.Desc"] },
-                onChange = function(checked)
-                    BR.Config.Set("defaults.feastAtPlayer", checked)
-                end,
-            })
-        end,
+        build = AddPlaceAtPlayerCheckbox,
+    },
+
+    flask = {
+        build = AddPlaceAtPlayerCheckbox,
     },
 
     delveFood = {

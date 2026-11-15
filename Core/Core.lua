@@ -407,7 +407,7 @@ local DefaultSettingKeys = {
     rightClickSnooze = "DisplayRefresh", -- Re-wires the consumable buttons' type2 attribute
     hideLegacyConsumables = "DisplayRefresh",
     preferReusableRunes = "DisplayRefresh",
-    feastAtPlayer = "DisplayRefresh",
+    placeAtPlayer = "DisplayRefresh",
     -- Pet display mode
     petDisplayMode = "DisplayRefresh",
     petLabels = "DisplayRefresh",

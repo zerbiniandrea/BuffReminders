@@ -398,14 +398,14 @@ local function GetWeaponSlot(frame)
     return nil
 end
 
----A bag item from the consumable scan. A feast drops at the player location when
----the feastAtPlayer setting is on, because a ground target needs a second click.
----@param item table Scan entry with itemID and feast
+---A bag item from the consumable scan. A feast or cauldron drops at the player location when
+---the placeAtPlayer setting is on, because a ground target needs a second click.
+---@param item table Scan entry with itemID and placed
 ---@param frame table The buff frame
 ---@return BRSecureAction
 local function ConsumableItemAction(item, frame)
-    if item.feast and BR.profile.defaults.feastAtPlayer ~= false then
-        local action = NewAction("macro", "feastitem", item.itemID)
+    if item.placed and BR.profile.defaults.placeAtPlayer ~= false then
+        local action = NewAction("macro", "placeditem", item.itemID)
         action.itemID = item.itemID
         action.atPlayer = true
         action.snooze = true
@@ -840,7 +840,7 @@ local function RefreshConsumableCache()
         for itemID, item in pairs(entries) do
             local entry = allowedSet and allowedSet[itemID]
             item.permanent = type(entry) == "table" and entry.permanent or nil
-            item.feast = type(entry) == "table" and entry.feast or nil
+            item.placed = type(entry) == "table" and entry.placed or nil
             if not (hideLegacy and type(entry) == "table" and entry.legacy) then
                 if runeFallback and not item.permanent then
                     runeFallback[#runeFallback + 1] = item

@@ -24,7 +24,7 @@ local max = math.max
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 60
+BR.Migrations.DB_VERSION = 61
 
 ---Move a category's growth direction from growDirection, read only under the
 ---appearance override, to layoutDirection, which inherits on its own. The
@@ -67,6 +67,19 @@ function BR.Migrations.SplitBuffTooltips(profile)
         end
     end
     profileDefaults.showBuffTooltips = nil
+end
+
+---Move defaults.feastAtPlayer to defaults.placeAtPlayer. The setting also places cauldrons.
+---@param profile table One profile
+function BR.Migrations.RenameFeastAtPlayer(profile)
+    local profileDefaults = type(profile.defaults) == "table" and profile.defaults
+    if not profileDefaults then
+        return
+    end
+    if profileDefaults.feastAtPlayer ~= nil then
+        profileDefaults.placeAtPlayer = profileDefaults.feastAtPlayer
+    end
+    profileDefaults.feastAtPlayer = nil
 end
 
 -- Run pending migrations against the profile `db`, using code `defaults` for
@@ -1255,6 +1268,22 @@ function BR.Migrations.Run(db, defaults, ctx)
             for _, profile in pairs(profiles) do
                 if type(profile) == "table" and profile ~= active and (profile.dbVersion or 0) >= 58 then
                     BR.Migrations.SplitBuffTooltips(profile)
+                end
+            end
+        end,
+        -- [61] defaults.feastAtPlayer becomes defaults.placeAtPlayer
+        -- (BR.Migrations.RenameFeastAtPlayer). No older migration reads the old key,
+        -- so every inactive profile converts, whatever its version.
+        [61] = function()
+            BR.Migrations.RenameFeastAtPlayer(db)
+            local profiles = BR.aceDB and BR.aceDB.sv and BR.aceDB.sv.profiles
+            if not profiles then
+                return
+            end
+            local active = BR.aceDB.profile
+            for _, profile in pairs(profiles) do
+                if type(profile) == "table" and profile ~= active then
+                    BR.Migrations.RenameFeastAtPlayer(profile)
                 end
             end
         end,

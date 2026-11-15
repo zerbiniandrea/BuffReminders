@@ -69,7 +69,7 @@ local BR = ns
 ---@field repairThreshold? number Durability percent
 ---@field repairHideInCombat? boolean
 ---@field mageFoodContent? "all"|"dungeon"|"raid"
----@field feastAtPlayer? boolean
+---@field placeAtPlayer? boolean
 ---@field consumableDisplayMode? "icon_only"|"sub_icons"|"expanded"
 ---@field consumableBadgeOnSubIcons? boolean
 ---@field showConsumableTooltips? boolean
