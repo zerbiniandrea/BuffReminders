@@ -82,6 +82,84 @@ function BR.Migrations.RenameFeastAtPlayer(profile)
     profileDefaults.feastAtPlayer = nil
 end
 
+---Move a tracked Guardian of the Forgotten Queen from the curated externals list to
+---a custom entry, sound override included. labelSpellID, not a stored name: aura
+---228050 reads as "Divine Shield", and the granting ability localizes on every client.
+---@param profile table One profile
+function BR.Migrations.KeepForgottenQueen(profile)
+    local externals = profile.externals
+    if type(externals) ~= "table" then
+        return
+    end
+    local entries = externals.entries
+    if type(entries) ~= "table" or not entries.forgottenQueen then
+        return
+    end
+
+    externals.custom = externals.custom or {}
+    local key = BR.NewExternalKey(228050)
+    externals.custom[key] = { spellIDs = { 228050 }, labelSpellID = 228049 }
+    entries[key] = true
+    entries.forgottenQueen = nil
+
+    local sounds = externals.sounds
+    if type(sounds) == "table" and sounds.forgottenQueen ~= nil then
+        sounds[key] = sounds.forgottenQueen
+        sounds.forgottenQueen = nil
+    end
+end
+
+---Clear the saved entry and sound of curated externals that left the list.
+---@param profile table One profile
+---@param keys string[] Curated external keys
+function BR.Migrations.ClearExternals(profile, keys)
+    local externals = type(profile.externals) == "table" and profile.externals
+    if not externals then
+        return
+    end
+    local entries = type(externals.entries) == "table" and externals.entries
+    local sounds = type(externals.sounds) == "table" and externals.sounds
+    for _, key in ipairs(keys) do
+        if entries then
+            entries[key] = nil
+        end
+        if sounds then
+            sounds[key] = nil
+        end
+    end
+end
+
+local WARLOCK_DEMON_KEYS = { [688] = "imp", [697] = "voidwalker", [691] = "felhunter", [366222] = "sayaad" }
+
+---Move defaults.warlockDemon (one summon spell ID per row) to defaults.warlockDemons
+---(a set of allowed demons per row). Every key is written, because a missing key
+---follows the default, which allows Felhunter.
+---@param profile table One profile
+function BR.Migrations.ConvertWarlockDemons(profile)
+    local profileDefaults = type(profile.defaults) == "table" and profile.defaults
+    if not profileDefaults then
+        return
+    end
+    local old = rawget(profileDefaults, "warlockDemon")
+    if type(old) == "table" then
+        local new = rawget(profileDefaults, "warlockDemons")
+        if type(new) ~= "table" then
+            new = {}
+            profileDefaults.warlockDemons = new
+        end
+        for row, spellID in pairs(old) do
+            if type(row) == "string" and WARLOCK_DEMON_KEYS[spellID] then
+                local accepted = {}
+                for id, key in pairs(WARLOCK_DEMON_KEYS) do
+                    accepted[key] = id == spellID
+                end
+                new[row] = accepted
+            end
+        end
+    end
+    profileDefaults.warlockDemon = nil
+end
+
 -- Versioning predates multiple profiles, and the single profile converted from the
 -- flat layout was the active one at its first login. So an unversioned profile was
 -- created in a session, in a version that did not stamp new profiles. Its data is
@@ -1097,28 +1175,10 @@ function BR.Migrations.Run(db, defaults, ctx)
             end
         end,
         -- [51] Guardian of the Forgotten Queen leaves the curated externals list:
-        -- it is a PvP talent, too niche to offer everyone. A player who already
-        -- tracks it keeps it as an entry of their own, sound override included.
-        -- labelSpellID rather than a stored name: aura 228050 reads as "Divine
-        -- Shield", and the ability that grants it localizes on every client.
+        -- it is a PvP talent, too niche to offer everyone
+        -- (BR.Migrations.KeepForgottenQueen).
         [51] = function()
-            local externals = db.externals
-            local entries = externals and externals.entries
-            if not entries or not entries.forgottenQueen then
-                return
-            end
-
-            externals.custom = externals.custom or {}
-            local key = BR.NewExternalKey(228050)
-            externals.custom[key] = { spellIDs = { 228050 }, labelSpellID = 228049 }
-            entries[key] = true
-            entries.forgottenQueen = nil
-
-            local sounds = externals.sounds
-            if sounds and sounds.forgottenQueen ~= nil then
-                sounds[key] = sounds.forgottenQueen
-                sounds.forgottenQueen = nil
-            end
+            BR.Migrations.KeepForgottenQueen(db)
         end,
         -- [52] The options panel zoom replaces a raw frame scale that held
         -- PANEL_DENSITY at 100%. This pass covers every profile, not only `db`:
@@ -1143,34 +1203,14 @@ function BR.Migrations.Run(db, defaults, ctx)
         -- for the player it was offered to. Nothing walks a tracked key without a
         -- matching entry, so this pass only clears the dead saved keys.
         [53] = function()
-            local externals = db.externals
-            if not externals then
-                return
-            end
-            if externals.entries then
-                externals.entries.auraMastery = nil
-            end
-            if externals.sounds then
-                externals.sounds.auraMastery = nil
-            end
+            BR.Migrations.ClearExternals(db, { "auraMastery" })
         end,
         -- [54] Luminous Barrier and Earthen Wall Totem leave the curated externals
         -- list: the game removed both abilities, so auras 271466 and 201633 can never
         -- apply. Nothing walks a tracked key without a matching entry, so this pass
         -- only clears the dead saved keys.
         [54] = function()
-            local externals = db.externals
-            if not externals then
-                return
-            end
-            if externals.entries then
-                externals.entries.luminousBarrier = nil
-                externals.entries.earthenWall = nil
-            end
-            if externals.sounds then
-                externals.sounds.luminousBarrier = nil
-                externals.sounds.earthenWall = nil
-            end
+            BR.Migrations.ClearExternals(db, { "luminousBarrier", "earthenWall" })
         end,
         -- [55] The icon cache leaves the custom buff entries. The display code
         -- wrote `_iconsCache` onto each entry, so SavedVariables and profile
@@ -1193,36 +1233,16 @@ function BR.Migrations.Run(db, defaults, ctx)
             end
         end,
 
-        -- [56] defaults.warlockDemon (one summon spell ID per row) becomes
-        -- defaults.warlockDemons (a set of allowed demons per row). Every key is
-        -- written, because a missing key follows the default, which allows Felhunter.
+        -- [56] defaults.warlockDemon becomes defaults.warlockDemons
+        -- (BR.Migrations.ConvertWarlockDemons).
         [56] = function()
             local profiles = BR.aceDB and BR.aceDB.sv and BR.aceDB.sv.profiles
             if not profiles then
                 return
             end
-            local demonKeys = { [688] = "imp", [697] = "voidwalker", [691] = "felhunter", [366222] = "sayaad" }
             for _, profile in pairs(profiles) do
-                local profileDefaults = type(profile) == "table" and profile.defaults
-                if type(profileDefaults) == "table" then
-                    local old = rawget(profileDefaults, "warlockDemon")
-                    if type(old) == "table" then
-                        local new = rawget(profileDefaults, "warlockDemons")
-                        if type(new) ~= "table" then
-                            new = {}
-                            profileDefaults.warlockDemons = new
-                        end
-                        for row, spellID in pairs(old) do
-                            if type(row) == "string" and demonKeys[spellID] then
-                                local accepted = {}
-                                for id, key in pairs(demonKeys) do
-                                    accepted[key] = id == spellID
-                                end
-                                new[row] = accepted
-                            end
-                        end
-                    end
-                    profileDefaults.warlockDemon = nil
+                if type(profile) == "table" then
+                    BR.Migrations.ConvertWarlockDemons(profile)
                 end
             end
         end,
@@ -1236,15 +1256,10 @@ function BR.Migrations.Run(db, defaults, ctx)
             if not profiles then
                 return
             end
+            local keys = { "ancestralProtection" }
             for _, profile in pairs(profiles) do
-                local externals = type(profile) == "table" and profile.externals
-                if type(externals) == "table" then
-                    if type(externals.entries) == "table" then
-                        externals.entries.ancestralProtection = nil
-                    end
-                    if type(externals.sounds) == "table" then
-                        externals.sounds.ancestralProtection = nil
-                    end
+                if type(profile) == "table" then
+                    BR.Migrations.ClearExternals(profile, keys)
                 end
             end
         end,

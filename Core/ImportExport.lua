@@ -206,6 +206,30 @@ local function ImportSettings(prefixedStr)
     end
     p.optionsPanelScale = nil
 
+    -- Pre-v51 strings carry Forgotten Queen as a curated external (migration [51]).
+    if exportVersion < 51 then
+        BR.Migrations.KeepForgottenQueen(p)
+    end
+    -- Pre-v53 strings carry the Aura Mastery external (migration [53]).
+    if exportVersion < 53 then
+        BR.Migrations.ClearExternals(p, { "auraMastery" })
+    end
+    -- Pre-v54 strings carry the removed barrier and totem externals (migration [54]).
+    if exportVersion < 54 then
+        BR.Migrations.ClearExternals(p, { "luminousBarrier", "earthenWall" })
+    end
+    -- Pre-v56 strings carry defaults.warlockDemon (migration [56]).
+    if exportVersion < 56 then
+        BR.Migrations.ConvertWarlockDemons(p)
+    end
+    -- Pre-v57 strings carry the Ancestral Protection external (migration [57]).
+    if exportVersion < 57 then
+        BR.Migrations.ClearExternals(p, { "ancestralProtection" })
+    end
+    -- Pre-v58 strings carry debugMode (migration [58]).
+    if exportVersion < 58 then
+        p.debugMode = nil
+    end
     -- Pre-v59 strings carry a category's direction as growDirection (migration [59]).
     -- In a newer string a nil layoutDirection means "follow Defaults", so only an
     -- older string gets the conversion.
