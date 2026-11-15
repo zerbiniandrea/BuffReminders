@@ -43,6 +43,21 @@ local optionsPanel = nil
 -- POPUP DIALOGS
 -- ============================================================================
 
+StaticPopupDialogs["BUFFREMINDERS_DELETE_PROFILE"] = {
+    text = L["Dialog.DeleteProfile"],
+    button1 = L["Options.Delete"],
+    button2 = L["Dialog.Cancel"],
+    OnAccept = function(_, data)
+        BR.Profiles.DeleteProfile(data.name)
+        data.onDeleted()
+    end,
+    showAlert = true,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
 StaticPopupDialogs["BUFFREMINDERS_RESET_DEFAULTS"] = {
     text = L["Dialog.ResetProfile"],
     button1 = L["Dialog.Reset"],

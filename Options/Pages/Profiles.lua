@@ -117,8 +117,11 @@ local function Build(content, scrollFrame)
             if value == "" then
                 return
             end
-            BR.Profiles.DeleteProfile(value)
             RefreshProfileDropdown()
+            StaticPopup_Show("BUFFREMINDERS_DELETE_PROFILE", value, nil, {
+                name = value,
+                onDeleted = RefreshProfileDropdown,
+            })
         end,
     })
     layout:Add(deleteDropdown, 26, SECTION_GAP)

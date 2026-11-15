@@ -932,6 +932,7 @@ english["Options.UnknownError"] = "Unknown error"
 -- ============================================================================
 english["Dialog.Cancel"] = "Cancel"
 english["Dialog.DeleteCustomBuff"] = 'Delete custom buff "%s"?'
+english["Dialog.DeleteProfile"] = 'Delete profile "%s"? You cannot undo this.'
 english["Dialog.DeleteLoadout"] = 'Delete loadout reminder "%s"?'
 english["Dialog.ResetProfile"] =
     "Reset the active profile to defaults?\n\nThis will erase all customizations\nin the current profile and reload the UI."
