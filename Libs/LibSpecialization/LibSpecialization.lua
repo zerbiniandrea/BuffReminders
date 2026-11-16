@@ -321,6 +321,7 @@ do
 	-- 0=success, 1=duplicate, 2=invalid, 3=toomany
 	if type(result) == "number" and result > 1 then
 		error("LibSpecialization: Failed to register the addon prefix.")
+		return
 	end
 end
 
@@ -328,62 +329,65 @@ end
 function LS.RegisterGroup(addon, func)
 	if type(addon) ~= "table" or addon == LS then
 		error("LibSpecialization: The function lib.RegisterGroup expects your own unique table as the first arg.")
-	end
-
-	local t = type(func)
-	if t == "function" then
-		callbackMapGroup[addon] = func
 	else
-		error("LibSpecialization: The function lib.RegisterGroup expects your own function as the second arg.")
+		local t = type(func)
+		if t == "function" then
+			callbackMapGroup[addon] = func
+		else
+			error("LibSpecialization: The function lib.RegisterGroup expects your own function as the second arg.")
+		end
 	end
 end
 
 function LS.UnregisterGroup(addon)
 	if type(addon) ~= "table" or addon == LS then
 		error("LibSpecialization: The function lib.UnregisterGroup expects the unique table you used during registration.")
+	else
+		callbackMapGroup[addon] = nil
 	end
-	callbackMapGroup[addon] = nil
 end
 
 -- Handle guilds (comms are on manual request)
 function LS.RegisterGuild(addon, func)
 	if type(addon) ~= "table" or addon == LS then
 		error("LibSpecialization: The function lib.RegisterGuild expects your own unique table as the first arg.")
-	end
-
-	local t = type(func)
-	if t == "function" then
-		callbackMapGuild[addon] = func
 	else
-		error("LibSpecialization: The function lib.RegisterGuild expects your own function as the second arg.")
+		local t = type(func)
+		if t == "function" then
+			callbackMapGuild[addon] = func
+		else
+			error("LibSpecialization: The function lib.RegisterGuild expects your own function as the second arg.")
+		end
 	end
 end
 
 function LS.UnregisterGuild(addon)
 	if type(addon) ~= "table" or addon == LS then
 		error("LibSpecialization: The function lib.UnregisterGuild expects the unique table you used during registration.")
+	else
+		callbackMapGuild[addon] = nil
 	end
-	callbackMapGuild[addon] = nil
 end
 
 function LS.RegisterPlayerSpecChange(addon, func)
 	if type(addon) ~= "table" or addon == LS then
 		error("LibSpecialization: The function lib.RegisterPlayerSpecChange expects your own unique table as the first arg.")
-	end
-
-	local t = type(func)
-	if t == "function" then
-		LS.callbackMapPlayerSpecChange[addon] = func
 	else
-		error("LibSpecialization: The function lib.RegisterPlayerSpecChange expects your own function as the second arg.")
+		local t = type(func)
+		if t == "function" then
+			LS.callbackMapPlayerSpecChange[addon] = func
+		else
+			error("LibSpecialization: The function lib.RegisterPlayerSpecChange expects your own function as the second arg.")
+		end
 	end
 end
 
 function LS.UnregisterPlayerSpecChange(addon)
 	if type(addon) ~= "table" or addon == LS then
 		error("LibSpecialization: The function lib.UnregisterPlayerSpecChange expects the unique table you used during registration.")
+	else
+		LS.callbackMapPlayerSpecChange[addon] = nil
 	end
-	LS.callbackMapPlayerSpecChange[addon] = nil
 end
 
 local GetInfo
