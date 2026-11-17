@@ -5,7 +5,6 @@ if BR.locale ~= "zhTW" then
 end
 
 local L = BR.L -- luacheck: ignore 211
-
 -- Credit by BlueNightSky
 
 -- ============================================================================
@@ -18,7 +17,7 @@ L["Category.Self"] = "自身增益"
 L["Category.Pet"] = "寵物"
 L["Category.Consumable"] = "消耗品"
 L["Category.Utility"] = "功能"
-L["Category.Custom"] = "自定義"
+L["Category.Custom"] = "自訂"
 L["Category.Loadout"] = "天賦構建"
 
 -- Long form (used in Options section headers)
@@ -29,7 +28,7 @@ L["Category.UtilityReminders"] = "功能提醒"
 L["Category.PresenceBuffs"] = "職業增益"
 L["Category.SelfBuffs"] = "自身增益"
 L["Category.PetReminders"] = "寵物提示"
-L["Category.CustomBuffs"] = "自定義增益"
+L["Category.CustomBuffs"] = "自訂增益"
 L["Category.LoadoutReminders"] = "天賦構建提醒"
 
 -- Category notes
@@ -63,6 +62,8 @@ L["Loadout.NoLoadoutSelected"] = "先選擇一個天賦構建。"
 L["Loadout.TLXTag"] = "|cff9d9d9d(構建範例)|r"
 L["Loadout.InvalidSpell"] = "法術ID不存在。請使用天賦的法術ID。"
 L["Loadout.CombatBlocked"] = "無法在戰鬥中更換裝備或天賦。"
+L["Loadout.EquipFailed"] = "無法穿上裝備套裝，請確認套裝中的每件裝備都在背包裡。"
+L["Loadout.OpenTalentsFailed"] = "無法開啟天賦視窗，請手動開啟以修正提醒。"
 L["Loadout.Instances"] = "%d 副本"
 L["Loadout.LimitRaids"] = "只有指定的團隊副本"
 L["Loadout.LimitDungeons"] = "只有指定的地下城"
@@ -165,8 +166,15 @@ L["Label.LowPrimary"] = "低主屬"
 L["Label.LowSecondary"] = "低次屬"
 L["Label.RevivePet"] = "復活寵物"
 L["Label.Felguard"] = "惡魔守衛"
+L["Label.Imp"] = "小鬼"
+L["Label.Voidwalker"] = "虛無行者"
+L["Label.Felhunter"] = "惡魔獵犬"
+L["Label.Sayaad"] = "薩亞德"
+L["Label.Ghoul"] = "食屍鬼"
+L["Label.WaterElemental"] = "水元素"
 L["Badge.Hearty"] = "澎"
 L["Badge.Fleeting"] = "普"
+L["Badge.Cauldron"] = "鍋"
 
 -- ============================================================================
 -- BUFF NAMES (used in Options panel checkboxes and sound notification list)
@@ -300,8 +308,6 @@ L["Display.FramesLocked"] = "框架已鎖定。"
 L["Display.FramesUnlocked"] = "框架已解鎖。"
 L["Display.MinimapHidden"] = "小地圖圖示已隱藏。"
 L["Display.MinimapShown"] = "小地圖圖示已顯示。"
-L["Display.DebugEnabled"] = "偵錯模式已啟用。再次運行 |cFFFFD100/br debug|r 來關閉。"
-L["Display.DebugDisabled"] = "偵錯模式已停用"
 L["Display.Description"] = "一目了然地查看所有缺失的增益。"
 L["Display.OpenOptions"] = "打開選項"
 L["Display.SlashCommands"] = "使用指令:  /br, /br lock, /br unlock, /br test, /br minimap, /br snooze"
@@ -312,6 +318,8 @@ L["Display.LoginFirstInstall"] =
     "感謝安裝！輸入 |cFFFFD100/br unlock|r 來移動增益顯示，或者使用 |cFFFFD100/br|r 選項面板底部的按鈕。"
 L["Display.LoginSnooze"] =
     "消耗品關閉按鈕現在是右鍵點擊: 右鍵點選消耗品可暫停其提醒，或輸入 |cFFFFD100/br snooze|r。"
+L["Display.LoginCasterName"] =
+    "外部增益效果現在可以顯示每個增益效果的施放者。在 |cFFFFD100/br|r > 類別 > 外部增益啟用此功能。"
 
 -- ============================================================================
 -- OPTIONS: NAVIGATION LABELS
@@ -352,22 +360,25 @@ L["Externals.Boosts"] = "傷害 & 法力"
 L["Externals.Movement"] = "移動"
 L["Externals.Aggro"] = "威脅重定向"
 L["Externals.Augmentation"] = "強化"
-L["Externals.Appearance"] = "外觀"
+L["Externals.Countdown"] = "倒數計時"
 L["Externals.AppearanceNote"] =
-    "Changes made in combat apply as soon as you leave it. Unlock the frames to drag the row."
+    "戰鬥中所做的更改會在你離開戰鬥後立即生效。解鎖框架即可拖曳列。"
 L["Externals.ShowSwipe"] = "顯示持續時間轉圈"
 L["Externals.ShowSwipe.Desc"] =
     "在圖示上掃一條黑色的線。當增益耗盡時，轉圈會露出圖示。"
 L["Externals.ShowTooltips"] = "顯示工具提示"
 L["Externals.ShowTooltips.Desc"] =
     "當滑鼠位於圖示上時顯示遊戲的增益工具提示。這些圖示不需要點擊，只需要移動滑鼠。"
+L["Externals.CasterName"] = "施法者名字"
+L["Externals.CasterName.Desc"] =
+    "在圖示旁顯示施放增益效果的人員，顏色以職業顏色表示。"
+L["Externals.CasterNameOff"] = "首先為施法者的名字挑選一個陣營。"
 L["Externals.Sound.Claimed"] = "%s 已經為此法術ID播放一個聲音。"
 -- Externals: the player's own entries
 L["Externals.Custom"] = "你的增益"
 L["Externals.Custom.SpellID"] = "法術ID"
 L["Externals.Custom.Name"] = "名字"
 L["Externals.Custom.Add"] = "添加"
-L["Externals.Custom.Save"] = "儲存"
 L["Externals.Custom.Edit"] = "編輯"
 L["Externals.Custom.Delete"] = "刪除此增益"
 L["Externals.Custom.Empty"] = "你自己還沒有增益。"
@@ -395,11 +406,11 @@ L["Page.Layout"] = "佈局"
 L["Page.Categories"] = "類別"
 L["Page.Profiles"] = "設定檔"
 L["Page.Reminders"] = "提醒"
-L["Page.CustomAnchors"] = "自訂義定位"
+L["Page.CustomAnchors"] = "自訂定位"
 
 -- Per-category page section headers
 L["Section.Tracking"] = "追蹤"
-L["Section.TrackingOverrides"] = "追蹤覆蓋"
+L["Section.TrackingOverrides"] = "追蹤覆寫"
 L["Section.TrackingOverrides.Desc"] =
     "縮小一種情況的追蹤模式。預設保留上述模式。如果有兩個同時適用時，限制最嚴格的那個獲勝。"
 L["DisabledReason.PvPDisabled"] = "此類別在PvP中完全隱藏 (請看可見性頁面)。"
@@ -413,12 +424,10 @@ L["Options.Preview"] = "預覽"
 -- ============================================================================
 -- OPTIONS: GLOBAL DEFAULTS
 -- ============================================================================
-L["Options.GlobalDefaults"] = "全局預設值"
-L["Options.GlobalDefaults.Note"] = "（套用於所有類別，除非被自定義外觀覆蓋）"
+L["Options.GlobalDefaults.Note"] = "（套用於所有類別，除非被自訂外觀覆蓋）"
 L["Options.Default"] = "預設"
 L["Options.Text"] = "文字"
-L["Options.Text.Note"] =
-    "(每個類別：尺寸和顏色。任何地方：字體、外框、位置。)"
+L["Options.AppliesEverywhere"] = "適用於所有類別。類別不能覆蓋此規則。"
 L["Options.Font"] = "字體"
 L["Options.TextOutline"] = "外框樣式"
 L["Options.TextOutline.None"] = "無"
@@ -427,6 +436,10 @@ L["Options.TextOutline.Thick"] = "粗外框"
 L["Options.TextOutline.Monochrome"] = "單色"
 L["Options.TextOutline.OutlineMono"] = "外框 + 單色"
 L["Options.TextOutline.ThickMono"] = "粗外框 + 單色"
+L["Options.SlugOutline"] = "平滑外框"
+L["Options.SlugOutline.Desc"] =
+    "使用客戶端的Slug文字渲染器繪製外框。邊緣更平滑，但外框可能看起來稍微粗一點。"
+L["Options.SlugOutline.Disabled"] = '僅適用於"外框"和"粗外框"樣式。'
 
 -- ============================================================================
 -- OPTIONS: GLOW SETTINGS
@@ -447,14 +460,13 @@ L["Options.Threshold"] = "閾值"
 L["Options.GlowMissingPets"] = "缺失寵物發光"
 L["Options.Expiration"] = "過期"
 L["Options.Glow"] = "發光"
-L["Options.UseCustomColor"] = "使用自定義顏色"
+L["Options.UseCustomColor"] = "使用自訂顏色"
 L["Options.UseCustomColor.Desc"] =
     "啟用後會降低觸發發光的飽和度並更改顏色。\n可能看起來不如預設觸發發光清晰。"
 L["Options.ExpirationReminder"] = "過期提示"
-L["Options.Timing"] = "定時"
-L["Options.UseDefaultThreshold"] = "使用預設閾值"
-L["Options.UseDefaultThreshold.Desc"] =
-    "當勾選後，此類別遵循預設頁面中的全域過期閾值。\n取消選取以設定類別指定的閾值。"
+L["Options.ExpirationWarning"] = "低於多少時警告"
+L["Options.Override.Expiration.Desc"] =
+    "為該類別設定警告時間。關閉此功能後，將採用預設設定頁面中的時間。"
 L["Options.PreKeyThreshold"] = "鑰石前閾值"
 L["Options.PreKeyThreshold.Desc"] =
     "當進入傳奇地下城(M0)於插入鑰石之前，使用較長的過期閾值。\n有助於確保在鑰石插入之前您的增益效果是新鮮的。"
@@ -514,6 +526,7 @@ L["Tooltip.PinNotInGroup"] = "(不在隊伍中)"
 L["Options.FreeConsumables"] = "免費消耗品"
 L["Options.FreeConsumables.Note"] = "（治療石、永久強化符文）"
 L["Options.FreeConsumables.Override"] = "覆蓋內容過濾"
+L["Options.FreeConsumables.Follows"] = "根據上方篩選條件所顯示。"
 L["Options.FreeConsumables.Override.Desc"] =
     "勾選後，免費消耗品將使用下方獨立的內容類型設置。\n\n取消勾選後，它們將遵循與其他消耗品相同的內容過濾規則。"
 
@@ -521,20 +534,18 @@ L["Options.FreeConsumables.Override.Desc"] =
 -- OPTIONS: ICONS
 -- ============================================================================
 L["Options.Icons"] = "圖示"
-L["Options.ShowText"] = "在圖示上顯示文字"
-L["Options.ShowText.Desc"] =
-    "在該類別的增益圖示上顯示層數或缺失增益文字覆蓋。即將到期的倒計時器始終保持可見"
+L["Options.ShowTextToggle"] = "顯示"
+L["Options.MainText.Desc"] =
+    "在圖示上顯示主要文字：例如 17/20 這樣的計數，或像禁止寵物這樣的標籤。 預設設定頁面可以設定其位置。倒數計時始終可見。"
 L["Options.ShowMissingCountOnly"] = "僅顯示缺失數量"
 L["Options.ShowMissingCountOnly.Desc"] =
     "僅顯示缺失增益的數量（例如：”1“），而不是完整的分數形式（例如：”19/20“）。"
-L["Options.ShowBuffReminderText"] = "顯示“補BUFF”提示文字"
-L["Options.Size"] = "大小"
 
 -- ============================================================================
 -- OPTIONS: TEXT POSITIONS
 -- ============================================================================
-L["Options.TextPositions"] = "文字"
 L["Options.TextPositions.Zone"] = "位置"
+L["Options.TextPositions.Offset"] = "偏移"
 L["Options.TextPositions.OffsetX.Short"] = "X"
 L["Options.TextPositions.OffsetY.Short"] = "Y"
 L["Options.TextPositions.Size"] = "大小"
@@ -543,7 +554,7 @@ L["Options.TextPositions.MainText.Note"] =
     "大文字的位置：計數、倒數計時和標籤。"
 L["Options.TextPositions.StackCount"] = "堆疊計數"
 L["Options.TextPositions.StatLabel"] = "屬性標籤"
-L["Options.TextPositions.Badge"] = "標誌 (H / F)"
+L["Options.TextPositions.Badge"] = "標誌 (H / F / C)"
 L["Options.TextSizes.Note"] =
     "自動將文字保持為基礎大小。設定一個值以調整文字本身的大小（以圖示的百分比表示）。"
 L["Options.TextPositions.Vertical.Above"] = "上方"
@@ -558,6 +569,13 @@ L["Options.TextPositions.Align.Right"] = "右側"
 -- ============================================================================
 -- OPTIONS: CLICK TO CAST
 -- ============================================================================
+L["Options.Interaction"] = "互動"
+L["Options.TextOverlays"] = "文字 & 遮蓋層"
+L["Options.BuffReminderText"] = '"補增益!" 文字'
+L["Options.ItemFilters"] = "物品"
+L["Options.Direction.Default"] = "預設"
+L["Options.Direction.Desc"] =
+    "此框架中圖示的增長方向。預設值與預設頁面上的方向一致。"
 L["Options.ClickToCast"] = "點擊施法"
 L["Options.ClickToCast.DescFull"] =
     "你可以點擊增益圖示來施放對應的法術（僅限非戰鬥狀態）。只對你的角色可施放的法術有效。"
@@ -588,7 +606,7 @@ L["ChatRequest.skyfury"] = "請補上天怒增益"
 L["ChatRequest.atrophicNumbingPoison"] = "請補上萎縮/麻痺毒藥"
 L["ChatRequest.devotionAura"] = "請補上虔誠光環"
 L["ChatRequest.soulstone"] = "請補上靈魂石"
-L["ChatRequest.healthstone"] = "請補上治療石"
+L["ChatRequest.healthstone"] = "請給我治療石"
 L["ChatRequest.mageFood"] = "法師請放餐點桌"
 
 -- ============================================================================
@@ -601,6 +619,8 @@ L["Options.PetSpecIcon.Desc"] =
 L["Options.ShowItemTooltips"] = "顯示物品提示訊息"
 L["Options.ShowItemTooltips.Desc"] = "將鼠標懸停在消耗品圖示上時顯示物品詳細訊息。"
 L["Options.ShowBuffTooltips"] = "顯示增益工具提示"
+L["Options.ShowBuffTooltips.Desc"] =
+    "將滑鼠懸停在團隊或職業增益圖示上時，顯示法術工具提示以及提供增益的職業。"
 L["Options.Behavior"] = "行為"
 L["Options.PetPassiveCombat"] = "僅在戰鬥中提示被動寵物"
 L["Options.PetPassiveCombat.Desc"] = "僅在戰鬥中顯示被動寵物提示。禁用時則始終顯示。"
@@ -620,8 +640,9 @@ L["Options.PetDisplay.SummonDesc"] = "將每個召喚寵物法術顯示為單獨
 L["Options.PetDisplay.Mode"] = "寵物顯示模式"
 L["Options.PetDisplay.Mode.Desc"] = "設置缺失寵物提示的顯示方式。"
 L["Options.PetLabels"] = "寵物標簽"
+L["Options.PetLabels.Classes"] = "標籤用於"
+L["Options.PetLabels.Classes.Desc"] = "寵物標籤僅顯示在已勾選類別的寵物身上。"
 L["Options.PetLabels.Desc"] = "在每個圖示下方顯示寵物名稱和專精。"
-L["Options.PetLabels.SizePct"] = "尺寸占比 %"
 
 -- ============================================================================
 -- OPTIONS: CONSUMABLE DISPLAY
@@ -634,11 +655,6 @@ L["Options.ConsumableBadgeOnSubIcons"] = "在子圖示上顯示品質標記"
 L["Options.ConsumableBadgeOnSubIcons.Title"] = "品質標記在子圖示上"
 L["Options.ConsumableBadgeOnSubIcons.Desc"] =
     '在每個子圖示顯示食物品質字母 (例如 "澎"為澎湃，"普"為普通的)，而非只在主圖示。'
-L["Options.ConsumableBadgeOnSubIcons.Disabled"] = "只適用於子圖示顯示模式。"
-L["Options.HideConsumableLabels"] = "隱藏屬性標籤"
-L["Options.HideConsumableLabels.Title"] = "隱藏消耗品屬性標籤"
-L["Options.HideConsumableLabels.Desc"] =
-    '隱藏顯示在消耗品圖示左上的小屬性標籤 (例如 "高主屬"、"低次屬")。'
 L["Options.ItemDisplay"] = "物品顯示"
 L["Options.ItemDisplay.IconOnly"] = "僅圖示"
 L["Options.ItemDisplay.IconOnlyDesc"] = "顯示數量最多的物品"
@@ -672,6 +688,9 @@ L["Options.PreferReusableRunes"] = "偏好可重複使用的增強符文"
 L["Options.PreferReusableRunes.Title"] = "偏好可重複使用的增強符文"
 L["Options.PreferReusableRunes.Desc"] =
     "如果您有可重複使用的增強符文，僅顯示該符文。如果沒有，顯示其他符文。"
+L["Options.FeastAtPlayer"] = "將大餐放在腳下"
+L["Options.FeastAtPlayer.Desc"] =
+    "點擊大餐圖示將大餐放置在您的位置。如果此選項關閉，您必須選擇地面上的一個點。"
 
 -- ============================================================================
 -- OPTIONS: DK RUNEFORGE PREFERENCES
@@ -741,6 +760,15 @@ L["BuffPanel.MageFoodContent"] = "何處"
 L["BuffPanel.MageFoodContent.All"] = "所有副本"
 L["BuffPanel.MageFoodContent.Dungeon"] = "僅限地下城"
 L["BuffPanel.MageFoodContent.Raid"] = "僅限團隊副本"
+L["BuffPanel.WarlockDemon.Warn"] = "當不同的惡魔出現時發出警告"
+L["BuffPanel.WarlockDemon.Warn.Desc"] = "如果啟用惡魔不是您允許此內容使用的惡魔之一，則顯示錯誤惡魔提醒。"
+L["BuffPanel.WarlockDemon.Hint"] = "點擊一個惡魔以允許它。您可以允許多個。如果你清除了一排，所有惡魔都可以在那裡。"
+L["BuffPanel.WarlockDemon.World"] = "世界"
+L["BuffPanel.WarlockDemon.Dungeon"] = "地下城"
+L["BuffPanel.WarlockDemon.Dungeon.Desc"] = "還涵蓋場景和探究。"
+L["BuffPanel.WarlockDemon.Raid"] = "團隊"
+L["BuffPanel.WarlockDemon.PvP"] = "PvP"
+L["BuffPanel.WarlockDemon.Felguard"] = "如果有天賦的話，惡魔學識總是會召喚惡魔守衛。"
 L["BuffPanel.Sound"] = "聲音"
 L["BuffPanel.Sound.None"] = "無"
 L["BuffPanel.Detached"] = "自己的框架 (獨立的)"
@@ -768,7 +796,10 @@ L["Options.Override.Appearance.Desc"] =
     "覆寫此類別的全域外觀預設值。 \n關閉時，下方的控制項顯示從「預設值」頁面繼承的值。"
 L["Options.Override.Glow.Desc"] =
     "覆寫此類別的全域發光設定。 \n關閉時，下方的控制項顯示從「預設值」頁面繼承的值。"
-L["Options.Customize"] = "自定義"
+L["Options.Override.Externals.Desc"] =
+    "覆蓋這些圖示的全域外觀預設值。\n關閉時，大小、縮放、邊框和間距控制顯示從「預設值」頁面繼承的值。倒數計時的大小和方向總是分開的。"
+L["Options.Override.OpenDefaults"] = "開啟"
+L["Options.Customize"] = "自訂"
 L["Options.ResetPosition"] = "重置位置"
 L["Options.MasqueNote"] = "縮放和邊框設置由Masque管理。"
 
@@ -777,6 +808,13 @@ L["Options.MasqueNote"] = "縮放和邊框設置由Masque管理。"
 -- ============================================================================
 L["Options.ShowLoginMessages"] = "顯示登入訊息"
 L["Options.ShowMinimapButton"] = "顯示小地圖按鈕"
+L["Options.Language"] = "語言"
+L["Options.Language.Auto"] = "自動 (遊戲客戶端)"
+L["Options.Language.Desc"] = "插件文字的語言。自動模式下使用遊戲客戶端的語言。"
+    .. "未翻譯的文字以英文顯示。"
+-- Each language names itself, so a reader finds their own language in any locale.
+-- Do not translate this.
+L["Language.enUS"] = "L"
 
 -- Hide when section
 L["Options.HideWhen"] = "隱藏條件:"
@@ -828,16 +866,16 @@ L["Options.BuffTracking.Smart.Desc"] =
 L["Options.BuffTracking.Mode"] = "增益追蹤模式"
 L["Options.BuffTracking.Mode.Desc"] =
     "設置要顯示的團隊和職業增益，以及是追蹤整個隊伍還是僅追蹤自身。"
-L["Options.BuffTracking.Override.Default"] = "預設 (使用方式如上)"
-L["Options.BuffTracking.Override.OutsideInstances"] = "地下城與團隊副本之外"
+L["Options.BuffTracking.Override.Default"] = "預設 (使用上方模式)"
+L["Options.BuffTracking.Override.OutsideInstances"] = "地城與團隊副本外"
 L["Options.BuffTracking.Override.OutsideInstances.Desc"] =
-    "在開放世界中使用的追蹤模式。上面選擇的模式仍然在地下城、團隊副本、場景和PvP中使用。"
+    "在開放世界中使用的追蹤模式。在地城、團隊副本、事件與 PvP 中仍會使用上方所選的模式。"
 L["Options.BuffTracking.Override.Combat"] = "戰鬥中"
 L["Options.BuffTracking.Override.Combat.Desc"] =
-    "在戰鬥中使用的追蹤模式。例如，縮小到'僅我的增益'會在戰鬥之外顯示其他類別的增益的提醒，以便您可以叫出它們，但在戰鬥開始後隱藏它們。"
-L["Options.BuffTracking.Override.Leveling"] = "當練級時"
+    "戰鬥時使用的追蹤模式。例如，縮小為「僅我的增益」可在戰鬥外保留其他職業增益的提醒以便喊話，進入戰鬥後則隱藏。"
+L["Options.BuffTracking.Override.Leveling"] = "升級過程中"
 L["Options.BuffTracking.Override.Leveling.Desc"] =
-    "在低於最大等級時使用的追蹤模式。一旦達到最高級別，就會使用上面選擇的模式。"
+    "未達等級上限時使用的追蹤模式。達到等級上限後，將改用上方所選的模式。"
 
 -- ============================================================================
 -- OPTIONS: PROFILES TAB
@@ -870,13 +908,15 @@ L["Options.UnknownError"] = "未知錯誤"
 -- OPTIONS: DIALOGS
 -- ============================================================================
 L["Dialog.Cancel"] = "取消"
-L["Dialog.DeleteCustomBuff"] = '是否刪除自定義增益 "%s"？'
+L["Dialog.DeleteCustomBuff"] = '是否刪除自訂增益 "%s"？'
+L["Dialog.DeleteProfile"] = '是否刪除設定檔 "%s"？你將無法復原它。'
 L["Dialog.DeleteLoadout"] = '是否刪除天賦構建提醒 "%s"？'
 L["Dialog.ResetProfile"] =
-    "是否將當前設定檔重置為預設值？\n\n當前設定檔的所有自定義設置將被刪除並重載UI。"
+    "是否將當前設定檔重置為預設值？\n\n當前設定檔的所有自訂設置將被刪除並重載UI。"
 L["Dialog.Reset"] = "重置"
 L["Dialog.ReloadPrompt"] = "設置導入成功！\n是否重載UI以套用更改？"
 L["Dialog.Reload"] = "重載"
+L["Dialog.ReloadLanguage"] = "新語言將在使用者介面重新載入後生效。\n現在重載嗎？"
 L["Dialog.NewProfilePrompt"] = "請輸入新設定檔的名稱："
 L["Dialog.Create"] = "創建"
 L["Dialog.DiscordPrompt"] = "加入BuffReminders的Discord頻道！\n複製下方網址以加入："
@@ -899,11 +939,11 @@ L["Options.Unlock"] = "解鎖"
 -- ============================================================================
 -- OPTIONS: CUSTOM BUFF DIALOG
 -- ============================================================================
-L["CustomBuff.Edit"] = "編輯自定義增益"
+L["CustomBuff.Edit"] = "編輯自訂增益"
 L["CustomBuff.EditShort"] = "編輯"
-L["CustomBuff.Add"] = "添加自定義增益"
-L["CustomBuff.AddButton"] = "+ 添加自定義增益"
-L["CustomBuff.Empty"] = "尚未有自定義增益。下面新增一個。"
+L["CustomBuff.Add"] = "添加自訂增益"
+L["CustomBuff.AddButton"] = "+ 添加自訂增益"
+L["CustomBuff.Empty"] = "尚未有自訂增益。下面新增一個。"
 L["CustomBuff.RestrictedNote"] =
     "當與首領以及傳奇+戰鬥時隱藏 - WoW阻止在那裡讀取光環。條形發光檢測在戰鬥中有效。"
 L["CustomBuff.SpellIDs"] = "法術ID:"
@@ -935,6 +975,7 @@ L["CustomBuff.WhenMissing"] = "缺失時"
 L["CustomBuff.OnlyIfSpellKnown"] = "只限已知法術"
 L["CustomBuff.ShowWhen"] = "顯示"
 L["CustomBuff.Expiration.Disabled"] = "過期警告僅適用於您缺失時顯示的增益"
+
 -- Custom buff class dropdown
 L["Class.Any"] = "任意"
 L["Class.DeathKnight"] = "死亡騎士"
@@ -1102,18 +1143,8 @@ L["Component.AdjustValue"] = "調整數值"
 L["Component.AdjustValue.Desc"] = "點擊輸入或使用鼠標滾輪。"
 L["Component.AdjustValue.ClickHint"] = "點擊數字即可輸入具體數值"
 
--- Sciope tag for globally-stored controls on category pages
-L["Options.GlobalTag"] = "全局"
-L["Options.GlobalTag.Title"] = "隨處套用"
-L["Options.GlobalTag.Desc"] =
-    "此設定會為整個插件儲存一次。 \n在此處更改它會更改每個類別的設置，而不僅僅是此類。"
-
 -- Disabled-control explanations
 L["Component.DisabledReason.Title"] = "為什麼這個被禁用了？"
-L["DisabledReason.GrowDirection"] =
-    '增長方向需要類別有自己的獨立框架。\n首先在佈局部分啟用"分離成單獨的框架"。'
-L["DisabledReason.ResetPosition"] =
-    '只有分離的類別才有自己的定位。\n首先啟用"分離成單獨的框架"。'
 L["DisabledReason.OverrideSection"] = "首先開啟本部分頂部的「覆蓋」。"
 L["DisabledReason.CombatOverride"] =
     '上面"戰鬥中"隱藏已啟用，因此戰鬥中不會顯示任何內容，且此覆蓋不會產生任何效果。\n取消勾選以使用戰鬥追踪覆蓋。'
@@ -1122,8 +1153,9 @@ L["DisabledReason.LevelingOverride"] =
 L["DisabledReason.ExpiringInCombat"] = '"戰鬥中"隱藏已啟用，所以在戰鬥中一切都被隱藏了。'
 L["DisabledReason.HealthstoneThreshold"] = '請先啟用"低時發出警告"。'
 L["DisabledReason.ClickToCast"] = '請先啟用"點擊施法"。'
-L["DisabledReason.UseDefaultThreshold"] = "取消選取“使用預設閾值”以設定類別特定的值。"
-L["DisabledReason.StatLabelsHidden"] = '請先取消選取"隱藏屬性標籤"。'
+L["DisabledReason.ShowWithoutItems"] = '請先開啟「不在包包裡時顯示」功能。'
+L["DisabledReason.PetLabelsOff"] = '首先確定「寵物標籤」的位置。'
+L["DisabledReason.OverrideRow"] = '首先勾選此行的「覆蓋」選項。'
 
 -- Direction labels
 L["Direction.Left"] = "左側"
