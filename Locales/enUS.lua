@@ -802,6 +802,9 @@ english["BuffPanel.WarlockDemon.Dungeon.Desc"] = "Also covers scenarios and Delv
 english["BuffPanel.WarlockDemon.Raid"] = "Raid"
 english["BuffPanel.WarlockDemon.PvP"] = "PvP"
 english["BuffPanel.WarlockDemon.Felguard"] = "Demonology always summons Felguard if talented."
+english["BuffPanel.GroupCast"] = "Cast group version (uses a reagent)"
+english["BuffPanel.GroupCast.Desc"] =
+    "If two or more group members lack the buff, a click casts the group version. You must know it and carry its reagent. Otherwise the click casts the single-target version on a member who lacks the buff."
 english["BuffPanel.Sound"] = "Sound"
 english["BuffPanel.Sound.None"] = "None"
 english["BuffPanel.Detached"] = "Own frame (detached)"
@@ -1193,6 +1196,7 @@ english["DisabledReason.ClickToCast"] = 'Turn on "Click to cast" first.'
 english["DisabledReason.ShowWithoutItems"] = 'Turn on "Show when not in bags" first.'
 english["DisabledReason.PetLabelsOff"] = 'Pick a position for "Pet labels" first.'
 english["DisabledReason.OverrideRow"] = 'Tick "Override" on this row first.'
+english["DisabledReason.RaidClickToCast"] = 'Turn on "Click to cast" on the Raid tab of the Categories page first.'
 
 -- Direction labels
 english["Direction.Left"] = "Left"

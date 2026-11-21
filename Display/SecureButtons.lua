@@ -124,6 +124,29 @@ local function ResolveCustomClickAction(buff)
     return nil, nil
 end
 
+---The click target of a castOnMissing buff: the player if the player lacks it, else
+---the first member in range who lacks it, else the first member who lacks it.
+---A secret or unchecked range reads as out of range.
+---@param key string
+---@return string unit
+local function PickCastUnit(key)
+    local units = BR.BuffState.GetMissingUnits(key)
+    if not units or not units[1] then
+        return "player"
+    end
+    for i = 1, #units do
+        if units[i] == "player" then
+            return "player"
+        end
+    end
+    for i = 1, #units do
+        if Plain(UnitInRange(units[i])) == true then
+            return units[i]
+        end
+    end
+    return units[1]
+end
+
 ---@param def table? Buff definition from the custom buff table
 ---@return boolean
 local function HasCustomClickAction(def)
@@ -244,6 +267,7 @@ end
 ---@field prefix string? Chat channel command in front of chatMsg
 ---@field chatKey string? Buff key when the action is a chat request
 ---@field chatMsg string? Request text without the channel prefix
+---@field pickDef RaidBuff? PreClick picks the spell and the unit for this buff
 
 -- Every resolver fills this one table, and ApplyAction copies what it needs before
 -- the next fill. A resolve runs for every frame on every display cycle, so it must
@@ -324,6 +348,7 @@ local function ApplyAction(button, action)
     button.itemID = action.itemID
     button._br_clickMacroFn = action.macroFn
     button._br_clickMacroSpellID = action.macroSpellID
+    button._br_pickDef = action.pickDef
     button._br_chatRequestKey = action.chatKey
     button._br_chatRequestMsg = action.chatMsg
     if not action.chatKey then
@@ -453,6 +478,17 @@ local function CreateClickOverlay(frame)
     overlay:SetScript("PreClick", function(self)
         if self._br_clickMacroFn and not self._br_chatRequestKey then
             self:SetAttribute("macrotext", self._br_clickMacroFn(self._br_clickMacroSpellID))
+        end
+        local pickDef = self._br_pickDef
+        if pickDef and not InCombatLockdown() then
+            local groupSpellID = BR.BuffState.GetGroupCastSpellID(pickDef)
+            if groupSpellID then
+                self:SetAttribute("spell", groupSpellID)
+                self:SetAttribute("unit", "player")
+            else
+                self:SetAttribute("spell", self._br_action.spellID)
+                self:SetAttribute("unit", PickCastUnit(pickDef.key))
+            end
         end
     end)
     overlay:SetScript("PostClick", function(self, button, down)
@@ -1369,6 +1405,7 @@ local function DisableOverlay(overlay)
     overlay._br_has_action = false
     overlay._br_clickMacroFn = nil
     overlay._br_clickMacroSpellID = nil
+    overlay._br_pickDef = nil
     overlay._br_chatRequestKey = nil
     overlay._br_chatRequestMsg = nil
     overlay._br_chatRequestCooldownUntil = nil
@@ -1636,6 +1673,13 @@ local function ResolveAction(frame, category, db)
         end
         if frame._br_pet_spell then
             return PetAction(castableID, db)
+        end
+        -- The unit stays "player" in the stored action. PreClick writes the
+        -- real spell and unit, so the refresh never overwrites a picked target.
+        if category == "raid" and def and def.castOnMissing then
+            local action = SpellAction(castableID, "player")
+            action.pickDef = def
+            return action
         end
         return SpellAction(castableID, (category == "raid" or category == "self") and "player" or nil)
     end

@@ -508,6 +508,7 @@ local DynamicRoots = {
     readyCheckOnlyOverrides = "DisplayRefresh",
     detachedIcons = "FramesReparent",
     loadoutReminders = "DisplayRefresh",
+    groupCast = false,
     -- One event for the whole subtree: AuraButton styling is creation-window-only,
     -- so every externals change takes the same reconfigure-or-defer path.
     externals = "ExternalsRefresh",
@@ -586,7 +587,7 @@ local function ValidatePath(segments)
         return false, nil
     end
 
-    if DynamicRoots[root] then
+    if DynamicRoots[root] ~= nil then
         -- Any subpath is valid for dynamic roots
         return true, DynamicRoots[root]
     end

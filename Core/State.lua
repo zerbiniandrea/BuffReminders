@@ -1465,10 +1465,14 @@ end
 ---@param playersOnly? boolean Exclude NPCs from the count (e.g. buffs NPCs provide themselves)
 ---@param partyOnly? boolean In a raid, count only the player's subgroup
 ---@param threshold number A short aura (IsShortAura) never sets minRemaining
+---@param missingUnits? string[] Wiped, then filled with the unit of each counted member who lacks the buff
 ---@return number missing
 ---@return number total
 ---@return number? minRemaining
-local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, partyOnly, threshold)
+local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, partyOnly, threshold, missingUnits)
+    if missingUnits then
+        wipe(missingUnits)
+    end
     local missing = 0
     local total = 0
     local minRemaining = nil
@@ -1484,6 +1488,9 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
         local hasBuff, remaining, _, duration = UnitHasBuff("player", GetUnitSpellIDs(buffKey, spellIDs, playerClass))
         if not hasBuff then
             missing = 1
+            if missingUnits then
+                missingUnits[1] = "player"
+            end
         elseif remaining and not IsShortAura(duration, threshold) then
             minRemaining = remaining
         end
@@ -1508,6 +1515,12 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
                     total = total + 1
                     if not hasBuff then
                         missing = missing + 1
+                        if missingUnits then
+                            -- In a raid the player is a raidN unit. The click target
+                            -- picker looks for "player" to cast on the player first.
+                            local isSelf = data.unit == "player" or Plain(UnitIsUnit(data.unit, "player")) == true
+                            missingUnits[missing] = isSelf and "player" or data.unit
+                        end
                     elseif remaining and not IsShortAura(duration, threshold) then
                         if not minRemaining or remaining < minRemaining then
                             minRemaining = remaining
@@ -2239,13 +2252,82 @@ local function IsAnySpellGlowing(buff)
     return IsPlayerSpellCached(spellID) and GameContext.IsSpellGlowing(spellID)
 end
 
+-- The members who lack a castOnMissing buff, by buff key. The click picks its
+-- target from this list, so only a buff that the player can cast fills one.
+---@type table<string, string[]>
+local missingUnitsByKey = {}
+
+---@param buff RaidBuff
+---@param isAuraRestricted boolean A restricted aura read returns nil, so every member reads as missing
+---@return string[]? list Empty list to fill, or nil when the buff needs none
+local function AcquireMissingUnits(buff, isAuraRestricted)
+    if not buff.castOnMissing then
+        return nil
+    end
+    local list = missingUnitsByKey[buff.key]
+    if list then
+        wipe(list)
+    end
+    if isAuraRestricted or buff.class ~= playerClass then
+        return nil
+    end
+    local known = false
+    local spellIDs = AsSpellList(buff.spellID)
+    for i = 1, #spellIDs do
+        if IsPlayerSpellCached(spellIDs[i]) then
+            known = true
+            break
+        end
+    end
+    if not known then
+        return nil
+    end
+    if not list then
+        list = {}
+        missingUnitsByKey[buff.key] = list
+    end
+    return list
+end
+
+---Units that lacked the buff at the last refresh. The player, if listed, is "player".
+---@param key string
+---@return string[]?
+function BuffState.GetMissingUnits(key)
+    return missingUnitsByKey[key]
+end
+
+---Highest group rank of the buff that the player knows and has the reagent for,
+---when the user turned on the group cast and two or more members lack the buff.
+---@param buff RaidBuff
+---@return number? spellID
+function BuffState.GetGroupCastSpellID(buff)
+    local ranks = buff.groupCast
+    local enabled = BR.profile.groupCast
+    local missingUnits = missingUnitsByKey[buff.key]
+    if not ranks or not (enabled and enabled[buff.key]) or not missingUnits or #missingUnits < 2 then
+        return nil
+    end
+    -- The spellbook reports only the highest learned rank as known. A lower rank is
+    -- known when a higher one is.
+    local known = false
+    for i = 1, #ranks do
+        local rank = ranks[i]
+        known = known or IsPlayerSpellCached(rank.spellID)
+        if known and GetItemCountCached(rank.reagent) > 0 then
+            return rank.spellID
+        end
+    end
+    return nil
+end
+
 -- Coverage category: the reminder counts how many group members miss the buff.
-local function RefreshRaid(db, trackingMode, hideExpiring, missingCountOnly)
+local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, missingCountOnly)
     local raidVisible = IsCategoryVisibleForContent("raid")
     local raidExGlow, raidMissGlow, raidThreshold = GetCategoryGlowSettings("raid")
     local bronzeHiddenInCombat = GameContext.IsInCombat() and db.bronzeHideInCombat
     for i, buff in ipairs(RaidBuffs) do
         local entry = GetOrCreateEntry(buff.key, "raid", i)
+        local missingUnits = AcquireMissingUnits(buff, isAuraRestricted)
         local scope = GetTrackingScope(
             trackingMode,
             buff.class,
@@ -2266,7 +2348,8 @@ local function RefreshRaid(db, trackingMode, hideExpiring, missingCountOnly)
                 scope.playerOnly,
                 buff.playersOnly,
                 buff.reach == "party",
-                raidThreshold
+                raidThreshold,
+                missingUnits
             )
 
             if missing > 0 then
@@ -2841,7 +2924,7 @@ function BuffState.Refresh(refreshMode)
     local isAuraRestricted = BuffState.IsRestricted()
     local hideExpiring = isAuraRestricted and db.hideExpiringInCombat ~= false
 
-    RefreshRaid(db, trackingMode, hideExpiring, missingCountOnly)
+    RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, missingCountOnly)
     if not groupOnly then
         -- Self buffs run before presence so suppressedByEntry can read self entries.
         RefreshSelf(isAuraRestricted, hideExpiring)

@@ -34,6 +34,8 @@ BR.CONSUMABLE_ITEMS = {}
 -- Spells have ranks, and every rank ID counts as the buff. Click-to-cast casts the
 -- first ID in spellID that the player knows, so each list starts with the highest rank.
 -- A raid buff lists its single-target ranks before its reagent group version.
+-- A single-target raid buff sets castOnMissing, so that the click casts on a member
+-- who lacks the buff. groupCast lists its group ranks, highest first.
 ---@type BuffTables
 BR.BUFF_TABLES = {
     ---@type RaidBuff[]
@@ -45,6 +47,8 @@ BR.BUFF_TABLES = {
             class = "MAGE",
             reach = "raid",
             icons = { spells = { 10157 } },
+            castOnMissing = true,
+            groupCast = { { spellID = 23028, reagent = 17020 } },
             chatRequestable = true,
         },
         {
@@ -64,6 +68,8 @@ BR.BUFF_TABLES = {
             class = "DRUID",
             reach = "raid",
             icons = { spells = { 9885 } },
+            castOnMissing = true,
+            groupCast = { { spellID = 21850, reagent = 17026 }, { spellID = 21849, reagent = 17021 } },
             chatRequestable = true,
         },
         {
@@ -73,6 +79,8 @@ BR.BUFF_TABLES = {
             class = "PRIEST",
             reach = "raid",
             icons = { spells = { 10938 } },
+            castOnMissing = true,
+            groupCast = { { spellID = 21564, reagent = 17029 }, { spellID = 21562, reagent = 17028 } },
             chatRequestable = true,
         },
     },

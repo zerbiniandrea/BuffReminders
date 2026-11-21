@@ -27,6 +27,7 @@ local EXTRA_PROFILE_KEYS = {
     "detachedIcons",
     "buffSounds",
     "readyCheckOnlyOverrides",
+    "groupCast",
     "customAnchorFrames",
 }
 
