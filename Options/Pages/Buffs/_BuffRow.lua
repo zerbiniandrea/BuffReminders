@@ -306,4 +306,22 @@ local function RenderBuffArray(parent, x, y, buffArray, rowWidth)
     return y
 end
 
+---Height that RenderBuffArray uses for the same array.
+---@param buffArray table[]
+---@return number
+local function MeasureBuffArray(buffArray)
+    local rows = 0
+    local seenGroups = {}
+    for _, buff in ipairs(buffArray) do
+        if not buff.groupId then
+            rows = rows + 1
+        elseif not seenGroups[buff.groupId] then
+            seenGroups[buff.groupId] = true
+            rows = rows + 1
+        end
+    end
+    return rows * ITEM_HEIGHT
+end
+
 BR.Options.BuffRow.Render = RenderBuffArray
+BR.Options.BuffRow.Measure = MeasureBuffArray
