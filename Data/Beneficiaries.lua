@@ -29,6 +29,11 @@ BR.BuffBeneficiaries = {
     -- stamina, versatility, skyfury, bronze = everyone benefits (nil)
 }
 
+-- Hunters use mana on WoW Forever.
+if BR.CLIENT == BR.ClientType.Forever then
+    BR.BuffBeneficiaries.intellect.HUNTER = true
+end
+
 -- Specs that benefit from each buff (used when spec ID is known via LibSpecialization)
 -- nil = everyone benefits (same as BuffBeneficiaries)
 -- When a unit's spec is known, this takes priority over the class-based BuffBeneficiaries table.

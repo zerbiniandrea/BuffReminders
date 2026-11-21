@@ -9,7 +9,7 @@ local BR = ns
 -- handler reads fresh values.
 -- RenderRequested asks for the render that a change needs. urgent = true asks for it now.
 
----@alias CacheId "auraTrackable"|"consumables"|"contentType"|"durability"|"healer"|"item"|"loadout"|"offHand"|"pet"|"petActions"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"stance"
+---@alias CacheId "auraTrackable"|"consumables"|"contentType"|"durability"|"healer"|"item"|"loadout"|"offHand"|"pet"|"petActions"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"stance"|"subgroup"
 
 ---@class GameContextEventSpec
 ---@field caches? CacheId[] Cache ids to clear, in order
@@ -189,6 +189,8 @@ local CONTENT_TYPE = { caches = { "contentType" } }
 ---@type GameContextEventSpec
 local HEALER = { caches = { "healer" } }
 ---@type GameContextEventSpec
+local ROSTER = { caches = { "healer", "subgroup" } }
+---@type GameContextEventSpec
 local STANCE = { caches = { "stance" } }
 
 ---@type table<string, GameContextEventSpec>
@@ -208,6 +210,7 @@ local EVENT_CACHES = {
             "petActions",
             "spellTextureMisses",
             "spellNameMisses",
+            "subgroup",
         },
         handle = function()
             inCombat = InCombatLockdown()
@@ -280,8 +283,8 @@ local EVENT_CACHES = {
             inVehicle = false
         end,
     },
-    GROUP_ROSTER_UPDATE = HEALER,
-    GROUP_FORMED = HEALER,
+    GROUP_ROSTER_UPDATE = ROSTER,
+    GROUP_FORMED = ROSTER,
     PLAYER_ROLES_ASSIGNED = HEALER,
     UNIT_PET = { playerOnly = true, caches = { "pet" } },
     UPDATE_SHAPESHIFT_FORM = STANCE,
