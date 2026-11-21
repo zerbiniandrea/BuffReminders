@@ -988,7 +988,10 @@ local function GetCurrentContentType()
     instanceCache.instanceName = instName
     instanceCache.instanceID = instanceID
     instanceCache.difficultyID = difficultyID
-    instanceCache.activeChallenge = C_ChallengeMode and C_ChallengeMode.GetActiveChallengeMapID() or nil
+    instanceCache.activeChallenge = C_ChallengeMode
+            and C_ChallengeMode.GetActiveChallengeMapID
+            and C_ChallengeMode.GetActiveChallengeMapID()
+        or nil
 
     -- Check housing before instance type (housing zones can report as instanced)
     if

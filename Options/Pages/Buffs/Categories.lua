@@ -27,9 +27,13 @@ local SCROLLBAR_WIDTH = BR.Options.Constants.SCROLLBAR_WIDTH
 local EXTERNALS_TAB = "externals"
 local TAB_CATEGORIES = {}
 for _, cat in ipairs(BR.CATEGORY_ORDER) do
-    TAB_CATEGORIES[#TAB_CATEGORIES + 1] = cat
+    if cat ~= "loadout" or BR.Loadouts then
+        TAB_CATEGORIES[#TAB_CATEGORIES + 1] = cat
+    end
 end
-TAB_CATEGORIES[#TAB_CATEGORIES + 1] = EXTERNALS_TAB
+if BR.Options.BuffSections.ExternalsAppearance then
+    TAB_CATEGORIES[#TAB_CATEGORIES + 1] = EXTERNALS_TAB
+end
 
 local TAB_STRIP_H = 26
 local TAB_GAP = 4

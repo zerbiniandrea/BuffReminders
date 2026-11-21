@@ -572,9 +572,9 @@ local SPECIAL_SECTIONS = {
     },
 }
 
----Editor module of a section, or nil when the section builds inline. The
----section holds the module name, not the table, so a load-order change cannot
----break the link.
+---Editor module of a section, or nil when the section builds inline or the
+---client does not load the module. The section holds the module name, not the
+---table, so a load-order change cannot break the link.
 ---@param section table
 ---@return table? module
 local function EditorModule(section)
@@ -589,7 +589,7 @@ local function BuildSpecial(section, layout)
     local module = EditorModule(section)
     if module then
         AddInlineEditor(layout, module.BuildInline)
-    else
+    elseif section.build then
         section.build(layout)
     end
 end
