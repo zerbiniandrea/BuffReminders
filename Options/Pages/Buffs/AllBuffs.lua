@@ -33,29 +33,21 @@ local ROW_INDENT = 6
 -- Vertical gap between the last row of one section and the next header.
 local INTER_SECTION_GAP = 10
 
-local LEFT_SECTIONS = {
+local SECTIONS = {
     {
         category = "raid",
         titleKey = "Category.RaidBuffs",
         noteKey = "Category.RaidNote",
     },
     {
-        category = "targeted",
-        titleKey = "Category.TargetedBuffs",
-        noteKey = "Category.TargetedNote",
-    },
-    {
-        category = "consumable",
-        titleKey = "Category.Consumables",
-        noteKey = "Category.ConsumableNote",
-    },
-}
-
-local RIGHT_SECTIONS = {
-    {
         category = "presence",
         titleKey = "Category.PresenceBuffs",
         noteKey = "Category.PresenceNote",
+    },
+    {
+        category = "targeted",
+        titleKey = "Category.TargetedBuffs",
+        noteKey = "Category.TargetedNote",
     },
     {
         category = "self",
@@ -66,6 +58,11 @@ local RIGHT_SECTIONS = {
         category = "pet",
         titleKey = "Category.PetReminders",
         noteKey = "Category.PetNote",
+    },
+    {
+        category = "consumable",
+        titleKey = "Category.Consumables",
+        noteKey = "Category.ConsumableNote",
     },
     {
         category = "utility",
@@ -87,19 +84,29 @@ local function CreateSectionWithNote(parent, x, y, headerText, noteText)
     return y - HEADER_TO_NOTE_GAP - NOTE_TO_ROWS_GAP
 end
 
+-- Masonry: each section, in list order, goes to the shorter column. A tie goes left.
+local function AssignColumns()
+    local Measure = BR.Options.BuffRow.Measure
+    local columns = { {}, {} }
+    local heights = { 0, 0 }
+    for _, section in ipairs(SECTIONS) do
+        if BR.IsCategoryAvailable(section.category) then
+            local col = heights[2] < heights[1] and 2 or 1
+            local gap = #columns[col] > 0 and INTER_SECTION_GAP or 0
+            local buffs = BUFF_TABLES[section.category] or {}
+            heights[col] = heights[col] + gap + HEADER_TO_NOTE_GAP + NOTE_TO_ROWS_GAP + Measure(buffs)
+            columns[col][#columns[col] + 1] = section
+        end
+    end
+    return columns[1], columns[2]
+end
+
 local function RenderColumn(parent, x, y, sections, colWidth)
     local Render = BR.Options.BuffRow.Render
     local rowsX = x + ROW_INDENT
     -- Rows start ROW_INDENT in from the column's left edge; span the rest of
     -- the column so the "Settings" link lands on the column's right edge.
     local rowWidth = colWidth - ROW_INDENT
-    local available = {}
-    for _, section in ipairs(sections) do
-        if BR.IsCategoryAvailable(section.category) then
-            available[#available + 1] = section
-        end
-    end
-    sections = available
     for i, section in ipairs(sections) do
         y = CreateSectionWithNote(parent, x, y, L[section.titleKey], L[section.noteKey])
         y = Render(parent, rowsX, y, BUFF_TABLES[section.category] or {}, rowWidth)
@@ -120,8 +127,9 @@ local function Build(content, scrollFrame)
     -- the same Y as on every other page (VerticalLayout starts at PAGE_TOP_PADDING).
     local startY = PAGE_TOP_PADDING
 
-    local leftEndY = RenderColumn(content, leftX, startY, LEFT_SECTIONS, colWidth)
-    local rightEndY = RenderColumn(content, rightX, startY, RIGHT_SECTIONS, colWidth)
+    local leftSections, rightSections = AssignColumns()
+    local leftEndY = RenderColumn(content, leftX, startY, leftSections, colWidth)
+    local rightEndY = RenderColumn(content, rightX, startY, rightSections, colWidth)
 
     content:SetHeight(math.max(math.abs(leftEndY), math.abs(rightEndY)) + 16)
 end
