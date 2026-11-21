@@ -847,12 +847,22 @@ local function HasCasterForBuff(requiredClass, levelRequired, reach)
     return not levelRequired or maxLevel >= levelRequired
 end
 
+---An aura whose full duration fits in the threshold is below it from the cast on,
+---so it never counts as expiring. It shows again only when it is missing.
+---@param duration? number
+---@param threshold number
+---@return boolean
+local function IsShortAura(duration, threshold)
+    return duration ~= nil and duration > 0 and duration <= threshold
+end
+
 ---Check if unit has a specific buff (handles single spellID or table of spellIDs)
 ---@param unit string
 ---@param spellIDs SpellID
 ---@return boolean hasBuff
 ---@return number? remainingTime
 ---@return string? sourceUnit
+---@return number? duration Full duration of the aura, nil or 0 when it never expires
 local function UnitHasBuff(unit, spellIDs)
     -- Fast path: single numeric spellID (most common case, avoids table allocation)
     if type(spellIDs) == "number" then
@@ -866,7 +876,7 @@ local function UnitHasBuff(unit, spellIDs)
             if exp and exp > 0 then
                 remaining = exp - GetTime()
             end
-            return true, remaining, AuraField(auraData, "sourceUnit")
+            return true, remaining, AuraField(auraData, "sourceUnit"), AuraField(auraData, "duration")
         end
         return false, nil, nil
     end
@@ -883,7 +893,7 @@ local function UnitHasBuff(unit, spellIDs)
             if exp and exp > 0 then
                 remaining = exp - GetTime()
             end
-            return true, remaining, AuraField(auraData, "sourceUnit")
+            return true, remaining, AuraField(auraData, "sourceUnit"), AuraField(auraData, "duration")
         end
     end
 
@@ -943,6 +953,7 @@ end
 ---@param spellIDs SpellID
 ---@return boolean found
 ---@return number? remainingTime
+---@return number? duration
 local function UnitHasBuffFromPlayer(unit, spellIDs)
     local singleId = type(spellIDs) == "number" and spellIDs or nil ---@type number?
     local i = 1
@@ -957,7 +968,7 @@ local function UnitHasBuffFromPlayer(unit, spellIDs)
             if exp and exp > 0 then
                 remaining = exp - GetTime()
             end
-            return true, remaining
+            return true, remaining, AuraField(auraData, "duration")
         end
         i = i + 1
         auraData = AuraByIndex(unit, i, "HELPFUL|PLAYER")
@@ -1453,10 +1464,11 @@ end
 ---@param playerOnly? boolean Only check the player, not the group
 ---@param playersOnly? boolean Exclude NPCs from the count (e.g. buffs NPCs provide themselves)
 ---@param partyOnly? boolean In a raid, count only the player's subgroup
+---@param threshold number A short aura (IsShortAura) never sets minRemaining
 ---@return number missing
 ---@return number total
 ---@return number? minRemaining
-local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, partyOnly)
+local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, partyOnly, threshold)
     local missing = 0
     local total = 0
     local minRemaining = nil
@@ -1469,10 +1481,10 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
             return 0, 0, nil
         end
         total = 1
-        local hasBuff, remaining = UnitHasBuff("player", GetUnitSpellIDs(buffKey, spellIDs, playerClass))
+        local hasBuff, remaining, _, duration = UnitHasBuff("player", GetUnitSpellIDs(buffKey, spellIDs, playerClass))
         if not hasBuff then
             missing = 1
-        elseif remaining then
+        elseif remaining and not IsShortAura(duration, threshold) then
             minRemaining = remaining
         end
         return missing, total, minRemaining
@@ -1487,7 +1499,8 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
         -- they still include NPCs.
         if (data.isPlayer or countNPCs) and (data.inPlayerParty or not partyOnly) then
             if UnitBenefitsFromBuff(specBeneficiaries, beneficiaries, allySpecCache[data.name], data.class) then
-                local hasBuff, remaining = UnitHasBuff(data.unit, GetUnitSpellIDs(buffKey, spellIDs, data.class))
+                local hasBuff, remaining, _, duration =
+                    UnitHasBuff(data.unit, GetUnitSpellIDs(buffKey, spellIDs, data.class))
                 -- A phased ally counts only when the buff is already on them. A
                 -- phased member without the buff is an unfixable gap - nobody can
                 -- cast on them - so both totals omit them.
@@ -1495,7 +1508,7 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
                     total = total + 1
                     if not hasBuff then
                         missing = missing + 1
-                    elseif remaining then
+                    elseif remaining and not IsShortAura(duration, threshold) then
                         if not minRemaining or remaining < minRemaining then
                             minRemaining = remaining
                         end
@@ -1514,16 +1527,21 @@ end
 ---@param playerOnly? boolean Only check the player, not the group
 ---@param playerCastOnly? boolean Count only auras cast by the player (e.g. castOnOthers for the caster class)
 ---@param partyOnly? boolean In a raid, look only in the player's subgroup
+---@param threshold number A short aura (IsShortAura) never sets minRemaining
 ---@return boolean hasBuff
 ---@return number? minRemaining
 ---@return table? targetEntry First non-player unit entry that has the buff
-local function HasPresenceBuff(spellIDs, playerOnly, playerCastOnly, partyOnly)
+local function HasPresenceBuff(spellIDs, playerOnly, playerCastOnly, partyOnly, threshold)
     if playerOnly or #currentValidUnits <= 1 then
+        local hasBuff, remaining, duration, _
         if playerCastOnly then
-            local hasBuff, remaining = UnitHasBuffFromPlayer("player", spellIDs)
-            return hasBuff, remaining, nil
+            hasBuff, remaining, duration = UnitHasBuffFromPlayer("player", spellIDs)
+        else
+            hasBuff, remaining, _, duration = UnitHasBuff("player", spellIDs)
         end
-        local hasBuff, remaining = UnitHasBuff("player", spellIDs)
+        if IsShortAura(duration, threshold) then
+            remaining = nil
+        end
         return hasBuff, remaining, nil
     end
 
@@ -1534,24 +1552,23 @@ local function HasPresenceBuff(spellIDs, playerOnly, playerCastOnly, partyOnly)
     for _, data in ipairs(currentValidUnits) do
         -- Skip NPCs in content where they cannot receive player buffs
         if (data.isPlayer or includeNPCsInCounting) and (data.inPlayerParty or not partyOnly) then
-            local hasBuff, remaining, sourceUnit = UnitHasBuff(data.unit, spellIDs)
+            local hasBuff, remaining, sourceUnit, duration = UnitHasBuff(data.unit, spellIDs)
             -- With player-cast auras only, another player's cast can mask the
             -- player's own via GetUnitAuraBySpellID. Fall back to a HELPFUL|PLAYER
             -- scan.
             if playerCastOnly and hasBuff and not (sourceUnit and Plain(UnitIsUnit(sourceUnit, "player"))) then
-                hasBuff, remaining = UnitHasBuffFromPlayer(data.unit, spellIDs)
+                hasBuff, remaining, duration = UnitHasBuffFromPlayer(data.unit, spellIDs)
             end
             if hasBuff then
                 found = true
                 if not targetEntry and not Plain(UnitIsUnit(data.unit, "player")) then
                     targetEntry = data
                 end
-                if remaining then
-                    if not minRemaining or remaining < minRemaining then
-                        minRemaining = remaining
-                    end
-                else
+                if not remaining then
                     return true, nil, targetEntry -- no expiration, no need to keep scanning
+                end
+                if not IsShortAura(duration, threshold) and (not minRemaining or remaining < minRemaining) then
+                    minRemaining = remaining
                 end
             end
         end
@@ -1582,11 +1599,13 @@ end
 ---Uses currentValidUnits cache built at start of refresh cycle
 ---@param spellID number
 ---@param role? RoleType Only check units with this role
+---@param threshold number A short aura (IsShortAura) never sets minRemaining
 ---@return boolean
 ---@return number? minRemaining
 ---@return table? targetEntry Unit entry of a non-player target with the buff (for last target cache)
-local function IsPlayerBuffActive(spellID, role)
+local function IsPlayerBuffActive(spellID, role, threshold)
     local minRemaining = nil
+    local found = false
     local targetEntry = nil
     local hasBeneficiary = not role
     for _, data in ipairs(currentValidUnits) do
@@ -1594,7 +1613,7 @@ local function IsPlayerBuffActive(spellID, role)
         if data.isPlayer or includeNPCsInCounting then
             if not role or GetUnitRole(data) == role then
                 hasBeneficiary = true
-                local hasBuff, remaining, sourceUnit = UnitHasBuff(data.unit, spellID)
+                local hasBuff, remaining, sourceUnit, duration = UnitHasBuff(data.unit, spellID)
                 if hasBuff then
                     local isFromPlayer = sourceUnit and Plain(UnitIsUnit(sourceUnit, "player"))
                     if not isFromPlayer then
@@ -1602,16 +1621,17 @@ local function IsPlayerBuffActive(spellID, role)
                         -- player cast the same spell (e.g. two Aug Evokers), that
                         -- instance can hide the player's own. Fall back to a full
                         -- aura scan.
-                        isFromPlayer, remaining = UnitHasBuffFromPlayer(data.unit, spellID)
+                        isFromPlayer, remaining, duration = UnitHasBuffFromPlayer(data.unit, spellID)
                     end
                     if isFromPlayer then
+                        found = true
                         if not targetEntry and not Plain(UnitIsUnit(data.unit, "player")) then
                             targetEntry = data
                         end
                         if not remaining then
                             return true, nil, targetEntry
                         end
-                        if not minRemaining or remaining < minRemaining then
+                        if not IsShortAura(duration, threshold) and (not minRemaining or remaining < minRemaining) then
                             minRemaining = remaining
                         end
                     end
@@ -1623,7 +1643,7 @@ local function IsPlayerBuffActive(spellID, role)
     if not hasBeneficiary then
         return true
     end
-    return minRemaining ~= nil, minRemaining, targetEntry
+    return found, minRemaining, targetEntry
 end
 
 ---Check if player should cast their targeted buff (returns true if a beneficiary needs it)
@@ -1632,9 +1652,19 @@ end
 ---@param beneficiaryRole? RoleType
 ---@param requireSpecId? number
 ---@param buffKey? string Used for last target cache
+---@param casterBuffId? number Check this buff on the caster instead of scanning the group
+---@param threshold number A short aura (IsShortAura) reports no remaining time
 ---@return boolean? shouldShow Returns nil if player can't provide this buff
 ---@return number? remainingTime
-local function ShouldShowTargetedBuff(spellIDs, requiredClass, beneficiaryRole, requireSpecId, buffKey, casterBuffId)
+local function ShouldShowTargetedBuff(
+    spellIDs,
+    requiredClass,
+    beneficiaryRole,
+    requireSpecId,
+    buffKey,
+    casterBuffId,
+    threshold
+)
     if playerClass ~= requiredClass then
         return nil
     end
@@ -1655,7 +1685,7 @@ local function ShouldShowTargetedBuff(spellIDs, requiredClass, beneficiaryRole, 
 
     if casterBuffId then
         -- Shortcut: check if the caster has this buff on themselves (combat-safe spell ID)
-        local hasBuff, remaining = UnitHasBuff("player", casterBuffId)
+        local hasBuff, remaining, _, duration = UnitHasBuff("player", casterBuffId)
         -- Scan the group for the original buff and record only on a hit. The
         -- target-side spell can be unqueryable (off the aura whitelist in restricted
         -- contexts like M+, or the target is phased / out of range), so a miss is
@@ -1672,10 +1702,13 @@ local function ShouldShowTargetedBuff(spellIDs, requiredClass, beneficiaryRole, 
                 end
             end
         end
+        if IsShortAura(duration, threshold) then
+            remaining = nil
+        end
         return not hasBuff, remaining
     end
 
-    local isActive, remaining, targetEntry = IsPlayerBuffActive(spellID, beneficiaryRole)
+    local isActive, remaining, targetEntry = IsPlayerBuffActive(spellID, beneficiaryRole, threshold)
 
     -- Update target memory (records even in combat: this path only runs for
     -- whitelist-safe queries, gated by IsAuraTrackable at the call site)
@@ -2163,8 +2196,12 @@ end
 ---@param remaining? number
 ---@param threshold number
 ---@param shouldGlow boolean
+---@param duration? number Full duration of the aura
 ---@return boolean wasSet true if the entry was marked as expiring
-local function TrySetEntryExpiring(entry, remaining, threshold, shouldGlow)
+local function TrySetEntryExpiring(entry, remaining, threshold, shouldGlow, duration)
+    if IsShortAura(duration, threshold) then
+        return false
+    end
     NoteTimedChange(remaining, threshold)
     if remaining and remaining < threshold then
         entry.visible = true
@@ -2223,8 +2260,14 @@ local function RefreshRaid(db, trackingMode, hideExpiring, missingCountOnly)
             and raidVisible
             and scope.show
         then
-            local missing, total, minRemaining =
-                CountMissingBuff(buff.spellID, buff.key, scope.playerOnly, buff.playersOnly, buff.reach == "party")
+            local missing, total, minRemaining = CountMissingBuff(
+                buff.spellID,
+                buff.key,
+                scope.playerOnly,
+                buff.playersOnly,
+                buff.reach == "party",
+                raidThreshold
+            )
 
             if missing > 0 then
                 entry.visible = true
@@ -2291,16 +2334,16 @@ local function RefreshSelf(isAuraRestricted, hideExpiring)
                             -- Buff present: check whether it expires soon.
                             -- Weapon imbues (paladin rites, shaman imbues) time
                             -- out on the enchant, not an aura.
-                            local remaining, expiringCastID
+                            local remaining, expiringCastID, duration
                             if buff.enchantID then
                                 remaining = GetWeaponEnchantRemaining(buff.enchantID)
                             elseif buff.getExpirationInfo then
                                 remaining, expiringCastID = buff.getExpirationInfo()
                             elseif buff.buffIdOverride or buff.spellID then
-                                _, remaining =
+                                _, remaining, _, duration =
                                     UnitHasBuff("player", (buff.buffIdOverride or buff.spellID) --[[@as SpellID]])
                             end
-                            if TrySetEntryExpiring(entry, remaining, selfThreshold, selfExGlow) then
+                            if TrySetEntryExpiring(entry, remaining, selfThreshold, selfExGlow, duration) then
                                 if expiringCastID then
                                     entry.dynamicIcon = BR.Icons.GetBuffTexture(expiringCastID)
                                 end
@@ -2395,7 +2438,7 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring)
             then
                 -- Full-group sweep (playerOnly=false): the buff lives on the target,
                 -- so a player-only scan never finds it.
-                hasBuff, minRemaining, targetEntry = HasPresenceBuff(buff.spellID, false, true)
+                hasBuff, minRemaining, targetEntry = HasPresenceBuff(buff.spellID, false, true, false, presThreshold)
                 scanned = true
                 TargetMemory.Observe(
                     buff.key,
@@ -2417,8 +2460,13 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring)
                         -- own cast. That resolves the right target and keeps another
                         -- caster's coverage from hiding the icon.
                         if not scanned then
-                            hasBuff, minRemaining =
-                                HasPresenceBuff(buff.spellID, scope.playerOnly, isOwnCaster, buff.reach == "party")
+                            hasBuff, minRemaining = HasPresenceBuff(
+                                buff.spellID,
+                                scope.playerOnly,
+                                isOwnCaster,
+                                buff.reach == "party",
+                                presThreshold
+                            )
                         end
                         -- customCheck gates display (e.g., soulstone CD tracking for warlocks)
                         local customOk = true
@@ -2464,7 +2512,8 @@ local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring)
                         buff.beneficiaryRole,
                         buff.requireSpecId,
                         buff.key,
-                        buff.casterBuffId
+                        buff.casterBuffId,
+                        targThreshold
                     )
 
                     if shouldShow then
@@ -2695,8 +2744,8 @@ local function RefreshCustom(isAuraRestricted, hideExpiring)
                 and buff.spellID
             then
                 -- Buff is present (not missing), check if expiring (per-buff threshold)
-                local _, remaining = UnitHasBuff("player", buff.spellID)
-                TrySetEntryExpiring(entry, remaining, buff.expirationThreshold * 60, true)
+                local _, remaining, _, duration = UnitHasBuff("player", buff.spellID)
+                TrySetEntryExpiring(entry, remaining, buff.expirationThreshold * 60, true, duration)
             end
         end
     end
