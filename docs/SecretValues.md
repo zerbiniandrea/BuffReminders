@@ -100,3 +100,24 @@ on a frame of unknown origin can return a secret.
 
 **Cooldowns.** `C_Spell.GetSpellCooldown` returns secrets while
 `ShouldCooldownsBeSecret()` is true. `C_Item.GetItemCooldown` throws instead.
+
+## 4. WoW Forever client
+
+These statements come from measurements on the WoW Forever client 1.60.1
+(`WOW_PROJECT_ID == WOW_PROJECT_CAMELOT`). The rules in sections 1 to 3 apply to it too.
+
+**Open-world combat restricts.** In open-world combat (no instance, `difficultyID` 0,
+`InCombatLockdown()` true), `HasSecretRestrictions()`, `ShouldAurasBeSecret()` and
+`ShouldCooldownsBeSecret()` all return `true`. `ShouldUnitIdentityBeSecret("player")`
+returns `false`. `GetAuraDataByIndex` on the player throws.
+
+**Tracked buffs are all secret in combat.** Every Forever buff spell that the addon
+tracks classifies as `ContextuallySecret`. This set includes the group buffs, Battle
+Shout, the paladin auras, the hunter aspects, the armors, Inner Fire, Lightning Shield,
+Thorns, Righteous Fury and Shadowform. In combat, `ShouldSpellAuraBeSecret(5242)` is
+`true`. `GetUnitAuraBySpellID("player", 5242)` returns `nil` while Battle Shout is on the
+player. As a result, all these reminders hide in combat (fail closed).
+
+**Spell ranks.** Out of combat, `C_SpellBook.IsSpellKnown` returns `true` only for the
+highest learned rank of a spell. A lower rank reads `false`. `GetPlayerAuraBySpellID`
+finds the exact rank ID that is on the player.
