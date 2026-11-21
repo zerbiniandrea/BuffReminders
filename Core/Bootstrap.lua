@@ -16,7 +16,7 @@ local defaults = BR.defaults
 local CATEGORIES = BR.CATEGORY_ORDER
 
 local bootstrapFrame = CreateFrame("Frame")
-bootstrapFrame:RegisterEvent("ADDON_LOADED")
+BR.Client.RegisterEvent(bootstrapFrame, "ADDON_LOADED")
 bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
     if event ~= "ADDON_LOADED" or arg1 ~= addonName then
         return

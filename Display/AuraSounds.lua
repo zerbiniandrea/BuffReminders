@@ -195,8 +195,8 @@ end
 
 local watcher = CreateFrame("Frame")
 -- Registrations do not survive a reload, so login rebuilds them all.
-watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
-watcher:RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED")
+BR.Client.RegisterEvent(watcher, "PLAYER_ENTERING_WORLD")
+BR.Client.RegisterEvent(watcher, "ADDON_RESTRICTION_STATE_CHANGED")
 watcher:SetScript("OnEvent", function(_, event, _, state)
     if event == "ADDON_RESTRICTION_STATE_CHANGED" then
         -- state 0 = Enum.AddOnRestrictionState.Inactive. Only a lift lets a

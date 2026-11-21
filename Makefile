@@ -1,10 +1,10 @@
-.PHONY: all lint format check typecheck compile i18n ascii-clean ascii-check api-audit
+.PHONY: all lint format check typecheck compile i18n ascii-clean ascii-check events-check api-audit
 
 # Prefer the real Lua 5.1 compiler (enforces the 200-local AND 60-upvalue
 # limits WoW hits); fall back to whatever luac is around.
 LUAC := $(shell command -v luac5.1 || command -v luac)
 
-all: typecheck lint compile ascii-clean format
+all: typecheck lint compile events-check ascii-clean format
 
 lint:
 	luacheck .
@@ -25,6 +25,11 @@ ascii-check:
 	@! rg -n -E none -g '*.lua' -g '!Libs' -g '!Locales' -g '!.ignored' '[^\x00-\x7F]' .
 	@! rg -n --glob '*.{md,sh}' -g '!Libs' '—|…|→' .
 
+# RegisterEvent throws on an event that the client lacks. BR.Client.RegisterEvent in
+# Core/Core.lua checks the event first, so it is the only direct caller.
+events-check:
+	@! rg -n -g '*.lua' -g '!Libs' -g '!.ignored' -g '!Core/Core.lua' ':Register(Unit)?Event\(' .
+
 format:
 	stylua .
 
@@ -35,7 +40,7 @@ i18n:
 	@scripts/check-locales.sh $(ARGS)
 
 # Changes no file, so CI runs it.
-check: typecheck lint compile ascii-check
+check: typecheck lint compile events-check ascii-check
 	stylua --check .
 
 # Lists WoW API calls that the pinned annotations mark deprecated. Run it once

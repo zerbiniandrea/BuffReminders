@@ -3399,7 +3399,7 @@ do
     local GetNumGroupMembers = GetNumGroupMembers
 
     local rosterFrame = CreateFrame("Frame")
-    rosterFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+    BR.Client.RegisterEvent(rosterFrame, "GROUP_ROSTER_UPDATE")
     rosterFrame:SetScript("OnEvent", function()
         local currentNames = {}
         currentNames[playerName] = true

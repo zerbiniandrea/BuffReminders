@@ -780,21 +780,21 @@ end
 -- otherwise stays stale until the next settings change, and a degraded parse sticks
 -- until something forces a rebuild.
 local liftWatcher = CreateFrame("Frame")
-liftWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
-liftWatcher:RegisterEvent("ENCOUNTER_END")
-liftWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
-liftWatcher:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+BR.Client.RegisterEvent(liftWatcher, "PLAYER_REGEN_ENABLED")
+BR.Client.RegisterEvent(liftWatcher, "ENCOUNTER_END")
+BR.Client.RegisterEvent(liftWatcher, "PLAYER_ENTERING_WORLD")
+BR.Client.RegisterEvent(liftWatcher, "ZONE_CHANGED_NEW_AREA")
 -- Cinematics drop the player's assistability, and UNIT_FACTION on the player is the
 -- only edge an in-world cutscene fires - UNIT_FLAGS does not. CINEMATIC_STOP and
 -- STOP_MOVIE cover the skip paths, whose faction restore can order ahead of it.
-liftWatcher:RegisterEvent("CINEMATIC_STOP")
-liftWatcher:RegisterEvent("STOP_MOVIE")
-liftWatcher:RegisterUnitEvent("UNIT_FACTION", "player")
+BR.Client.RegisterEvent(liftWatcher, "CINEMATIC_STOP")
+BR.Client.RegisterEvent(liftWatcher, "STOP_MOVIE")
+BR.Client.RegisterEvent(liftWatcher, "UNIT_FACTION", "player")
 -- A ride keeps assistability down from the BOARDING transition to well past the
 -- exit, so ENTERING counts as an edge of its own.
-liftWatcher:RegisterUnitEvent("UNIT_ENTERING_VEHICLE", "player")
-liftWatcher:RegisterUnitEvent("UNIT_ENTERED_VEHICLE", "player")
-liftWatcher:RegisterUnitEvent("UNIT_EXITED_VEHICLE", "player")
+BR.Client.RegisterEvent(liftWatcher, "UNIT_ENTERING_VEHICLE", "player")
+BR.Client.RegisterEvent(liftWatcher, "UNIT_ENTERED_VEHICLE", "player")
+BR.Client.RegisterEvent(liftWatcher, "UNIT_EXITED_VEHICLE", "player")
 
 local RECOVERY_EVENTS = {
     CINEMATIC_STOP = true,

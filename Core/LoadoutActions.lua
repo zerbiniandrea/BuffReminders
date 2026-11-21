@@ -67,7 +67,7 @@ local function QueueDropdownSync(specID, configID)
     syncGen = syncGen + 1
     local myGen = syncGen
     pendingSync = { specID = specID, configID = configID }
-    dropdownSyncFrame:RegisterEvent("TRAIT_CONFIG_UPDATED")
+    BR.Client.RegisterEvent(dropdownSyncFrame, "TRAIT_CONFIG_UPDATED")
     C_Timer.After(8, function()
         -- A newer queue bumps syncGen, so clear only a stamp from this generation.
         if myGen == syncGen and pendingSync then

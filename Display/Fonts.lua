@@ -239,7 +239,7 @@ LSM.RegisterCallback(BR.DisplayFonts, "LibSharedMedia_SetGlobal", OnMediaChanged
 
 -- Zone-change loading screens pass neither flag and stay excluded.
 local loginFrame = CreateFrame("Frame")
-loginFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+BR.Client.RegisterEvent(loginFrame, "PLAYER_ENTERING_WORLD")
 loginFrame:SetScript("OnEvent", function(_, _, isInitialLogin, isReloadingUi)
     if not (isInitialLogin or isReloadingUi) then
         return

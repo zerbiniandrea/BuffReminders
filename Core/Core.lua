@@ -93,6 +93,26 @@ function BR.Client.GetSpecID()
     return GetSpecializationInfo(specIndex), specIndex
 end
 
+local IsEventValid = C_EventUtils and C_EventUtils.IsEventValid
+
+---Register the event on the frame if the client defines it. RegisterEvent throws on an event
+---that the client lacks. With units, the registration is a unit event.
+---@param frame table
+---@param event string
+---@param ... string Units
+---@return boolean registered
+function BR.Client.RegisterEvent(frame, event, ...)
+    if IsEventValid and not IsEventValid(event) then
+        return false
+    end
+    if select("#", ...) > 0 then
+        frame:RegisterUnitEvent(event, ...)
+    else
+        frame:RegisterEvent(event)
+    end
+    return true
+end
+
 -- ============================================================================
 -- SHARED CONSTANTS
 -- ============================================================================

@@ -87,8 +87,8 @@ local function StartDungeonEntry()
     if dungeonEntryTimer then
         dungeonEntryTimer:Cancel()
     end
-    spellcastFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
-    spellcastFrame:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
+    BR.Client.RegisterEvent(spellcastFrame, "UNIT_SPELLCAST_SUCCEEDED", "player")
+    BR.Client.RegisterEvent(spellcastFrame, "UNIT_SPELLCAST_START", "player")
     dungeonEntryTimer = C_Timer.NewTimer(ENTRY_WINDOW_SECONDS, function()
         ClearDungeonEntry()
         NotifyChanged(true)
@@ -376,6 +376,13 @@ function GameContext.HandleEvent(event, ...)
     if entry.handle then
         entry.handle(...)
     end
+end
+
+---Each event that HandleEvent reacts to. The caller must register them.
+---@return fun(table: table<string, table>, key?: string): string, table
+---@return table<string, table>
+function GameContext.EachEvent()
+    return pairs(EVENT_CACHES)
 end
 
 ---@return boolean inCombat True in combat or in a boss encounter

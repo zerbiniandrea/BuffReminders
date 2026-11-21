@@ -284,7 +284,7 @@ end
 -- ============================================================================
 
 local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+BR.Client.RegisterEvent(eventFrame, "PLAYER_REGEN_ENABLED")
 eventFrame:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_REGEN_ENABLED" and pendingSwitch then
         local name = pendingSwitch

@@ -437,9 +437,9 @@ local function UpdateAuraEventRegistration()
     end
     auraEventsNarrow = narrow
     if narrow then
-        eventFrame:RegisterUnitEvent("UNIT_AURA", "player", "pet")
+        BR.Client.RegisterEvent(eventFrame, "UNIT_AURA", "player", "pet")
     else
-        eventFrame:RegisterEvent("UNIT_AURA")
+        BR.Client.RegisterEvent(eventFrame, "UNIT_AURA")
         SetDirty("group") -- catch group changes missed while narrowed
     end
 end
@@ -3415,50 +3415,7 @@ SlashCmdList["BUFFREMINDERS"] = SlashHandler
 
 -- Event handler (ADDON_LOADED is owned by Core/Bootstrap.lua)
 eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-eventFrame:RegisterEvent("ZONE_CHANGED")
-eventFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
-eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
-eventFrame:RegisterEvent("GROUP_FORMED")
-eventFrame:RegisterEvent("PLAYER_ROLES_ASSIGNED")
-eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
-eventFrame:RegisterEvent("ENCOUNTER_START")
-eventFrame:RegisterEvent("ENCOUNTER_END")
-eventFrame:RegisterEvent("PLAYER_DEAD")
-eventFrame:RegisterEvent("PLAYER_UNGHOST")
 UpdateAuraEventRegistration() -- UNIT_AURA: narrow or broad by combat/group state
-eventFrame:RegisterEvent("UNIT_FLAGS")
-eventFrame:RegisterEvent("UNIT_CONNECTION")
-eventFrame:RegisterEvent("UNIT_PHASE")
-eventFrame:RegisterEvent("READY_CHECK")
-eventFrame:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW")
-eventFrame:RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE")
-eventFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
-eventFrame:RegisterEvent("TRAIT_CONFIG_UPDATED")
-eventFrame:RegisterEvent("SPELLS_CHANGED")
-eventFrame:RegisterEvent("UNIT_PET")
-eventFrame:RegisterEvent("PET_BAR_UPDATE")
-eventFrame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
-eventFrame:RegisterEvent("UPDATE_SHAPESHIFT_FORMS")
-eventFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
-eventFrame:RegisterEvent("PET_STABLE_UPDATE")
-eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-eventFrame:RegisterEvent("EQUIPMENT_SETS_CHANGED")
-eventFrame:RegisterEvent("UNIT_ENTERED_VEHICLE")
-eventFrame:RegisterEvent("UNIT_EXITED_VEHICLE")
-eventFrame:RegisterEvent("PLAYER_DIFFICULTY_CHANGED")
-eventFrame:RegisterEvent("CHALLENGE_MODE_START")
-eventFrame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
-eventFrame:RegisterEvent("CHALLENGE_MODE_RESET")
-eventFrame:RegisterEvent("PLAYER_UPDATE_RESTING")
-eventFrame:RegisterEvent("PLAYER_LEVEL_UP")
-eventFrame:RegisterEvent("UPDATE_EXPANSION_LEVEL")
-eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
-eventFrame:RegisterEvent("UPDATE_INVENTORY_DURABILITY")
-eventFrame:RegisterEvent("NEW_MOUNT_ADDED")
-eventFrame:RegisterEvent("PVP_MATCH_STATE_CHANGED")
 
 -- The repair macro branches on whether the repair mount can be summoned here, and
 -- that answer follows the subzone. Subzone crossings are frequent, so the secure
@@ -3749,3 +3706,16 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
         handler(arg1, arg2, arg3)
     end
 end)
+
+local SELF_REGISTERED_EVENTS = { UNIT_AURA = true }
+local function RegisterIfValid(event)
+    if not SELF_REGISTERED_EVENTS[event] then
+        BR.Client.RegisterEvent(eventFrame, event)
+    end
+end
+for event in pairs(eventHandlers) do
+    RegisterIfValid(event)
+end
+for event in GameContext.EachEvent() do
+    RegisterIfValid(event)
+end
