@@ -454,6 +454,36 @@ local function UnregisterSecureHost(frame)
     secureHostFrames[frame] = nil
 end
 
+local ICON_HOVER_ATLAS = "UI-HUD-ActionBar-IconFrame-Mouseover"
+
+---Match the hover highlight of a click overlay to the icon style. The Blizzard
+---style gets the action-button hover art over its frame art; the flat style, or
+---a missing atlas, keeps the square highlight.
+local function StyleOverlayHighlight(overlay)
+    local highlight = overlay.highlight
+    local IconStyle = BR.IconStyle
+    if IconStyle.UsesBlizzardArt() and BR.HasThemeAtlas(ICON_HOVER_ATLAS) then
+        if not highlight._br_actionArt then
+            highlight:ClearAllPoints()
+            highlight:SetPoint("TOPLEFT", 0, 0)
+            -- SetAtlas keeps an earlier SetTexCoord crop.
+            highlight:SetTexCoord(0, 1, 0, 1)
+            highlight:SetAtlas(ICON_HOVER_ATLAS)
+            highlight:SetBlendMode("BLEND")
+            highlight._br_actionArt = true
+        end
+        local width, height = overlay:GetSize()
+        highlight:SetSize(width * IconStyle.FRAME_WIDTH_RATIO, height)
+    elseif highlight._br_actionArt then
+        highlight:ClearAllPoints()
+        highlight:SetAllPoints()
+        highlight:SetBlendMode("BLEND")
+        highlight:SetColorTexture(1, 1, 1, 0.2)
+        highlight:SetTexCoord(BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET, BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET)
+        highlight._br_actionArt = false
+    end
+end
+
 -- The overlay is parented to UIParent with NO anchor to the buff frame hierarchy:
 -- a layout dependency on that hierarchy makes the hierarchy protected.
 -- SyncSecureButtons positions it after each layout pass.
@@ -552,6 +582,7 @@ local function CreateClickOverlay(frame)
     overlay.highlight:SetAllPoints()
     overlay.highlight:SetTexCoord(BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET, BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET)
     overlay.highlight:SetColorTexture(1, 1, 1, 0.2)
+    overlay:HookScript("OnEnter", StyleOverlayHighlight)
     overlay:HookScript("OnEnter", function()
         if frame.buffDef and (frame.buffCategory == "targeted" or frame.buffDef.castOnOthers) then
             -- Only the caster class has a meaningful last target.
