@@ -23,6 +23,10 @@ local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 
 local tinsert = table.insert
 local wipe = wipe
+local Theme = BR.Theme
+local CELL_EDGE = Theme.cell.edge
+local CELL_EDGE_SELECTED = Theme.cell.selected
+local CELL_CHECK = Theme.cell.check
 
 -- Focused-editor default width. A section that names an editor module gets the
 -- width that module declares instead.
@@ -191,7 +195,7 @@ local function AddWarlockDemonGrid(layout)
             cell.icon:SetDesaturated(not selected)
             cell.icon:SetAlpha(selected and 1 or 0.45)
             cell.check:SetShown(selected)
-            cell:SetBackdropBorderColor(unpack(selected and BR.Colors.Accent or BR.Colors.Border))
+            cell:SetBackdropBorderColor(unpack(selected and CELL_EDGE_SELECTED or CELL_EDGE))
         end
     end
 
@@ -229,7 +233,7 @@ local function AddWarlockDemonGrid(layout)
             cell.check:SetSize(14, 14)
             cell.check:SetPoint("BOTTOMRIGHT", 4, -4)
             cell.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
-            cell.check:SetVertexColor(unpack(BR.Colors.Accent))
+            cell.check:SetVertexColor(unpack(CELL_CHECK))
             cell.row = row.key
             cell.demonKey = demon.key
             cell:SetScript("OnClick", function()
@@ -833,7 +837,7 @@ local function OpenEditor(info)
     local module = EditorModule(section)
     local panelW = module and module.Width or PANEL_W
 
-    editorBody = EditorDialog:Open("|cffffcc00" .. (info.displayName or key) .. "|r")
+    editorBody = EditorDialog:Open(BR.TITLE_COLOR_CODE .. (info.displayName or key) .. "|r")
     editor = EditorDialog.dialog
     EditorDialog:SetIcon(info.icons and info.icons[1] or 134400)
 
@@ -892,19 +896,13 @@ local function EnsureDrawer()
     catcher:Hide()
     catcher:SetScript("OnMouseDown", HideDrawer)
 
-    drawer = CreateFrame("Frame", "BuffRemindersBuffDrawer", UIParent, "BackdropTemplate")
+    drawer = CreateFrame("Frame", "BuffRemindersBuffDrawer", UIParent)
+    drawer._br_optionsSurface = true
     drawer:SetSize(DRAWER_W, 100)
     drawer:SetFrameStrata("FULLSCREEN_DIALOG")
     drawer:SetFrameLevel(230)
     drawer:SetClampedToScreen(true)
     drawer:EnableMouse(true)
-    drawer:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    drawer:SetBackdropColor(0.10, 0.10, 0.122, 0.98)
-    drawer:SetBackdropBorderColor(unpack(BR.Colors.Border))
     -- The drawer constants are written in screen pixels, not in panel units.
     BR.RegisterScaledDialog(drawer, 1)
 
@@ -916,11 +914,12 @@ local function EnsureDrawer()
         shadow:SetColorTexture(0, 0, 0, 0.05 + (i - 1) * 0.05)
     end
 
+    local inset = BR.AddShell(drawer, Theme.shell.drawer)
     local stripe = drawer:CreateTexture(nil, "ARTWORK")
-    stripe:SetPoint("TOPLEFT", 1, -1)
-    stripe:SetPoint("BOTTOMLEFT", 1, 1)
-    stripe:SetWidth(3)
-    stripe:SetColorTexture(0.9, 0.72, 0.26)
+    stripe:SetPoint("TOPLEFT", inset, -inset)
+    stripe:SetPoint("BOTTOMLEFT", inset, inset)
+    stripe:SetWidth(Theme.drawerStripe.width)
+    BR.SetThemeColorTexture(stripe, Theme.drawerStripe.color)
 
     drawerIcon = BR.CreateBuffIcon(drawer, 16)
     drawerIcon:SetPoint("TOPLEFT", DRAWER_BODY_X, -9)
@@ -933,7 +932,7 @@ local function EnsureDrawer()
     headSep:SetHeight(1)
     headSep:SetPoint("TOPLEFT", DRAWER_BODY_X, -30)
     headSep:SetPoint("TOPRIGHT", -10, -30)
-    headSep:SetColorTexture(0.4, 0.32, 0.05, 0.45)
+    BR.AddGroove(headSep, Theme.groove.drawer)
 
     -- Modeless ESC-to-dismiss. Other keys propagate, so the drawer does not
     -- block keyboard input.
@@ -975,7 +974,7 @@ local function OpenDrawer(title, icon, anchor, fill, width)
 
     drawer:SetWidth(width or DRAWER_W)
 
-    drawerTitle:SetText("|cffffcc00" .. title .. "|r")
+    drawerTitle:SetText(BR.TITLE_COLOR_CODE .. title .. "|r")
 
     -- With no icon, the title moves into the icon position. -17 is the header
     -- strip midpoint, where the icon centers.

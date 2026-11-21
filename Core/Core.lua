@@ -388,6 +388,7 @@ local DefaultSettingKeys = {
     iconWidth = "VisualsRefresh",
     iconZoom = "VisualsRefresh",
     borderSize = "VisualsRefresh",
+    iconStyle = "VisualsRefresh",
     textSize = "VisualsRefresh",
     iconAlpha = "VisualsRefresh",
     textAlpha = "VisualsRefresh",
@@ -941,28 +942,26 @@ end
 -- SHARED UI FACTORIES
 -- ============================================================================
 
----Create a draggable panel with standard backdrop
+-- The -32 offset of the dialog title line is load-bearing: dialogs hardcode
+-- content positions relative to this line. Restyle the line, but do not move it.
+local DIALOG_TITLE_LINE = 32
+
+---Create a draggable panel with the shell of the theme
 ---@param name string? Frame name (nil for anonymous)
 ---@param width number
 ---@param height number
----@param options? {bgColor?: table, borderColor?: table, strata?: string, level?: number, escClose?: boolean, dialog?: boolean}
+---@param options? {strata?: string, level?: number, escClose?: boolean, dialog?: boolean, header?: number, brackets?: boolean}
+---header: bottom of the header band. brackets: corner brackets.
 ---@return table
 function BR.CreatePanel(name, width, height, options)
     options = options or {}
     local isDialog = options.dialog
-    local bgColor = options.bgColor or (isDialog and { 0.098, 0.098, 0.118, 1 } or { 0.09, 0.09, 0.107, 0.97 })
-    local borderColor = options.borderColor or BR.Colors.Border
+    local shell = BR.Theme.shell
 
-    local panel = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
+    local panel = CreateFrame("Frame", name, UIParent)
+    panel._br_optionsSurface = true
     panel:SetSize(width, height)
     panel:SetPoint("CENTER")
-    panel:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 2,
-    })
-    panel:SetBackdropColor(unpack(bgColor))
-    panel:SetBackdropBorderColor(unpack(borderColor))
     panel:SetMovable(true)
     panel:EnableMouse(true)
     panel:RegisterForDrag("LeftButton")
@@ -976,8 +975,7 @@ function BR.CreatePanel(name, width, height, options)
     end
     if isDialog then
         -- Drop shadow: concentric rings, each darker than the last. The sublevels
-        -- stay below the backdrop of the panel, so the body color paints over the
-        -- inner overlap.
+        -- stay below the shell, so the shell paints over the inner overlap.
         local SHADOW_STEPS = 6
         for i = 1, SHADOW_STEPS do
             local outset = SHADOW_STEPS - i + 1 -- 6,5,4,3,2,1 px out
@@ -988,20 +986,12 @@ function BR.CreatePanel(name, width, height, options)
             layer:SetColorTexture(0, 0, 0, alpha)
         end
 
-        -- Sits above the shadow and backdrop, below the title separator (BORDER 0+).
-        local body = panel:CreateTexture(nil, "BORDER", nil, -7)
-        body:SetPoint("TOPLEFT", 2, -2)
-        body:SetPoint("BOTTOMRIGHT", -2, 2)
-        body:SetColorTexture(1, 1, 1, 1)
-        body:SetGradient("VERTICAL", CreateColor(0.094, 0.094, 0.112, 1), CreateColor(0.130, 0.130, 0.152, 1))
-
-        -- The -32 offset is load-bearing: dialogs hardcode content positions
-        -- relative to this line. Restyle the line, but do not move it.
+        local inset = BR.AddShell(panel, shell.dialog, DIALOG_TITLE_LINE)
         local titleSep = panel:CreateTexture(nil, "BORDER", nil, 1)
-        titleSep:SetPoint("TOPLEFT", 2, -32)
-        titleSep:SetPoint("TOPRIGHT", -2, -32)
+        titleSep:SetPoint("TOPLEFT", inset, -DIALOG_TITLE_LINE)
+        titleSep:SetPoint("TOPRIGHT", -inset, -DIALOG_TITLE_LINE)
         titleSep:SetHeight(1)
-        titleSep:SetColorTexture(unpack(BR.Colors.Border))
+        BR.AddGroove(titleSep, BR.Theme.groove.dialog)
 
         -- ESC is handled through keyboard input, not UISpecialFrames: a registered
         -- frame closes together with the parent options panel.
@@ -1023,8 +1013,14 @@ function BR.CreatePanel(name, width, height, options)
         end)
 
         BR.RegisterScaledDialog(panel)
-    elseif options.escClose and name then
-        tinsert(UISpecialFrames, name)
+    else
+        if options.escClose and name then
+            tinsert(UISpecialFrames, name)
+        end
+        BR.AddShell(panel, shell.panel, options.header)
+    end
+    if options.brackets then
+        BR.AddCornerBrackets(panel)
     end
     return panel
 end
@@ -1039,7 +1035,7 @@ end
 function BR.CreateSectionHeader(parent, text, x, y)
     local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     header:SetPoint("TOPLEFT", x, y)
-    header:SetText("|cffffcc00" .. text .. "|r")
+    header:SetText(BR.TITLE_COLOR_CODE .. text .. "|r")
     return header, y - 18
 end
 

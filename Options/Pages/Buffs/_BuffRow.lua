@@ -221,14 +221,11 @@ local function CreateBuffRow(
 
     settingsBtn:SetScript("OnEnter", function(self)
         settingsText:SetTextColor(unpack(self.hoverColor or LINK_HOVER))
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(displayName, 1, 0.82, 0)
-        GameTooltip:AddLine(L["BuffRow.SettingsLink.Tooltip"], 1, 1, 1, true)
-        GameTooltip:Show()
+        BR.ShowTooltip(self, displayName, L["BuffRow.SettingsLink.Tooltip"], "ANCHOR_RIGHT", true)
     end)
     settingsBtn:SetScript("OnLeave", function(self)
         settingsText:SetTextColor(unpack(self.idleColor or LINK_IDLE))
-        GameTooltip:Hide()
+        BR.HideTooltip()
     end)
     settingsBtn:SetScript("OnClick", openPanel)
 

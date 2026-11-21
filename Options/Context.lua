@@ -132,6 +132,8 @@ local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local COL_PADDING = BR.Options.Constants.COL_PADDING
 local SECTION_GAP = BR.Options.Constants.SECTION_GAP
 local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
+local Theme = BR.Theme
+local TITLE_COLOR_CODE = BR.TITLE_COLOR_CODE
 
 -- Section header: gold text + thin gold accent line beneath, spanning the
 -- content area's width.
@@ -166,18 +168,19 @@ function Helpers.LayoutSectionHeader(layout, parent, text)
     local header = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     header:SetPoint("TOPLEFT", 0, 0)
     header:SetWordWrap(false)
-    header:SetText("|cffffcc00" .. text .. "|r")
+    header:SetText(TITLE_COLOR_CODE .. text .. "|r")
 
     local headerH = ceil(header:GetStringHeight())
     if headerH < 14 then
         headerH = 14
     end
 
-    local sep = container:CreateTexture(nil, "ARTWORK")
-    sep:SetHeight(SEP_HEIGHT)
-    sep:SetPoint("TOPLEFT", 0, -(headerH + SEP_OFFSET))
-    sep:SetPoint("TOPRIGHT", 0, -(headerH + SEP_OFFSET))
-    sep:SetColorTexture(0.4, 0.32, 0.05, 0.6)
+    local sepY = -(headerH + SEP_OFFSET)
+    local sepLeft, sepRight = BR.CreateRule(container, "ARTWORK", Theme.sectionRule)
+    sepLeft:SetPoint("TOPLEFT", 0, sepY)
+    sepLeft:SetPoint("TOPRIGHT", container, "TOP", 0, sepY)
+    sepRight:SetPoint("TOPLEFT", container, "TOP", 0, sepY)
+    sepRight:SetPoint("TOPRIGHT", 0, sepY)
 
     local parentWidth = parent.GetWidth and parent:GetWidth() or 600
     local containerW = parentWidth - COL_PADDING * 2
@@ -200,7 +203,7 @@ end
 function Helpers.LayoutSubsectionHeader(layout, parent, text)
     layout:Space(SECTION_GAP)
     local header = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    header:SetText("|cffffcc00" .. text .. "|r")
+    header:SetText(TITLE_COLOR_CODE .. text .. "|r")
     local h = ceil(header:GetStringHeight())
     if h < 12 then
         h = 12
@@ -215,6 +218,7 @@ end
 function Helpers.LayoutSubsectionNote(layout, parent, text)
     local note = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     note:SetJustifyH("LEFT")
+    BR.ApplyNoteColor(note)
     local parentWidth = parent.GetWidth and parent:GetWidth() or 600
     local noteWidth = parentWidth - layout:GetX() - COL_PADDING
     if noteWidth < 1 then
@@ -237,6 +241,7 @@ end
 function Helpers.LayoutSectionNote(layout, parent, text)
     local note = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     note:SetJustifyH("LEFT")
+    BR.ApplyNoteColor(note)
 
     local parentWidth = parent.GetWidth and parent:GetWidth() or 600
     local noteWidth = parentWidth - COL_PADDING * 2
@@ -261,6 +266,11 @@ end
 -- ============================================================================
 -- SHARED ROWS
 -- ============================================================================
+
+---@return string
+function Helpers.IconStyleBorderReason()
+    return L["DisabledReason.IconStyleFrame"]:format(L["Options.IconStyle.Modern"])
+end
 
 ---Override checkbox plus a live inheritance state label, added to the layout.
 ---The wording is generic, so every override in the panel reads the same way.
@@ -898,9 +908,10 @@ end
 ---@return table button
 function Helpers.AddCloseButton(parent, onClick)
     local C = BR.Options.Constants
-    local btn = BR.CreateButton(parent, "x", onClick or function()
+    onClick = onClick or function()
         parent:Hide()
-    end)
+    end
+    local btn = BR.CreateButton(parent, "x", onClick, nil, Theme.closeButton)
     btn:SetSize(C.DIALOG_CLOSE_SIZE, C.DIALOG_CLOSE_SIZE)
     btn:SetPoint("TOPRIGHT", C.DIALOG_CLOSE_INSET, C.DIALOG_CLOSE_INSET)
     return btn
@@ -948,6 +959,7 @@ function Helpers.CreateDialog(config)
     local dialog, titleFS, iconTex, body
 
     local function TearDown()
+        BR.HideOptionsTooltip()
         if config.onTearDown then
             config.onTearDown()
         end
@@ -982,6 +994,7 @@ function Helpers.CreateDialog(config)
         end
 
         titleFS = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        BR.ApplyTitleColor(titleFS)
         if iconTex then
             titleFS:SetPoint("LEFT", iconTex, "RIGHT", 8, 0)
         else

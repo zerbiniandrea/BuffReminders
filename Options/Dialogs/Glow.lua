@@ -504,7 +504,7 @@ Show = function(category, kind)
     local titleText = currentCategory
             and (titleBase .. " - " .. currentCategory:sub(1, 1):upper() .. currentCategory:sub(2))
         or titleBase
-    titleFS:SetText("|cffffcc00" .. titleText .. "|r")
+    titleFS:SetText(BR.TITLE_COLOR_CODE .. titleText .. "|r")
 
     expiringTab:SetActive(currentKind == "expiring")
     missingTab:SetActive(currentKind == "missing")

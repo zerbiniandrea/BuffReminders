@@ -45,6 +45,7 @@ Locales\zhCN.lua
 Locales\zhTW.lua
 
 Core\Core.lua
+Core\Theme.lua
 Core\Restrictions.lua
 Core\TextPositions.lua
 Core\Profiles.lua

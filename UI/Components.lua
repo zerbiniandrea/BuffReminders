@@ -2,10 +2,38 @@ local _, ns = ...
 ---@class BR
 local BR = ns
 
--- Shared palette tokens (BR.Colors), unpacked once so the per-widget calls below
--- avoid re-indexing the palette table on every build.
-local BORDER_R, BORDER_G, BORDER_B = unpack(BR.Colors.Border)
-local ACCENT_R, ACCENT_G, ACCENT_B = unpack(BR.Colors.Accent)
+-- Every factory paints from BR.Theme through the shared surface helpers.
+local Theme = BR.Theme
+local CLEAR = BR.THEME_CLEAR
+local CreateSurface = BR.CreateSurface
+local PaintSurface = BR.PaintSurface
+local PaintStyled = BR.PaintStyled
+local CreateRing = BR.CreateRing
+local PaintRing = BR.PaintRing
+local PaintGradient = BR.PaintGradient
+local SetTextColor = BR.SetThemeTextColor
+local SetColorTexture = BR.SetThemeColorTexture
+
+---@param isEnabled boolean
+---@param isPressed boolean
+---@param isHovered boolean
+---@return "normal"|"hover"|"pressed"|"disabled"
+local function PressState(isEnabled, isPressed, isHovered)
+    if not isEnabled then
+        return "disabled"
+    elseif isPressed then
+        return "pressed"
+    elseif isHovered then
+        return "hover"
+    end
+    return "normal"
+end
+
+---@param label table FontString
+---@param enabled boolean
+local function SetLabelEnabled(label, enabled)
+    SetTextColor(label, enabled and Theme.text or Theme.textDisabled)
+end
 
 -- ============================================================================
 -- UI COMPONENT FACTORY
@@ -116,21 +144,111 @@ end
 -- TOOLTIP UTILITIES
 -- ============================================================================
 
+-- With Theme.ownTooltip, the options UI shows its own tooltip frame in the theme
+-- colors. GameTooltip is shared with the game and every addon, so the addon never
+-- restyles it. Frames outside the options UI keep GameTooltip.
+local OWN_TOOLTIP_MAX_WIDTH = 260
+local OWN_TOOLTIP_PAD = 8
+local OWN_TOOLTIP_ANCHORS = {
+    ANCHOR_TOP = { "BOTTOM", "TOP", 0, 4 },
+    ANCHOR_BOTTOM = { "TOP", "BOTTOM", 0, -4 },
+    ANCHOR_LEFT = { "BOTTOMRIGHT", "TOPLEFT", 0, 0 },
+    ANCHOR_RIGHT = { "BOTTOMLEFT", "TOPRIGHT", 0, 0 },
+}
+local ownTooltip
+local GAME_TOOLTIP_TITLE = { 1, 1, 1 }
+local GAME_TOOLTIP_DESC = { 0.7, 0.7, 0.7 }
+
+---True when the frame sits inside a panel or drawer of the options UI.
+---@param frame table
+---@return boolean
+local function IsOnOptionsSurface(frame)
+    while frame do
+        if frame._br_optionsSurface then
+            return true
+        end
+        frame = frame:GetParent()
+    end
+    return false
+end
+
+local function ShowOwnTooltip(owner, title, desc, anchor)
+    if not ownTooltip then
+        local style = Theme.tooltip
+        ownTooltip = CreateFrame("Frame", nil, UIParent)
+        ownTooltip:SetFrameStrata("TOOLTIP")
+        ownTooltip:SetClampedToScreen(true)
+        PaintSurface(CreateSurface(ownTooltip), style)
+        ownTooltip.title = ownTooltip:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        ownTooltip.title:SetPoint("TOPLEFT", OWN_TOOLTIP_PAD, -OWN_TOOLTIP_PAD)
+        ownTooltip.title:SetJustifyH("LEFT")
+        SetTextColor(ownTooltip.title, style.title)
+        ownTooltip.desc = ownTooltip:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        ownTooltip.desc:SetPoint("TOPLEFT", ownTooltip.title, "BOTTOMLEFT", 0, -4)
+        ownTooltip.desc:SetJustifyH("LEFT")
+        ownTooltip.desc:SetWordWrap(true)
+        SetTextColor(ownTooltip.desc, style.desc)
+        -- A hidden owner sends no OnLeave. OnUpdate runs only while the tooltip shows.
+        ownTooltip:SetScript("OnUpdate", function(self)
+            local tipOwner = self.owner
+            if not tipOwner or not tipOwner:IsVisible() then
+                self:Hide()
+            end
+        end)
+        ownTooltip:SetScript("OnHide", function(self)
+            self.owner = nil
+        end)
+    end
+    local tip = ownTooltip
+    tip.owner = owner
+    tip.title:SetWidth(0)
+    tip.title:SetText(title)
+    local width = min(ceil(tip.title:GetStringWidth()), OWN_TOOLTIP_MAX_WIDTH)
+    tip.title:SetWidth(width)
+    local height = ceil(tip.title:GetStringHeight())
+    if desc then
+        tip.desc:SetWidth(0)
+        tip.desc:SetText(desc)
+        width = max(width, min(ceil(tip.desc:GetStringWidth()), OWN_TOOLTIP_MAX_WIDTH))
+        tip.title:SetWidth(width)
+        tip.desc:SetWidth(width)
+        tip.desc:Show()
+        height = ceil(tip.title:GetStringHeight()) + 4 + ceil(tip.desc:GetStringHeight())
+    else
+        tip.desc:Hide()
+    end
+    tip:SetSize(width + OWN_TOOLTIP_PAD * 2, height + OWN_TOOLTIP_PAD * 2)
+    local spec = OWN_TOOLTIP_ANCHORS[anchor or "ANCHOR_RIGHT"] or OWN_TOOLTIP_ANCHORS.ANCHOR_RIGHT
+    tip:ClearAllPoints()
+    tip:SetPoint(spec[1], owner, spec[2], spec[3], spec[4])
+    tip:Show()
+end
+
 ---Show a tooltip on a widget (title in white, optional description in grey)
 ---@param owner table Frame that owns the tooltip
 ---@param title string Tooltip title
 ---@param desc? string Optional description line
 ---@param anchor? string Anchor point (default "ANCHOR_RIGHT")
-local function ShowTooltip(owner, title, desc, anchor)
+---@param titled? boolean GameTooltip shows the title in the title color and the description in the text color
+local function ShowTooltip(owner, title, desc, anchor, titled)
+    if Theme.ownTooltip and IsOnOptionsSurface(owner) then
+        ShowOwnTooltip(owner, title, desc, anchor)
+        return
+    end
+    local titleColor = titled and Theme.title or GAME_TOOLTIP_TITLE
+    local descColor = titled and Theme.text or GAME_TOOLTIP_DESC
     GameTooltip:SetOwner(owner, anchor or "ANCHOR_RIGHT")
-    GameTooltip:SetText(title, 1, 1, 1)
+    GameTooltip:SetText(title, titleColor[1], titleColor[2], titleColor[3])
     if desc then
-        GameTooltip:AddLine(desc, 0.7, 0.7, 0.7, true)
+        GameTooltip:AddLine(desc, descColor[1], descColor[2], descColor[3], true)
     end
     GameTooltip:Show()
 end
 
 local function HideTooltip()
+    if ownTooltip then
+        ownTooltip:Hide()
+    end
     GameTooltip:Hide()
 end
 
@@ -152,6 +270,16 @@ end
 
 BR.ShowTooltip = ShowTooltip
 BR.HideTooltip = HideTooltip
+
+---Hide the tooltip of an options control. A GameTooltip that another frame owns stays.
+function BR.HideOptionsTooltip()
+    if ownTooltip then
+        ownTooltip:Hide()
+    end
+    if IsOnOptionsSurface(GameTooltip:GetOwner()) then
+        GameTooltip:Hide()
+    end
+end
 BR.SetupTooltip = SetupTooltip
 BR.HookTooltip = HookTooltip
 
@@ -177,20 +305,25 @@ end
 function Components.AttachDisabledReason(holder, isEnabledFn, reason)
     -- Always anchored to the holder, so the tooltip does not move while the
     -- cursor crosses the parts of the control.
+    local reasonShown = false
     local function showReason()
         if isEnabledFn() then
             return
         end
         ShowTooltip(holder, L["Component.DisabledReason.Title"], ResolveDisabledReason(reason), "ANCHOR_TOP")
+        reasonShown = true
+    end
+    -- The control can turn enabled while the reason shows, so the hide does not ask isEnabledFn.
+    local function hideReason()
+        if reasonShown then
+            reasonShown = false
+            HideTooltip()
+        end
     end
 
     holder:EnableMouse(true)
     holder:HookScript("OnEnter", showReason)
-    holder:HookScript("OnLeave", function()
-        if not isEnabledFn() then
-            HideTooltip()
-        end
-    end)
+    holder:HookScript("OnLeave", hideReason)
 
     -- A part that takes the mouse (a value box, a slider thumb, a label with its
     -- own tooltip) hides the holder from the cursor. Its own tooltip runs first,
@@ -199,12 +332,14 @@ function Components.AttachDisabledReason(holder, isEnabledFn, reason)
         for _, child in ipairs({ frame:GetChildren() }) do
             if child:IsMouseEnabled() then
                 child:HookScript("OnEnter", showReason)
+                child:HookScript("OnLeave", hideReason)
             end
             hookParts(child)
         end
         for _, region in ipairs({ frame:GetRegions() }) do
             if region.IsMouseEnabled and region.HookScript and region:IsMouseEnabled() then
                 region:HookScript("OnEnter", showReason)
+                region:HookScript("OnLeave", hideReason)
             end
         end
     end
@@ -215,40 +350,18 @@ end
 -- BUTTON
 -- ============================================================================
 
-local ButtonColors = {
-    bg = { 0.15, 0.15, 0.15, 1 },
-    bgHover = { 0.22, 0.22, 0.22, 1 },
-    bgPressed = { 0.12, 0.12, 0.12, 1 },
-    border = BR.Colors.Border,
-    borderHover = { 0.5, 0.5, 0.5, 1 },
-    borderPressed = BR.Colors.Accent,
-    borderDisabled = { 0.25, 0.25, 0.25, 1 },
-    text = { 1, 1, 1, 1 },
-    textDisabled = { 0.5, 0.5, 0.5, 1 },
-}
-
----Create a modern flat-style button with dark background and thin border
+---Create a button that paints its normal, hover, pressed and disabled states
 ---@param parent Frame
 ---@param text string
 ---@param onClick? function
 ---@param tooltip? TooltipText Optional tooltip configuration
----@param colorOverrides? table Partial color table to override defaults (same keys as ButtonColors)
+---@param styles? table<string, ThemeStyle> State styles (default Theme.button)
 ---@return table
-function BR.CreateButton(parent, text, onClick, tooltip, colorOverrides)
-    local colors = ButtonColors
-    if colorOverrides then
-        colors = {}
-        for k, v in pairs(ButtonColors) do
-            colors[k] = colorOverrides[k] or v
-        end
-    end
+function BR.CreateButton(parent, text, onClick, tooltip, styles)
+    styles = styles or Theme.button
 
-    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    btn:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    local btn = CreateFrame("Button", nil, parent)
+    local surface = CreateSurface(btn)
     local btnText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     btnText:SetPoint("CENTER", 0, 0)
     btnText:SetText(text)
@@ -262,23 +375,7 @@ function BR.CreateButton(parent, text, onClick, tooltip, colorOverrides)
     local isHovered = false
 
     local function UpdateVisual()
-        if not isEnabled then
-            btn:SetBackdropColor(unpack(colors.bg))
-            btn:SetBackdropBorderColor(unpack(colors.borderDisabled))
-            btnText:SetTextColor(unpack(colors.textDisabled))
-        elseif isPressed then
-            btn:SetBackdropColor(unpack(colors.bgPressed))
-            btn:SetBackdropBorderColor(unpack(colors.borderPressed))
-            btnText:SetTextColor(unpack(colors.text))
-        elseif isHovered then
-            btn:SetBackdropColor(unpack(colors.bgHover))
-            btn:SetBackdropBorderColor(unpack(colors.borderHover))
-            btnText:SetTextColor(unpack(colors.text))
-        else
-            btn:SetBackdropColor(unpack(colors.bg))
-            btn:SetBackdropBorderColor(unpack(colors.border))
-            btnText:SetTextColor(unpack(colors.text))
-        end
+        PaintStyled(surface, btnText, styles[PressState(isEnabled, isPressed, isHovered)])
     end
 
     UpdateVisual()
@@ -319,6 +416,12 @@ function BR.CreateButton(parent, text, onClick, tooltip, colorOverrides)
         UpdateVisual()
     end)
 
+    -- A click can hide the button under the cursor, and then OnLeave does not fire.
+    btn:HookScript("OnHide", function()
+        isHovered, isPressed = false, false
+        UpdateVisual()
+    end)
+
     btn:SetScript("OnClick", function()
         if isEnabled and onClick then
             onClick(btn)
@@ -342,6 +445,9 @@ function BR.CreateButton(parent, text, onClick, tooltip, colorOverrides)
         else
             self:Disable()
         end
+        -- A disabled button can miss OnLeave, so the hover and press flags can go stale.
+        isHovered = enabled and self:IsMouseOver()
+        isPressed = isPressed and isHovered
         UpdateVisual()
     end
 
@@ -403,72 +509,121 @@ end
 
 local panelEditBoxes = nil ---@type table[]?
 
-local SliderColors = {
-    track = { 0.2, 0.2, 0.2, 1 },
-    trackFill = { 0.6, 0.5, 0.1, 1 },
-    trackDisabled = { 0.15, 0.15, 0.15, 1 },
-    thumb = { 0.4, 0.4, 0.4, 1 },
-    thumbHover = BR.Colors.Accent,
-    thumbDisabled = { 0.25, 0.25, 0.25, 1 },
-    text = { 1, 1, 1, 1 },
-    textDisabled = { 0.5, 0.5, 0.5, 1 },
-}
+---Paint an edit box container from Theme.editBox, with hover, focus and disabled
+---states. Adds container:SetBoxEnabled(enabled) and container:SetBoxTextColor(color).
+---@param container table
+---@param editBox table
+local function DecorateEditBox(container, editBox)
+    local styles = Theme.editBox
+    local surface = CreateSurface(container)
+    local ring = CreateRing(container, "BACKGROUND", -4, 1, true)
+    local isHovered, isFocused, isEnabled = false, false, true
+    local textColor
 
-local TextInputColors = {
-    bg = { 0.08, 0.08, 0.08, 0.9 },
-    bgFocused = { 0.1, 0.1, 0.1, 0.95 },
-    border = BR.Colors.Border,
-    borderFocused = BR.Colors.Accent,
-}
+    local function Paint()
+        local style = styles.normal
+        if not isEnabled then
+            style = styles.disabled
+        elseif isFocused then
+            style = styles.focus
+        elseif isHovered then
+            style = styles.hover
+        end
+        PaintSurface(surface, style)
+        PaintRing(ring, style.ring)
+        local text = isEnabled and textColor or style.text --[[@as number[] ]]
+        SetTextColor(editBox, text)
+    end
 
----Style any EditBox with dark flat UI (dark bg, gray border, gold focus highlight).
----Wraps the EditBox in a BackdropTemplate container. Caller must set size and position on the returned container.
+    editBox:HookScript("OnEnter", function()
+        isHovered = true
+        Paint()
+    end)
+    editBox:HookScript("OnLeave", function()
+        isHovered = false
+        Paint()
+    end)
+    editBox:HookScript("OnEditFocusGained", function()
+        isFocused = true
+        Paint()
+    end)
+    editBox:HookScript("OnEditFocusLost", function()
+        isFocused = false
+        Paint()
+    end)
+    local cursor = styles.cursor
+    if cursor and editBox.SetCursorColor then
+        editBox:SetCursorColor(cursor[1], cursor[2], cursor[3])
+    end
+
+    function container:SetBoxEnabled(enabled)
+        isEnabled = enabled
+        Paint()
+    end
+    function container:SetBoxTextColor(color)
+        textColor = color
+        Paint()
+    end
+    Paint()
+end
+
+---Wrap an EditBox in a themed container. Caller must set size and position on the returned container.
 ---@param editBox table The EditBox to style
----@return table container The backdrop container frame
+---@return table container
 local function StyleEditBox(editBox)
-    local colors = TextInputColors
-    local parent = editBox:GetParent()
-
-    local container = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    container:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    container:SetBackdropColor(unpack(colors.bg))
-    container:SetBackdropBorderColor(unpack(colors.border))
-
+    local container = CreateFrame("Frame", nil, editBox:GetParent())
     editBox:SetParent(container)
     editBox:ClearAllPoints()
     editBox:SetPoint("TOPLEFT", 4, -2)
     editBox:SetPoint("BOTTOMRIGHT", -4, 2)
-    editBox:SetTextColor(1, 1, 1, 1)
-
-    editBox:HookScript("OnEditFocusGained", function()
-        container:SetBackdropColor(unpack(colors.bgFocused))
-        container:SetBackdropBorderColor(unpack(colors.borderFocused))
-    end)
-
-    editBox:HookScript("OnEditFocusLost", function()
-        container:SetBackdropColor(unpack(colors.bg))
-        container:SetBackdropBorderColor(unpack(colors.border))
-    end)
-
+    DecorateEditBox(container, editBox)
     editBox:HookScript("OnEscapePressed", function(self)
         self:ClearFocus()
     end)
-
     return container
 end
 
 BR.StyleEditBox = StyleEditBox
+
+---Add the track edge, track shade, fill line and knob of the theme to a slider.
+---The track, fill and thumb textures keep their anchors, so the thumb position
+---math does not change.
+---@return fun(state: "normal"|"hover"|"drag"|"disabled") paint
+local function DecorateSlider(trackBg, trackFill, thumbTex)
+    local trackEdge = trackBg:GetParent():CreateTexture(nil, "BACKGROUND", nil, -1)
+    trackEdge:SetPoint("TOPLEFT", trackBg, "TOPLEFT", -1, 1)
+    trackEdge:SetPoint("BOTTOMRIGHT", trackBg, "BOTTOMRIGHT", 1, -1)
+    local trackShade = trackBg:GetParent():CreateTexture(nil, "BACKGROUND", nil, 1)
+    trackShade:SetPoint("TOPLEFT", trackBg, "TOPLEFT", 0, 0)
+    trackShade:SetPoint("TOPRIGHT", trackBg, "TOPRIGHT", 0, 0)
+    trackShade:SetHeight(1)
+
+    local fillLine = trackFill:GetParent():CreateTexture(nil, "ARTWORK", nil, 1)
+    fillLine:SetPoint("TOPLEFT", trackFill, "TOPLEFT", 0, 0)
+    fillLine:SetPoint("TOPRIGHT", trackFill, "TOPRIGHT", 0, 0)
+    fillLine:SetHeight(1)
+
+    local knob = thumbTex:GetParent():CreateTexture(nil, "OVERLAY", nil, 1)
+    knob:SetPoint("TOPLEFT", 1, -1)
+    knob:SetPoint("BOTTOMRIGHT", -1, 1)
+
+    return function(state)
+        local s = Theme.slider[state]
+        SetColorTexture(trackEdge, s.trackEdge)
+        PaintGradient(trackBg, "VERTICAL", s.trackBottom, s.trackTop)
+        SetColorTexture(trackShade, s.trackShade)
+        PaintGradient(trackFill, "HORIZONTAL", s.fillLeft, s.fillRight)
+        SetColorTexture(fillLine, s.fillLine)
+        SetColorTexture(thumbTex, s.thumb)
+        PaintGradient(knob, "VERTICAL", s.knobBottom, s.knobTop)
+    end
+end
 
 ---Create a modern flat-style slider with thin track and small thumb
 ---@param parent table Parent frame
 ---@param config SliderConfig Configuration table
 ---@return table holder Frame containing slider with .slider, .valueText, .SetValue(v), .GetValue()
 function Components.Slider(parent, config)
-    local colors = SliderColors
     local sliderWidth = config.sliderWidth or 100
     local step = config.step or 1
     local suffix = config.suffix or ""
@@ -515,6 +670,7 @@ function Components.Slider(parent, config)
         label:SetText(config.label)
     end
     holder.label = label
+    SetTextColor(label, Theme.text)
 
     local sliderFrame = CreateFrame("Frame", nil, holder)
     sliderFrame:SetPoint("LEFT", label, "RIGHT", 5, 0)
@@ -525,13 +681,11 @@ function Components.Slider(parent, config)
     trackBg:SetHeight(TRACK_HEIGHT)
     trackBg:SetPoint("LEFT", 0, 0)
     trackBg:SetPoint("RIGHT", 0, 0)
-    trackBg:SetColorTexture(unpack(colors.track))
     sliderFrame.trackBg = trackBg
 
     local trackFill = sliderFrame:CreateTexture(nil, "ARTWORK")
     trackFill:SetHeight(TRACK_HEIGHT)
     trackFill:SetPoint("LEFT", trackBg, "LEFT", 0, 0)
-    trackFill:SetColorTexture(unpack(colors.trackFill))
     sliderFrame.trackFill = trackFill
 
     local thumb = CreateFrame("Button", nil, sliderFrame)
@@ -540,13 +694,15 @@ function Components.Slider(parent, config)
 
     local thumbTex = thumb:CreateTexture(nil, "OVERLAY")
     thumbTex:SetAllPoints()
-    thumbTex:SetColorTexture(unpack(colors.thumb))
     thumb.tex = thumbTex
 
     local currentValue = config.get and config.get() or config.value or config.min
     local isEnabled = true
     local isDragging = false
     local isThumbHovered = false
+
+    local paintSlider = DecorateSlider(trackBg, trackFill, thumbTex)
+    local valueColor = Theme.text
 
     -- Clickable value display button (declared early for event handlers)
     local valueBtn = CreateFrame("Button", nil, holder)
@@ -585,19 +741,16 @@ function Components.Slider(parent, config)
     end
 
     local function UpdateVisual()
+        local state = "normal"
         if not isEnabled then
-            thumbTex:SetColorTexture(unpack(colors.thumbDisabled))
-            trackBg:SetColorTexture(unpack(colors.trackDisabled))
-            trackFill:SetColorTexture(0.3, 0.25, 0.05, 1)
-        elseif isThumbHovered or isDragging then
-            thumbTex:SetColorTexture(unpack(colors.thumbHover))
-            trackBg:SetColorTexture(unpack(colors.track))
-            trackFill:SetColorTexture(unpack(colors.trackFill))
-        else
-            thumbTex:SetColorTexture(unpack(colors.thumb))
-            trackBg:SetColorTexture(unpack(colors.track))
-            trackFill:SetColorTexture(unpack(colors.trackFill))
+            state = "disabled"
+        elseif isDragging then
+            state = "drag"
+        elseif isThumbHovered then
+            state = "hover"
         end
+        paintSlider(state)
+        SetTextColor(valueText, isEnabled and isDragging and Theme.slider.valueDrag or valueColor)
         UpdateThumbPosition()
     end
 
@@ -649,9 +802,9 @@ function Components.Slider(parent, config)
             local newVal = PositionToValue(localX)
             currentValue = newVal
             valueText:SetText(displayText(currentValue))
+            isDragging = true
             UpdateVisual()
             config.onChange(floor(currentValue))
-            isDragging = true
         end
     end)
 
@@ -681,12 +834,12 @@ function Components.Slider(parent, config)
         valueBtn:Show()
     end)
 
-    editBox:SetScript("OnEscapePressed", function()
+    editBox:HookScript("OnEscapePressed", function()
         editContainer:Hide()
         valueBtn:Show()
     end)
 
-    editBox:SetScript("OnEditFocusLost", function()
+    editBox:HookScript("OnEditFocusLost", function()
         editContainer:Hide()
         valueBtn:Show()
     end)
@@ -750,11 +903,10 @@ function Components.Slider(parent, config)
 
     function holder:SetEnabled(enabled)
         isEnabled = enabled
-        local color = enabled and 1 or 0.5
-        label:SetTextColor(color, color, color)
+        SetLabelEnabled(label, enabled)
         -- An inherited value is real and applies, so it stays readable.
-        local valueColor = (enabled or (config.inherited and config.inherited())) and 1 or 0.5
-        valueText:SetTextColor(valueColor, valueColor, valueColor)
+        local readable = enabled or (config.inherited and config.inherited())
+        valueColor = readable and Theme.text or Theme.textDisabled
         UpdateVisual()
     end
 
@@ -781,44 +933,23 @@ function Components.Slider(parent, config)
     return holder
 end
 
-local CheckboxColors = {
-    bg = { 0.12, 0.12, 0.12, 1 },
-    bgHover = { 0.16, 0.16, 0.16, 1 },
-    bgChecked = { 0.15, 0.13, 0.08, 1 },
-    border = BR.Colors.Border,
-    borderHover = { 0.45, 0.45, 0.45, 1 },
-    borderChecked = { 0.6, 0.5, 0.2, 1 },
-    borderDisabled = { 0.2, 0.2, 0.2, 1 },
-    checkmark = BR.Colors.AccentMuted,
-    checkmarkDisabled = { 0.5, 0.42, 0.1, 1 },
-    text = { 1, 1, 1, 1 },
-    textDisabled = { 0.5, 0.5, 0.5, 1 },
-}
-
 ---Create the core checkbox button frame (reusable by Checkbox component)
 ---@param parent table Parent frame
 ---@param initialChecked boolean Initial checked state
 ---@param onChange fun(checked: boolean) Callback when state changes
 ---@return table cb Checkbox button with .SetChecked(v), .GetChecked(), .SetHovered(v), .SetEnabled(v)
 local function CreateCheckboxCore(parent, initialChecked, onChange)
-    local colors = CheckboxColors
+    local styles = Theme.checkbox
     local CHECKBOX_SIZE = 16 -- Match icon size for alignment
 
-    local cb = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    local cb = CreateFrame("Button", nil, parent)
     cb:SetSize(CHECKBOX_SIZE, CHECKBOX_SIZE)
-    cb:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    cb:SetBackdropColor(unpack(colors.bg))
-    cb:SetBackdropBorderColor(unpack(colors.border))
+    local surface = CreateSurface(cb)
 
     local checkmark = cb:CreateTexture(nil, "ARTWORK")
     checkmark:SetPoint("CENTER", 0, 0)
     checkmark:SetSize(CHECKBOX_SIZE + 4, CHECKBOX_SIZE + 4)
     checkmark:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
-    checkmark:SetVertexColor(unpack(colors.checkmark))
     checkmark:Hide()
     cb.checkmark = checkmark
 
@@ -827,31 +958,18 @@ local function CreateCheckboxCore(parent, initialChecked, onChange)
     local isHovered = false
 
     local function UpdateVisual()
-        if isChecked then
-            checkmark:Show()
-        else
-            checkmark:Hide()
-        end
-
+        local style
         if not isEnabled then
-            cb:SetBackdropBorderColor(unpack(colors.borderDisabled))
-            cb:SetBackdropColor(0.08, 0.08, 0.08, 1)
-            checkmark:SetVertexColor(unpack(colors.checkmarkDisabled))
-        elseif isChecked and isHovered then
-            cb:SetBackdropBorderColor(unpack(colors.borderHover))
-            cb:SetBackdropColor(unpack(colors.bgHover))
-            checkmark:SetVertexColor(unpack(colors.checkmark))
+            style = isChecked and styles.disabledChecked or styles.disabled
         elseif isChecked then
-            cb:SetBackdropBorderColor(unpack(colors.borderChecked))
-            cb:SetBackdropColor(unpack(colors.bgChecked))
-            checkmark:SetVertexColor(unpack(colors.checkmark))
-        elseif isHovered then
-            cb:SetBackdropBorderColor(unpack(colors.borderHover))
-            cb:SetBackdropColor(unpack(colors.bgHover))
+            style = isHovered and styles.checkedHover or styles.checked
         else
-            cb:SetBackdropBorderColor(unpack(colors.border))
-            cb:SetBackdropColor(unpack(colors.bg))
+            style = isHovered and styles.hover or styles.normal
         end
+        PaintSurface(surface, style)
+        local mark = style.mark --[[@as number[] ]]
+        checkmark:SetVertexColor(mark[1], mark[2], mark[3], mark[4] or 1)
+        checkmark:SetShown(isChecked)
     end
 
     cb:SetScript("OnEnter", function()
@@ -921,7 +1039,6 @@ end
 ---@param config CheckboxConfig Configuration table
 ---@return table holder Frame containing checkbox with .checkbox, .SetChecked(v), .GetChecked()
 function Components.Checkbox(parent, config)
-    local colors = CheckboxColors
     local initialChecked = config.get and config.get() or config.checked or false
 
     local CHECKBOX_W = 16
@@ -977,6 +1094,7 @@ function Components.Checkbox(parent, config)
     end
     label:SetText(config.label)
     holder.label = label
+    SetTextColor(label, Theme.text)
     cb.label = label
 
     -- Hover tooltip (on all interactive children, chained with hover visuals)
@@ -1041,11 +1159,7 @@ function Components.Checkbox(parent, config)
 
     function holder:SetEnabled(enabled)
         cb:SetEnabled(enabled)
-        if enabled then
-            label:SetTextColor(unpack(colors.text))
-        else
-            label:SetTextColor(unpack(colors.textDisabled))
-        end
+        SetLabelEnabled(label, enabled)
     end
 
     -- Refresh method for OnShow pattern
@@ -1073,13 +1187,6 @@ end
 -- DIMENSION LINK (chain toggle between Width/Height sliders)
 -- ============================================================================
 
-local DimensionLinkColors = {
-    linked = BR.Colors.AccentMuted,
-    unlinked = { 0.35, 0.35, 0.35, 1 },
-    hover = BR.Colors.Accent,
-    disabled = { 0.2, 0.2, 0.2, 1 },
-}
-
 ---@class DimensionLinkConfig
 ---@field isLinked fun(): boolean
 ---@field onLink fun()
@@ -1091,7 +1198,7 @@ local DimensionLinkColors = {
 ---@param config DimensionLinkConfig
 ---@return Frame
 function Components.DimensionLink(parent, config)
-    local colors = DimensionLinkColors
+    local colors = Theme.link
     local ICON_SIZE = 16
     local BAR_W = 2
     local BAR_H = 10
@@ -1165,8 +1272,8 @@ function Components.DimensionLink(parent, config)
             for _, part in ipairs(allParts) do
                 part:SetColorTexture(unpack(color))
             end
-            local tipText = config.isLinked() and "Unlink width and height" or "Link width and height"
-            ShowTooltip(holder, tipText, "When linked, changing one updates both.", "ANCHOR_TOP")
+            local tipText = config.isLinked() and L["DimensionLink.Unlink"] or L["DimensionLink.Link"]
+            ShowTooltip(holder, tipText, L["DimensionLink.Desc"], "ANCHOR_TOP")
         end
     end)
 
@@ -1193,26 +1300,10 @@ function Components.DimensionLink(parent, config)
     return holder
 end
 
-local ToggleColors = {
-    trackOff = { 0.12, 0.12, 0.12, 1 },
-    trackOn = { 0.15, 0.13, 0.08, 1 },
-    borderOff = BR.Colors.Border,
-    borderOn = { 0.6, 0.5, 0.2, 1 },
-    borderHover = { 0.45, 0.45, 0.45, 1 },
-    borderDisabled = { 0.2, 0.2, 0.2, 1 },
-    thumbOff = { 0.4, 0.4, 0.4, 1 },
-    thumbOn = BR.Colors.AccentMuted,
-    thumbHover = BR.Colors.Accent,
-    thumbDisabled = { 0.25, 0.25, 0.25, 1 },
-    text = { 1, 1, 1, 1 },
-    textDisabled = { 0.5, 0.5, 0.5, 1 },
-}
-
 ---@param parent Frame
 ---@param config ToggleConfig
 ---@return Frame
 function Components.Toggle(parent, config)
-    local colors = ToggleColors
     local checked
     if config.get then
         checked = config.get() and true or false
@@ -1229,18 +1320,17 @@ function Components.Toggle(parent, config)
     local holder = CreateFrame("Frame", nil, parent)
     holder:SetSize(holderWidth, 20)
 
-    local track = CreateFrame("Button", nil, holder, "BackdropTemplate")
+    local track = CreateFrame("Button", nil, holder)
     track:SetSize(TRACK_W, 16)
     track:SetPoint("LEFT", 0, 0)
-    track:SetBackdrop({
-        bgFile = "Interface\\BUTTONS\\WHITE8x8",
-        edgeFile = "Interface\\BUTTONS\\WHITE8x8",
-        edgeSize = 1,
-    })
+    local surface = CreateSurface(track)
 
     local thumb = track:CreateTexture(nil, "OVERLAY")
     thumb:SetSize(12, 12)
-    thumb:SetColorTexture(1, 1, 1, 1)
+    local knobSheen = track:CreateTexture(nil, "OVERLAY", nil, 1)
+    knobSheen:SetPoint("TOPLEFT", thumb, "TOPLEFT", 0, 0)
+    knobSheen:SetPoint("TOPRIGHT", thumb, "TOPRIGHT", 0, 0)
+    knobSheen:SetHeight(1)
 
     local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     label:SetPoint("LEFT", track, "RIGHT", LABEL_GAP, 0)
@@ -1254,26 +1344,25 @@ function Components.Toggle(parent, config)
     end
     label:SetText(config.label)
     holder.label = label
+    SetTextColor(label, Theme.text)
 
     local enabled = true
+    local hovered = false
 
     local function UpdateVisual()
+        local styles = Theme.toggle
+        local style
         if not enabled then
-            track:SetBackdropColor(unpack(colors.trackOff))
-            track:SetBackdropBorderColor(unpack(colors.borderDisabled))
-            thumb:SetVertexColor(unpack(colors.thumbDisabled))
-            label:SetTextColor(unpack(colors.textDisabled))
+            style = styles.disabled
         elseif checked then
-            track:SetBackdropColor(unpack(colors.trackOn))
-            track:SetBackdropBorderColor(unpack(colors.borderOn))
-            thumb:SetVertexColor(unpack(colors.thumbOn))
-            label:SetTextColor(unpack(colors.text))
+            style = hovered and styles.onHover or styles.on
         else
-            track:SetBackdropColor(unpack(colors.trackOff))
-            track:SetBackdropBorderColor(unpack(colors.borderOff))
-            thumb:SetVertexColor(unpack(colors.thumbOff))
-            label:SetTextColor(unpack(colors.text))
+            style = hovered and styles.offHover or styles.off
         end
+        PaintSurface(surface, style)
+        PaintGradient(thumb, "VERTICAL", style.knobBottom, style.knobTop)
+        SetColorTexture(knobSheen, style.sheen)
+        SetLabelEnabled(label, enabled)
 
         thumb:ClearAllPoints()
         if checked then
@@ -1295,20 +1384,12 @@ function Components.Toggle(parent, config)
     end)
 
     track:SetScript("OnEnter", function()
-        if not enabled then
-            return
-        end
-        if checked then
-            thumb:SetVertexColor(unpack(colors.thumbHover))
-        else
-            track:SetBackdropBorderColor(unpack(colors.borderHover))
-        end
+        hovered = true
+        UpdateVisual()
     end)
 
     track:SetScript("OnLeave", function()
-        if not enabled then
-            return
-        end
+        hovered = false
         UpdateVisual()
     end)
 
@@ -1340,6 +1421,8 @@ function Components.Toggle(parent, config)
     function holder:SetEnabled(value)
         enabled = value and true or false
         track:EnableMouse(enabled)
+        -- A track without mouse input gets no OnLeave, so the hover flag can go stale.
+        hovered = enabled and track:IsMouseOver()
         UpdateVisual()
     end
 
@@ -1367,25 +1450,40 @@ function Components.Toggle(parent, config)
 end
 
 -- Modern dropdown styling colors
-local DropdownColors = {
-    bg = { 0.15, 0.15, 0.15, 1 },
-    bgHover = { 0.2, 0.2, 0.2, 1 },
-    bgDisabled = { 0.1, 0.1, 0.1, 1 },
-    border = BR.Colors.Border,
-    borderHover = { 0.5, 0.5, 0.5, 1 },
-    borderDisabled = { 0.2, 0.2, 0.2, 1 },
-    arrow = { 0.7, 0.7, 0.7, 1 },
-    arrowHover = BR.Colors.Accent,
-    arrowDisabled = { 0.4, 0.4, 0.4, 1 },
-    text = { 1, 1, 1, 1 },
-    textDisabled = { 0.5, 0.5, 0.5, 1 },
-    menuBg = { 0.12, 0.12, 0.12, 0.98 },
-    menuBorder = BR.Colors.Border,
-    itemBgHover = { 0.25, 0.22, 0.1, 1 },
-    itemText = { 1, 1, 1, 1 },
-    itemTextHover = BR.Colors.Accent,
-    checkmark = BR.Colors.AccentMuted,
-}
+---Paint a dropdown field with an arrow cap at the right. The arrow moves onto the
+---cap frame, which takes no mouse input.
+---@return fun(state: "normal"|"hover"|"open"|"disabled") paint
+local function DecorateDropdownField(button, arrow, buttonText)
+    local surface = CreateSurface(button)
+    local cap = CreateFrame("Frame", nil, button)
+    cap:SetPoint("TOPRIGHT", -1, -1)
+    cap:SetPoint("BOTTOMRIGHT", -1, 1)
+    cap:SetWidth(Theme.dropdown.capWidth)
+    local capFill = cap:CreateTexture(nil, "BACKGROUND")
+    capFill:SetAllPoints()
+    local capLine = cap:CreateTexture(nil, "BACKGROUND", nil, 1)
+    capLine:SetPoint("TOPLEFT", 0, 0)
+    capLine:SetPoint("TOPRIGHT", 0, 0)
+    capLine:SetHeight(1)
+    local divider = cap:CreateTexture(nil, "BORDER")
+    divider:SetPoint("TOPLEFT", 0, 0)
+    divider:SetPoint("BOTTOMLEFT", 0, 0)
+    divider:SetWidth(1)
+    arrow:SetParent(cap)
+    arrow:ClearAllPoints()
+    arrow:SetPoint("CENTER", 0, 0)
+
+    return function(state)
+        local style = Theme.dropdown[state] --[[@as ThemeStyle]]
+        PaintSurface(surface, style)
+        SetColorTexture(divider, style.divider)
+        PaintGradient(capFill, "VERTICAL", style.capBottom, style.capTop)
+        SetColorTexture(capLine, style.capLine)
+        local c = style.arrow --[[@as number[] ]]
+        arrow:SetVertexColor(c[1], c[2], c[3], c[4] or 1)
+        SetTextColor(buttonText, style.text)
+    end
+end
 
 ---Create the core dropdown (button + menu) - reusable by Dropdown and DirectionButtons
 ---@param parent table Parent frame
@@ -1397,7 +1495,7 @@ local DropdownColors = {
 ---@param itemInit? fun(item: table, label: FontString, opt: table) Optional per-item setup callback
 ---@return table dropdown Core dropdown with .button, .menu, .SetValue(), .GetValue(), .SetEnabled()
 local function CreateDropdownCore(parent, width, options, initialValue, onChange, maxItems, itemInit)
-    local colors = DropdownColors
+    local itemColors = Theme.menuItem
     local BUTTON_HEIGHT = 22
     local ITEM_HEIGHT = 22
     local MENU_PADDING_V = 4
@@ -1431,13 +1529,8 @@ local function CreateDropdownCore(parent, width, options, initialValue, onChange
     local isHovered = false
 
     -- ==================== BUTTON ====================
-    local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    local button = CreateFrame("Button", nil, parent)
     button:SetSize(width, BUTTON_HEIGHT)
-    button:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
 
     local buttonText = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     buttonText:SetPoint("LEFT", 8, 0)
@@ -1452,6 +1545,8 @@ local function CreateDropdownCore(parent, width, options, initialValue, onChange
     arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
     arrow:SetRotation(math.rad(-90)) -- points down
 
+    local paintField = DecorateDropdownField(button, arrow, buttonText)
+
     -- ==================== MENU ====================
     -- Parent to the dropdown parent so the menu scrolls with the container.
     -- If maxItems is set, always build the scroll infrastructure, even when the
@@ -1461,15 +1556,9 @@ local function CreateDropdownCore(parent, width, options, initialValue, onChange
     local hasScroll = maxItems ~= nil
     local visibleCount = hasScroll and min(#options, maxItems) or #options
     local menuHeight = visibleCount * ITEM_HEIGHT + MENU_PADDING_V * 2
-    local menu = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    local menu = CreateFrame("Frame", nil, parent)
     menu:SetSize(menuWidth, menuHeight)
-    menu:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    menu:SetBackdropColor(unpack(colors.menuBg))
-    menu:SetBackdropBorderColor(unpack(colors.menuBorder))
+    PaintSurface(CreateSurface(menu), Theme.menu)
     menu:SetFrameStrata("FULLSCREEN_DIALOG")
     menu:EnableMouse(true)
     menu:Hide()
@@ -1500,22 +1589,15 @@ local function CreateDropdownCore(parent, width, options, initialValue, onChange
 
     -- ==================== VISUAL STATE ====================
     local function UpdateButtonVisual()
+        local state = "normal"
         if not isEnabled then
-            button:SetBackdropColor(unpack(colors.bgDisabled))
-            button:SetBackdropBorderColor(unpack(colors.borderDisabled))
-            buttonText:SetTextColor(unpack(colors.textDisabled))
-            arrow:SetVertexColor(unpack(colors.arrowDisabled))
-        elseif isHovered or isOpen then
-            button:SetBackdropColor(unpack(colors.bgHover))
-            button:SetBackdropBorderColor(unpack(colors.borderHover))
-            buttonText:SetTextColor(unpack(colors.text))
-            arrow:SetVertexColor(unpack(colors.arrowHover))
-        else
-            button:SetBackdropColor(unpack(colors.bg))
-            button:SetBackdropBorderColor(unpack(colors.border))
-            buttonText:SetTextColor(unpack(colors.text))
-            arrow:SetVertexColor(unpack(colors.arrow))
+            state = "disabled"
+        elseif isOpen then
+            state = "open"
+        elseif isHovered then
+            state = "hover"
         end
+        paintField(state)
     end
 
     -- Track if mouse was down last frame (for click-outside detection)
@@ -1598,12 +1680,19 @@ local function CreateDropdownCore(parent, width, options, initialValue, onChange
                 local itemBg = item:CreateTexture(nil, "BACKGROUND")
                 itemBg:SetAllPoints()
                 item._bg = itemBg
+                local bar = item:CreateTexture(nil, "BORDER")
+                bar:SetPoint("TOPLEFT", 0, 0)
+                bar:SetPoint("BOTTOMLEFT", 0, 0)
+                bar:SetWidth(2)
+                SetColorTexture(bar, itemColors.bar)
+                bar:Hide()
+                item._bar = bar
 
                 local check = item:CreateTexture(nil, "ARTWORK")
                 check:SetSize(CHECK_SIZE, CHECK_SIZE)
                 check:SetPoint("LEFT", CHECK_LEFT, 0)
                 check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
-                check:SetVertexColor(unpack(colors.checkmark))
+                check:SetVertexColor(unpack(itemColors.check))
                 item.check = check
 
                 local label = item:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -1616,15 +1705,17 @@ local function CreateDropdownCore(parent, width, options, initialValue, onChange
                 -- Scripts read item.opt (refreshed each render) so a reused item
                 -- always acts on its current option, not a stale captured one.
                 item:SetScript("OnEnter", function()
-                    item._bg:SetColorTexture(unpack(colors.itemBgHover))
-                    item._label:SetTextColor(unpack(colors.itemTextHover))
+                    PaintGradient(item._bg, "HORIZONTAL", itemColors.hoverLeft, itemColors.hoverRight)
+                    item._bar:Show()
+                    SetTextColor(item._label, itemColors.textHover)
                     if item.opt and item.opt.desc then
                         ShowTooltip(item, item.opt.label, item.opt.desc, "ANCHOR_RIGHT")
                     end
                 end)
                 item:SetScript("OnLeave", function()
                     item._bg:SetColorTexture(0, 0, 0, 0)
-                    item._label:SetTextColor(unpack(colors.itemText))
+                    item._bar:Hide()
+                    SetTextColor(item._label, itemColors.text)
                     HideTooltip()
                 end)
                 item:SetScript("OnClick", function()
@@ -1659,8 +1750,9 @@ local function CreateDropdownCore(parent, width, options, initialValue, onChange
             item.opt = opt
             item.value = opt.value
             item._bg:SetColorTexture(0, 0, 0, 0)
+            item._bar:Hide()
             item._label:SetText(opt.label)
-            item._label:SetTextColor(unpack(colors.itemText))
+            SetTextColor(item._label, itemColors.text)
             item.check:SetShown(opt.value == currentValue)
             -- Custom per-item setup (e.g., font preview); re-run so reused items
             -- adopt the new option's styling.
@@ -1721,6 +1813,8 @@ local function CreateDropdownCore(parent, width, options, initialValue, onChange
         if not enabled and isOpen then
             CloseMenu()
         end
+        -- A button without mouse input gets no OnLeave, so the hover flag can go stale.
+        isHovered = enabled and button:IsMouseOver()
         UpdateButtonVisual()
     end
 
@@ -1795,6 +1889,7 @@ function Components.DirectionButtons(parent, config)
     label:SetJustifyH("LEFT")
     label:SetText(labelText)
     holder.label = label
+    SetTextColor(label, Theme.text)
 
     local initialValue = config.get and config.get() or config.selected
 
@@ -1810,8 +1905,7 @@ function Components.DirectionButtons(parent, config)
 
     function holder:SetEnabled(enabled)
         dropdown:SetEnabled(enabled)
-        local color = enabled and 1 or 0.5
-        label:SetTextColor(color, color, color)
+        SetLabelEnabled(label, enabled)
     end
 
     -- Refresh method for OnShow pattern
@@ -1862,8 +1956,6 @@ end
 -- to include that or anything anchored to picker.RIGHT lands inside the
 -- align dropdown.
 local ZONE_PICKER_DD_PADDING = 10
-local ZONE_PICKER_LABEL_COLOR = { 1, 1, 1, 1 }
-local ZONE_PICKER_LABEL_DISABLED_COLOR = { 0.5, 0.5, 0.5, 1 }
 
 -- Localized option lists, built once at file load. Locale strings stay stable
 -- for the session.
@@ -1985,12 +2077,7 @@ function Components.ZonePicker(parent, config)
     -- reads as one disabled element (otherwise the label stays white while
     -- everything to its right is greyed).
     function holder:Refresh()
-        local enabledNow = not config.enabled or config.enabled()
-        if enabledNow then
-            itemLabel:SetTextColor(unpack(ZONE_PICKER_LABEL_COLOR))
-        else
-            itemLabel:SetTextColor(unpack(ZONE_PICKER_LABEL_DISABLED_COLOR))
-        end
+        SetLabelEnabled(itemLabel, not config.enabled or config.enabled())
         alignDD:SetShown(not isOff())
     end
 
@@ -2114,6 +2201,70 @@ local BAR_H = SEGMENT_H + 2
 ---@field setState fun(key: string)
 ---@field onChange? fun()
 
+---@class SegmentStyle
+---@field top number[]
+---@field bottom number[]
+---@field text number[]
+---@field sheen number[]
+---@field tintTop? number Fill factors on a per-content color; nil keeps top and bottom
+---@field tintBottom? number
+---@field tintText? number Text factor on a per-content color; nil keeps text
+---@field tintAlpha? number
+
+-- A sub-toggle that the caller blocks: dark red, not clickable.
+---@type SegmentStyle
+local BLOCKED_SEGMENT = {
+    top = { 0.08, 0.02, 0.02, 1 },
+    bottom = { 0.08, 0.02, 0.02, 1 },
+    text = { 0.5, 0.2, 0.2, 1 },
+    sheen = CLEAR,
+}
+
+---@param c number[]
+---@param f number
+---@param a? number
+---@return number[]
+local function Scale(c, f, a)
+    return { c[1] * f, c[2] * f, c[3] * f, a or 1 }
+end
+
+-- Tinted colors per content color and style. Callers must not change a content color.
+local tintCache = setmetatable({}, { __mode = "k" })
+
+---@param style SegmentStyle
+---@param c number[]
+---@return {top: number[], bottom: number[], text: number[]}
+local function Tinted(style, c)
+    local byStyle = tintCache[c]
+    if not byStyle then
+        byStyle = {}
+        tintCache[c] = byStyle
+    end
+    local tint = byStyle[style]
+    if not tint then
+        tint = { top = style.top, bottom = style.bottom, text = style.text }
+        if style.tintTop then
+            tint.top, tint.bottom = Scale(c, style.tintTop), Scale(c, style.tintBottom)
+        end
+        if style.tintText then
+            tint.text = Scale(c, style.tintText, style.tintAlpha)
+        end
+        byStyle[style] = tint
+    end
+    return tint
+end
+
+---Paint one segment of a segmented bar.
+---@param btn table Segment button with .bg, .sheen, .label
+---@param style SegmentStyle
+---@param c? number[] Per-content color
+local function PaintSegment(btn, style, c)
+    local colors = c and Tinted(style, c) or style
+    PaintGradient(btn.bg, "VERTICAL", colors.bottom, colors.top)
+    SetColorTexture(btn.sheen, style.sheen)
+    SetTextColor(btn.label, colors.text)
+end
+
 ---Create a generic segmented toggle bar
 ---@param parent table Parent frame
 ---@param barConfig SegmentedBarConfig
@@ -2124,15 +2275,9 @@ local function CreateSegmentedBar(parent, barConfig)
     local segW = barConfig.segmentWidth or DEFAULT_SEGMENT_W
     local barW = ComputeBarWidth(#toggleDefs, segW)
 
-    local container = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    local container = CreateFrame("Frame", nil, parent)
     container:SetSize(barW, BAR_H)
-    container:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    container:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
-    container:SetBackdropBorderColor(BORDER_R, BORDER_G, BORDER_B, 1)
+    PaintSurface(CreateSurface(container), Theme.segmentBar)
 
     local barDisabled = false
     local toggleButtons = {}
@@ -2149,43 +2294,27 @@ local function CreateSegmentedBar(parent, barConfig)
         btnLabel:SetPoint("CENTER", 0, -1)
         btnLabel:SetText(toggle.label)
 
-        local function UpdateToggleVisual()
-            if barDisabled then
-                bg:SetColorTexture(0, 0, 0, 0)
-                btnLabel:SetTextColor(0.25, 0.25, 0.25, 1)
-                return
-            end
-            local visualState
-            if barConfig.getVisualState then
-                visualState = barConfig.getVisualState(toggle.key)
-            else
-                visualState = barConfig.getState(toggle.key) and "on" or "off"
-            end
-            local c = toggle.color
-            if visualState == "on" then
-                if c then
-                    bg:SetColorTexture(c[1] * 0.25, c[2] * 0.25, c[3] * 0.25, 1)
-                    btnLabel:SetTextColor(c[1], c[2], c[3], 1)
-                else
-                    bg:SetColorTexture(0.18, 0.15, 0.08, 1)
-                    btnLabel:SetTextColor(unpack(BR.Colors.AccentMuted))
-                end
-            elseif visualState == "partial" then
-                if c then
-                    bg:SetColorTexture(c[1] * 0.15, c[2] * 0.15, c[3] * 0.15, 1)
-                    btnLabel:SetTextColor(c[1] * 0.7, c[2] * 0.7, c[3] * 0.7, 1)
-                else
-                    bg:SetColorTexture(0.12, 0.08, 0.02, 1)
-                    btnLabel:SetTextColor(0.7, 0.5, 0.1, 1)
-                end
-            else
-                bg:SetColorTexture(0, 0, 0, 0)
-                btnLabel:SetTextColor(0.4, 0.4, 0.4, 1)
-            end
-        end
-        btn.UpdateVisual = UpdateToggleVisual
+        local sheen = btn:CreateTexture(nil, "BACKGROUND", nil, 1)
+        sheen:SetPoint("TOPLEFT", 0, 0)
+        sheen:SetPoint("TOPRIGHT", 0, 0)
+        sheen:SetHeight(1)
+
         btn.bg = bg
         btn.label = btnLabel
+        btn.sheen = sheen
+
+        local function UpdateToggleVisual()
+            local state = "disabled"
+            if not barDisabled then
+                if barConfig.getVisualState then
+                    state = barConfig.getVisualState(toggle.key)
+                else
+                    state = barConfig.getState(toggle.key) and "on" or "off"
+                end
+            end
+            PaintSegment(btn, Theme.segment[state], toggle.color)
+        end
+        btn.UpdateVisual = UpdateToggleVisual
         UpdateToggleVisual()
 
         btn:SetScript("OnClick", function()
@@ -2200,13 +2329,13 @@ local function CreateSegmentedBar(parent, barConfig)
         end)
 
         local tipTitle = toggle.tooltip.title
-        SetupTooltip(btn, tipTitle, "Click to toggle visibility in " .. tipTitle:lower(), "ANCHOR_TOP")
+        SetupTooltip(btn, tipTitle, string.format(L["Content.ClickToToggleVisibility"], tipTitle:lower()), "ANCHOR_TOP")
 
         if i < #toggleDefs then
             local divider = container:CreateTexture(nil, "ARTWORK")
             divider:SetSize(DIVIDER_W, SEGMENT_H)
             divider:SetPoint("LEFT", btn, "RIGHT", 0, 0)
-            divider:SetColorTexture(BORDER_R, BORDER_G, BORDER_B, 0.8)
+            SetColorTexture(divider, Theme.segmentDivider)
         end
 
         toggleButtons[i] = btn
@@ -2439,8 +2568,7 @@ function Components.VisibilityToggles(parent, config)
                     local subBtn = buttons[j]
                     subBtn:SetScript("OnClick", function() end)
                     subBtn.UpdateVisual = function()
-                        subBtn.bg:SetColorTexture(0.08, 0.02, 0.02, 1)
-                        subBtn.label:SetTextColor(0.5, 0.2, 0.2, 1)
+                        PaintSegment(subBtn, BLOCKED_SEGMENT)
                     end
                     subBtn.UpdateVisual()
                     if disabledInfo.tooltip then
@@ -2559,6 +2687,7 @@ function Components.Dropdown(parent, config, _)
     label:SetJustifyH("LEFT")
     label:SetText(config.label)
     holder.label = label
+    SetTextColor(label, Theme.text)
 
     local initialValue = config.get and config.get() or config.selected
 
@@ -2578,8 +2707,7 @@ function Components.Dropdown(parent, config, _)
 
     function holder:SetEnabled(enabled)
         dropdown:SetEnabled(enabled)
-        local color = enabled and 1 or 0.5
-        label:SetTextColor(color, color, color)
+        SetLabelEnabled(label, enabled)
     end
 
     -- Hover tooltip (attached to label only, not the entire holder)
@@ -2643,12 +2771,22 @@ function Components.Tab(parent, config)
     tab:SetSize(width, height)
     tab.tabName = config.name
 
+    local colors = Theme.tab
+    local lineR, lineG, lineB = colors.line[1], colors.line[2], colors.line[3]
+
     local underline = tab:CreateTexture(nil, "ARTWORK")
     underline:SetHeight(2)
     underline:SetPoint("BOTTOMLEFT", 1, 0)
     underline:SetPoint("BOTTOMRIGHT", -1, 0)
-    underline:SetColorTexture(ACCENT_R, ACCENT_G, ACCENT_B, 0)
+    underline:SetColorTexture(lineR, lineG, lineB, 0)
     tab.underline = underline
+
+    local wash = tab:CreateTexture(nil, "BORDER")
+    wash:SetHeight(14)
+    wash:SetPoint("BOTTOMLEFT", 1, 0)
+    wash:SetPoint("BOTTOMRIGHT", -1, 0)
+    PaintGradient(wash, "VERTICAL", colors.washBottom, colors.washTop)
+    wash:Hide()
 
     local text = tab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     text:SetPoint("CENTER", 0, 1)
@@ -2656,33 +2794,30 @@ function Components.Tab(parent, config)
     text:SetText(config.label)
     tab.text = text
 
-    local ACTIVE_TEXT = BR.Colors.Accent
-    local IDLE_TEXT = { 0.6, 0.6, 0.62 }
-    local HOVER_TEXT = { 0.85, 0.85, 0.85 }
-
     tab:SetScript("OnEnter", function(self)
         if not self.isActive then
-            self.text:SetTextColor(unpack(HOVER_TEXT))
-            self.underline:SetColorTexture(ACCENT_R, ACCENT_G, ACCENT_B, 0.25)
+            SetTextColor(self.text, colors.hover)
+            self.underline:SetColorTexture(lineR, lineG, lineB, colors.hoverAlpha)
         end
     end)
     tab:SetScript("OnLeave", function(self)
         if not self.isActive then
-            self.text:SetTextColor(unpack(IDLE_TEXT))
-            self.underline:SetColorTexture(ACCENT_R, ACCENT_G, ACCENT_B, 0)
+            SetTextColor(self.text, colors.idle)
+            self.underline:SetColorTexture(lineR, lineG, lineB, 0)
         end
     end)
 
     function tab:SetActive(active)
         self.isActive = active
+        wash:SetShown(active)
         if active then
             self.text:SetFontObject("GameFontHighlightSmall")
-            self.text:SetTextColor(unpack(ACTIVE_TEXT))
-            self.underline:SetColorTexture(ACCENT_R, ACCENT_G, ACCENT_B, 1)
+            SetTextColor(self.text, colors.active)
+            self.underline:SetColorTexture(lineR, lineG, lineB, 1)
         else
             self.text:SetFontObject("GameFontNormalSmall")
-            self.text:SetTextColor(unpack(IDLE_TEXT))
-            self.underline:SetColorTexture(ACCENT_R, ACCENT_G, ACCENT_B, 0)
+            SetTextColor(self.text, colors.idle)
+            self.underline:SetColorTexture(lineR, lineG, lineB, 0)
         end
     end
 
@@ -2697,14 +2832,14 @@ end
 ---@param parent table Frame owning the strip
 ---@param anchorTab table The left-most tab in the strip
 ---@param width number Total strip width the line should span
----@return table line The baseline texture
+---@return table line The left half of the line; the right half anchors to it
 function Components.TabBaseline(parent, anchorTab, width)
-    local line = parent:CreateTexture(nil, "BORDER")
-    line:SetHeight(1)
-    line:SetPoint("BOTTOMLEFT", anchorTab, "BOTTOMLEFT", 0, 0)
-    line:SetWidth(width)
-    line:SetColorTexture(1, 1, 1, 0.08)
-    return line
+    local left, right = BR.CreateRule(parent, "BORDER", Theme.tabRule)
+    left:SetPoint("BOTTOMLEFT", anchorTab, "BOTTOMLEFT", 0, 0)
+    left:SetWidth(width / 2)
+    right:SetPoint("LEFT", left, "RIGHT", 0, 0)
+    right:SetWidth(width / 2)
+    return left
 end
 
 ---@class TextInputConfig : ComponentConfig
@@ -2743,6 +2878,7 @@ function Components.TextInput(parent, config)
     label:SetJustifyH("LEFT")
     label:SetText(config.label)
     holder.label = label
+    SetTextColor(label, Theme.text)
 
     local editBox = CreateFrame("EditBox", nil, holder)
     editBox:SetFontObject("GameFontHighlightSmall")
@@ -2790,10 +2926,8 @@ function Components.TextInput(parent, config)
 
     function holder:SetEnabled(enabled)
         editBox:SetEnabled(enabled)
-        local color = enabled and 1 or 0.5
-        label:SetTextColor(color, color, color)
-        local borderAlpha = enabled and 1 or 0.4
-        inputContainer:SetBackdropBorderColor(BORDER_R, BORDER_G, BORDER_B, borderAlpha)
+        SetLabelEnabled(label, enabled)
+        inputContainer:SetBoxEnabled(enabled)
     end
 
     -- Refresh method for OnShow pattern
@@ -2859,6 +2993,7 @@ function Components.NumericStepper(parent, config)
     label:SetJustifyH("LEFT")
     label:SetText(config.label)
     holder.label = label
+    SetTextColor(label, Theme.text)
 
     if config.tooltip then
         local labelHover = CreateFrame("Frame", nil, holder)
@@ -2880,6 +3015,7 @@ function Components.NumericStepper(parent, config)
     valueText:SetAllPoints()
     valueText:SetWordWrap(false)
     valueText:SetJustifyH("CENTER")
+    SetTextColor(valueText, Theme.text)
 
     -- Forward declarations (buttons needed by UpdateButtonStates, defined below)
     local UpdateButtonStates
@@ -2905,16 +3041,10 @@ function Components.NumericStepper(parent, config)
         end
     end
 
-    local minusBtn = CreateFrame("Button", nil, holder, "BackdropTemplate")
+    local minusBtn = CreateFrame("Button", nil, holder)
     minusBtn:SetSize(BTN_SIZE, BTN_SIZE)
     minusBtn:SetPoint("LEFT", label, "RIGHT", 5, 0)
-    minusBtn:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    minusBtn:SetBackdropColor(0.2, 0.2, 0.2, 1)
-    minusBtn:SetBackdropBorderColor(BORDER_R, BORDER_G, BORDER_B, 1)
+    local minusSurface = CreateSurface(minusBtn)
 
     local minusLabel = minusBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     minusLabel:SetPoint("CENTER", 0, 0)
@@ -2922,44 +3052,40 @@ function Components.NumericStepper(parent, config)
 
     valueBtn:SetPoint("LEFT", minusBtn, "RIGHT", 2, 0)
 
-    local plusBtn = CreateFrame("Button", nil, holder, "BackdropTemplate")
+    local plusBtn = CreateFrame("Button", nil, holder)
     plusBtn:SetSize(BTN_SIZE, BTN_SIZE)
     plusBtn:SetPoint("LEFT", valueBtn, "RIGHT", 2, 0)
-    plusBtn:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    plusBtn:SetBackdropColor(0.2, 0.2, 0.2, 1)
-    plusBtn:SetBackdropBorderColor(BORDER_R, BORDER_G, BORDER_B, 1)
+    local plusSurface = CreateSurface(plusBtn)
 
     local plusLabel = plusBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     plusLabel:SetPoint("CENTER", 0, 0)
     plusLabel:SetText("+")
 
+    local hoveredBtn, pressedBtn
+    local parts = {
+        { minusBtn, minusSurface, minusLabel, true },
+        { plusBtn, plusSurface, plusLabel, false },
+    }
     UpdateButtonStates = function()
-        if not isEnabled then
-            return
-        end
         local atMin = currentValue <= (config.min or 0)
         local atMax = currentValue >= (config.max or 100)
-        if atMin then
-            minusBtn:SetBackdropColor(0.15, 0.15, 0.15, 1)
-            minusBtn:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
-            minusLabel:SetTextColor(0.35, 0.35, 0.35)
-        else
-            minusBtn:SetBackdropColor(0.2, 0.2, 0.2, 1)
-            minusBtn:SetBackdropBorderColor(BORDER_R, BORDER_G, BORDER_B, 1)
-            minusLabel:SetTextColor(1, 1, 1)
-        end
-        if atMax then
-            plusBtn:SetBackdropColor(0.15, 0.15, 0.15, 1)
-            plusBtn:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
-            plusLabel:SetTextColor(0.35, 0.35, 0.35)
-        else
-            plusBtn:SetBackdropColor(0.2, 0.2, 0.2, 1)
-            plusBtn:SetBackdropBorderColor(BORDER_R, BORDER_G, BORDER_B, 1)
-            plusLabel:SetTextColor(1, 1, 1)
+        for _, part in ipairs(parts) do
+            local btn = part[1]
+            local atLimit = atMax
+            if part[4] then
+                atLimit = atMin
+            end
+            local state = "normal"
+            if not isEnabled then
+                state = "disabled"
+            elseif atLimit then
+                state = "limit"
+            elseif pressedBtn == btn then
+                state = "pressed"
+            elseif hoveredBtn == btn then
+                state = "hover"
+            end
+            PaintStyled(part[2], part[3], Theme.stepper[state])
         end
     end
 
@@ -2980,12 +3106,12 @@ function Components.NumericStepper(parent, config)
         valueBtn:Show()
     end)
 
-    editBox:SetScript("OnEscapePressed", function()
+    editBox:HookScript("OnEscapePressed", function()
         editContainer:Hide()
         valueBtn:Show()
     end)
 
-    editBox:SetScript("OnEditFocusLost", function()
+    editBox:HookScript("OnEditFocusLost", function()
         editContainer:Hide()
         valueBtn:Show()
     end)
@@ -3007,21 +3133,22 @@ function Components.NumericStepper(parent, config)
     end)
     SetupTooltip(valueBtn, L["Component.AdjustValue"], L["Component.AdjustValue.Desc"], "ANCHOR_TOP")
 
-    local function IsBtnAtLimit(btn)
-        if btn == minusBtn then
-            return currentValue <= (config.min or 0)
-        end
-        return currentValue >= (config.max or 100)
-    end
-
     for _, btn in ipairs({ minusBtn, plusBtn }) do
         btn:SetScript("OnEnter", function(self)
-            if isEnabled and not IsBtnAtLimit(self) then
-                self:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
-                self:SetBackdropColor(0.25, 0.25, 0.25, 1)
-            end
+            hoveredBtn = self
+            UpdateButtonStates()
         end)
         btn:SetScript("OnLeave", function()
+            hoveredBtn = nil
+            pressedBtn = nil
+            UpdateButtonStates()
+        end)
+        btn:SetScript("OnMouseDown", function(self)
+            pressedBtn = self
+            UpdateButtonStates()
+        end)
+        btn:SetScript("OnMouseUp", function()
+            pressedBtn = nil
             UpdateButtonStates()
         end)
     end
@@ -3057,22 +3184,15 @@ function Components.NumericStepper(parent, config)
 
     function holder:SetEnabled(enabled)
         isEnabled = enabled
-        local color = enabled and 1 or 0.5
-        label:SetTextColor(color, color, color)
-        local valueColor = (enabled or (config.inherited and config.inherited())) and 1 or 0.5
-        valueText:SetTextColor(valueColor, valueColor, valueColor)
-        if enabled then
-            UpdateButtonStates()
-        else
+        -- An inherited value is real and applies, so it stays readable.
+        local readable = enabled or (config.inherited and config.inherited())
+        SetLabelEnabled(label, enabled)
+        SetLabelEnabled(valueText, readable)
+        if not enabled then
             editContainer:Hide()
             valueBtn:Show()
-            minusBtn:SetBackdropColor(0.15, 0.15, 0.15, 1)
-            minusBtn:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
-            plusBtn:SetBackdropColor(0.15, 0.15, 0.15, 1)
-            plusBtn:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
-            minusLabel:SetTextColor(0.5, 0.5, 0.5)
-            plusLabel:SetTextColor(0.5, 0.5, 0.5)
         end
+        UpdateButtonStates()
     end
 
     -- Refresh method for OnShow pattern
@@ -3109,6 +3229,30 @@ end
 ---@field hasOpacity? boolean Show opacity/alpha slider (default false)
 ---@field labelWidth? number Width of label (default 70)
 
+-- One swatch at a time owns the color picker. Its close callback runs when the
+-- picker hides, or when another swatch takes the picker over.
+local colorPickerOnClose
+local colorPickerHooked = false
+
+---@param onClose fun()
+local function WatchColorPicker(onClose)
+    if not colorPickerHooked then
+        colorPickerHooked = true
+        ColorPickerFrame:HookScript("OnHide", function()
+            local callback = colorPickerOnClose
+            colorPickerOnClose = nil
+            if callback then
+                callback()
+            end
+        end)
+    end
+    local previous = colorPickerOnClose
+    colorPickerOnClose = onClose
+    if previous and previous ~= onClose then
+        previous()
+    end
+end
+
 ---Create a small color swatch that opens WoW's ColorPickerFrame on click
 ---@param parent table Parent frame
 ---@param config ColorSwatchConfig Configuration table
@@ -3142,16 +3286,16 @@ function Components.ColorSwatch(parent, config)
         label:SetText(config.label)
     end
     holder.label = label
+    SetTextColor(label, Theme.text)
 
-    local swatchBtn = CreateFrame("Button", nil, holder, "BackdropTemplate")
+    local swatchBtn = CreateFrame("Button", nil, holder)
     swatchBtn:SetSize(SWATCH_SIZE, SWATCH_SIZE)
     swatchBtn:SetPoint("LEFT", label, "RIGHT", 5, 0)
-    swatchBtn:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    swatchBtn:SetBackdropBorderColor(BORDER_R, BORDER_G, BORDER_B, 1)
+    local swatchColors = Theme.swatch
+    local swatchFill = swatchBtn:CreateTexture(nil, "BACKGROUND", nil, -7)
+    swatchFill:SetAllPoints()
+    local swatchEdge = CreateRing(swatchBtn, "BACKGROUND", -6, 0)
+    PaintRing(CreateRing(swatchBtn, "BACKGROUND", -5, 1, true), swatchColors.inner)
 
     local currentR, currentG, currentB, currentA = 1, 1, 1, 1
     if config.get then
@@ -3160,6 +3304,19 @@ function Components.ColorSwatch(parent, config)
         currentA = a or 1
     end
     local isEnabled = true
+    local isHovered, isPickerOpen = false, false
+    local openEdge = swatchColors.open
+    local function PaintSwatchEdge()
+        local edge = swatchColors.normal
+        if not isEnabled then
+            edge = swatchColors.disabled
+        elseif isPickerOpen and openEdge then
+            edge = openEdge
+        elseif isHovered then
+            edge = swatchColors.hover
+        end
+        PaintRing(swatchEdge, edge)
+    end
 
     local alphaText
     if config.hasOpacity then
@@ -3167,31 +3324,38 @@ function Components.ColorSwatch(parent, config)
         alphaText:SetPoint("LEFT", swatchBtn, "RIGHT", 4, 0)
         alphaText:SetWordWrap(false)
         alphaText:SetText(floor(currentA * 100) .. "%")
+        SetTextColor(alphaText, Theme.text)
     end
 
     local function UpdateSwatchColor()
-        swatchBtn:SetBackdropColor(currentR, currentG, currentB, 1)
+        swatchFill:SetColorTexture(currentR, currentG, currentB, 1)
         if alphaText then
             alphaText:SetText(floor(currentA * 100) .. "%")
         end
     end
     UpdateSwatchColor()
+    PaintSwatchEdge()
 
     swatchBtn:SetScript("OnEnter", function()
-        if isEnabled then
-            swatchBtn:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
-        end
+        isHovered = true
+        PaintSwatchEdge()
     end)
     swatchBtn:SetScript("OnLeave", function()
-        if isEnabled then
-            swatchBtn:SetBackdropBorderColor(BORDER_R, BORDER_G, BORDER_B, 1)
-        end
+        isHovered = false
+        PaintSwatchEdge()
     end)
 
     swatchBtn:SetScript("OnClick", function()
         if not isEnabled then
             return
         end
+        -- The watch runs the close callback of the previous owner, which can be this swatch.
+        WatchColorPicker(function()
+            isPickerOpen = false
+            PaintSwatchEdge()
+        end)
+        isPickerOpen = true
+        PaintSwatchEdge()
         local prevR, prevG, prevB, prevA = currentR, currentG, currentB, currentA
         local info = {
             r = currentR,
@@ -3231,18 +3395,12 @@ function Components.ColorSwatch(parent, config)
 
     function holder:SetEnabled(enabled)
         isEnabled = enabled
-        local color = enabled and 1 or 0.5
-        label:SetTextColor(color, color, color)
+        SetLabelEnabled(label, enabled)
         if alphaText then
-            alphaText:SetTextColor(color, color, color)
+            SetLabelEnabled(alphaText, enabled)
         end
-        if not enabled then
-            swatchBtn:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
-            swatchBtn:SetAlpha(0.35)
-        else
-            swatchBtn:SetBackdropBorderColor(BORDER_R, BORDER_G, BORDER_B, 1)
-            swatchBtn:SetAlpha(1)
-        end
+        swatchBtn:SetAlpha(enabled and 1 or 0.35)
+        PaintSwatchEdge()
     end
 
     -- Refresh method for OnShow pattern
@@ -3269,17 +3427,66 @@ function Components.ColorSwatch(parent, config)
     return holder
 end
 
-local ScrollbarColors = {
-    track = { 0.1, 0.1, 0.11, 0.5 },
-    thumb = { 0.3, 0.3, 0.3, 1 },
-    thumbHover = { 0.45, 0.45, 0.45, 1 },
-}
+---Paint a legacy scrollbar: a track with a 1 px edge and a thumb with hover and
+---drag states. The thumb texture keeps its role as the drag handle, so its
+---proportional height and hit area do not change.
+---@param scrollBar table
+---@param thumb? table
+local function DecorateScrollbar(scrollBar, thumb)
+    local colors = Theme.scrollbar
+    local track = scrollBar:CreateTexture(nil, "BACKGROUND")
+    track:SetPoint("TOPLEFT", colors.trackInset, 0)
+    track:SetPoint("BOTTOMRIGHT", -colors.trackInset, 0)
+    PaintGradient(track, "HORIZONTAL", colors.trackLeft, colors.trackRight)
+    local frame = CreateFrame("Frame", nil, scrollBar)
+    frame:SetAllPoints(track)
+    frame:EnableMouse(false)
+    PaintRing(CreateRing(frame, "BACKGROUND", 0, 0, true), colors.trackEdge)
+    if not thumb then
+        return
+    end
+
+    thumb:SetSize(6, 40)
+    local sheen = scrollBar:CreateTexture(nil, "OVERLAY", nil, 7)
+    sheen:SetPoint("TOPLEFT", thumb, "TOPLEFT", 0, 0)
+    sheen:SetPoint("TOPRIGHT", thumb, "TOPRIGHT", 0, 0)
+    sheen:SetHeight(1)
+    SetColorTexture(sheen, colors.sheen)
+
+    local isHovered, isDragging = false, false
+    local dragColors = colors.drag
+    local function Paint()
+        local state = colors.normal
+        if isDragging and dragColors then
+            state = dragColors
+        elseif isHovered then
+            state = colors.hover
+        end
+        PaintGradient(thumb, "HORIZONTAL", state.left, state.right)
+    end
+    scrollBar:HookScript("OnEnter", function()
+        isHovered = true
+        Paint()
+    end)
+    scrollBar:HookScript("OnLeave", function()
+        isHovered = false
+        Paint()
+    end)
+    scrollBar:HookScript("OnMouseDown", function()
+        isDragging = true
+        Paint()
+    end)
+    scrollBar:HookScript("OnMouseUp", function()
+        isDragging = false
+        Paint()
+    end)
+    Paint()
+end
 
 local function ApplyModernScrollbarStyle(scrollBar)
     if not scrollBar then
         return
     end
-    local colors = ScrollbarColors
 
     local trackBg = scrollBar.trackBg or scrollBar.Track
     if trackBg then
@@ -3296,27 +3503,8 @@ local function ApplyModernScrollbarStyle(scrollBar)
         end
     end
 
-    local track = scrollBar:CreateTexture(nil, "BACKGROUND")
-    track:SetColorTexture(unpack(colors.track))
-    track:SetPoint("TOPLEFT", 5, 0)
-    track:SetPoint("BOTTOMRIGHT", -5, 0)
-
-    -- Style the thumb (height is managed proportionally by SetupProportionalScrollbar)
-    local thumb = scrollBar.ThumbTexture or scrollBar.thumbTexture
-    if thumb then
-        thumb:SetColorTexture(unpack(colors.thumb))
-        thumb:SetSize(6, 40)
-
-        local thumbParent = thumb:GetParent()
-        if thumbParent and thumbParent.SetScript then
-            thumbParent:HookScript("OnEnter", function()
-                thumb:SetColorTexture(unpack(colors.thumbHover))
-            end)
-            thumbParent:HookScript("OnLeave", function()
-                thumb:SetColorTexture(unpack(colors.thumb))
-            end)
-        end
-    end
+    -- The thumb height is managed proportionally by SetupProportionalScrollbar.
+    DecorateScrollbar(scrollBar, scrollBar.ThumbTexture or scrollBar.thumbTexture)
 
     local scrollUp = scrollBar.ScrollUpButton or scrollBar.scrollUp or _G[scrollBar:GetName() .. "ScrollUpButton"]
     local scrollDown = scrollBar.ScrollDownButton
@@ -3363,14 +3551,6 @@ local function SetupProportionalScrollbar(scrollFrame, scrollBar)
     Update() -- sync initial state before any event fires
 end
 
-local TextAreaColors = {
-    bg = { 0.08, 0.08, 0.08, 0.9 },
-    bgFocused = { 0.1, 0.1, 0.1, 0.95 },
-    border = BR.Colors.Border,
-    borderFocused = BR.Colors.Accent,
-    text = { 1, 1, 1, 1 },
-}
-
 ---@class TextAreaConfig : ComponentConfig
 ---@field width number Width of the text area
 ---@field height number Height of the text area
@@ -3384,17 +3564,8 @@ local TextAreaColors = {
 ---@param config TextAreaConfig Configuration table
 ---@return table holder Frame with .editBox, .SetText(v), .GetText(), .HighlightText(), .SetFocus()
 function Components.TextArea(parent, config)
-    local colors = TextAreaColors
-
-    local holder = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    local holder = CreateFrame("Frame", nil, parent)
     holder:SetSize(config.width, config.height)
-    holder:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    holder:SetBackdropColor(unpack(colors.bg))
-    holder:SetBackdropBorderColor(unpack(colors.border))
 
     local scrollFrame = CreateFrame("ScrollFrame", nil, holder)
     scrollFrame:SetPoint("TOPLEFT", 1, -1)
@@ -3415,7 +3586,6 @@ function Components.TextArea(parent, config)
     editBox:SetAutoFocus(false)
     editBox:SetTextInsets(6, 6, 6, 6)
     editBox:EnableMouse(true)
-    editBox:SetTextColor(unpack(colors.text))
 
     if config.readOnly then
         editBox:SetScript("OnChar", function() end)
@@ -3426,25 +3596,13 @@ function Components.TextArea(parent, config)
     holder.editBox = editBox
     holder.scrollFrame = scrollFrame
 
-    local function UpdateFocusVisual(focused)
-        if focused then
-            holder:SetBackdropColor(unpack(colors.bgFocused))
-            holder:SetBackdropBorderColor(unpack(colors.borderFocused))
-        else
-            holder:SetBackdropColor(unpack(colors.bg))
-            holder:SetBackdropBorderColor(unpack(colors.border))
-        end
-    end
-
     editBox:SetScript("OnEditFocusGained", function(self)
-        UpdateFocusVisual(true)
         if config.onFocusGained then
             config.onFocusGained()
         end
     end)
 
     editBox:SetScript("OnEditFocusLost", function(self)
-        UpdateFocusVisual(false)
         if config.onFocusLost then
             config.onFocusLost()
         end
@@ -3465,6 +3623,12 @@ function Components.TextArea(parent, config)
             config.onTextChanged(text)
         end
     end)
+
+    -- After the SetScript calls above, so they do not replace the paint hooks.
+    DecorateEditBox(holder, editBox)
+    if config.readOnly then
+        holder:SetBoxTextColor(Theme.editBox.readOnly)
+    end
 
     -- Track editbox for focus cleanup
     if panelEditBoxes then
@@ -3516,6 +3680,8 @@ end
 ---@field labelWidth? number                        Shared label column; omitted = measured from the grid labels
 ---@field spacingPx? boolean                       Spacing in absolute pixels (0-32), not a fraction of the icon width
 ---@field zoomMax? number                           Zoom slider maximum (default 15)
+---@field borderBlocked? fun(): boolean               True when the border does not draw (disables the border slider)
+---@field borderBlockedReason? string|fun(): string Hover text while `borderBlocked` returns true
 
 ---Text size stepper + color swatch on one row. The swatch writes textColor and
 ---textAlpha as a pair.
@@ -3706,18 +3872,37 @@ function Components.AppearanceGrid(parent, config)
     })
     zoomHolder:SetPoint("TOPLEFT", 0, -ROW_H)
 
+    local borderEnabled = masqueCheck and masqueEnabled or (enabled and baseEnabled or nil)
+    local borderInherited, borderDisabledReason = masqueInherited, masqueDisabledReason
+    local borderBlocked = config.borderBlocked
+    if borderBlocked then
+        local gate = borderEnabled
+        borderEnabled = function()
+            return (not gate or gate()) and not borderBlocked()
+        end
+        borderInherited = function()
+            return masqueInherited() and not borderBlocked()
+        end
+        borderDisabledReason = function()
+            if not masqueActive() and borderBlocked() then
+                return ResolveDisabledReason(config.borderBlockedReason)
+            end
+            return masqueDisabledReason()
+        end
+    end
+
     local borderHolder = Components.Slider(frame, {
         label = L["Appearance.Border"],
         min = 0,
         max = 8,
         labelWidth = LW,
-        inherited = masqueInherited,
-        disabledReason = masqueDisabledReason,
+        inherited = borderInherited,
+        disabledReason = borderDisabledReason,
         suffix = "px",
         get = function()
             return config.get("borderSize", BR.DEFAULT_BORDER_SIZE)
         end,
-        enabled = masqueCheck and masqueEnabled or (enabled and baseEnabled or nil),
+        enabled = borderEnabled,
         onChange = function(val)
             config.set("borderSize", val)
         end,
@@ -3920,9 +4105,10 @@ function Components.ScrollableContainer(parent, config)
     fadeOverlay:SetFrameLevel(scrollFrame:GetFrameLevel() + 20)
     fadeOverlay:EnableMouse(false)
 
-    local FADE_HEIGHT = 20
-    local opaque = CreateColor(0.05, 0.05, 0.06, 0.95)
-    local clear = CreateColor(0.05, 0.05, 0.06, 0)
+    local FADE_HEIGHT = Theme.scrollFade.height
+    local fadeColor = Theme.scrollFade.color
+    local opaque = CreateColor(fadeColor[1], fadeColor[2], fadeColor[3], fadeColor[4])
+    local clear = CreateColor(fadeColor[1], fadeColor[2], fadeColor[3], 0)
     local function MakeFade(edge, bottomColor, topColor)
         local tex = fadeOverlay:CreateTexture(nil, "OVERLAY")
         tex:SetColorTexture(1, 1, 1)
@@ -4134,11 +4320,7 @@ function Components.Banner(parent, config)
         or max(BANNER_MIN, MeasureTextHeight("Wg", "GameFontHighlightSmall") + TEXT_VERT_PAD)
 
     -- Color presets: "red" (warning) or "orange" (info)
-    local colors = {
-        red = { bg = { 0.18, 0.06, 0.06, 0.6 }, accent = { 0.7, 0.12, 0.1, 0.8 }, text = { 0.85, 0.7, 0.65 } },
-        orange = { bg = { 0.18, 0.12, 0.04, 0.6 }, accent = { 0.7, 0.45, 0.1, 0.8 }, text = { 0.9, 0.78, 0.6 } },
-    }
-    local c = colors[config.color] or colors.red
+    local c = Theme.banner[config.color] or Theme.banner.red
 
     local holder = CreateFrame("Frame", nil, parent)
     holder:SetHeight(BANNER_HEIGHT)
@@ -4151,11 +4333,21 @@ function Components.Banner(parent, config)
     end
     bg:SetColorTexture(unpack(bgColor))
 
-    local accent = holder:CreateTexture(nil, "ARTWORK")
-    accent:SetPoint("BOTTOMLEFT")
-    accent:SetPoint("BOTTOMRIGHT")
-    accent:SetHeight(1.5)
-    accent:SetColorTexture(unpack(c.accent))
+    local accentBottom = holder:CreateTexture(nil, "ARTWORK")
+    accentBottom:SetPoint("BOTTOMLEFT")
+    accentBottom:SetPoint("BOTTOMRIGHT")
+    accentBottom:SetHeight(1.5)
+    SetColorTexture(accentBottom, c.accentBottom)
+    local accentLeft = holder:CreateTexture(nil, "ARTWORK")
+    accentLeft:SetPoint("TOPLEFT")
+    accentLeft:SetPoint("BOTTOMLEFT")
+    accentLeft:SetWidth(2)
+    SetColorTexture(accentLeft, c.accentLeft)
+    local bottomLine = holder:CreateTexture(nil, "ARTWORK")
+    bottomLine:SetPoint("BOTTOMLEFT")
+    bottomLine:SetPoint("BOTTOMRIGHT")
+    bottomLine:SetHeight(1)
+    SetColorTexture(bottomLine, c.line)
 
     -- Icon (supports atlas names or texture file paths)
     local icon = holder:CreateTexture(nil, "ARTWORK")

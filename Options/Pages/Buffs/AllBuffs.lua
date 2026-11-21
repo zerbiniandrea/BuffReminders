@@ -77,9 +77,10 @@ local RIGHT_SECTIONS = {
 local function CreateSectionWithNote(parent, x, y, headerText, noteText)
     local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     header:SetPoint("TOPLEFT", x, y)
-    header:SetText("|cffffcc00" .. headerText .. "|r")
+    header:SetText(BR.TITLE_COLOR_CODE .. headerText .. "|r")
 
     local note = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    BR.ApplyNoteColor(note)
     note:SetPoint("TOPLEFT", x, y - HEADER_TO_NOTE_GAP)
     note:SetText(noteText)
 
