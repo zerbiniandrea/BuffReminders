@@ -47,6 +47,7 @@ read_globals = {
     "C_Spell",
     "C_Traits",
     "C_StableInfo",
+    "C_Texture",
     "C_Loot",
     "C_SpellActivationOverlay",
     "C_SpellBook",

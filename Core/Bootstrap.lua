@@ -93,6 +93,7 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
     local title = settingsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 16, -16)
     title:SetText("BuffReminders")
+    BR.ApplyTitleColor(title)
 
     local desc = settingsPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
@@ -129,6 +130,7 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
                     BR.Options.Toggle()
                 elseif button == "RightButton" then
                     BR.Display.ToggleTestMode()
+                    BR.Components.RefreshAll()
                 end
             end,
             OnTooltipShow = function(tooltip)

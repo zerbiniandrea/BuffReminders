@@ -171,7 +171,7 @@ local function SectionHeader(layout, parent, text)
     local header = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     header:SetPoint("TOPLEFT", 0, 0)
     header:SetWordWrap(false)
-    header:SetText("|cffffcc00" .. text .. "|r")
+    header:SetText(BR.TITLE_COLOR_CODE .. text .. "|r")
 
     local headerH = ceil(header:GetStringHeight())
     if headerH < 14 then

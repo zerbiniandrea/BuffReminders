@@ -33,9 +33,13 @@ local CONTENT_TOP_OFFSET = C.CONTENT_TOP_OFFSET
 local PANEL_BOTTOM_MARGIN = C.PANEL_BOTTOM_MARGIN
 local SCROLLBAR_WIDTH = C.SCROLLBAR_WIDTH
 local COL_PADDING = C.COL_PADDING
+-- Top of the content: the header divider, and the bottom of the header band.
+local HEADER_HEIGHT = CONTENT_TOP_OFFSET - 4
 
-local BORDER_R, BORDER_G, BORDER_B = unpack(BR.Colors.Border)
-local ACCENT_R, ACCENT_G, ACCENT_B = unpack(BR.Colors.Accent)
+local Theme = BR.Theme
+local SetTextColor = BR.SetThemeTextColor
+local SetColorTexture = BR.SetThemeColorTexture
+local PaintGradient = BR.PaintGradient
 
 local optionsPanel = nil
 
@@ -166,20 +170,22 @@ StaticPopupDialogs["BUFFREMINDERS_KOFI_URL"] = {
 -- ============================================================================
 
 local function CreateSidebarGroupHeader(parent, text)
+    local colors = Theme.sidebarGroup
     local header = CreateFrame("Frame", nil, parent)
     header:SetSize(SIDEBAR_WIDTH, 22)
 
     local fs = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     fs:SetPoint("LEFT", 8, 0)
-    fs:SetText("|cffffcc00" .. text:upper() .. "|r")
     fs:SetJustifyH("LEFT")
+    fs:SetText(text:upper())
+    SetTextColor(fs, colors.text)
     header.label = fs
 
     local sep = header:CreateTexture(nil, "ARTWORK")
     sep:SetHeight(1)
     sep:SetPoint("BOTTOMLEFT", 4, 1)
     sep:SetPoint("BOTTOMRIGHT", -4, 1)
-    sep:SetColorTexture(0.4, 0.32, 0.05, 0.6)
+    PaintGradient(sep, "HORIZONTAL", colors.left, colors.right)
 
     return header
 end
@@ -199,37 +205,29 @@ local function AttachNotificationDot(anchorLabel)
     return dot
 end
 
--- A toggle for the sidebar footer (Lock / Test). When active, its fill, border
--- and text take the given accent.
+-- A toggle for the sidebar footer (Lock / Test).
 -- opts: { accent = {r,g,b}, tooltip = {title, desc}, onClick = fn(self) }.
 local function CreateFooterToggle(parent, opts)
-    local accent = opts.accent
-    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    local btn = CreateFrame("Button", nil, parent)
     btn:SetHeight(24)
-    btn:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    local surface = BR.CreateSurface(btn)
     local label = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     label:SetPoint("CENTER", 0, 0)
     btn.label = label
 
+    local styles = Theme.footer
+    local normalStyle = BR.ResolveStyle(styles.normal, opts.accent)
+    local hoverStyle = BR.ResolveStyle(styles.hover, opts.accent)
+    local activeStyle = BR.ResolveStyle(styles.active, opts.accent)
     local isHovered, isActive = false, false
     local function Update()
+        local style = normalStyle
         if isActive then
-            btn:SetBackdropColor(accent[1], accent[2], accent[3], 0.22)
-            btn:SetBackdropBorderColor(accent[1], accent[2], accent[3], 1)
-            label:SetTextColor(1, 1, 1)
+            style = activeStyle
         elseif isHovered then
-            btn:SetBackdropColor(1, 1, 1, 0.06)
-            btn:SetBackdropBorderColor(accent[1], accent[2], accent[3], 0.8)
-            label:SetTextColor(1, 1, 1)
-        else
-            btn:SetBackdropColor(0, 0, 0, 0)
-            btn:SetBackdropBorderColor(BORDER_R, BORDER_G, BORDER_B, 1)
-            label:SetTextColor(0.85, 0.85, 0.85)
+            style = hoverStyle
         end
+        BR.PaintStyled(surface, label, style)
     end
 
     btn:SetScript("OnEnter", function()
@@ -261,19 +259,33 @@ local function CreateFooterToggle(parent, opts)
     return btn
 end
 
+---@param btn table
+---@param hovered boolean
+local function PaintSidebarButton(btn, hovered)
+    local nav = Theme.nav
+    local style = nav.idle
+    if btn.isActive then
+        style = nav.active
+    elseif hovered then
+        style = nav.hover
+    end
+    PaintGradient(btn.bg, "HORIZONTAL", style.left, style.right)
+    SetTextColor(btn.label, style.text)
+    btn.accent:SetShown(btn.isActive)
+end
+
 local function CreateSidebarButton(parent, text)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(SIDEBAR_WIDTH, 24)
 
     local bg = btn:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    bg:SetColorTexture(1, 1, 1, 0)
     btn.bg = bg
 
     local accent = btn:CreateTexture(nil, "ARTWORK")
-    accent:SetSize(2, 18)
+    accent:SetSize(2, Theme.nav.barHeight)
     accent:SetPoint("LEFT", 0, 0)
-    accent:SetColorTexture(ACCENT_R, ACCENT_G, ACCENT_B, 1)
+    SetColorTexture(accent, Theme.nav.bar)
     accent:Hide()
     btn.accent = accent
 
@@ -284,29 +296,15 @@ local function CreateSidebarButton(parent, text)
     btn.label = fs
 
     btn:SetScript("OnEnter", function(self)
-        if not self.isActive then
-            self.bg:SetColorTexture(1, 1, 1, 0.06)
-        end
+        PaintSidebarButton(self, true)
     end)
     btn:SetScript("OnLeave", function(self)
-        if not self.isActive then
-            self.bg:SetColorTexture(1, 1, 1, 0)
-        end
+        PaintSidebarButton(self, false)
     end)
-
     function btn:SetActive(active)
         self.isActive = active
-        if active then
-            self.bg:SetColorTexture(ACCENT_R, ACCENT_G, ACCENT_B, 0.12)
-            self.accent:Show()
-            self.label:SetTextColor(1, 1, 1)
-        else
-            self.bg:SetColorTexture(1, 1, 1, 0)
-            self.accent:Hide()
-            self.label:SetTextColor(0.85, 0.85, 0.85)
-        end
+        PaintSidebarButton(self, self:IsVisible() and self:IsMouseOver())
     end
-
     btn:SetActive(false)
     return btn
 end
@@ -316,7 +314,11 @@ end
 -- ============================================================================
 
 local function CreateOptionsPanel()
-    local panel = CreatePanel("BuffRemindersOptions", PANEL_WIDTH, PANEL_HEIGHT, { escClose = true })
+    local panel = CreatePanel("BuffRemindersOptions", PANEL_WIDTH, PANEL_HEIGHT, {
+        escClose = true,
+        header = HEADER_HEIGHT,
+        brackets = true,
+    })
     panel:Hide()
 
     -- EditBox tracker so panel-wide hide clears focus. Components owns the
@@ -325,6 +327,7 @@ local function CreateOptionsPanel()
     Components.SetEditBoxesRef(panelEditBoxes)
     panel:SetScript("OnHide", function()
         Components.ClearEditBoxFocus()
+        BR.HideOptionsTooltip()
         -- A panel close acknowledges this release's additions. Persist first,
         -- then recompute the snapshot, so the next open shows no dots.
         BR.Options.WhatsNew.MarkSeen()
@@ -336,16 +339,19 @@ local function CreateOptionsPanel()
     -- ====================================================================
     local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", COL_PADDING, -14)
-    title:SetText("|cffffffffBuff|r|cffffcc00Reminders|r")
+    local brand = Theme.headerBrand
+    title:SetText(BR.ColorCode(brand[1]) .. "Buff|r" .. BR.ColorCode(brand[2]) .. "Reminders|r")
+    local headerDot = BR.ColorCode(Theme.headerDot) .. "\194\183|r"
 
     local version = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     version:SetPoint("LEFT", title, "RIGHT", 6, 0)
     local addonVersion = C_AddOns.GetAddOnMetadata("BuffReminders", "Version") or ""
     version:SetText(addonVersion)
+    SetTextColor(version, Theme.version)
 
     local discordSep = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     discordSep:SetPoint("LEFT", version, "RIGHT", 6, 0)
-    discordSep:SetText("|cff555555\194\183|r")
+    discordSep:SetText(headerDot)
 
     local discordLink = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     discordLink:SetPoint("LEFT", discordSep, "RIGHT", 6, 0)
@@ -367,7 +373,7 @@ local function CreateOptionsPanel()
 
     local kofiSep = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     kofiSep:SetPoint("LEFT", discordLink, "RIGHT", 6, 0)
-    kofiSep:SetText("|cff555555\194\183|r")
+    kofiSep:SetText(headerDot)
 
     local kofiLink = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     kofiLink:SetPoint("LEFT", kofiSep, "RIGHT", 6, 0)
@@ -410,11 +416,13 @@ local function CreateOptionsPanel()
     scaleUp:SetPoint("LEFT", scaleValue, "RIGHT", 4, 0)
     scaleUp:SetText(">")
 
+    local zoomIdle, zoomLimit, zoomHover = Theme.zoom.idle, Theme.zoom.limit, Theme.zoom.hover
+
     local function UpdateScaleText()
         local pct = BR.GetPanelZoom()
         scaleValue:SetText(pct .. "%")
-        scaleDown:SetTextColor(pct > MIN_PCT and 1 or 0.4, pct > MIN_PCT and 1 or 0.4, pct > MIN_PCT and 1 or 0.4)
-        scaleUp:SetTextColor(pct < MAX_PCT and 1 or 0.4, pct < MAX_PCT and 1 or 0.4, pct < MAX_PCT and 1 or 0.4)
+        SetTextColor(scaleDown, pct > MIN_PCT and zoomIdle or zoomLimit)
+        SetTextColor(scaleUp, pct < MAX_PCT and zoomIdle or zoomLimit)
     end
 
     local function UpdateScale(delta)
@@ -431,7 +439,7 @@ local function CreateOptionsPanel()
     end)
     downBtn:SetScript("OnEnter", function()
         if BR.GetPanelZoom() > MIN_PCT then
-            scaleDown:SetTextColor(ACCENT_R, ACCENT_G, ACCENT_B)
+            SetTextColor(scaleDown, zoomHover)
         end
     end)
     downBtn:SetScript("OnLeave", function()
@@ -445,7 +453,7 @@ local function CreateOptionsPanel()
     end)
     upBtn:SetScript("OnEnter", function()
         if BR.GetPanelZoom() < MAX_PCT then
-            scaleUp:SetTextColor(ACCENT_R, ACCENT_G, ACCENT_B)
+            SetTextColor(scaleUp, zoomHover)
         end
     end)
     upBtn:SetScript("OnLeave", function()
@@ -460,9 +468,9 @@ local function CreateOptionsPanel()
     -- content area hang from it and run to the panel's bottom margin.
     local headerSep = panel:CreateTexture(nil, "ARTWORK")
     headerSep:SetHeight(1)
-    headerSep:SetPoint("TOPLEFT", SIDEBAR_X, -CONTENT_TOP_OFFSET + 4)
-    headerSep:SetPoint("TOPRIGHT", -COL_PADDING, -CONTENT_TOP_OFFSET + 4)
-    headerSep:SetColorTexture(BORDER_R, BORDER_G, BORDER_B, 1)
+    headerSep:SetPoint("TOPLEFT", SIDEBAR_X, -HEADER_HEIGHT)
+    headerSep:SetPoint("TOPRIGHT", -COL_PADDING, -HEADER_HEIGHT)
+    BR.AddGroove(headerSep, Theme.groove.header)
 
     -- ====================================================================
     -- SIDEBAR
@@ -472,15 +480,20 @@ local function CreateOptionsPanel()
     sidebar:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", SIDEBAR_X, PANEL_BOTTOM_MARGIN)
     sidebar:SetWidth(SIDEBAR_WIDTH)
 
+    -- The inset keeps the recess clear of the shade line under the header groove.
+    local sidebarColors = Theme.sidebar
+    local sidebarTop = -sidebarColors.inset
+
     local sidebarBg = sidebar:CreateTexture(nil, "BACKGROUND")
-    sidebarBg:SetAllPoints()
-    sidebarBg:SetColorTexture(0, 0, 0.04, 0.35)
+    sidebarBg:SetPoint("TOPLEFT", 0, sidebarTop)
+    sidebarBg:SetPoint("BOTTOMRIGHT", 0, 0)
 
     local sidebarBorder = sidebar:CreateTexture(nil, "BORDER")
     sidebarBorder:SetWidth(1)
-    sidebarBorder:SetPoint("TOPRIGHT", 0, 0)
+    sidebarBorder:SetPoint("TOPRIGHT", 0, sidebarTop)
     sidebarBorder:SetPoint("BOTTOMRIGHT", 0, 0)
-    sidebarBorder:SetColorTexture(BORDER_R, BORDER_G, BORDER_B, 1)
+    PaintGradient(sidebarBg, "VERTICAL", sidebarColors.bottom, sidebarColors.top)
+    SetColorTexture(sidebarBorder, sidebarColors.edge)
 
     -- ====================================================================
     -- CONTENT AREA
@@ -659,7 +672,7 @@ local function CreateOptionsPanel()
     local UNLOCK_ACCENT = { 0.95, 0.55, 0.2 } -- orange = "edit mode", matching the anchor hint banner
 
     local testToggle = CreateFooterToggle(sidebar, {
-        accent = { ACCENT_R, ACCENT_G, ACCENT_B },
+        accent = BR.Colors.Accent,
         tooltip = { title = L["Options.TestAppearance"], desc = L["Options.TestAppearance.Desc"] },
         onClick = function(self)
             ToggleTestMode()
@@ -695,11 +708,11 @@ local function CreateOptionsPanel()
     lockToggle:Refresh()
     table.insert(BR.RefreshableComponents, lockToggle)
 
-    local footerSep = sidebar:CreateTexture(nil, "ARTWORK")
-    footerSep:SetHeight(1)
-    footerSep:SetPoint("BOTTOMLEFT", lockToggle, "TOPLEFT", 0, FOOTER_PAD)
-    footerSep:SetPoint("BOTTOMRIGHT", lockToggle, "TOPRIGHT", 0, FOOTER_PAD)
-    footerSep:SetColorTexture(BORDER_R, BORDER_G, BORDER_B, 0.7)
+    local footerSepLeft, footerSepRight = BR.CreateRule(sidebar, "ARTWORK", Theme.footerRule)
+    footerSepLeft:SetPoint("BOTTOMLEFT", lockToggle, "TOPLEFT", 0, FOOTER_PAD)
+    footerSepLeft:SetPoint("BOTTOMRIGHT", lockToggle, "TOP", 0, FOOTER_PAD)
+    footerSepRight:SetPoint("BOTTOMLEFT", lockToggle, "TOP", 0, FOOTER_PAD)
+    footerSepRight:SetPoint("BOTTOMRIGHT", lockToggle, "TOPRIGHT", 0, FOOTER_PAD)
 
     local unlockBanner = Components.Banner(panel, {
         text = L["Options.AnchorHint"],

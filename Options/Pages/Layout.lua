@@ -37,15 +37,6 @@ local ALL_CATEGORIES = BR.CATEGORY_ORDER
 -- STACKING ORDER
 -- ============================================================================
 
-local ARROW_COLOR = { 0.7, 0.7, 0.7, 1 }
-local ARROW_HOVER_COLOR = BR.Colors.Accent
-local ARROW_DISABLED_COLOR = { 0.4, 0.4, 0.4, 1 }
-local ARROW_BG = { 0.1, 0.1, 0.1, 0.7 }
-local ARROW_BG_HOVER = { 0.2, 0.2, 0.2, 0.85 }
-local ARROW_BG_DISABLED = { 0.05, 0.05, 0.05, 0.5 }
-local ARROW_BORDER = BR.Colors.Border
-local ARROW_BORDER_DISABLED = { 0.2, 0.2, 0.2, 0.6 }
-
 local ORDER_ROW_H = 22
 local ORDER_ARROW_W = 22
 local ORDER_ARROW_H = 18
@@ -114,13 +105,9 @@ end
 ---@param direction "up"|"down"
 ---@param onClick fun()
 local function CreateOrderArrowButton(parent, direction, onClick)
-    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(ORDER_ARROW_W, ORDER_ARROW_H)
-    btn:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    local surface = BR.CreateSurface(btn)
 
     local arrow = btn:CreateTexture(nil, "OVERLAY")
     arrow:SetSize(ORDER_ARROW_TEX_SIZE, ORDER_ARROW_TEX_SIZE)
@@ -131,19 +118,16 @@ local function CreateOrderArrowButton(parent, direction, onClick)
     local enabled = true
 
     local function UpdateVisual()
+        local styles = BR.Theme.arrowButton
+        local style = styles.normal
         if not enabled then
-            btn:SetBackdropColor(unpack(ARROW_BG_DISABLED))
-            btn:SetBackdropBorderColor(unpack(ARROW_BORDER_DISABLED))
-            arrow:SetVertexColor(unpack(ARROW_DISABLED_COLOR))
+            style = styles.disabled
         elseif btn:IsMouseOver() then
-            btn:SetBackdropColor(unpack(ARROW_BG_HOVER))
-            btn:SetBackdropBorderColor(unpack(ARROW_BORDER))
-            arrow:SetVertexColor(unpack(ARROW_HOVER_COLOR))
-        else
-            btn:SetBackdropColor(unpack(ARROW_BG))
-            btn:SetBackdropBorderColor(unpack(ARROW_BORDER))
-            arrow:SetVertexColor(unpack(ARROW_COLOR))
+            style = styles.hover
         end
+        BR.PaintSurface(surface, style)
+        local c = style.text --[[@as number[] ]]
+        arrow:SetVertexColor(c[1], c[2], c[3], c[4] or 1)
     end
     UpdateVisual()
 
@@ -432,7 +416,8 @@ local function Build(content, scrollFrame)
 
     local mask = strip:CreateTexture(nil, "BACKGROUND")
     mask:SetAllPoints(strip)
-    mask:SetColorTexture(0.09, 0.09, 0.107, 1)
+    -- The mask hides content that scrolls under the strip, so it matches the panel body.
+    BR.SetThemeColorTexture(mask, BR.Theme.stripMask)
 
     local prev, firstTab
     for _, id in ipairs(TAB_IDS) do

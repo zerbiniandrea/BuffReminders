@@ -29,6 +29,32 @@ local IsIconDetached = BR.Helpers.IsIconDetached
 
 local BORDER_R, BORDER_G, BORDER_B = unpack(BR.Colors.Border)
 
+local MOVER_BODY = BR.Theme.mover.body
+local MOVER_EDGE = BR.Theme.mover.edge
+local MOVER_TEXT = BR.Theme.mover.text
+local MOVER_EDGE_SIZE = 2
+
+local function AddMoverEdge(mover, color)
+    local r, g, b, a = color[1], color[2], color[3], color[4]
+    local sides = {
+        { "TOPLEFT", "TOPRIGHT", nil, MOVER_EDGE_SIZE },
+        { "BOTTOMLEFT", "BOTTOMRIGHT", nil, MOVER_EDGE_SIZE },
+        { "TOPLEFT", "BOTTOMLEFT", MOVER_EDGE_SIZE, nil },
+        { "TOPRIGHT", "BOTTOMRIGHT", MOVER_EDGE_SIZE, nil },
+    }
+    for _, side in ipairs(sides) do
+        local line = mover:CreateTexture(nil, "BORDER")
+        line:SetColorTexture(r, g, b, a)
+        line:SetPoint(side[1], 0, 0)
+        line:SetPoint(side[2], 0, 0)
+        if side[3] then
+            line:SetWidth(side[3])
+        else
+            line:SetHeight(side[4])
+        end
+    end
+end
+
 local ANCHOR_COORD_FN = {
     LEFT = function(m, px, py)
         return m:GetLeft() - px, select(2, m:GetCenter()) - py
@@ -1311,18 +1337,19 @@ local function CreateMoverFrame(catKey, displayName)
 
     local bg = mover:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    bg:SetColorTexture(0, 0.7, 0, 0.6)
+    bg:SetColorTexture(unpack(MOVER_BODY))
+    AddMoverEdge(mover, MOVER_EDGE)
 
     mover.label = mover:CreateFontString(nil, "OVERLAY")
     mover.label:SetPoint("BOTTOM", mover, "TOP", 0, 4)
     ApplyFont(mover.label, 11)
-    mover.label:SetTextColor(0.4, 1, 0.4, 1)
+    mover.label:SetTextColor(unpack(MOVER_TEXT))
     mover.label:SetText(displayName or catKey)
 
     mover.anchorText = mover:CreateFontString(nil, "OVERLAY")
     mover.anchorText:SetPoint("TOP", mover, "BOTTOM", 0, -4)
     ApplyFont(mover.anchorText, 11)
-    mover.anchorText:SetTextColor(0.4, 1, 0.4, 1)
+    mover.anchorText:SetTextColor(unpack(MOVER_TEXT))
 
     mover.catKey = catKey
 

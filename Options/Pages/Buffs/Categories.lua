@@ -178,7 +178,8 @@ local function Build(content, scrollFrame)
 
     local mask = strip:CreateTexture(nil, "BACKGROUND")
     mask:SetAllPoints(strip)
-    mask:SetColorTexture(0.09, 0.09, 0.107, 1)
+    -- The mask hides content that scrolls under the strip, so it matches the panel body.
+    BR.SetThemeColorTexture(mask, BR.Theme.stripMask)
 
     -- Translated labels can make the row wider than the strip. Then the row
     -- scrolls inside a ScrollFrame, which clips both the drawing and the clicks.

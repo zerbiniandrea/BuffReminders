@@ -57,6 +57,7 @@ local function EnsureShell()
     shell:Hide()
 
     shellTitle = shell:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    BR.ApplyTitleColor(shellTitle)
     shellTitle:SetPoint("TOP", 0, -12)
 
     BR.Options.Helpers.AddCloseButton(shell)

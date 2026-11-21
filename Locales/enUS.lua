@@ -566,6 +566,15 @@ english["Options.FreeConsumables.Override.Desc"] =
 -- OPTIONS: ICONS
 -- ============================================================================
 english["Options.Icons"] = "Icons"
+english["Options.IconStyle"] = "Icon style"
+english["Options.IconStyle.Desc"] =
+    "Modern draws a flat square border. The other style draws the action-button frame of the game, with rounded corners. The style applies to the buff icons of all categories. It does not apply to the externals display or to the clickable consumable item buttons. When Masque is active, Masque styles the icons."
+english["Options.IconStyle.Modern"] = "Modern"
+english["Options.IconStyle.Blizzard"] = "Blizzard"
+english["Options.IconStyle.Forever"] = "Forever"
+english["DisabledReason.IconStyleFrame"] = 'The icon style draws its own frame. To use a border, select "%s" in Icon style on the Defaults page.'
+english["DisabledReason.IconStyleMasque"] = "Masque styles the icons. To use an icon style, disable the BuffReminders group in Masque."
+english["DisabledReason.IconStyleNoArt"] = "This game client lacks the action-button art, so the icons keep the Modern style."
 english["Options.ShowTextToggle"] = "Show"
 english["Options.MainText.Desc"] =
     "Show the main text on the icons: a count like 17/20, or a label like NO PET. The Defaults page sets its position. The expiring countdown always stays visible."
@@ -1138,6 +1147,12 @@ english["Options.Min"] = "min"
 -- ============================================================================
 -- Content filter tooltip
 english["Content.ClickToFilter"] = "Click to filter by %s difficulty"
+english["Content.ClickToToggleVisibility"] = "Click to toggle visibility in %s"
+
+-- Width and height link
+english["DimensionLink.Link"] = "Link width and height"
+english["DimensionLink.Unlink"] = "Unlink width and height"
+english["DimensionLink.Desc"] = "When linked, changing one updates both."
 
 -- Mover labels
 english["Mover.AnchorGrowth"] = "Anchor · Growth %s"
