@@ -43,7 +43,7 @@ jobs:
           cat CHANGELOG.md
 
       - name: Package and Release
-        uses: BigWigsMods/packager@v2.5.0
+        uses: BigWigsMods/packager@v2.7.0
         env:
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
