@@ -1,5 +1,4 @@
-## Interface: 120105
-# WOW_INTERFACE_TARGETS: standard
+## Interface: 120105, 16001
 ## Title: BuffReminders
 ## Notes: Track missing buffs at a glance
 ## Author: zerbi
@@ -31,7 +30,7 @@ Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 Libs\LibDBIcon-1.0\lib.xml
 Libs\AceDB-3.0\AceDB-3.0.lua
 Libs\LibDualSpec-1.0\LibDualSpec-1.0.lua
-Libs\LibSpecialization\LibSpecialization.lua
+Libs\LibSpecialization\LibSpecialization.lua [AllowLoadGameType standard]
 
 Locales\enUS.lua
 Locales\deDE.lua
@@ -52,6 +51,8 @@ Core\Profiles.lua
 Core\Migrations.lua
 Core\GameContext.lua
 Data\Buffs.lua
+Data\Buffs_Forever.lua
+Data\BuffIndex.lua
 Data\Defaults.lua
 Data\Beneficiaries.lua
 Data\ConsumableItems.lua

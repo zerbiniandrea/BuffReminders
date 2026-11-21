@@ -65,6 +65,19 @@ BR.Components = {}
 BR.RefreshableComponents = {}
 
 -- ============================================================================
+-- CLIENT
+-- ============================================================================
+
+---@enum ClientType
+BR.ClientType = {
+    Retail = "retail",
+    Forever = "forever",
+}
+
+---@type ClientType
+BR.CLIENT = WOW_PROJECT_ID == WOW_PROJECT_CAMELOT and BR.ClientType.Forever or BR.ClientType.Retail
+
+-- ============================================================================
 -- SHARED CONSTANTS
 -- ============================================================================
 

@@ -1,6 +1,10 @@
 local _, ns = ...
 ---@class BR
 local BR = ns
+
+if BR.CLIENT ~= BR.ClientType.Retail then
+    return
+end
 local L = BR.L
 
 -- Lookup tables of known consumable item IDs, keyed by consumable type.

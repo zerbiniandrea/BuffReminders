@@ -37,6 +37,8 @@ read_globals = {
     "C_Housing",
     "C_PvP",
     "C_EncodingUtil",
+    "WOW_PROJECT_CAMELOT",
+    "WOW_PROJECT_ID",
     "C_Item",
     "C_MountJournal",
     "C_RestrictedActions",

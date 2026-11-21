@@ -2,6 +2,10 @@ local _, ns = ...
 ---@class BR
 local BR = ns
 
+if BR.CLIENT ~= BR.ClientType.Retail then
+    return
+end
+
 local L = BR.L
 local Components = BR.Components
 local CreateButton = BR.CreateButton

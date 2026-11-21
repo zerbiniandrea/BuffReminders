@@ -2,6 +2,10 @@ local _, ns = ...
 ---@class BR
 local BR = ns
 
+if BR.CLIENT ~= BR.ClientType.Retail then
+    return
+end
+
 -- ============================================================================
 -- BUFF PAGE SECTION: Externals Appearance
 -- ============================================================================
