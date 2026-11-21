@@ -78,12 +78,9 @@ local function GetActionSpellID(buff)
         return nil
     end
     if buff.requireSpecId then
-        local spec = GetSpecialization()
-        if spec then
-            local specId = GetSpecializationInfo(spec)
-            if specId ~= buff.requireSpecId then
-                return nil
-            end
+        local specId, specIndex = BR.Client.GetSpecID()
+        if specIndex and specId ~= buff.requireSpecId then
+            return nil
         end
     end
     -- Prefer the role spell so the cast matches the icon the player sees.

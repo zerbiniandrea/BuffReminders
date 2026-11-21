@@ -152,7 +152,7 @@ local function Build(content, scrollFrame)
     })
     layout:Add(specEnabled, 20, COMPONENT_GAP)
 
-    local numSpecs = GetNumSpecializations() or 0
+    local numSpecs = BR.CLIENT == BR.ClientType.Retail and GetNumSpecializations() or 0
     local specDropdowns = {}
     for i = 1, numSpecs do
         local _, specName = GetSpecializationInfo(i)

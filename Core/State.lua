@@ -533,10 +533,7 @@ local function GetPlayerSpecId()
     if cachedSpecId then
         return cachedSpecId
     end
-    local specIndex = GetSpecialization()
-    if specIndex then
-        cachedSpecId = GetSpecializationInfo(specIndex)
-    end
+    cachedSpecId = BR.Client.GetSpecID()
     return cachedSpecId
 end
 
@@ -546,7 +543,7 @@ local function GetPlayerRole()
     if cachedPlayerRole then
         return cachedPlayerRole
     end
-    local specIndex = GetSpecialization()
+    local _, specIndex = BR.Client.GetSpecID()
     if specIndex then
         cachedPlayerRole = GetSpecializationRole(specIndex)
     end

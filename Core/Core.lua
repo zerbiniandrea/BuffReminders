@@ -77,6 +77,22 @@ BR.ClientType = {
 ---@type ClientType
 BR.CLIENT = WOW_PROJECT_ID == WOW_PROJECT_CAMELOT and BR.ClientType.Forever or BR.ClientType.Retail
 
+BR.Client = {}
+
+---The player's specialization, or nil on WoW Forever and before the spec loads.
+---@return number? specID
+---@return number? specIndex
+function BR.Client.GetSpecID()
+    if BR.CLIENT == BR.ClientType.Forever then
+        return nil
+    end
+    local specIndex = GetSpecialization()
+    if not specIndex then
+        return nil
+    end
+    return GetSpecializationInfo(specIndex), specIndex
+end
+
 -- ============================================================================
 -- SHARED CONSTANTS
 -- ============================================================================
@@ -1031,10 +1047,12 @@ local CLASS_IDS = {
 BR.CLASS_SPEC_OPTIONS = {}
 for token, classID in pairs(CLASS_IDS) do
     local specs = {}
-    for i = 1, 4 do
-        local specID, name = GetSpecializationInfoForClassID(classID, i)
-        if specID then
-            table.insert(specs, { value = specID, label = name })
+    if BR.CLIENT == BR.ClientType.Retail then
+        for i = 1, 4 do
+            local specID, name = GetSpecializationInfoForClassID(classID, i)
+            if specID then
+                table.insert(specs, { value = specID, label = name })
+            end
         end
     end
     table.sort(specs, function(a, b)
