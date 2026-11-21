@@ -209,5 +209,89 @@ local function PrintSecretDebug(arg)
     )
 end
 
+local SPELL_DEBUG_CATEGORIES = { "raid", "presence", "targeted", "self", "pet", "consumable", "utility" }
+
+---@param buff table
+---@return number[]
+local function BuffSpellIDs(buff)
+    local ids = {}
+    local spellID = buff.spellID
+    if type(spellID) == "table" then
+        for _, id in ipairs(spellID) do
+            ids[#ids + 1] = id
+        end
+    elseif type(spellID) == "number" then
+        ids[1] = spellID
+    end
+    if type(buff.castSpellID) == "number" then
+        ids[#ids + 1] = buff.castSpellID
+    end
+    return ids
+end
+
+local spellDebugWindow
+
+---@param text string
+local function ShowCopyWindow(text)
+    if not spellDebugWindow then
+        local panel = BR.CreatePanel("BuffRemindersSpellDebug", 720, 460, { escClose = true })
+        panel:SetPoint("CENTER")
+        local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        title:SetPoint("TOPLEFT", 12, -10)
+        title:SetText("BuffReminders spell debug: Ctrl+A, Ctrl+C, then Esc")
+        local area = BR.Components.TextArea(panel, { width = 696, height = 416, readOnly = true })
+        area:SetPoint("TOPLEFT", 12, -32)
+        panel.area = area
+        spellDebugWindow = panel
+    end
+    spellDebugWindow.area:SetText(text)
+    spellDebugWindow:Show()
+    spellDebugWindow.area:SetFocus()
+    spellDebugWindow.area:HighlightText()
+end
+
+-- One row per spell ID of every buff of the active client: whether the client knows the
+-- spell, whether the player knows it, its aura secrecy, and whether the player has the aura.
+local function ShowSpellDebug()
+    local S = C_Secrets
+    local _, class = UnitClass("player")
+    local version, build = GetBuildInfo()
+    local lines = {
+        string.format(
+            "client=%s project=%s build=%s.%s class=%s level=%s",
+            BR.CLIENT,
+            tostring(WOW_PROJECT_ID),
+            tostring(version),
+            tostring(build),
+            tostring(class),
+            tostring(UnitLevel("player"))
+        ),
+        "category | key | id | name | rank | known | secrecy | on player",
+    }
+    for _, category in ipairs(SPELL_DEBUG_CATEGORIES) do
+        for _, buff in ipairs(BR.BUFF_TABLES[category] or {}) do
+            for _, id in ipairs(BuffSpellIDs(buff)) do
+                local okLevel, level = pcall(S.GetSpellAuraSecrecy, id)
+                local okAura, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, id)
+                local onPlayer = not okAura and "THREW" or issecretvalue(aura) and "SECRET" or tostring(aura ~= nil)
+                local levelName = okLevel and not issecretvalue(level) and SECRECY_LEVEL_NAMES[level] or "?"
+                lines[#lines + 1] = string.format(
+                    "%s | %s | %d | %s | %s | %s | %s | %s",
+                    category,
+                    tostring(buff.key),
+                    id,
+                    tostring(C_Spell.GetSpellName(id)),
+                    tostring(C_Spell.GetSpellSubtext(id)),
+                    tostring(C_SpellBook.IsSpellKnown(id)),
+                    levelName,
+                    onPlayer
+                )
+            end
+        end
+    end
+    ShowCopyWindow(table.concat(lines, "\n"))
+end
+
 BR.Display.PrintRuneDebug = PrintRuneDebug
 BR.Display.PrintSecretDebug = PrintSecretDebug
+BR.Display.ShowSpellDebug = ShowSpellDebug

@@ -3375,6 +3375,8 @@ local function SlashHandler(msg)
     elseif cmd == "secretdebug" then
         local arg = msg:match("^%S+%s+(%S+)")
         BR.Display.PrintSecretDebug(arg)
+    elseif cmd == "spelldebug" then
+        BR.Display.ShowSpellDebug()
     elseif cmd == "shownew" then
         local WhatsNew = BR.Options.WhatsNew
         local arg = msg:match("^%S+%s+(%S+)")
