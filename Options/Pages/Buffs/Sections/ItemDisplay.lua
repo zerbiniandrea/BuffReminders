@@ -78,9 +78,10 @@ local function Build(ctx, layout)
     local P_GAP = 3
     local P_STEP = P_ICON + P_GAP + P_BORDER * 2
     local P_SUB_STEP = P_SUB + P_BORDER * 2
-    local TEX_FLASK = { 7548898, 7548899, 7548900 }
-    local TEX_FOOD = { 4672193, 1045939 }
-    local TEX_OIL = 7548987
+    local previewTextures = BR.CONSUMABLE_PREVIEW_TEXTURES
+    local TEX_FLASK = previewTextures.flask
+    local TEX_FOOD = previewTextures.food
+    local TEX_OIL = previewTextures.oil
 
     local previewHeight = P_ICON + P_SUB + P_GAP + P_BORDER * 2
     local MODE_ICON_COUNT = { icon_only = 3, sub_icons = 3, expanded = 6 }
@@ -229,7 +230,7 @@ local function Build(ctx, layout)
     updateSubIconSideVisibility = function(mode)
         local subIcons = mode == "sub_icons"
         subIconSideHolder:SetShown(subIcons)
-        badgeOnSubIconsHolder:SetShown(subIcons)
+        badgeOnSubIconsHolder:SetShown(subIcons and BR.CONSUMABLE_FEATURES.itemLabels)
     end
     updateSubIconSideVisibility(BR.Config.Get("defaults.consumableDisplayMode"))
     table.insert(BR.RefreshableComponents, {
@@ -320,16 +321,18 @@ local function BuildOverlays(ctx, layout)
         })
     end
 
-    -- "Off" on the stat label row is the stored hideConsumableLabels flag.
-    TextItemRow("statLabel", L["Options.TextPositions.StatLabel"], {
-        get = function()
-            return BR.Config.Get("defaults.hideConsumableLabels") == true
-        end,
-        set = function(off)
-            BR.Config.Set("defaults.hideConsumableLabels", off)
-        end,
-    })
-    TextItemRow("badge", L["Options.TextPositions.Badge"])
+    if BR.CONSUMABLE_FEATURES.itemLabels then
+        -- "Off" on the stat label row is the stored hideConsumableLabels flag.
+        TextItemRow("statLabel", L["Options.TextPositions.StatLabel"], {
+            get = function()
+                return BR.Config.Get("defaults.hideConsumableLabels") == true
+            end,
+            set = function(off)
+                BR.Config.Set("defaults.hideConsumableLabels", off)
+            end,
+        })
+        TextItemRow("badge", L["Options.TextPositions.Badge"])
+    end
 
     TextItemRow("stackCount", L["Options.TextPositions.StackCount"])
     Helpers.LayoutSubsectionNote(layout, parent, L["Options.TextSizes.Note"])
@@ -378,35 +381,39 @@ local function BuildFilters(ctx, layout)
     layout:Add(readyCheckOnlyHolder, nil, COMPONENT_GAP)
     layout:SetX(layout:GetX() - DEPENDENT_INDENT)
 
-    local delveFoodOnlyHolder = Components.Checkbox(parent, {
-        label = L["Options.DelveFoodOnly"],
-        get = function()
-            return BR.Config.Get("defaults.delveFoodOnly") == true
-        end,
-        tooltip = {
-            title = L["Options.DelveFoodOnly"],
-            desc = L["Options.DelveFoodOnly.Desc"],
-        },
-        onChange = function(checked)
-            BR.Config.Set("defaults.delveFoodOnly", checked)
-        end,
-    })
-    layout:Add(delveFoodOnlyHolder, nil, COMPONENT_GAP)
+    if BR.CONSUMABLE_FEATURES.delveFood then
+        local delveFoodOnlyHolder = Components.Checkbox(parent, {
+            label = L["Options.DelveFoodOnly"],
+            get = function()
+                return BR.Config.Get("defaults.delveFoodOnly") == true
+            end,
+            tooltip = {
+                title = L["Options.DelveFoodOnly"],
+                desc = L["Options.DelveFoodOnly.Desc"],
+            },
+            onChange = function(checked)
+                BR.Config.Set("defaults.delveFoodOnly", checked)
+            end,
+        })
+        layout:Add(delveFoodOnlyHolder, nil, COMPONENT_GAP)
+    end
 
-    local hideLegacyHolder = Components.Checkbox(parent, {
-        label = L["Options.HideLegacyConsumables"],
-        get = function()
-            return BR.Config.Get("defaults.hideLegacyConsumables") ~= false
-        end,
-        tooltip = {
-            title = L["Options.HideLegacyConsumables.Title"],
-            desc = L["Options.HideLegacyConsumables.Desc"],
-        },
-        onChange = function(checked)
-            BR.Config.Set("defaults.hideLegacyConsumables", checked)
-        end,
-    })
-    layout:Add(hideLegacyHolder, nil, COMPONENT_GAP)
+    if BR.CONSUMABLE_FEATURES.legacyItems then
+        local hideLegacyHolder = Components.Checkbox(parent, {
+            label = L["Options.HideLegacyConsumables"],
+            get = function()
+                return BR.Config.Get("defaults.hideLegacyConsumables") ~= false
+            end,
+            tooltip = {
+                title = L["Options.HideLegacyConsumables.Title"],
+                desc = L["Options.HideLegacyConsumables.Desc"],
+            },
+            onChange = function(checked)
+                BR.Config.Set("defaults.hideLegacyConsumables", checked)
+            end,
+        })
+        layout:Add(hideLegacyHolder, nil, COMPONENT_GAP)
+    end
 end
 
 BR.Options.BuffSections.ItemDisplay = Build

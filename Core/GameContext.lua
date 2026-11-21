@@ -9,7 +9,7 @@ local BR = ns
 -- handler reads fresh values.
 -- RenderRequested asks for the render that a change needs. urgent = true asks for it now.
 
----@alias CacheId "auraTrackable"|"consumables"|"contentType"|"durability"|"healer"|"item"|"loadout"|"offHand"|"pet"|"petActions"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"stance"|"subgroup"
+---@alias CacheId "auraTrackable"|"consumables"|"contentType"|"durability"|"healer"|"item"|"loadout"|"offHand"|"pet"|"petActions"|"petHappiness"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"spellUsable"|"stance"|"subgroup"
 
 ---@class GameContextEventSpec
 ---@field caches? CacheId[] Cache ids to clear, in order
@@ -192,6 +192,13 @@ local HEALER = { caches = { "healer" } }
 local ROSTER = { caches = { "healer", "subgroup" } }
 ---@type GameContextEventSpec
 local STANCE = { caches = { "stance" } }
+---@type GameContextEventSpec
+local PET_HAPPINESS = {
+    caches = { "petHappiness" },
+    handle = function()
+        NotifyChanged(false)
+    end,
+}
 
 ---@type table<string, GameContextEventSpec>
 local EVENT_CACHES = {
@@ -208,9 +215,11 @@ local EVENT_CACHES = {
             "repairSource",
             "durability",
             "petActions",
+            "petHappiness",
             "spellTextureMisses",
             "spellNameMisses",
             "subgroup",
+            "spellUsable",
         },
         handle = function()
             inCombat = InCombatLockdown()
@@ -238,8 +247,9 @@ local EVENT_CACHES = {
             NotifyChanged(true)
         end,
     },
-    PLAYER_REGEN_DISABLED = { handle = OnCombatStart },
+    PLAYER_REGEN_DISABLED = { caches = { "spellUsable" }, handle = OnCombatStart },
     PLAYER_REGEN_ENABLED = {
+        caches = { "spellUsable" },
         handle = function()
             inCombat = inEncounter
         end,
@@ -286,7 +296,8 @@ local EVENT_CACHES = {
     GROUP_ROSTER_UPDATE = ROSTER,
     GROUP_FORMED = ROSTER,
     PLAYER_ROLES_ASSIGNED = HEALER,
-    UNIT_PET = { playerOnly = true, caches = { "pet" } },
+    UNIT_PET = { playerOnly = true, caches = { "pet", "petHappiness" } },
+    UNIT_HAPPINESS = PET_HAPPINESS,
     UPDATE_SHAPESHIFT_FORM = STANCE,
     UPDATE_SHAPESHIFT_FORMS = STANCE,
     PET_STABLE_UPDATE = { caches = { "petActions" } },
@@ -311,10 +322,36 @@ local EVENT_CACHES = {
         end,
     },
     SPELLS_CHANGED = {
-        caches = { "spell", "pet", "stance", "loadout", "petActions", "spellTextureMisses", "spellNameMisses" },
+        caches = {
+            "spell",
+            "pet",
+            "stance",
+            "loadout",
+            "petActions",
+            "spellTextureMisses",
+            "spellNameMisses",
+            "spellUsable",
+        },
+    },
+    -- Fires often, for example on each power change that crosses a spell cost.
+    -- An empty cache holds no stale value, so the event then requests no render.
+    SPELL_UPDATE_USABLE = {
+        handle = function()
+            if BR.BuffState.HasSpellUsableCache() then
+                GameContext.Invalidate("spellUsable")
+                NotifyChanged(false)
+            end
+        end,
     },
     PLAYER_EQUIPMENT_CHANGED = { caches = { "item", "offHand", "loadout", "durability" } },
     UPDATE_INVENTORY_DURABILITY = { caches = { "durability" } },
+    -- A temporary weapon enchant starts and ends with no aura event.
+    UNIT_INVENTORY_CHANGED = {
+        playerOnly = true,
+        handle = function()
+            NotifyChanged(false)
+        end,
+    },
     BAG_UPDATE_DELAYED = { caches = { "item", "repairSource", "consumables" } },
     NEW_MOUNT_ADDED = { caches = { "repairSource" } },
     PLAYER_MOUNT_DISPLAY_CHANGED = {

@@ -47,7 +47,7 @@ local function GetCastableSpellID(spellIDs)
     return nil
 end
 
-local FEL_DOMINATION_ID = 333889
+local FEL_DOMINATION_ID = BR.PET_SPELLS.felDomination
 
 -- Spell names never change once the client resolves them. An unresolved name at
 -- login is not cached, so the next display cycle retries it.
@@ -506,22 +506,41 @@ local function CreateClickOverlay(frame)
     -- can read the attribute snapshot before the write propagates, which sends a
     -- stale channel prefix. RefreshChatRequestMacros rewires those overlays instead.
     overlay:SetScript("PreClick", function(self)
+        -- A spell action with no spell casts nothing. PostClick writes the spell back.
+        local entry = BR.BuffState.entries[frame.key]
+        if entry and entry.noClick and self._br_action_type == "spell" and not InCombatLockdown() then
+            self:SetAttribute("spell", nil)
+            self._br_spellCleared = true
+            return
+        end
         if self._br_clickMacroFn and not self._br_chatRequestKey then
             self:SetAttribute("macrotext", self._br_clickMacroFn(self._br_clickMacroSpellID))
         end
         local pickDef = self._br_pickDef
         if pickDef and not InCombatLockdown() then
-            local groupSpellID = BR.BuffState.GetGroupCastSpellID(pickDef)
+            local groupSpellID, groupUnit = BR.BuffState.GetGroupCastSpellID(pickDef)
             if groupSpellID then
                 self:SetAttribute("spell", groupSpellID)
-                self:SetAttribute("unit", "player")
+                self:SetAttribute("unit", groupUnit or "player")
             else
-                self:SetAttribute("spell", self._br_action.spellID)
+                -- The stored action holds any known spell of a choice-grid buff. The
+                -- active choice of the current content names the spell to cast.
+                local castID
+                if pickDef.activeChoice then
+                    castID = select(2, pickDef.activeChoice())
+                end
+                self:SetAttribute("spell", castID or self._br_action.spellID)
                 self:SetAttribute("unit", PickCastUnit(pickDef.key))
             end
         end
     end)
     overlay:SetScript("PostClick", function(self, button, down)
+        if self._br_spellCleared then
+            self._br_spellCleared = nil
+            if not InCombatLockdown() then
+                self:SetAttribute("spell", self._br_action.spellID)
+            end
+        end
         -- Fire the snooze once, on the up event, and skip the refresh below.
         if button == "RightButton" and not down and self._br_snoozeRightClick then
             BR.SnoozeConsumables()
@@ -871,6 +890,7 @@ local function RefreshConsumableCache()
                             if type(allowedEntry) == "table" then
                                 bucket.statLabel = allowedEntry.label
                                 bucket.badge = allowedEntry.badge
+                                bucket.weaponClass = allowedEntry.weaponClass
                             end
                             -- The item link carries the crafted quality tier.
                             local hyperlink = info and info.hyperlink
@@ -976,6 +996,38 @@ end
 
 local BUFF_KEY_TO_CATEGORY = BR.BUFF_KEY_TO_CATEGORY
 
+-- Weapon subclasses (Enum.ItemWeaponSubclass) that each weaponClass accepts.
+local WEAPON_CLASS_SUBCLASSES = {
+    edged = { [0] = true, [1] = true, [6] = true, [7] = true, [8] = true, [15] = true },
+    blunt = { [4] = true, [5] = true, [10] = true, [13] = true },
+}
+
+-- Filtered weapon item list per hand slot. It is rebuilt when the bag scan makes a
+-- new list or the weapon in the hand changes.
+---@type table<number, { source: table, subclass: number|false, list: table[] }>
+local weaponFitCache = {}
+
+---Drop the items that do not fit the weapon in the hand. The order of the sorted list stays.
+---@param items table[] Sorted bag scan items of the weapon category
+---@param slot number 16 (main hand) or 17 (off hand)
+---@return table[]
+local function FilterForWeapon(items, slot)
+    local subclass = BR.BuffState.GetWeaponSubclass(slot) or false
+    local cached = weaponFitCache[slot]
+    if cached and cached.source == items and cached.subclass == subclass then
+        return cached.list
+    end
+    local list = {}
+    for _, item in ipairs(items) do
+        local accepted = item.weaponClass and WEAPON_CLASS_SUBCLASSES[item.weaponClass]
+        if not accepted or (subclass and accepted[subclass]) then
+            list[#list + 1] = item
+        end
+    end
+    weaponFitCache[slot] = { source = items, subclass = subclass, list = list }
+    return list
+end
+
 ---@param buff table The buff definition table
 ---@return table[]? items Array of { itemID, count, icon } sorted by count desc, or nil
 local function GetConsumableActionItems(buff)
@@ -988,6 +1040,10 @@ local function GetConsumableActionItems(buff)
     end
     RefreshConsumableCache()
     local items = consumableCache[category]
+    local slot = buff.checkWeaponEnchant and 16 or buff.checkWeaponEnchantOH and 17 or nil
+    if items and slot then
+        items = FilterForWeapon(items, slot)
+    end
     return items and #items > 0 and items or nil
 end
 

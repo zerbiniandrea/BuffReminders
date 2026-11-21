@@ -31,6 +31,8 @@ local BR = ns
 ---@field normal? boolean
 ---@field heroic? boolean
 ---@field mythic? boolean
+---@field raid40? boolean
+---@field raid20? boolean
 
 ---@class ScenarioDifficulty
 ---@field delves? boolean
@@ -76,6 +78,9 @@ BR.ClientType = {
 
 ---@type ClientType
 BR.CLIENT = WOW_PROJECT_ID == WOW_PROJECT_CAMELOT and BR.ClientType.Forever or BR.ClientType.Retail
+
+-- Stance key for "no stance" (stance bar form 0) in the allowed-stances sets of BR.STANCE_RULES.
+BR.NO_STANCE = 0
 
 BR.Client = {}
 
@@ -437,6 +442,7 @@ local DefaultSettingKeys = {
     delveFoodOnly = "DisplayRefresh",
     delveFoodTimer = "DisplayRefresh",
     mageFoodContent = "DisplayRefresh",
+    shamanImbue = "DisplayRefresh",
     freeConsumableMode = "DisplayRefresh",
     freeConsumableVisibility = "DisplayRefresh",
     healthstoneVisibility = "DisplayRefresh",
@@ -444,6 +450,9 @@ local DefaultSettingKeys = {
     healthstoneThreshold = "DisplayRefresh",
     repairThreshold = "DisplayRefresh",
     repairHideInCombat = "VisibilityRefresh",
+    reagentThreshold = "DisplayRefresh",
+    reagentRestedOnly = "DisplayRefresh",
+    ammoThresholdStacks = "DisplayRefresh",
     soulstoneVisibility = "DisplayRefresh",
     soulstoneHideCooldown = "DisplayRefresh",
     soulstonePinnedTarget = false, -- nil when unset (no Defaults entry); macro rebuilds on PreClick
@@ -472,6 +481,14 @@ local DefaultSettingKeys = {
     position = false, -- No auto-refresh, saved directly by movers
 }
 
+-- Per-content grids (path = defaults.{grid}.{world|dungeon|raid|pvp}.{choice})
+local ContentGridKeys = {
+    warlockDemons = true,
+    warriorStances = true,
+    druidForms = true,
+    paladinBlessings = true,
+}
+
 -- Canonical buff category list. The order is the display stacking order.
 -- Every other category list derives from this one, so a new category needs
 -- only this edit.
@@ -490,6 +507,21 @@ for _, cat in ipairs(BR.CATEGORY_ORDER) do
     if not BR.VIRTUAL_CATEGORIES[cat] then
         BR.STATIC_CATEGORIES[#BR.STATIC_CATEGORIES + 1] = cat
     end
+end
+
+---A category with nothing to show on this client stays out of the options UI and the movers.
+---Loadout reads as unavailable until Core/Loadouts.lua loads.
+---@param category string
+---@return boolean
+function BR.IsCategoryAvailable(category)
+    if category == "custom" then
+        return true
+    end
+    if category == "loadout" then
+        return BR.Loadouts ~= nil
+    end
+    local buffs = BR.BUFF_TABLES and BR.BUFF_TABLES[category]
+    return buffs ~= nil and buffs[1] ~= nil
 end
 
 -- Valid category names for config paths (categorySettings.<category>.<key>).
@@ -558,8 +590,8 @@ local function ValidatePath(segments)
         if segments[2] == "textSizes" and #segments == 3 then
             return true, "VisualsRefresh"
         end
-        -- defaults.warlockDemons.<world|dungeon|raid|pvp>.<demon>
-        if segments[2] == "warlockDemons" and #segments == 4 then
+        -- defaults.<grid>.<row>.<choice>
+        if ContentGridKeys[segments[2]] and #segments == 4 then
             return true, "DisplayRefresh"
         end
         return false, nil

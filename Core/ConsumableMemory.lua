@@ -11,6 +11,25 @@ local BR = ns
 
 local GetItemSpell = C_Item.GetItemSpell
 
+-- WoW Forever has no specializations, so its memory uses one fixed key in place of the spec ID.
+local NO_SPEC_KEY = BR.CLIENT == BR.ClientType.Forever and 0 or nil
+
+---@param specId number?
+---@return number?
+local function MemoryKey(specId)
+    return specId or NO_SPEC_KEY
+end
+
+-- Categories whose memory comes from item count deltas. The remembered spell is the
+-- use spell of the item.
+local COUNT_TRACKED = { food = true, weapon = true }
+
+---@param category string
+---@return boolean
+local function IsCountTracked(category)
+    return COUNT_TRACKED[category] == true
+end
+
 -- ============================================================================
 -- UNREMEMBERED FLASKS
 -- ============================================================================
@@ -52,6 +71,7 @@ end
 ---@param spellID number The spell ID to remember
 ---@param updateOnly? boolean When true, only update an existing entry (never create new spec/category memory)
 local function Remember(specId, category, spellID, updateOnly)
+    specId = MemoryKey(specId)
     if not specId or not category or not spellID then
         return
     end
@@ -79,6 +99,7 @@ end
 ---@param category string Consumable category
 ---@return number? spellID The remembered spell ID, or nil
 local function GetRemembered(specId, category)
+    specId = MemoryKey(specId)
     if not specId then
         return nil
     end
@@ -106,7 +127,7 @@ local function RememberChoice(itemID, buffFrame)
     end
     local resolvedFrame = buffFrame.mainFrame or buffFrame
     local cat = BR.BUFF_KEY_TO_CATEGORY[resolvedFrame.key]
-    local specId = BR.StateHelpers and BR.StateHelpers.GetPlayerSpecId()
+    local specId = MemoryKey(BR.StateHelpers and BR.StateHelpers.GetPlayerSpecId())
     if not cat or not specId then
         return
     end
@@ -127,12 +148,13 @@ local previousCounts = {}
 ---@param buckets table Current bag scan buckets: category -> { [itemID] = { count, useSpellID, ... } }
 ---@param specId number? Player's current specialization ID
 local function DetectConsumedItems(buckets, specId)
+    specId = MemoryKey(specId)
     if not specId then
         return
     end
     local isEating = BR.StateHelpers and BR.StateHelpers.IsPlayerEating and BR.StateHelpers.IsPlayerEating()
     for category, oldItems in pairs(previousCounts) do
-        if category == "food" or category == "weapon" then
+        if IsCountTracked(category) then
             for itemID, old in pairs(oldItems) do
                 if old.useSpellID then
                     local newBucket = buckets[category] and buckets[category][itemID]
@@ -186,6 +208,7 @@ BR.ConsumableMemory = {
     GetRemembered = GetRemembered,
     IsUnrememberedSpell = IsUnrememberedSpell,
     IsUnrememberedItem = IsUnrememberedItem,
+    IsCountTracked = IsCountTracked,
     RememberChoice = RememberChoice,
     DetectConsumedItems = DetectConsumedItems,
     SnapshotCounts = SnapshotCounts,

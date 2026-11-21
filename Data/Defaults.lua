@@ -179,7 +179,7 @@ BR.defaults = {
         -- Behavior (glow settings)
         showExpirationGlow = false,
         showMissingGlow = false,
-        expirationThreshold = 15, -- minutes
+        expirationThreshold = BR.CLIENT == BR.ClientType.Forever and 5 or 15, -- minutes
         preKeyThreshold = 0, -- minutes (0 = off); used in M0 before inserting a keystone
         glowType = 2, -- BR.Glow.Type: Pixel=1, AutoCast=2, Border=3, Proc=4 (expiring default)
         glowSize = 2,
@@ -188,6 +188,7 @@ BR.defaults = {
         delveFoodOnly = true,
         delveFoodTimer = false,
         mageFoodContent = "all", -- "all" | "dungeon" | "raid"
+        shamanImbue = "windfury", -- "windfury" | "flametongue" | "rockbiter" | "frostbrand"
         freeConsumableMode = "override",
         freeConsumableVisibility = {
             openWorld = false,
@@ -202,6 +203,9 @@ BR.defaults = {
         healthstoneLowStock = false,
         repairThreshold = 20, -- percent; repair reminder shows below this durability
         repairHideInCombat = true,
+        reagentThreshold = 5, -- the reagent reminder shows below this count
+        reagentRestedOnly = true,
+        ammoThresholdStacks = 1, -- the ammo reminder shows below this many stacks
         soulstoneVisibility = "readyCheck",
         soulstoneHideCooldown = false,
         -- soulstonePinnedTarget: deliberately absent - nil means "no pin" (set via BuffPanel drawer)
@@ -227,13 +231,26 @@ BR.defaults = {
         useFelDomination = false,
         -- Allowed warlock demons per content row (WARLOCK_DEMON_CHOICES keys). A row
         -- with none allows all demons. Demonology with Felguard talented ignores it.
-        warlockDemons = {
+        -- WoW Forever rows allow a demon below level 30, where Felhunter is not learned.
+        warlockDemons = BR.CLIENT == BR.ClientType.Forever and {
+            world = { imp = true, voidwalker = true, succubus = true, felhunter = true },
+            dungeon = { imp = true, felhunter = true },
+            raid = { imp = true, succubus = true },
+            pvp = { succubus = true, felhunter = true },
+        } or {
             world = { felhunter = true },
             dungeon = { felhunter = true },
             raid = { imp = true, felhunter = true, sayaad = true },
             pvp = { felhunter = true },
         },
         warlockWrongDemon = true,
+        -- The paladin blessing of each content row (WoW Forever). One choice per row.
+        paladinBlessings = BR.CLIENT == BR.ClientType.Forever and {
+            world = { might = true },
+            dungeon = { might = true },
+            raid = { might = true },
+            pvp = { might = true },
+        } or nil,
         -- Per-text-item size override, as a percentage of the icon size. An
         -- absent key follows consumableTextScale.
         textSizes = {},
@@ -325,7 +342,8 @@ BR.defaults = {
             hideInPvPMatch = false,
         },
         consumable = {
-            openWorld = false,
+            -- Forever players use food, stones and poisons while leveling in the open world.
+            openWorld = BR.CLIENT == BR.ClientType.Forever,
             dungeon = true,
             scenario = true,
             raid = true,
@@ -350,6 +368,8 @@ BR.defaults = {
                 normal = true,
                 heroic = true,
                 mythic = true,
+                raid40 = true,
+                raid20 = true,
             },
         },
     },

@@ -31,7 +31,7 @@ local SCROLLBAR_WIDTH = BR.Options.Constants.SCROLLBAR_WIDTH
 
 local tinsert = table.insert
 
-local ALL_CATEGORIES = BR.CATEGORY_ORDER
+local ALL_CATEGORIES = BR.AVAILABLE_CATEGORIES
 
 -- ============================================================================
 -- STACKING ORDER

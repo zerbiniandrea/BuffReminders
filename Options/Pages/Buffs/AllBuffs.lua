@@ -93,6 +93,13 @@ local function RenderColumn(parent, x, y, sections, colWidth)
     -- Rows start ROW_INDENT in from the column's left edge; span the rest of
     -- the column so the "Settings" link lands on the column's right edge.
     local rowWidth = colWidth - ROW_INDENT
+    local available = {}
+    for _, section in ipairs(sections) do
+        if BR.IsCategoryAvailable(section.category) then
+            available[#available + 1] = section
+        end
+    end
+    sections = available
     for i, section in ipairs(sections) do
         y = CreateSectionWithNote(parent, x, y, L[section.titleKey], L[section.noteKey])
         y = Render(parent, rowsX, y, BUFF_TABLES[section.category] or {}, rowWidth)

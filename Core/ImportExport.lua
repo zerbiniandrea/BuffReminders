@@ -219,16 +219,21 @@ local ITEM_MODES = { equipped = true, bags = true }
 local ITEM_COOLDOWNS = { offCooldown = true, onCooldown = true }
 local LEVEL_FILTERS = { maxLevel = true, belowMaxLevel = true }
 
--- Content and difficulty keys come from the toggle defs the editor renders.
+-- Content and difficulty keys of both clients. A string exported on the other
+-- client keeps its keys, so a later export from this client returns them intact.
 local CONTENT_KEYS, DIFFICULTY_KEYS = {}, {}
-for _, def in ipairs(BR.Components.ContentToggleDefs) do
-    CONTENT_KEYS[def.key] = true
-    if def.diffDbKey then
-        local allowed = {}
-        for _, diff in ipairs(def.diffDefs) do
-            allowed[diff.key] = true
+do
+    local catalog = BR.Components.ContentToggleCatalog
+    for key, def in pairs(catalog.content) do
+        CONTENT_KEYS[key] = true
+        local diffDefs = catalog.difficulties[key]
+        if diffDefs then
+            local allowed = {}
+            for diffKey in pairs(diffDefs) do
+                allowed[diffKey] = true
+            end
+            DIFFICULTY_KEYS[def.diffDbKey] = allowed
         end
-        DIFFICULTY_KEYS[def.diffDbKey] = allowed
     end
 end
 

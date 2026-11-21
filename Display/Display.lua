@@ -71,7 +71,11 @@ local BR = ns
 ---@field soulstonePinnedTarget? string
 ---@field repairThreshold? number Durability percent
 ---@field repairHideInCombat? boolean
+---@field reagentThreshold? number
+---@field reagentRestedOnly? boolean
+---@field ammoThresholdStacks? number
 ---@field mageFoodContent? "all"|"dungeon"|"raid"
+---@field shamanImbue? "windfury"|"flametongue"|"rockbiter"|"frostbrand" The imbue that the WoW Forever click casts
 ---@field placeAtPlayer? boolean
 ---@field consumableDisplayMode? "icon_only"|"sub_icons"|"expanded"
 ---@field consumableBadgeOnSubIcons? boolean
@@ -89,6 +93,9 @@ local BR = ns
 ---@field useFelDomination? boolean
 ---@field warlockDemons? table<string, table<string, boolean>> Content row -> allowed demon keys
 ---@field warlockWrongDemon? boolean
+---@field warriorStances? table<string, table<string, boolean>> Content row -> allowed stance keys
+---@field druidForms? table<string, table<string, boolean>> Content row -> allowed form keys
+---@field paladinBlessings? table<string, table<string, boolean>> Content row -> chosen blessing key
 ---@field textPositions? table<string, {zone: string, offsetX: number, offsetY: number}>
 ---@field textSizes? table<string, number>
 
@@ -475,6 +482,14 @@ BR.CATEGORY_LABELS = {
 }
 
 BR.CATEGORIES = CATEGORIES
+
+-- The options UI and the movers list only these. Frames, defaults and state keep every category.
+BR.AVAILABLE_CATEGORIES = {}
+for _, category in ipairs(CATEGORIES) do
+    if BR.IsCategoryAvailable(category) then
+        BR.AVAILABLE_CATEGORIES[#BR.AVAILABLE_CATEGORIES + 1] = category
+    end
+end
 
 -- Early init of BR.Display for split modules (populated further below and in InitializeFrames)
 BR.Display = BR.Display or {}
@@ -1828,7 +1843,6 @@ local function HideAllDisplayFrames()
     BR.SecureButtons.HideAllSecureFrames()
 end
 
--- Eating icon texture ID (from State.lua, matches the eating channel aura icon)
 local EATING_ICON = BR.EATING_AURA_ICON
 
 ---Apply consumable overlays (stat label top-left, badge/quality bottom-left) to a frame.

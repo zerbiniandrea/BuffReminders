@@ -2101,73 +2101,79 @@ end
 ---@field diffDbKey? string
 ---@field diffDefs? ToggleDef[]
 
----@type ToggleDef[]
-local SCENARIO_DIFF_DEFS = {
-    { key = "delves", label = "D", tooltip = { title = L["Content.Delves"] } },
-    { key = "others", label = "O", tooltip = { title = L["Content.OtherScenarios"] } },
-}
-
----@type ToggleDef[]
-local DUNGEON_DIFF_DEFS = {
-    { key = "normal", label = "N", tooltip = { title = L["Content.NormalDungeons"] } },
-    { key = "heroic", label = "H", tooltip = { title = L["Content.HeroicDungeons"] } },
-    { key = "mythic", label = "M", tooltip = { title = L["Content.MythicDungeons"] } },
-    { key = "mythicPlus", label = "M+", tooltip = { title = L["Content.MythicPlus"] } },
-    { key = "timewalking", label = "TW", tooltip = { title = L["Content.TimewalkingDungeons"] } },
-    { key = "follower", label = "F", tooltip = { title = L["Content.FollowerDungeons"] } },
-}
-
----@type ToggleDef[]
-local RAID_DIFF_DEFS = {
-    { key = "lfr", label = "LFR", tooltip = { title = L["Content.LFR"] } },
-    { key = "normal", label = "N", tooltip = { title = L["Content.NormalRaids"] } },
-    { key = "heroic", label = "H", tooltip = { title = L["Content.HeroicRaids"] } },
-    { key = "mythic", label = "M", tooltip = { title = L["Content.MythicRaids"] } },
-}
-
----@type ToggleDef[]
-local PVP_TYPE_DEFS = {
-    { key = "arena", label = "A", tooltip = { title = L["Content.Arena"] } },
-    { key = "bg", label = "B", tooltip = { title = L["Content.Battlegrounds"] } },
-}
-
----@type ToggleDef[]
-local CONTENT_TOGGLE_DEFS = {
-    { key = "openWorld", label = "W", tooltip = { title = L["Content.OpenWorld"] } },
-    { key = "housing", label = "H", tooltip = { title = L["Content.Housing"] } },
-    {
+-- Every content segment and sub-toggle of both clients. BR.INSTANCE_CONTENT picks the
+-- ones that this client renders.
+---@type table<string, ToggleDef>
+local CONTENT_DEFS = {
+    openWorld = { key = "openWorld", label = "W", tooltip = { title = L["Content.OpenWorld"] } },
+    housing = { key = "housing", label = "H", tooltip = { title = L["Content.Housing"] } },
+    scenario = {
         key = "scenario",
         label = "S",
         tooltip = { title = L["Content.Scenarios"] },
         diffDbKey = "scenarioDifficulty",
-        diffDefs = SCENARIO_DIFF_DEFS,
     },
-    {
+    dungeon = {
         key = "dungeon",
         label = "D",
         tooltip = { title = L["Content.Dungeons"] },
         diffDbKey = "dungeonDifficulty",
-        diffDefs = DUNGEON_DIFF_DEFS,
     },
-    {
-        key = "raid",
-        label = "R",
-        tooltip = { title = L["Content.Raids"] },
-        diffDbKey = "raidDifficulty",
-        diffDefs = RAID_DIFF_DEFS,
+    raid = { key = "raid", label = "R", tooltip = { title = L["Content.Raids"] }, diffDbKey = "raidDifficulty" },
+    pvp = { key = "pvp", label = "P", tooltip = { title = L["Content.PvP"] }, diffDbKey = "pvpType" },
+}
+
+---@type table<string, table<string, ToggleDef>>
+local DIFFICULTY_DEFS = {
+    scenario = {
+        delves = { key = "delves", label = "D", tooltip = { title = L["Content.Delves"] } },
+        others = { key = "others", label = "O", tooltip = { title = L["Content.OtherScenarios"] } },
     },
-    {
-        key = "pvp",
-        label = "P",
-        tooltip = { title = L["Content.PvP"] },
-        diffDbKey = "pvpType",
-        diffDefs = PVP_TYPE_DEFS,
+    dungeon = {
+        normal = { key = "normal", label = "N", tooltip = { title = L["Content.NormalDungeons"] } },
+        heroic = { key = "heroic", label = "H", tooltip = { title = L["Content.HeroicDungeons"] } },
+        mythic = { key = "mythic", label = "M", tooltip = { title = L["Content.MythicDungeons"] } },
+        mythicPlus = { key = "mythicPlus", label = "M+", tooltip = { title = L["Content.MythicPlus"] } },
+        timewalking = { key = "timewalking", label = "TW", tooltip = { title = L["Content.TimewalkingDungeons"] } },
+        follower = { key = "follower", label = "F", tooltip = { title = L["Content.FollowerDungeons"] } },
+    },
+    raid = {
+        lfr = { key = "lfr", label = "LFR", tooltip = { title = L["Content.LFR"] } },
+        normal = { key = "normal", label = "N", tooltip = { title = L["Content.NormalRaids"] } },
+        heroic = { key = "heroic", label = "H", tooltip = { title = L["Content.HeroicRaids"] } },
+        mythic = { key = "mythic", label = "M", tooltip = { title = L["Content.MythicRaids"] } },
+        raid40 = { key = "raid40", label = "40", tooltip = { title = L["Content.Raids40"] } },
+        raid20 = { key = "raid20", label = "20", tooltip = { title = L["Content.Raids20"] } },
+    },
+    pvp = {
+        arena = { key = "arena", label = "A", tooltip = { title = L["Content.Arena"] } },
+        bg = { key = "bg", label = "B", tooltip = { title = L["Content.Battlegrounds"] } },
     },
 }
 
--- The set of content and difficulty keys a visibility table can hold. Exported
--- so import validation needs no second copy of the same list.
-Components.ContentToggleDefs = CONTENT_TOGGLE_DEFS
+Components.ContentToggleCatalog = { content = CONTENT_DEFS, difficulties = DIFFICULTY_DEFS }
+
+---@type ToggleDef[]
+local CONTENT_TOGGLE_DEFS = {}
+do
+    local instanceContent = BR.INSTANCE_CONTENT
+    local titles = instanceContent.titles or {}
+    for _, key in ipairs(instanceContent.contentTypes) do
+        local def = CONTENT_DEFS[key]
+        local title = titles[key]
+        local toggle = { key = key, label = def.label, tooltip = title and { title = title } or def.tooltip }
+        local diffKeys = instanceContent.difficulties[key]
+        if diffKeys then
+            local diffDefs = {}
+            for i, diffKey in ipairs(diffKeys) do
+                diffDefs[i] = DIFFICULTY_DEFS[key][diffKey]
+            end
+            toggle.diffDbKey = def.diffDbKey
+            toggle.diffDefs = diffDefs
+        end
+        CONTENT_TOGGLE_DEFS[#CONTENT_TOGGLE_DEFS + 1] = toggle
+    end
+end
 
 local contentToggleByKey = {}
 local DIFF_MAPPINGS = {}

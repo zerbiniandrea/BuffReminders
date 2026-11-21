@@ -29,9 +29,18 @@ BR.BuffBeneficiaries = {
     -- stamina, versatility, skyfury, bronze = everyone benefits (nil)
 }
 
--- Hunters use mana on WoW Forever.
+-- Hunters use mana on WoW Forever. Spirit helps the same mana users.
+-- Blessing of Might raises melee attack power only.
 if BR.CLIENT == BR.ClientType.Forever then
     BR.BuffBeneficiaries.intellect.HUNTER = true
+    BR.BuffBeneficiaries.spirit = BR.BuffBeneficiaries.intellect
+    BR.BuffBeneficiaries.meleeAttackPower = {
+        WARRIOR = true,
+        ROGUE = true,
+        PALADIN = true,
+        SHAMAN = true,
+        DRUID = true,
+    }
 end
 
 -- Specs that benefit from each buff (used when spec ID is known via LibSpecialization)
