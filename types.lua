@@ -57,6 +57,8 @@
 ---@alias SpellID number|number[]
 ---@alias ClassName "WARRIOR"|"PALADIN"|"HUNTER"|"ROGUE"|"PRIEST"|"DEATHKNIGHT"|"SHAMAN"|"MAGE"|"WARLOCK"|"MONK"|"DRUID"|"DEMONHUNTER"|"EVOKER"
 ---@alias RoleType "TANK"|"HEALER"|"DAMAGER"
+-- What one cast of the buff covers: the caster's party, or the whole raid.
+---@alias BuffReach "party"|"raid"
 ---@alias SpecID number
 ---@alias BuffBeneficiaries table<string, table<ClassName, boolean>>
 ---@alias SpecBeneficiaries table<string, table<SpecID, boolean>>

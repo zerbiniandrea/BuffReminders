@@ -83,8 +83,11 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field key string
 ---@field name string
 ---@field class ClassName
+---@field reach BuffReach In a raid, "party" counts only the player's subgroup
+---@field icons? IconSpec
 ---@field levelRequired? number
 ---@field playersOnly? boolean Exclude NPCs from the count (e.g. buffs NPCs provide themselves)
+---@field defaultEnabled? boolean Ships disabled when false (opt-in); enabled otherwise. Resolved at read time by IsBuffEnabled.
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
 
 ---@class PresenceBuff
@@ -92,6 +95,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field key string
 ---@field name string
 ---@field class ClassName
+---@field reach BuffReach In a raid, "party" counts only the player's subgroup
 ---@field levelRequired? number
 ---@field overlayText string
 ---@field groupId? string
@@ -500,6 +504,7 @@ BR.BUFF_TABLES = {
             key = "intellect",
             name = L["Buff.ArcaneIntellect"],
             class = "MAGE",
+            reach = "raid",
             levelRequired = 8,
             chatRequestable = true,
         }, -- 432778 = NPC version
@@ -508,6 +513,7 @@ BR.BUFF_TABLES = {
             key = "attackPower",
             name = L["Buff.BattleShout"],
             class = "WARRIOR",
+            reach = "raid",
             levelRequired = 10,
             chatRequestable = true,
         },
@@ -531,6 +537,7 @@ BR.BUFF_TABLES = {
             key = "bronze",
             name = L["Buff.BlessingOfTheBronze"],
             class = "EVOKER",
+            reach = "raid",
             levelRequired = 30,
             playersOnly = true, -- NPCs have their own bronze variant (e.g. 432658)
             chatRequestable = true,
@@ -540,6 +547,7 @@ BR.BUFF_TABLES = {
             key = "versatility",
             name = L["Buff.MarkOfTheWild"],
             class = "DRUID",
+            reach = "raid",
             levelRequired = 10,
             chatRequestable = true,
         }, -- 432661 = NPC version
@@ -548,6 +556,7 @@ BR.BUFF_TABLES = {
             key = "stamina",
             name = L["Buff.PowerWordFortitude"],
             class = "PRIEST",
+            reach = "raid",
             levelRequired = 10,
             chatRequestable = true,
         },
@@ -556,6 +565,7 @@ BR.BUFF_TABLES = {
             key = "skyfury",
             name = L["Buff.Skyfury"],
             class = "SHAMAN",
+            reach = "raid",
             levelRequired = 16,
             chatRequestable = true,
         },
@@ -570,6 +580,7 @@ BR.BUFF_TABLES = {
             key = "atrophicNumbingPoison",
             name = L["Buff.AtrophicNumbingPoison"],
             class = "ROGUE",
+            reach = "raid",
             levelRequired = 80,
             overlayText = L["Overlay.NoDrPoison"],
             groupOnly = true, -- self-buff "roguePoisons" already covers solo
@@ -581,6 +592,7 @@ BR.BUFF_TABLES = {
             key = "devotionAura",
             name = L["Buff.DevotionAura"],
             class = "PALADIN",
+            reach = "raid",
             levelRequired = 10,
             overlayText = L["Overlay.NoAura"],
             chatRequestable = true,
@@ -590,6 +602,7 @@ BR.BUFF_TABLES = {
             key = "soulstone",
             name = L["Buff.Soulstone"],
             class = "WARLOCK",
+            reach = "raid",
             levelRequired = 13,
             overlayText = L["Overlay.NoSoulstone"],
             chatRequestable = true,

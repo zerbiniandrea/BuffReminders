@@ -319,7 +319,7 @@ end
 -- already-active buff on an unreachable ally still registers as covered.
 -- Counting paths apply a "phased + missing -> skip" rule to keep unfixable gaps
 -- out of the missing math; presence/targeted scans just iterate everyone.
----@type {unit: string, class: string?, isPlayer: boolean, name: string?, isPhased: boolean}[]
+---@type {unit: string, class: string?, isPlayer: boolean, name: string?, isPhased: boolean, inPlayerParty: boolean}[]
 local currentValidUnits = {}
 
 -- Solo snapshot from the most recent BuildValidUnitCache().
@@ -486,7 +486,7 @@ end
 local activeNames = {}
 
 -- Pool of reusable unit entry tables (avoids creating new tables each refresh)
----@type {unit: string, class: string?, isPlayer: boolean, name: string?, isPhased: boolean}[]
+---@type {unit: string, class: string?, isPlayer: boolean, name: string?, isPhased: boolean, inPlayerParty: boolean}[]
 local unitEntryPool = {}
 local unitEntryPoolSize = 0
 
@@ -496,8 +496,9 @@ local unitEntryPoolSize = 0
 ---@param isPlayer boolean
 ---@param name string?
 ---@param isPhased boolean True when the unit is in another phase or out of broadcast range
----@return {unit: string, class: string?, isPlayer: boolean, name: string?, isPhased: boolean}
-local function AcquireUnitEntry(unit, class, isPlayer, name, isPhased)
+---@param inPlayerParty boolean True when the unit is in the player's raid subgroup, or not in a raid
+---@return {unit: string, class: string?, isPlayer: boolean, name: string?, isPhased: boolean, inPlayerParty: boolean}
+local function AcquireUnitEntry(unit, class, isPlayer, name, isPhased, inPlayerParty)
     local entry
     if unitEntryPoolSize > 0 then
         entry = unitEntryPool[unitEntryPoolSize]
@@ -508,8 +509,16 @@ local function AcquireUnitEntry(unit, class, isPlayer, name, isPhased)
         entry.isPlayer = isPlayer
         entry.name = name
         entry.isPhased = isPhased
+        entry.inPlayerParty = inPlayerParty
     else
-        entry = { unit = unit, class = class, isPlayer = isPlayer, name = name, isPhased = isPhased }
+        entry = {
+            unit = unit,
+            class = class,
+            isPlayer = isPlayer,
+            name = name,
+            isPhased = isPhased,
+            inPlayerParty = inPlayerParty,
+        }
     end
     return entry
 end
@@ -526,6 +535,44 @@ end
 -- Max level per class for current refresh cycle (players only, for caster availability checks)
 ---@type table<ClassName, number>
 local classMaxLevels = {}
+-- The same, for the members in the player's raid subgroup only
+---@type table<ClassName, number>
+local partyClassMaxLevels = {}
+
+-- Raid subgroup per raid unit token, and the player's own subgroup under "player"
+---@type table<string, number>
+local raidSubgroups = {}
+local raidSubgroupsValid = false
+
+-- Only a party-reach buff reads raid subgroups, so a client without one skips the roster scan
+local hasPartyReachBuff = false
+for _, list in ipairs({ RaidBuffs, PresenceBuffs }) do
+    for _, buff in ipairs(list) do
+        if buff.reach == "party" then
+            hasPartyReachBuff = true
+        end
+    end
+end
+
+---@return table<string, number>
+local function GetRaidSubgroups()
+    if raidSubgroupsValid then
+        return raidSubgroups
+    end
+    wipe(raidSubgroups)
+    for i = 1, GetNumGroupMembers() do
+        local unit = "raid" .. i
+        local _, _, subgroup = GetRaidRosterInfo(i)
+        subgroup = Plain(subgroup)
+        raidSubgroups[unit] = subgroup
+        if Plain(UnitIsUnit(unit, "player")) then
+            raidSubgroups.player = subgroup
+        end
+    end
+    -- A secret roster read leaves the player's subgroup unknown, so the next refresh reads again
+    raidSubgroupsValid = raidSubgroups.player ~= nil
+    return raidSubgroups
+end
 
 ---Get the player's current spec ID (cached)
 ---@return number?
@@ -696,6 +743,7 @@ end
 local function BuildValidUnitCache()
     RecycleUnitEntries()
     wipe(classMaxLevels)
+    wipe(partyClassMaxLevels)
     wipe(activeNames)
     -- Reset per-unit tracked-aura instance sets; the scans this refresh performs
     -- repopulate them (sets are reused; stale unit keys stay empty)
@@ -723,6 +771,10 @@ local function BuildValidUnitCache()
     -- the unit cache. Treat it as a 1-unit "group of player" so dead/phased/etc.
     -- filtering via IsValidBuffTarget runs uniformly for solo and grouped paths.
     local memberCount = groupSize == 0 and 1 or groupSize
+
+    -- An unknown player subgroup counts every raid member as the player's party
+    local subgroups = inRaid and hasPartyReachBuff and GetRaidSubgroups()
+    local playerSubgroup = subgroups and subgroups.player
 
     for i = 1, memberCount do
         local unit
@@ -756,7 +808,9 @@ local function BuildValidUnitCache()
                 end
                 local isPlayer = UnitIsPlayer(unit)
                 local isPhased = IsUnitPhased(unit)
-                currentValidUnits[#currentValidUnits + 1] = AcquireUnitEntry(unit, class, isPlayer, name, isPhased)
+                local inPlayerParty = not playerSubgroup or (subgroups and subgroups[unit]) == playerSubgroup
+                currentValidUnits[#currentValidUnits + 1] =
+                    AcquireUnitEntry(unit, class, isPlayer, name, isPhased, inPlayerParty)
                 -- Track max level per class (players only, for buff caster checks).
                 -- Skip phased / out-of-broadcast-range allies: they cannot reliably
                 -- cast on the group now. The addon must not track a buff that no
@@ -765,6 +819,9 @@ local function BuildValidUnitCache()
                     local level = UnitLevel(unit)
                     if not classMaxLevels[class] or level > classMaxLevels[class] then
                         classMaxLevels[class] = level
+                    end
+                    if inPlayerParty and (not partyClassMaxLevels[class] or level > partyClassMaxLevels[class]) then
+                        partyClassMaxLevels[class] = level
                     end
                 end
             end
@@ -780,9 +837,10 @@ end
 ---Uses classMaxLevels cache built at start of refresh cycle
 ---@param requiredClass ClassName
 ---@param levelRequired? number
+---@param reach? BuffReach "party" looks only in the player's raid subgroup
 ---@return boolean
-local function HasCasterForBuff(requiredClass, levelRequired)
-    local maxLevel = classMaxLevels[requiredClass]
+local function HasCasterForBuff(requiredClass, levelRequired, reach)
+    local maxLevel = (reach == "party" and partyClassMaxLevels or classMaxLevels)[requiredClass]
     if not maxLevel then
         return false
     end
@@ -1394,10 +1452,11 @@ end
 ---@param buffKey? string Used for class benefit filtering
 ---@param playerOnly? boolean Only check the player, not the group
 ---@param playersOnly? boolean Exclude NPCs from the count (e.g. buffs NPCs provide themselves)
+---@param partyOnly? boolean In a raid, count only the player's subgroup
 ---@return number missing
 ---@return number total
 ---@return number? minRemaining
-local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly)
+local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, partyOnly)
     local missing = 0
     local total = 0
     local minRemaining = nil
@@ -1426,7 +1485,7 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly)
         -- combat-whitelisted, so UnitHasBuff returns nil and the missing count is
         -- wrong. Targeted buffs use player-cast spell IDs that ARE whitelisted, so
         -- they still include NPCs.
-        if data.isPlayer or countNPCs then
+        if (data.isPlayer or countNPCs) and (data.inPlayerParty or not partyOnly) then
             if UnitBenefitsFromBuff(specBeneficiaries, beneficiaries, allySpecCache[data.name], data.class) then
                 local hasBuff, remaining = UnitHasBuff(data.unit, GetUnitSpellIDs(buffKey, spellIDs, data.class))
                 -- A phased ally counts only when the buff is already on them. A
@@ -1454,10 +1513,11 @@ end
 ---@param spellIDs SpellID
 ---@param playerOnly? boolean Only check the player, not the group
 ---@param playerCastOnly? boolean Count only auras cast by the player (e.g. castOnOthers for the caster class)
+---@param partyOnly? boolean In a raid, look only in the player's subgroup
 ---@return boolean hasBuff
 ---@return number? minRemaining
 ---@return table? targetEntry First non-player unit entry that has the buff
-local function HasPresenceBuff(spellIDs, playerOnly, playerCastOnly)
+local function HasPresenceBuff(spellIDs, playerOnly, playerCastOnly, partyOnly)
     if playerOnly or #currentValidUnits <= 1 then
         if playerCastOnly then
             local hasBuff, remaining = UnitHasBuffFromPlayer("player", spellIDs)
@@ -1473,7 +1533,7 @@ local function HasPresenceBuff(spellIDs, playerOnly, playerCastOnly)
 
     for _, data in ipairs(currentValidUnits) do
         -- Skip NPCs in content where they cannot receive player buffs
-        if data.isPlayer or includeNPCsInCounting then
+        if (data.isPlayer or includeNPCsInCounting) and (data.inPlayerParty or not partyOnly) then
             local hasBuff, remaining, sourceUnit = UnitHasBuff(data.unit, spellIDs)
             -- With player-cast auras only, another player's cast can mask the
             -- player's own via GetUnitAuraBySpellID. Fall back to a HELPFUL|PLAYER
@@ -2149,17 +2209,22 @@ local function RefreshRaid(db, trackingMode, hideExpiring, missingCountOnly)
     local bronzeHiddenInCombat = GameContext.IsInCombat() and db.bronzeHideInCombat
     for i, buff in ipairs(RaidBuffs) do
         local entry = GetOrCreateEntry(buff.key, "raid", i)
-        local scope =
-            GetTrackingScope(trackingMode, buff.class, "raid", HasCasterForBuff(buff.class, buff.levelRequired))
+        local scope = GetTrackingScope(
+            trackingMode,
+            buff.class,
+            "raid",
+            HasCasterForBuff(buff.class, buff.levelRequired, buff.reach)
+        )
 
         if
             not (bronzeHiddenInCombat and buff.key == "bronze")
             and IsBuffEnabled(buff.key)
+            and (not isAuraRestricted or IsAuraTrackable(buff))
             and raidVisible
             and scope.show
         then
             local missing, total, minRemaining =
-                CountMissingBuff(buff.spellID, buff.key, scope.playerOnly, buff.playersOnly)
+                CountMissingBuff(buff.spellID, buff.key, scope.playerOnly, buff.playersOnly, buff.reach == "party")
 
             if missing > 0 then
                 entry.visible = true
@@ -2290,7 +2355,7 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring)
                 trackingMode,
                 buff.class,
                 "presence",
-                HasCasterForBuff(buff.class, buff.levelRequired),
+                HasCasterForBuff(buff.class, buff.levelRequired, buff.reach),
                 buff.castOnOthers
             )
             local dungeonEntryOk = buff.showOnInstanceEntry and GameContext.IsInDungeonEntry()
@@ -2352,7 +2417,8 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring)
                         -- own cast. That resolves the right target and keeps another
                         -- caster's coverage from hiding the icon.
                         if not scanned then
-                            hasBuff, minRemaining = HasPresenceBuff(buff.spellID, scope.playerOnly, isOwnCaster)
+                            hasBuff, minRemaining =
+                                HasPresenceBuff(buff.spellID, scope.playerOnly, isOwnCaster, buff.reach == "party")
                         end
                         -- customCheck gates display (e.g., soulstone CD tracking for warlocks)
                         local customOk = true
@@ -2991,6 +3057,10 @@ function BuffState.InvalidateHealerCache()
     cachedHealerInGroup = nil
 end
 
+function BuffState.InvalidateSubgroupCache()
+    raidSubgroupsValid = false
+end
+
 ---Get the player's current role (cached, invalidated on spec change)
 ---@return RoleType?
 BuffState.GetPlayerRole = GetPlayerRole
@@ -3477,6 +3547,7 @@ BR.GameContext.RegisterCache("auraTrackable", BuffState.InvalidateAuraTrackableC
 BR.GameContext.RegisterCache("spell", BuffState.InvalidateSpellCache)
 BR.GameContext.RegisterCache("spec", BuffState.InvalidateSpecCache)
 BR.GameContext.RegisterCache("healer", BuffState.InvalidateHealerCache)
+BR.GameContext.RegisterCache("subgroup", BuffState.InvalidateSubgroupCache)
 BR.GameContext.RegisterCache("offHand", BuffState.InvalidateOffHandCache)
 BR.GameContext.RegisterCache("item", BuffState.InvalidateItemCache)
 BR.GameContext.RegisterCache("durability", BuffState.InvalidateDurabilityCache)
