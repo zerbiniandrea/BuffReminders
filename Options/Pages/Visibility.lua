@@ -30,7 +30,8 @@ local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
 
 -- One declarative row per HideWhen toggle. `default` is the value the getter
 -- returns when the key is unset. Some keys default on and some default off, so
--- each row carries its own value.
+-- each row carries its own value. `shown = false` leaves out a row that cannot
+-- apply on this client.
 local HIDE_WHEN_ROWS = {
     {
         key = "showOnlyInGroup",
@@ -81,6 +82,7 @@ local HIDE_WHEN_ROWS = {
     },
     {
         key = "hideInLegacyInstances",
+        shown = BR.INSTANCE_CONTENT.legacyLoot,
         default = false,
         labelKey = "Options.HideWhen.Legacy",
         tooltipTitle = "Options.HideWhen.Legacy.Title",
@@ -102,26 +104,28 @@ local function BuildHideWhenSection(content, layout)
     LayoutSectionHeader(layout, content, L["Options.HideWhen"])
 
     for _, row in ipairs(HIDE_WHEN_ROWS) do
-        local baseSetter = MakeProfileSetter(row.key)
-        local onChange = row.extraOnChange
-                and function(checked)
-                    baseSetter(checked)
-                    row.extraOnChange()
-                end
-            or baseSetter
+        if row.shown ~= false then
+            local baseSetter = MakeProfileSetter(row.key)
+            local onChange = row.extraOnChange
+                    and function(checked)
+                        baseSetter(checked)
+                        row.extraOnChange()
+                    end
+                or baseSetter
 
-        local cfg = {
-            label = L[row.labelKey],
-            get = MakeProfileGetter(row.key, row.default),
-            onChange = onChange,
-            enabled = row.enabled,
-            disabledReason = row.disabledReason and L[row.disabledReason] or nil,
-        }
-        if row.tooltipTitle then
-            cfg.tooltip = { title = L[row.tooltipTitle], desc = L[row.tooltipDesc] }
+            local cfg = {
+                label = L[row.labelKey],
+                get = MakeProfileGetter(row.key, row.default),
+                onChange = onChange,
+                enabled = row.enabled,
+                disabledReason = row.disabledReason and L[row.disabledReason] or nil,
+            }
+            if row.tooltipTitle then
+                cfg.tooltip = { title = L[row.tooltipTitle], desc = L[row.tooltipDesc] }
+            end
+            local holder = Components.Checkbox(content, cfg)
+            layout:Add(holder, nil, COMPONENT_GAP)
         end
-        local holder = Components.Checkbox(content, cfg)
-        layout:Add(holder, nil, COMPONENT_GAP)
     end
 end
 

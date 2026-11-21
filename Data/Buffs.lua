@@ -91,6 +91,9 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
 ---@field castOnMissing? boolean The cast takes one target: the click casts on a member who lacks the buff
 ---@field groupCast? GroupCastRank[] Group ranks that use a reagent, highest first. The user turns them on per buff
+---@field requiresKnownSpell? boolean Only a player who knows one of the spells sees it. The talents of other members are unreadable
+---@field choiceGrid? StanceGrid The user picks the tracked buff per content row
+---@field activeChoice? fun(): StanceChoice?, number? Choice of the current row and the rank to cast. nil = no reminder
 
 ---@class GroupCastRank
 ---@field spellID number
@@ -144,10 +147,12 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field overlayText string
 ---@field groupId? string
 ---@field defaultEnabled? boolean Ships disabled when false (opt-in); enabled otherwise. Resolved at read time by IsBuffEnabled.
----@field enchantID? number
+---@field enchantID? number|table<number, true> One enchant ID, or a set of accepted IDs
+---@field enchantDuration? number Full enchant duration in seconds, for the short-buff expiration rule
+---@field visibilityCondition? fun(): boolean Return false to hide the buff
 ---@field requiresBuffWithEnchant? boolean -- When true, require both enchant AND buff to be present (for Paladin Rites)
 ---@field getExpirationInfo? fun(): number?, number? -- Remaining seconds and expiring spell ID, for a buff with no single aura
----@field castSpellID? number           -- Spell ID used for click-to-cast when different from spellID
+---@field castSpellID? number|number[] -- Click-to-cast spell when different from spellID. A list casts the first known spell
 ---@field clickMacro? fun(spellID: number?): string -- Macro text override for click-to-cast, receives castable spell ID
 ---@field buffIdOverride? number|number[]
 ---@field requireSpecId? number        -- Only show if player's current spec matches (WoW spec ID)
@@ -157,12 +162,19 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field infoTooltip? TooltipText
 ---@field customCheck? fun(isRestricted?: boolean): boolean?
 ---@field getPetActions? fun(): PetAction[]?  -- Override pet actions (e.g., wrong pet -> Felguard only)
+---@field petSacrifice? PetSacrifice The player can sacrifice the pet for a buff
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
 ---@field showOnInstanceEntry? boolean Only show when entering an instance (not M+), skip normal buff checks
 ---@field showWhenPresent? boolean Show when buff IS active (inverts normal "show when missing" logic)
 ---@field noClickToCast? boolean Suppress click-to-cast overlay (e.g., CastSpellByID can't toggle this spell)
 ---@field noExpirationGlow? boolean Suppress expiration glow (for permanent enchants or intentionally short buffs)
 ---@field skipSpellKnownCheck? boolean Skip the "player knows spell" check (for custom/dynamic entries)
+
+---A known sacrifice spell hides the reminder while a sacrifice buff is up. If a restricted
+---context makes the buffs unreadable, the reminder hides.
+---@class PetSacrifice
+---@field spellID number
+---@field auraIDs number[] Buffs that the sacrifice gives
 
 ---@class ConsumableBuff
 ---@field spellID? SpellID
@@ -257,20 +269,151 @@ local function IsInDelve()
 end
 BR.IsInDelve = IsInDelve
 
----Check if the player's pet is on passive stance
----@return boolean? true if pet exists and is on passive, nil otherwise
-local function IsPetOnPassive()
-    if not UnitExists("pet") then
-        return nil
-    end
-    for i = 1, NUM_PET_ACTION_SLOTS do
-        local name, _, _, isActive = GetPetActionInfo(i)
-        if name == "PET_MODE_PASSIVE" and isActive then
-            return true
-        end
-    end
-    return nil
+-- Extra content that the dungeon row of a per-content grid covers. nil = dungeons only.
+---@type string?
+BR.CONTENT_GRID_DUNGEON_DESC = L["BuffPanel.WarlockDemon.Dungeon.Desc"]
+
+BR.SHADOWFORM_SPELL_ID = 232698
+
+-- Icon of the eating channel aura, the same for all food types.
+BR.EATING_AURA_ICON = 133950
+
+-- Sample icons for the consumable item display preview in the options.
+BR.CONSUMABLE_PREVIEW_TEXTURES = {
+    flask = { 7548898, 7548899, 7548900 },
+    food = { 4672193, 1045939 },
+    oil = 7548987,
+}
+
+-- Consumable options that only apply to this client's item data.
+BR.CONSUMABLE_FEATURES = { itemLabels = true, delveFood = true, legacyItems = true }
+
+---@class InstanceContent
+---@field contentTypes string[] Segments of the content visibility bar, in bar order
+---@field difficulties table<string, string[]> Sub-toggle keys per content type, in bar order. No entry = no sub-row
+---@field difficultyIDs table<string, table<number, string>> Difficulty key per GetInstanceInfo difficultyID
+---@field titles? table<string, string> Content segment titles that replace the shared titles
+---@field legacyLoot boolean Old instances can run in legacy loot mode
+
+---@type InstanceContent
+BR.INSTANCE_CONTENT = {
+    contentTypes = { "openWorld", "housing", "scenario", "dungeon", "raid", "pvp" },
+    difficulties = {
+        scenario = { "delves", "others" },
+        dungeon = { "normal", "heroic", "mythic", "mythicPlus", "timewalking", "follower" },
+        raid = { "lfr", "normal", "heroic", "mythic" },
+        pvp = { "arena", "bg" },
+    },
+    difficultyIDs = {
+        dungeon = {
+            [1] = "normal",
+            [2] = "heroic",
+            [23] = "mythic",
+            [8] = "mythicPlus", -- Mythic Keystone
+            [24] = "timewalking",
+            [205] = "follower",
+        },
+        raid = {
+            [17] = "lfr",
+            [14] = "normal",
+            [15] = "heroic",
+            [16] = "mythic",
+        },
+    },
+    legacyLoot = true,
+}
+
+---@class PetSpells
+---@field callPet number[] Call Pet spells, one per stable slot
+---@field stableSlots? boolean Each Call Pet spell summons the pet of its stable slot
+---@field demonFlyout? number Flyout that holds the demon summons
+---@field demonSummons? number[] Demon summon spells, for a client without the flyout
+---@field demonChoices string[] Demon keys of the warlockDemons grid, in grid order
+---@field demonPreference string[] Demon keys in the order that the summon click prefers
+---@field felguard? number
+---@field felDomination number
+
+---@type PetSpells
+BR.PET_SPELLS = {
+    callPet = { 883, 83242, 83243, 83244, 83245 },
+    stableSlots = true,
+    demonFlyout = 10,
+    demonChoices = { "imp", "voidwalker", "felhunter", "sayaad" },
+    -- Felhunter first for its interrupt.
+    demonPreference = { "felhunter", "imp", "voidwalker", "sayaad" },
+    felguard = 30146,
+    felDomination = 333889,
+}
+
+---@class StanceChoice
+---@field key string Saved-variable key in the grid rows
+---@field spellIDs number[] Highest rank first. Empty for the caster choice (no form)
+---@field label? string Label of a choice with no spell
+---@field iconSpellID? number Icon of a choice with no spell
+---@field groupCast? GroupCastRank[] Group ranks of a buff choice, highest first
+---@field auraIDs? number[] Every aura ID that counts as the buff choice
+---@field beneficiaries? string BuffBeneficiaries key of a buff choice. nil = the beneficiaries of the buff key
+
+---@class StanceGrid
+---@field setting string Key of the grid in profile.defaults
+---@field choices StanceChoice[] In grid order. The click prefers the first allowed choice
+---@field hint string
+---@field single? boolean A row holds at most one choice
+
+---@class StanceRule
+---@field allowed fun(): table<number, boolean>? Allowed stance spells (BR.NO_STANCE = no stance). nil = no reminder
+---@field castID fun(): number? Stance spell that the click casts. BR.NO_STANCE = cancel the current form
+---@field grid? StanceGrid Allowed choices per content row
+
+local STANCE_BATTLE = 386164
+local STANCE_BERSERKER = 386196
+local STANCE_DEFENSIVE = 386208
+
+-- Arms: Battle. Fury: Battle or Berserker (the Berserker talent replaces Battle).
+-- Protection: Defensive.
+local WARRIOR_EXPECTED_STANCES = {
+    [71] = { [STANCE_BATTLE] = true },
+    [72] = { [STANCE_BATTLE] = true, [STANCE_BERSERKER] = true },
+    [73] = { [STANCE_DEFENSIVE] = true },
+}
+
+-- Only Feral and Balance need a form. Incarnation talents empower the existing
+-- form and keep its stance bar slot, so the base form ID still matches.
+local DRUID_EXPECTED_FORMS = {
+    [102] = 24858, -- Balance: Moonkin Form
+    [103] = 768, -- Feral: Cat Form
+}
+local DRUID_ALLOWED_FORMS = {}
+for specId, formID in pairs(DRUID_EXPECTED_FORMS) do
+    DRUID_ALLOWED_FORMS[specId] = { [formID] = true }
 end
+
+---@type table<string, StanceRule>
+BR.STANCE_RULES = {
+    WARRIOR = {
+        allowed = function()
+            return WARRIOR_EXPECTED_STANCES[BR.StateHelpers.GetPlayerSpecId()]
+        end,
+        castID = function()
+            local specId = BR.StateHelpers.GetPlayerSpecId()
+            if specId == 73 then
+                return STANCE_DEFENSIVE
+            end
+            if specId == 72 and IsPlayerSpellCached(STANCE_BERSERKER) then
+                return STANCE_BERSERKER
+            end
+            return STANCE_BATTLE
+        end,
+    },
+    DRUID = {
+        allowed = function()
+            return DRUID_ALLOWED_FORMS[BR.StateHelpers.GetPlayerSpecId()]
+        end,
+        castID = function()
+            return DRUID_EXPECTED_FORMS[BR.StateHelpers.GetPlayerSpecId()]
+        end,
+    },
+}
 
 ---Build a clickMacro function for targeted buffs that remembers the last target (last target re-casting).
 ---Macro priority: last target > mouseover > current target > no target (self-cast or error).
@@ -1010,8 +1153,8 @@ BR.BUFF_TABLES = {
             class = "PRIEST",
             overlayText = L["Overlay.NoForm"],
             icons = { textures = { 136200 } }, -- spell_shadow_shadowform
-            requiresSpellID = 232698,
-            castSpellID = 232698,
+            requiresSpellID = BR.SHADOWFORM_SPELL_ID,
+            castSpellID = BR.SHADOWFORM_SPELL_ID,
             noExpirationGlow = true, -- Voidform (short duration) replaces Shadowform; do not warn
             customCheck = function()
                 return not BR.BuffState.IsShadowFormActive()
@@ -1119,7 +1262,7 @@ BR.BUFF_TABLES = {
                 dynamic = function()
                     -- Show the stance the player is currently in (the wrong one); when
                     -- unstanced, fall back to the expected-for-spec icon as a hint.
-                    local current = BR.BuffState.GetCurrentWarriorStanceIcon()
+                    local current = BR.BuffState.GetCurrentStanceIcon()
                     if current then
                         return current
                     end
@@ -1146,7 +1289,9 @@ BR.BUFF_TABLES = {
             -- No class: applies to any class with a pet
             overlayText = L["Overlay.PassivePet"],
             icons = { textures = { 132311 } },
-            customCheck = IsPetOnPassive,
+            customCheck = function()
+                return BR.PetHelpers.IsPetOnPassive()
+            end,
         },
         -- Pet reminders, in alphabetical order.
         {

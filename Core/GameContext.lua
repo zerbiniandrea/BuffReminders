@@ -9,7 +9,7 @@ local BR = ns
 -- handler reads fresh values.
 -- RenderRequested asks for the render that a change needs. urgent = true asks for it now.
 
----@alias CacheId "auraTrackable"|"consumables"|"contentType"|"durability"|"healer"|"item"|"loadout"|"offHand"|"pet"|"petActions"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"stance"|"subgroup"
+---@alias CacheId "auraTrackable"|"consumables"|"contentType"|"durability"|"healer"|"item"|"loadout"|"offHand"|"pet"|"petActions"|"petHappiness"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"stance"|"subgroup"
 
 ---@class GameContextEventSpec
 ---@field caches? CacheId[] Cache ids to clear, in order
@@ -192,6 +192,13 @@ local HEALER = { caches = { "healer" } }
 local ROSTER = { caches = { "healer", "subgroup" } }
 ---@type GameContextEventSpec
 local STANCE = { caches = { "stance" } }
+---@type GameContextEventSpec
+local PET_HAPPINESS = {
+    caches = { "petHappiness" },
+    handle = function()
+        NotifyChanged(false)
+    end,
+}
 
 ---@type table<string, GameContextEventSpec>
 local EVENT_CACHES = {
@@ -208,6 +215,7 @@ local EVENT_CACHES = {
             "repairSource",
             "durability",
             "petActions",
+            "petHappiness",
             "spellTextureMisses",
             "spellNameMisses",
             "subgroup",
@@ -286,7 +294,8 @@ local EVENT_CACHES = {
     GROUP_ROSTER_UPDATE = ROSTER,
     GROUP_FORMED = ROSTER,
     PLAYER_ROLES_ASSIGNED = HEALER,
-    UNIT_PET = { playerOnly = true, caches = { "pet" } },
+    UNIT_PET = { playerOnly = true, caches = { "pet", "petHappiness" } },
+    UNIT_HAPPINESS = PET_HAPPINESS,
     UPDATE_SHAPESHIFT_FORM = STANCE,
     UPDATE_SHAPESHIFT_FORMS = STANCE,
     PET_STABLE_UPDATE = { caches = { "petActions" } },
@@ -315,6 +324,13 @@ local EVENT_CACHES = {
     },
     PLAYER_EQUIPMENT_CHANGED = { caches = { "item", "offHand", "loadout", "durability" } },
     UPDATE_INVENTORY_DURABILITY = { caches = { "durability" } },
+    -- A temporary weapon enchant starts and ends with no aura event.
+    UNIT_INVENTORY_CHANGED = {
+        playerOnly = true,
+        handle = function()
+            NotifyChanged(false)
+        end,
+    },
     BAG_UPDATE_DELAYED = { caches = { "item", "repairSource", "consumables" } },
     NEW_MOUNT_ADDED = { caches = { "repairSource" } },
     PLAYER_MOUNT_DISPLAY_CHANGED = {
@@ -353,6 +369,19 @@ function GameContext.Invalidate(id)
         error("GameContext: unknown cache id '" .. tostring(id) .. "'", 2)
     end
     fn()
+end
+
+-- A client with pet happiness can report it as a pet power type. The pet unit filter keeps
+-- the power events of other units away.
+if GetPetHappiness then
+    local petPowerFrame = CreateFrame("Frame")
+    petPowerFrame:SetScript("OnEvent", function(_, _, _, powerType)
+        if powerType == "HAPPINESS" then
+            GameContext.Invalidate("petHappiness")
+            NotifyChanged(false)
+        end
+    end)
+    BR.Client.RegisterEvent(petPowerFrame, "UNIT_POWER_UPDATE", "pet")
 end
 
 ---@param ids CacheId[]

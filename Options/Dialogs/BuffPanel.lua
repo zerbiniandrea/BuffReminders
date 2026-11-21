@@ -102,6 +102,12 @@ local SHOW_MODELS = {
     soulstone = function()
         return MakeVisibilityShowModel("soulstoneVisibility")
     end,
+    manaGem = function()
+        local model = MakeVisibilityShowModel("healthstoneVisibility")
+        model.hasCasterOption = false
+        model.note = L["BuffPanel.ShowSharedWithHealthstone"]
+        return model
+    end,
 }
 
 -- Drawer / editor geometry.
@@ -132,16 +138,15 @@ local function AddSpecialCheckbox(layout, opts)
     return holder
 end
 
-local DEMON_ROWS = {
+local GRID_ROWS = {
     { key = "world", label = L["BuffPanel.WarlockDemon.World"] },
-    { key = "dungeon", label = L["BuffPanel.WarlockDemon.Dungeon"], desc = L["BuffPanel.WarlockDemon.Dungeon.Desc"] },
+    { key = "dungeon", label = L["BuffPanel.WarlockDemon.Dungeon"], desc = BR.CONTENT_GRID_DUNGEON_DESC },
     { key = "raid", label = L["BuffPanel.WarlockDemon.Raid"] },
     { key = "pvp", label = L["BuffPanel.WarlockDemon.PvP"] },
 }
-local DEMON_CHOICES = BR.PetHelpers.WARLOCK_DEMON_CHOICES
-local DEMON_CELL = 24
-local DEMON_GAP = 4
-local DEMON_INFO_ICON = 14
+local GRID_CELL = 24
+local GRID_GAP = 4
+local GRID_INFO_ICON = 14
 
 -- Class-colored header above controls that apply to one class only.
 local function AddClassHeader(layout, classToken)
@@ -165,33 +170,44 @@ local function AddClassHeader(layout, classToken)
     layout:Add(head, 14, COMPONENT_GAP)
 end
 
--- One row of demon toggles per content row.
-local function AddWarlockDemonGrid(layout)
+---@class ContentGridChoice
+---@field key string Saved-variable key in the grid rows
+---@field label string
+---@field icon number?
+
+-- One row of choice toggles per content row of the grid in profile.defaults[setting].
+---@param layout table
+---@param setting string
+---@param hintText string
+---@param choices ContentGridChoice[]
+---@param single? boolean A row holds at most one choice
+local function AddContentGrid(layout, setting, hintText, choices, single)
+    local IsContentChoiceAllowed = BR.StateHelpers.IsContentChoiceAllowed
     local hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hint:SetWidth(bodyW)
     hint:SetJustifyH("LEFT")
-    hint:SetText(L["BuffPanel.WarlockDemon.Hint"])
-    layout:AddText(hint, math.max(12, math.ceil(hint:GetStringHeight())), DEMON_GAP + 2)
+    hint:SetText(hintText)
+    layout:AddText(hint, math.max(12, math.ceil(hint:GetStringHeight())), GRID_GAP + 2)
 
     local rowLabels = {}
-    for i, row in ipairs(DEMON_ROWS) do
+    for i, row in ipairs(GRID_ROWS) do
         rowLabels[i] = row.label
     end
     local labelW = Components.MeasureSharedLabelWidth(rowLabels, "GameFontHighlightSmall", DRAWER_LABEL_W)
-    for _, row in ipairs(DEMON_ROWS) do
+    for _, row in ipairs(GRID_ROWS) do
         if row.desc then
             local w = Components.MeasureSharedLabelWidth({ row.label }, "GameFontHighlightSmall", 0)
-            labelW = math.max(labelW, w + DEMON_INFO_ICON)
+            labelW = math.max(labelW, w + GRID_INFO_ICON)
         end
     end
 
     local holder = CreateFrame("Frame", nil, body)
-    holder:SetSize(bodyW, #DEMON_ROWS * (DEMON_CELL + DEMON_GAP) - DEMON_GAP)
+    holder:SetSize(bodyW, #GRID_ROWS * (GRID_CELL + GRID_GAP) - GRID_GAP)
     local cells = {}
 
     function holder:Refresh()
         for _, cell in ipairs(cells) do
-            local selected = BR.PetHelpers.IsWarlockDemonAllowed(cell.row, cell.demonKey)
+            local selected = IsContentChoiceAllowed(setting, cell.row, cell.choiceKey)
             cell.icon:SetDesaturated(not selected)
             cell.icon:SetAlpha(selected and 1 or 0.45)
             cell.check:SetShown(selected)
@@ -199,19 +215,19 @@ local function AddWarlockDemonGrid(layout)
         end
     end
 
-    for r, row in ipairs(DEMON_ROWS) do
-        local y = -(r - 1) * (DEMON_CELL + DEMON_GAP)
+    for r, row in ipairs(GRID_ROWS) do
+        local y = -(r - 1) * (GRID_CELL + GRID_GAP)
         local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        label:SetPoint("LEFT", holder, "TOPLEFT", 0, y - DEMON_CELL / 2)
+        label:SetPoint("LEFT", holder, "TOPLEFT", 0, y - GRID_CELL / 2)
         label:SetWidth(labelW)
         label:SetJustifyH("LEFT")
         label:SetWordWrap(false)
         label:SetText(row.label)
         if row.desc then
             local info = holder:CreateTexture(nil, "ARTWORK")
-            info:SetSize(DEMON_INFO_ICON, DEMON_INFO_ICON)
+            info:SetSize(GRID_INFO_ICON, GRID_INFO_ICON)
             info:SetAtlas("QuestNormal")
-            info:SetPoint("LEFT", holder, "TOPLEFT", label:GetStringWidth() + 2, y - DEMON_CELL / 2)
+            info:SetPoint("LEFT", holder, "TOPLEFT", label:GetStringWidth() + 2, y - GRID_CELL / 2)
             local hit = CreateFrame("Frame", nil, holder)
             hit:SetPoint("TOPLEFT", label, "TOPLEFT")
             hit:SetPoint("BOTTOMRIGHT", info, "BOTTOMRIGHT")
@@ -222,12 +238,12 @@ local function AddWarlockDemonGrid(layout)
             hit:SetScript("OnLeave", BR.HideTooltip)
         end
 
-        for c, demon in ipairs(DEMON_CHOICES) do
+        for c, choice in ipairs(choices) do
             local cell = CreateFrame("Button", nil, holder, "BackdropTemplate")
-            cell:SetSize(DEMON_CELL, DEMON_CELL)
-            cell:SetPoint("TOPLEFT", labelW + DEMON_GAP + (c - 1) * (DEMON_CELL + DEMON_GAP), y)
+            cell:SetSize(GRID_CELL, GRID_CELL)
+            cell:SetPoint("TOPLEFT", labelW + GRID_GAP + (c - 1) * (GRID_CELL + GRID_GAP), y)
             cell:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
-            cell.icon = BR.CreateBuffIcon(cell, DEMON_CELL - 2, C_Spell.GetSpellTexture(demon.spellID))
+            cell.icon = BR.CreateBuffIcon(cell, GRID_CELL - 2, choice.icon)
             cell.icon:SetPoint("CENTER")
             cell.check = cell:CreateTexture(nil, "OVERLAY")
             cell.check:SetSize(14, 14)
@@ -235,15 +251,27 @@ local function AddWarlockDemonGrid(layout)
             cell.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
             cell.check:SetVertexColor(unpack(CELL_CHECK))
             cell.row = row.key
-            cell.demonKey = demon.key
+            cell.choiceKey = choice.key
             cell:SetScript("OnClick", function()
-                local allowed = BR.PetHelpers.IsWarlockDemonAllowed(row.key, demon.key)
-                BR.Config.Set("defaults.warlockDemons." .. row.key .. "." .. demon.key, not allowed)
-                holder:Refresh()
+                local allowed = IsContentChoiceAllowed(setting, row.key, choice.key)
+                local rowPath = "defaults." .. setting .. "." .. row.key .. "."
+                if single then
+                    -- Every key gets an explicit value, so that a code default cannot
+                    -- add a second choice to the row.
+                    local changes = {}
+                    for _, other in ipairs(choices) do
+                        changes[rowPath .. other.key] = false
+                    end
+                    changes[rowPath .. choice.key] = not allowed
+                    BR.Config.SetMulti(changes)
+                else
+                    BR.Config.Set(rowPath .. choice.key, not allowed)
+                end
+                Components.RefreshAll()
             end)
             cell:SetScript("OnEnter", function(self)
                 self.icon:SetAlpha(1)
-                BR.ShowTooltip(self, demon.label, nil, "ANCHOR_TOP")
+                BR.ShowTooltip(self, choice.label, nil, "ANCHOR_TOP")
             end)
             cell:SetScript("OnLeave", function()
                 BR.HideTooltip()
@@ -256,11 +284,23 @@ local function AddWarlockDemonGrid(layout)
     holder:Refresh()
     tinsert(BR.RefreshableComponents, holder)
     tinsert(bodyHolders, holder)
-    layout:Add(holder, holder:GetHeight(), DEMON_GAP + 2)
+    layout:Add(holder, holder:GetHeight(), GRID_GAP + 2)
+end
 
+local function AddWarlockDemonGrid(layout)
+    local choices = {}
+    for i, demon in ipairs(BR.PetHelpers.WARLOCK_DEMON_CHOICES) do
+        choices[i] = { key = demon.key, label = demon.label, icon = C_Spell.GetSpellTexture(demon.spellID) }
+    end
+    AddContentGrid(layout, "warlockDemons", L["BuffPanel.WarlockDemon.Hint"], choices)
+
+    local felguardSpellID = BR.PetHelpers.FELGUARD_SPELL_ID
+    if not felguardSpellID then
+        return
+    end
     local felguard = CreateFrame("Frame", nil, body)
     felguard:SetSize(bodyW, 16)
-    local fgIcon = BR.CreateBuffIcon(felguard, 16, C_Spell.GetSpellTexture(30146))
+    local fgIcon = BR.CreateBuffIcon(felguard, 16, C_Spell.GetSpellTexture(felguardSpellID))
     fgIcon:SetPoint("LEFT")
     local fgText = felguard:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     fgText:SetPoint("LEFT", fgIcon, "RIGHT", 6, 0)
@@ -306,6 +346,83 @@ local function PoisonNeedsSetup()
         return true
     end
     return noneEnabled("lethal") and noneEnabled("nonLethal")
+end
+
+-- Stance grids of the client. A client with spec-based stance rules has none.
+local WARRIOR_STANCE_GRID = BR.STANCE_RULES.WARRIOR.grid
+local DRUID_FORM_GRID = BR.STANCE_RULES.DRUID.grid
+
+---True when no row of the stance grid allows a choice, so no reminder can fire.
+---@param grid StanceGrid
+---@return boolean
+local function StanceGridNeedsSetup(grid)
+    for _, row in ipairs(GRID_ROWS) do
+        for _, choice in ipairs(grid.choices) do
+            if BR.StateHelpers.IsContentChoiceAllowed(grid.setting, row.key, choice.key) then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+---@param layout table
+---@param grid StanceGrid
+local function AddStanceGrid(layout, grid)
+    local choices = {}
+    for i, choice in ipairs(grid.choices) do
+        local spellID = choice.iconSpellID or choice.spellIDs[#choice.spellIDs]
+        choices[i] = {
+            key = choice.key,
+            label = choice.label or BR.GetSpellName(spellID) or choice.key,
+            icon = C_Spell.GetSpellTexture(spellID),
+        }
+    end
+    AddContentGrid(layout, grid.setting, grid.hint, choices, grid.single)
+end
+
+---@param choice StanceChoice
+---@return boolean
+local function KnowsChoice(choice)
+    for _, id in ipairs(choice.spellIDs) do
+        if BR.StateHelpers.IsPlayerSpellCached(id) then
+            return true
+        end
+    end
+    return false
+end
+
+---True when no row chooses a buff, or a row chooses one that this character of the
+---buff's class does not know. Either way a row stays silent. A character who knows
+---no choice yet is not flagged.
+---@param buff RaidBuff
+---@return boolean
+local function ChoiceGridNeedsSetup(buff)
+    local grid = buff.choiceGrid --[[@as StanceGrid]]
+    if StanceGridNeedsSetup(grid) then
+        return true
+    end
+    local _, playerClass = UnitClass("player")
+    if playerClass ~= buff.class then
+        return false
+    end
+    local knowsAny = false
+    for _, choice in ipairs(grid.choices) do
+        knowsAny = knowsAny or KnowsChoice(choice)
+    end
+    if not knowsAny then
+        return false
+    end
+    for _, row in ipairs(GRID_ROWS) do
+        for _, choice in ipairs(grid.choices) do
+            if
+                BR.StateHelpers.IsContentChoiceAllowed(grid.setting, row.key, choice.key) and not KnowsChoice(choice)
+            then
+                return true
+            end
+        end
+    end
+    return false
 end
 
 local function AddPlaceAtPlayerCheckbox(layout)
@@ -411,6 +528,58 @@ local SPECIAL_SECTIONS = {
         end,
     },
 
+    lowReagents = {
+        build = function(layout)
+            local thresholdHolder = Components.Slider(body, {
+                label = L["Options.Reagent.Threshold"],
+                labelWidth = 110,
+                min = 1,
+                max = 20,
+                step = 1,
+                get = function()
+                    return BR.Config.Get("defaults.reagentThreshold") or 5
+                end,
+                tooltip = { title = L["Options.Reagent.Threshold"], desc = L["Options.Reagent.Threshold.Desc"] },
+                onChange = function(val)
+                    BR.Config.Set("defaults.reagentThreshold", val)
+                end,
+            })
+            tinsert(bodyHolders, thresholdHolder)
+            layout:Add(thresholdHolder, nil, COMPONENT_GAP)
+            AddSpecialCheckbox(layout, {
+                label = L["Options.Reagent.RestedOnly"],
+                get = function()
+                    return BR.Config.Get("defaults.reagentRestedOnly") ~= false
+                end,
+                tooltip = { title = L["Options.Reagent.RestedOnly"], desc = L["Options.Reagent.RestedOnly.Desc"] },
+                onChange = function(checked)
+                    BR.Config.Set("defaults.reagentRestedOnly", checked)
+                end,
+            })
+        end,
+    },
+
+    lowAmmo = {
+        build = function(layout)
+            local thresholdHolder = Components.Slider(body, {
+                label = L["Options.Ammo.Threshold"],
+                labelWidth = 110,
+                min = 1,
+                max = 10,
+                step = 1,
+                get = function()
+                    return BR.Config.Get("defaults.ammoThresholdStacks") or 1
+                end,
+                tooltip = { title = L["Options.Ammo.Threshold"], desc = L["Options.Ammo.Threshold.Desc"] },
+                onChange = function(val)
+                    BR.Config.Set("defaults.ammoThresholdStacks", val)
+                end,
+            })
+            tinsert(bodyHolders, thresholdHolder)
+            layout:Add(thresholdHolder, nil, COMPONENT_GAP)
+        end,
+    },
+
     soulstone = {
         build = function(layout)
             AddSpecialCheckbox(layout, {
@@ -463,6 +632,9 @@ local SPECIAL_SECTIONS = {
 
     druidWrongForm = {
         build = function(layout)
+            if DRUID_FORM_GRID then
+                AddStanceGrid(layout, DRUID_FORM_GRID)
+            end
             AddSpecialCheckbox(layout, {
                 label = L["Options.DruidIgnoreTravelForm"],
                 get = function()
@@ -476,6 +648,18 @@ local SPECIAL_SECTIONS = {
                     BR.Config.Set("druidIgnoreTravelForm", checked)
                 end,
             })
+        end,
+        warn = DRUID_FORM_GRID and function()
+            return BR.StateHelpers.IsBuffEnabled("druidWrongForm") and StanceGridNeedsSetup(DRUID_FORM_GRID)
+        end,
+    },
+
+    warriorWrongStance = WARRIOR_STANCE_GRID and {
+        build = function(layout)
+            AddStanceGrid(layout, WARRIOR_STANCE_GRID)
+        end,
+        warn = function()
+            return BR.StateHelpers.IsBuffEnabled("warriorWrongStance") and StanceGridNeedsSetup(WARRIOR_STANCE_GRID)
         end,
     },
 
@@ -568,6 +752,35 @@ local SPECIAL_SECTIONS = {
         end,
     },
 
+    shamanImbue = {
+        build = function(layout)
+            local options = {}
+            for _, imbue in ipairs({
+                { value = "windfury", spellID = 8232, fallback = L["Buff.WindfuryWeapon"] },
+                { value = "flametongue", spellID = 8024, fallback = L["Buff.FlametongueWeapon"] },
+                { value = "rockbiter", spellID = 8017, fallback = L["Buff.RockbiterWeapon"] },
+                { value = "frostbrand", spellID = 8033, fallback = L["Buff.FrostbrandWeapon"] },
+            }) do
+                tinsert(options, { label = BR.GetSpellName(imbue.spellID) or imbue.fallback, value = imbue.value })
+            end
+            local drop = Components.Dropdown(body, {
+                label = L["BuffPanel.ShamanImbue"],
+                labelWidth = DRAWER_LABEL_W,
+                width = DRAWER_FIELD_W,
+                options = options,
+                tooltip = { title = L["BuffPanel.ShamanImbue"], desc = L["BuffPanel.ShamanImbue.Desc"] },
+                get = function()
+                    return BR.Config.Get("defaults.shamanImbue", "windfury")
+                end,
+                onChange = function(val)
+                    BR.Config.Set("defaults.shamanImbue", val)
+                end,
+            })
+            tinsert(bodyHolders, drop)
+            layout:Add(drop, 26, COMPONENT_GAP)
+        end,
+    },
+
     dkRunes = {
         editor = "Runeforge",
     },
@@ -584,8 +797,9 @@ local function IsRaidClickable()
 end
 
 ---@param buff RaidBuff
+---@param desc? string Tooltip text. nil = the generic group cast text
 ---@return table section
-local function MakeGroupCastSection(buff)
+local function MakeGroupCastSection(buff, desc)
     local key = buff.key
     return {
         build = function(layout)
@@ -597,7 +811,7 @@ local function MakeGroupCastSection(buff)
                 end,
                 enabled = IsRaidClickable,
                 disabledReason = L["DisabledReason.RaidClickToCast"],
-                tooltip = { title = L["BuffPanel.GroupCast"], desc = L["BuffPanel.GroupCast.Desc"] },
+                tooltip = { title = L["BuffPanel.GroupCast"], desc = desc or L["BuffPanel.GroupCast.Desc"] },
                 onChange = function(checked)
                     BR.Config.Set("groupCast." .. key, checked or nil)
                 end,
@@ -608,9 +822,28 @@ end
 
 -- Buffs with group ranks get the group cast section. Their definitions belong to
 -- the active client, so the sections build at load time from its buff table.
+-- A choice-grid buff keeps its group ranks on each choice.
 for _, buff in ipairs(BR.BUFF_TABLES.raid) do
-    if buff.groupCast and not SPECIAL_SECTIONS[buff.key] then
+    if buff.choiceGrid then
+        local groupCast = MakeGroupCastSection(buff, L["BuffPanel.GroupCast.Blessing.Desc"])
+        SPECIAL_SECTIONS[buff.key] = {
+            build = function(layout)
+                AddStanceGrid(layout, buff.choiceGrid)
+                groupCast.build(layout)
+            end,
+            warn = function()
+                return BR.StateHelpers.IsBuffEnabled(buff.key) and ChoiceGridNeedsSetup(buff)
+            end,
+        }
+    elseif buff.groupCast and not SPECIAL_SECTIONS[buff.key] then
         SPECIAL_SECTIONS[buff.key] = MakeGroupCastSection(buff)
+    end
+end
+
+-- The low-stock warning counts charges, so a healthstone without charges has no section.
+for _, buff in ipairs(BR.BUFF_TABLES.consumable) do
+    if buff.key == "healthstone" and not buff.itemMaxCharges then
+        SPECIAL_SECTIONS.healthstone = nil
     end
 end
 
@@ -701,6 +934,16 @@ local function AddShowRow(layout, info)
     end
     tinsert(bodyHolders, toggle)
     layout:Add(showRow, 22, COMPONENT_GAP)
+
+    if showModel.note then
+        local note = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        note:SetWidth(bodyW - DRAWER_LABEL_W - 4)
+        note:SetJustifyH("LEFT")
+        note:SetText(showModel.note)
+        layout:SetX(DRAWER_LABEL_W + 4)
+        layout:AddText(note, math.max(12, math.ceil(note:GetStringHeight())), COMPONENT_GAP)
+        layout:SetX(0)
+    end
 
     if showModel.hasCasterOption then
         layout:SetX(DRAWER_LABEL_W + 4)

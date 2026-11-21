@@ -26,10 +26,8 @@ local SCROLLBAR_WIDTH = BR.Options.Constants.SCROLLBAR_WIDTH
 -- the shared template.
 local EXTERNALS_TAB = "externals"
 local TAB_CATEGORIES = {}
-for _, cat in ipairs(BR.CATEGORY_ORDER) do
-    if cat ~= "loadout" or BR.Loadouts then
-        TAB_CATEGORIES[#TAB_CATEGORIES + 1] = cat
-    end
+for _, cat in ipairs(BR.AVAILABLE_CATEGORIES) do
+    TAB_CATEGORIES[#TAB_CATEGORIES + 1] = cat
 end
 if BR.Options.BuffSections.ExternalsAppearance then
     TAB_CATEGORIES[#TAB_CATEGORIES + 1] = EXTERNALS_TAB

@@ -28,8 +28,9 @@ local IsSpellKnown = C_SpellBook.IsSpellKnown
 ---@class PetActionList : PetAction[]
 ---@field genericIndex? number  -- Preferred index for generic (collapsed) display mode
 
--- Hunter Call Pet spell IDs (Call Pet 1 through Call Pet 5)
-local CALL_PET_SPELLS = { 883, 83242, 83243, 83244, 83245 }
+local PET_SPELLS = BR.PET_SPELLS
+
+local CALL_PET_SPELLS = PET_SPELLS.callPet
 
 local REVIVE_PET = 982
 
@@ -40,15 +41,16 @@ local PET_SPEC_ICONS = {
     Tenacity = 571585,
 }
 
-local SUMMON_DEMON_FLYOUT = 10
+local SUMMON_DEMON_FLYOUT = PET_SPELLS.demonFlyout
 local SUMMON_FELHUNTER = 691
-local SUMMON_FELGUARD = 30146
+local SUMMON_FELGUARD = PET_SPELLS.felguard
 
 -- Warlock summon spell ID -> short pet name (fallback: full spell name)
 local WARLOCK_PET_NAMES = {
     [688] = L["Label.Imp"],
     [697] = L["Label.Voidwalker"],
     [691] = L["Label.Felhunter"],
+    [712] = L["Label.Succubus"],
     [366222] = L["Label.Sayaad"],
     [30146] = L["Label.Felguard"],
 }
@@ -59,14 +61,19 @@ local WARLOCK_DEMON_FAMILIES = {
     [688] = { [23] = true, [100] = true }, -- Imp
     [697] = { [16] = true, [101] = true }, -- Voidwalker
     [691] = { [15] = true, [103] = true }, -- Felhunter
+    [712] = { [17] = true, [302] = true }, -- Succubus
     [366222] = { [17] = true, [102] = true, [302] = true }, -- Sayaad
     [30146] = { [29] = true, [104] = true }, -- Felguard
 }
 
 -- Resolve Spirit Beast family name from Blizzard's creature family data (localized)
-local SPIRIT_BEAST_FAMILY = (C_CreatureInfo.GetCreatureFamilyInfo(46) or {}).name or "Spirit Beast"
+local GetCreatureFamilyInfo = C_CreatureInfo and C_CreatureInfo.GetCreatureFamilyInfo
+local SPIRIT_BEAST_FAMILY = (GetCreatureFamilyInfo and GetCreatureFamilyInfo(46) or {}).name or "Spirit Beast"
 
----Build hunter pet actions from stable info
+local GetStablePetInfo = C_StableInfo and C_StableInfo.GetStablePetInfo
+
+---Build hunter pet actions. With stable slots, each Call Pet spell shows the pet in its
+---slot. Without them, each Call Pet spell shows its own name and icon.
 ---@return PetAction[]?
 local function BuildHunterActions()
     -- Marksmanship hunters have no pet without Unbreakable Bond.
@@ -79,8 +86,22 @@ local function BuildHunterActions()
     local order = 0
 
     for slotIndex, spellID in ipairs(CALL_PET_SPELLS) do
-        if IsSpellKnown(spellID) then
-            local info = C_StableInfo.GetStablePetInfo(slotIndex)
+        local known = IsSpellKnown(spellID)
+        if known and not PET_SPELLS.stableSlots then
+            local info = C_Spell.GetSpellInfo(spellID)
+            if info then
+                order = order + 1
+                actions[#actions + 1] = {
+                    key = "pet_action_" .. spellID,
+                    spellID = spellID,
+                    spellName = info.name,
+                    icon = info.iconID,
+                    label = info.name,
+                    sortOrder = order,
+                }
+            end
+        elseif known and GetStablePetInfo then
+            local info = GetStablePetInfo(slotIndex)
             if info and info.name and info.icon and (not info.isExotic or canUseExotic) then
                 order = order + 1
                 actions[#actions + 1] = {
@@ -116,31 +137,43 @@ local function BuildHunterActions()
     return #actions > 0 and actions or nil
 end
 
----Build warlock pet actions from the Summon Demon flyout
+---@param actions PetAction[]
+---@param spellID number
+local function AddDemonAction(actions, spellID)
+    local info = C_Spell.GetSpellInfo(spellID)
+    if info then
+        actions[#actions + 1] = {
+            key = "pet_action_" .. spellID,
+            spellID = spellID,
+            spellName = info.name,
+            icon = info.iconID,
+            label = WARLOCK_PET_NAMES[spellID] or info.name,
+            sortOrder = #actions + 1,
+        }
+    end
+end
+
+---Build warlock pet actions from the Summon Demon flyout, or from the summon spells
+---of a client without the flyout.
 ---@return PetAction[]?
 local function BuildWarlockActions()
-    local ok, _, _, numSlots, isKnown = pcall(GetFlyoutInfo, SUMMON_DEMON_FLYOUT)
-    if not ok or not isKnown or not numSlots then
-        return nil
-    end
-
     local actions = {}
-    local order = 0
 
-    for i = 1, numSlots do
-        local slotOk, spellID, _, slotIsKnown = pcall(GetFlyoutSlotInfo, SUMMON_DEMON_FLYOUT, i)
-        if slotOk and spellID and slotIsKnown then
-            local info = C_Spell.GetSpellInfo(spellID)
-            if info then
-                order = order + 1
-                actions[#actions + 1] = {
-                    key = "pet_action_" .. spellID,
-                    spellID = spellID,
-                    spellName = info.name,
-                    icon = info.iconID,
-                    label = WARLOCK_PET_NAMES[spellID] or info.name,
-                    sortOrder = order,
-                }
+    if SUMMON_DEMON_FLYOUT then
+        local ok, _, _, numSlots, isKnown = pcall(GetFlyoutInfo, SUMMON_DEMON_FLYOUT)
+        if not ok or not isKnown or not numSlots then
+            return nil
+        end
+        for i = 1, numSlots do
+            local slotOk, spellID, _, slotIsKnown = pcall(GetFlyoutSlotInfo, SUMMON_DEMON_FLYOUT, i)
+            if slotOk and spellID and slotIsKnown then
+                AddDemonAction(actions, spellID)
+            end
+        end
+    else
+        for _, spellID in ipairs(PET_SPELLS.demonSummons or {}) do
+            if IsSpellKnown(spellID) then
+                AddDemonAction(actions, spellID)
             end
         end
     end
@@ -160,53 +193,54 @@ local function IndexOfSpell(actions, spellID)
     return nil
 end
 
--- Content type -> warlockDemons row. Other content uses the world row.
-local DEMON_ROW_BY_CONTENT = { dungeon = "dungeon", scenario = "dungeon", raid = "raid", pvp = "pvp" }
-local DEFAULT_WARLOCK_DEMONS = BR.defaults.defaults.warlockDemons --[[@as table<string, table<string, boolean>>]]
+---@class WarlockDemonChoice
+---@field spellID number
+---@field key string Saved-variable key in the warlockDemons rows
+---@field label string
 
--- Demons that the content rows can allow, in grid order. `key` is the saved-variable key.
-local WARLOCK_DEMON_CHOICES = {
-    { spellID = 688, key = "imp", label = L["Label.Imp"] },
-    { spellID = 697, key = "voidwalker", label = L["Label.Voidwalker"] },
-    { spellID = 691, key = "felhunter", label = L["Label.Felhunter"] },
-    { spellID = 366222, key = "sayaad", label = L["Label.Sayaad"] },
+---@type table<string, WarlockDemonChoice>
+local WARLOCK_DEMONS = {
+    imp = { spellID = 688, key = "imp", label = L["Label.Imp"] },
+    voidwalker = { spellID = 697, key = "voidwalker", label = L["Label.Voidwalker"] },
+    felhunter = { spellID = 691, key = "felhunter", label = L["Label.Felhunter"] },
+    succubus = { spellID = 712, key = "succubus", label = L["Label.Succubus"] },
+    sayaad = { spellID = 366222, key = "sayaad", label = L["Label.Sayaad"] },
 }
+
+---@param keys string[]
+---@return WarlockDemonChoice[]
+local function DemonList(keys)
+    local list = {}
+    for _, key in ipairs(keys) do
+        list[#list + 1] = WARLOCK_DEMONS[key]
+    end
+    return list
+end
+
+-- Demons that the content rows can allow, in grid order.
+local WARLOCK_DEMON_CHOICES = DemonList(PET_SPELLS.demonChoices)
+-- The click summons the first demon in this order that the row allows and the player knows.
+local WARLOCK_DEMON_PREFERENCE = DemonList(PET_SPELLS.demonPreference)
 
 ---@return string
 local function GetWarlockDemonRow()
-    return DEMON_ROW_BY_CONTENT[BR.StateHelpers.GetCurrentContentType()] or "world"
+    return BR.StateHelpers.GetContentRow()
 end
 
----A saved row holds only the keys that the user toggled, and an unchecked demon
----is stored as false. A missing key follows the code default.
 ---@param row string
 ---@param key string
 ---@return boolean
 local function IsWarlockDemonAllowed(row, key)
-    local defaults = BR.profile.defaults
-    local prefs = defaults and defaults.warlockDemons
-    local saved = type(prefs) == "table" and prefs[row]
-    local allowed
-    if type(saved) == "table" then
-        allowed = saved[key]
-    end
-    if allowed == nil then
-        local defaultRow = DEFAULT_WARLOCK_DEMONS[row]
-        allowed = defaultRow and defaultRow[key]
-    end
-    return allowed == true
+    return BR.StateHelpers.IsContentChoiceAllowed("warlockDemons", row, key)
 end
 
----Summon spell ID for the current content row: Felhunter (interrupt) if allowed,
----else the first allowed demon in the flyout, else Felhunter.
+---Summon spell ID for the current content row: the first demon in preference order
+---that the row allows and the player knows, else Felhunter.
 ---@param actions PetActionList
 ---@return number
 local function GetPreferredDemonSpell(actions)
     local row = GetWarlockDemonRow()
-    if IsWarlockDemonAllowed(row, "felhunter") then
-        return SUMMON_FELHUNTER
-    end
-    for _, demon in ipairs(WARLOCK_DEMON_CHOICES) do
+    for _, demon in ipairs(WARLOCK_DEMON_PREFERENCE) do
         if IsWarlockDemonAllowed(row, demon.key) and IndexOfSpell(actions, demon.spellID) then
             return demon.spellID
         end
@@ -214,13 +248,13 @@ local function GetPreferredDemonSpell(actions)
     return SUMMON_FELHUNTER
 end
 
----Felguard on Demonology overrides the preferred demon. A preferred demon that
----is not in the flyout falls back to Felhunter (interrupt).
+---Felguard on Demonology overrides the preferred demon. The result is nil when the
+---player knows neither the preferred demon nor Felhunter.
 ---@param actions PetActionList
 ---@param preferred number
 ---@return number?
 local function ResolveWarlockGenericIndex(actions, preferred)
-    if BR.StateHelpers.GetPlayerSpecId() == 266 then
+    if SUMMON_FELGUARD and BR.StateHelpers.GetPlayerSpecId() == 266 then
         local idx = IndexOfSpell(actions, SUMMON_FELGUARD)
         if idx then
             return idx
@@ -348,6 +382,20 @@ local function GetDesiredWarlockDemonList()
     return cachedDesiredDemonList
 end
 
+---@return boolean? true if the pet exists and is on passive, nil otherwise
+local function IsPetOnPassive()
+    if not UnitExists("pet") then
+        return nil
+    end
+    for i = 1, NUM_PET_ACTION_SLOTS do
+        local name, _, _, isActive = GetPetActionInfo(i)
+        if name == "PET_MODE_PASSIVE" and isActive then
+            return true
+        end
+    end
+    return nil
+end
+
 ---Invalidate cached pet actions (call on spec/talent/stable changes).
 local function InvalidatePetActions()
     cacheValid = false
@@ -358,10 +406,11 @@ end
 -- Export
 BR.PetHelpers = {
     REVIVE_PET_ID = REVIVE_PET,
+    FELGUARD_SPELL_ID = SUMMON_FELGUARD,
     GetPetActions = GetPetActions,
+    IsPetOnPassive = IsPetOnPassive,
     WARLOCK_DEMON_FAMILIES = WARLOCK_DEMON_FAMILIES,
     WARLOCK_DEMON_CHOICES = WARLOCK_DEMON_CHOICES,
-    IsWarlockDemonAllowed = IsWarlockDemonAllowed,
     IsAllowedWarlockFamily = IsAllowedWarlockFamily,
     GetDesiredWarlockDemon = GetDesiredWarlockDemon,
     GetDesiredWarlockDemonList = GetDesiredWarlockDemonList,

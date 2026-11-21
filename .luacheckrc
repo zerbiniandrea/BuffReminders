@@ -71,6 +71,8 @@ read_globals = {
     "GetItemSpell",
     "GetMaxLevelForPlayerExpansion",
     "GetPetActionInfo",
+    "GetPetHappiness",
+    "INVSLOT_RANGED",
     "GetCursorPosition",
     "GetMouseFoci",
     "GetNumGroupMembers",

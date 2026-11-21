@@ -16,7 +16,7 @@ local tinsert, tconcat = table.insert, table.concat
 local wipe = wipe
 
 local L = BR.L
-local CATEGORIES = BR.CATEGORIES
+local CATEGORIES = BR.AVAILABLE_CATEGORIES
 local CATEGORY_LABELS = BR.CATEGORY_LABELS
 local DIRECTION_ANCHORS = BR.DIRECTION_ANCHORS
 
