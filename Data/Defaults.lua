@@ -175,6 +175,7 @@ BR.defaults = {
         iconZoom = 0, -- percentage (additional zoom on top of base TEXCOORD_INSET crop)
         borderSize = 2,
         growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT", "UP", "DOWN"
+        iconStyle = BR.CLIENT == BR.ClientType.Forever and "blizzard" or "modern",
         -- Behavior (glow settings)
         showExpirationGlow = false,
         showMissingGlow = false,

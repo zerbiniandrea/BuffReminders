@@ -196,6 +196,8 @@ local function BuildAppearance(ctx, layout)
         disabledReason = L["DisabledReason.OverrideSection"],
         labelWidth = textLabelWidth,
         masqueCheck = IsMasqueActive,
+        borderBlocked = BR.IconStyle.UsesBlizzardArt,
+        borderBlockedReason = Helpers.IconStyleBorderReason,
     })
     appFrame:SetSize(480, catGrid.height)
     layout:Space(catGrid.height)

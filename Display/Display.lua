@@ -6,6 +6,8 @@ local BR = ns
 -- TYPE DEFINITIONS
 -- ============================================================================
 
+---@alias IconStyle "modern"|"blizzard"
+
 ---@class DefaultSettings
 ---@field iconSize number
 ---@field iconWidth? number
@@ -16,6 +18,7 @@ local BR = ns
 ---@field spacing number
 ---@field iconZoom number
 ---@field borderSize number
+---@field iconStyle IconStyle Global only. "blizzard" draws the action-button frame and mask
 ---@field growDirection string
 ---@field showExpirationGlow boolean
 ---@field showMissingGlow boolean
@@ -747,6 +750,28 @@ end
 
 local SetExpirationGlow = BR.Glow.SetExpiration
 
+-- The action-button art of the client: bronze on Forever, gold on retail. The
+-- ratios are relative to the icon size.
+local BLIZZARD_ICON_ART = {
+    frameAtlas = "UI-HUD-ActionBar-IconFrame",
+    maskAtlas = "UI-HUD-ActionBar-IconFrame-Mask",
+    frameWidthRatio = 46 / 45,
+    maskRatio = 91 / 64,
+}
+-- A missing mask atlas would hide the icon, so the style needs both atlases.
+BLIZZARD_ICON_ART.available = BR.HasThemeAtlas(BLIZZARD_ICON_ART.frameAtlas)
+    and BR.HasThemeAtlas(BLIZZARD_ICON_ART.maskAtlas)
+
+---True when the icons draw the action-button frame and mask. Masque always wins.
+local function UsesBlizzardIconStyle()
+    if not BLIZZARD_ICON_ART.available then
+        return false
+    end
+    local d = BR.profile.defaults
+    local style = d and d.iconStyle or defaults.defaults.iconStyle
+    return style == "blizzard" and not BR.Masque.IsActive()
+end
+
 -- Per-render-cycle cache for glow settings (avoids repeated DB reads)
 local expiringGlowCache = {} ---@type table<string, table>
 local missingGlowCache = {} ---@type table<string, table>
@@ -812,7 +837,7 @@ local function GetCachedGlowSettings(category, kind)
         typeIndex = typeIndex,
         color = color,
         size = size,
-        borderSize = GetSetting(category, "borderSize") or DEFAULT_BORDER_SIZE,
+        borderSize = UsesBlizzardIconStyle() and 0 or GetSetting(category, "borderSize") or DEFAULT_BORDER_SIZE,
         params = params,
         glowXOffset = xOff,
         glowYOffset = yOff,
@@ -955,6 +980,11 @@ local function CreateCategoryFrame(category)
     return frame
 end
 
+local function SizeBlizzardIconArt(frame, width, height)
+    frame.iconFrameArt:SetSize(width * BLIZZARD_ICON_ART.frameWidthRatio, height)
+    frame.iconMask:SetSize(width * BLIZZARD_ICON_ART.maskRatio, height * BLIZZARD_ICON_ART.maskRatio)
+end
+
 -- Create icon and border textures on a buff frame (no positioning - call UpdateIconStyling after)
 local function CreateIconTextures(frame, texture)
     frame.icon = frame:CreateTexture(nil, "ARTWORK")
@@ -968,6 +998,47 @@ local function CreateIconTextures(frame, texture)
 
     frame.border = frame:CreateTexture(nil, "BACKGROUND")
     frame.border:SetColorTexture(0, 0, 0, 1)
+
+    -- Above the icon, below the count and overlay text.
+    frame.iconFrameArt = frame:CreateTexture(nil, "ARTWORK", nil, 7)
+    frame.iconFrameArt:SetAtlas(BLIZZARD_ICON_ART.frameAtlas)
+    frame.iconFrameArt:SetPoint("TOPLEFT", 0, 0)
+    frame.iconFrameArt:Hide()
+
+    frame.iconMask = frame:CreateMaskTexture()
+    frame.iconMask:SetAtlas(BLIZZARD_ICON_ART.maskAtlas)
+    frame.iconMask:SetPoint("CENTER", frame.icon, "CENTER", 0, 0)
+
+    -- Some callers resize a frame after its styling pass, so the art follows the frame.
+    frame:HookScript("OnSizeChanged", function(self, width, height)
+        if self._br_masked then
+            SizeBlizzardIconArt(self, width, height)
+        end
+    end)
+end
+
+---Show or hide the action-button frame and mask. AddMaskTexture stacks, so the
+---frame remembers whether the icon holds the mask.
+local function SetBlizzardIconArt(frame, shown, iconWidth, iconHeight)
+    if shown then
+        local width, height = frame:GetSize()
+        if width > 0 and height > 0 then
+            SizeBlizzardIconArt(frame, width, height)
+        else
+            SizeBlizzardIconArt(frame, iconWidth, iconHeight)
+        end
+        frame.iconFrameArt:Show()
+        if not frame._br_masked then
+            frame.icon:AddMaskTexture(frame.iconMask)
+            frame._br_masked = true
+        end
+    else
+        frame.iconFrameArt:Hide()
+        if frame._br_masked then
+            frame.icon:RemoveMaskTexture(frame.iconMask)
+            frame._br_masked = false
+        end
+    end
 end
 
 -- Apply icon zoom and border sizing (single source of truth for Masque vs native styling)
@@ -975,13 +1046,20 @@ local function UpdateIconStyling(frame, catSettings)
     if BR.Masque.IsActive() then
         -- Masque controls styling; hide the native border (Masque manages its own textures via ReSkin)
         frame.border:Hide()
+        SetBlizzardIconArt(frame, false)
         return
     end
     -- When Masque is loaded but disabled, hide textures it created (Backdrop, Shadow, Gloss, etc.)
     -- that linger with a default Blizzard look. Skip the loop entirely if Masque was never loaded.
     if masqueGroup then
         for _, region in next, { frame:GetRegions() } do
-            if region:IsObjectType("Texture") and region ~= frame.icon and region ~= frame.border then
+            if
+                region:IsObjectType("Texture")
+                and region ~= frame.icon
+                and region ~= frame.border
+                and region ~= frame.iconFrameArt
+                and region ~= frame.iconMask
+            then
                 region:Hide()
             end
         end
@@ -992,15 +1070,19 @@ local function UpdateIconStyling(frame, catSettings)
     frame.border:SetDrawLayer("BACKGROUND")
     frame.border:SetAlpha(1)
     frame.border:SetColorTexture(0, 0, 0, 1)
-    -- Always apply base inset to crop texture edge artifacts; zoom adds on top
+    -- The action-button frame shows the full icon, with its built-in dark border.
+    local blizzardStyle = UsesBlizzardIconStyle()
     local additionalZoom = (catSettings.iconZoom or DEFAULT_ICON_ZOOM) / 100
-    local inset = TEXCOORD_INSET + additionalZoom
+    local inset = (blizzardStyle and 0 or TEXCOORD_INSET) + additionalZoom
     local iconHeight = catSettings.iconSize or 64
     local iconWidth = GetEffectiveWidth(catSettings.iconWidth, iconHeight)
     local xInset, yInset = GetAspectCropInsets(inset, iconWidth, iconHeight)
     frame.icon:SetTexCoord(xInset, 1 - xInset, yInset, 1 - yInset)
+    SetBlizzardIconArt(frame, blizzardStyle, iconWidth, iconHeight)
     local borderSize = catSettings.borderSize or DEFAULT_BORDER_SIZE
-    if borderSize > 0 then
+    if blizzardStyle then
+        frame.border:Hide()
+    elseif borderSize > 0 then
         frame.border:ClearAllPoints()
         frame.border:SetPoint("TOPLEFT", -borderSize, borderSize)
         frame.border:SetPoint("BOTTOMRIGHT", borderSize, -borderSize)
@@ -3252,6 +3334,8 @@ end)
 if masqueGroup then
     masqueGroup:RegisterCallback(function()
         C_Timer.After(0, function()
+            wipe(expiringGlowCache)
+            wipe(missingGlowCache)
             UpdateVisuals()
             BR.Components.RefreshAll()
         end)
@@ -3336,6 +3420,12 @@ BR.Display.ResetCategoryFramePosition = function(category, x, y)
     BR.CallbackRegistry:TriggerEvent("LayoutRefresh")
 end
 
+BR.IconStyle = {
+    UsesBlizzardArt = UsesBlizzardIconStyle,
+    FRAME_WIDTH_RATIO = BLIZZARD_ICON_ART.frameWidthRatio,
+    ARTWORK_AVAILABLE = BLIZZARD_ICON_ART.available,
+}
+
 BR.Masque = {
     IsActive = function()
         return masqueGroup ~= nil and not masqueGroup.db.Disabled
@@ -3348,6 +3438,7 @@ local function SlashHandler(msg)
 
     if cmd == "test" then
         ToggleTestMode()
+        BR.Components.RefreshAll()
     elseif cmd == "snooze" then
         BR.SnoozeConsumables()
     elseif cmd == "lock" then

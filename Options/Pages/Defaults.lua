@@ -153,9 +153,40 @@ local function Build(content)
         end,
         labelWidth = textLabelWidth,
         masqueCheck = IsMasqueActive,
+        borderBlocked = BR.IconStyle.UsesBlizzardArt,
+        borderBlockedReason = Helpers.IconStyleBorderReason,
     })
     layout:Add(defGrid.frame, defGrid.height, COMPONENT_GAP)
     local labelWidth = defGrid.labelWidth
+
+    -- One stored value; the label names the art that the client draws.
+    local blizzardStyleLabel = BR.CLIENT == BR.ClientType.Forever and L["Options.IconStyle.Forever"]
+        or L["Options.IconStyle.Blizzard"]
+    local iconStyleHolder = Components.Dropdown(content, {
+        label = L["Options.IconStyle"],
+        labelWidth = labelWidth,
+        tooltip = { title = L["Options.IconStyle"], desc = L["Options.IconStyle.Desc"] },
+        options = {
+            { label = L["Options.IconStyle.Modern"], value = "modern" },
+            { label = blizzardStyleLabel, value = "blizzard" },
+        },
+        width = TEXT_DD_W,
+        get = MakeDefaultsGetter("iconStyle", BR.defaults.defaults.iconStyle),
+        enabled = function()
+            return BR.IconStyle.ARTWORK_AVAILABLE and not IsMasqueActive()
+        end,
+        disabledReason = function()
+            if not BR.IconStyle.ARTWORK_AVAILABLE then
+                return L["DisabledReason.IconStyleNoArt"]
+            end
+            return L["DisabledReason.IconStyleMasque"]
+        end,
+        onChange = function(value)
+            BR.Config.Set("defaults.iconStyle", value)
+            Components.RefreshAll()
+        end,
+    })
+    layout:Add(iconStyleHolder, nil, COMPONENT_GAP)
 
     Helpers.LayoutSubsectionHeader(layout, content, L["Options.Text"])
 

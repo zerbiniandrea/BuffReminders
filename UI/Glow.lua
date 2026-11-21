@@ -464,9 +464,13 @@ function BR.Glow.SetExpiration(frame, show, category, cachedSettings)
                 color = nil
             end
             size = d.glowSize or 2
-            borderOffset = (category and BR.Config.GetCategorySetting(category, "borderSize"))
-                or d.borderSize
-                or BR.DEFAULT_BORDER_SIZE
+            if BR.IconStyle.UsesBlizzardArt() then
+                borderOffset = 0
+            else
+                borderOffset = (category and BR.Config.GetCategorySetting(category, "borderSize"))
+                    or d.borderSize
+                    or BR.DEFAULT_BORDER_SIZE
+            end
             params = BR.Glow.BuildAdvancedParams(d, typeIndex)
             glowXOff = d.glowXOffset or 0
             glowYOff = d.glowYOffset or 0
