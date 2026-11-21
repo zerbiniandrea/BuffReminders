@@ -129,6 +129,7 @@ read_globals = {
     "UnitIsPlayer",
     "UnitGUID",
     "UnitInVehicle",
+    "UnitInRange",
     "UnitIsUnit",
     "UnitIsVisible",
     "UnitLevel",

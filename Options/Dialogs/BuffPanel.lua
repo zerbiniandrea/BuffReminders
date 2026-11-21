@@ -119,6 +119,8 @@ local function AddSpecialCheckbox(layout, opts)
         label = opts.label,
         get = opts.get,
         tooltip = opts.tooltip,
+        enabled = opts.enabled,
+        disabledReason = opts.disabledReason,
         onChange = opts.onChange,
     })
     tinsert(bodyHolders, holder)
@@ -571,6 +573,42 @@ local SPECIAL_SECTIONS = {
         editor = "RoguePoison",
     },
 }
+
+local function IsRaidClickable()
+    local cs = BR.profile.categorySettings
+    return cs ~= nil and cs.raid ~= nil and cs.raid.clickable == true
+end
+
+---@param buff RaidBuff
+---@return table section
+local function MakeGroupCastSection(buff)
+    local key = buff.key
+    return {
+        build = function(layout)
+            AddSpecialCheckbox(layout, {
+                label = L["BuffPanel.GroupCast"],
+                get = function()
+                    local groupCast = BR.profile.groupCast
+                    return groupCast ~= nil and groupCast[key] == true
+                end,
+                enabled = IsRaidClickable,
+                disabledReason = L["DisabledReason.RaidClickToCast"],
+                tooltip = { title = L["BuffPanel.GroupCast"], desc = L["BuffPanel.GroupCast.Desc"] },
+                onChange = function(checked)
+                    BR.Config.Set("groupCast." .. key, checked or nil)
+                end,
+            })
+        end,
+    }
+end
+
+-- Buffs with group ranks get the group cast section. Their definitions belong to
+-- the active client, so the sections build at load time from its buff table.
+for _, buff in ipairs(BR.BUFF_TABLES.raid) do
+    if buff.groupCast and not SPECIAL_SECTIONS[buff.key] then
+        SPECIAL_SECTIONS[buff.key] = MakeGroupCastSection(buff)
+    end
+end
 
 ---Editor module of a section, or nil when the section builds inline or the
 ---client does not load the module. The section holds the module name, not the

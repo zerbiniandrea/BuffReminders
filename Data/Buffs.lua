@@ -89,6 +89,12 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field playersOnly? boolean Exclude NPCs from the count (e.g. buffs NPCs provide themselves)
 ---@field defaultEnabled? boolean Ships disabled when false (opt-in); enabled otherwise. Resolved at read time by IsBuffEnabled.
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
+---@field castOnMissing? boolean The cast takes one target: the click casts on a member who lacks the buff
+---@field groupCast? GroupCastRank[] Group ranks that use a reagent, highest first. The user turns them on per buff
+
+---@class GroupCastRank
+---@field spellID number
+---@field reagent number Item ID that the cast uses
 
 ---@class PresenceBuff
 ---@field spellID SpellID

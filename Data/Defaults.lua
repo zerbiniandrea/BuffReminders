@@ -72,6 +72,7 @@ local BR = ns
 ---@field detachedIcons? DetachedIcons
 ---@field buffSounds? table<string, string>
 ---@field readyCheckOnlyOverrides? table<string, boolean>
+---@field groupCast? table<string, boolean> Buff key -> cast the group rank that uses a reagent
 ---@field rememberedConsumables? table<number, table<string, number>> Spec ID -> category -> spell ID
 ---@field customAnchorFrames? string[]
 ---@field position? CategoryPosition
