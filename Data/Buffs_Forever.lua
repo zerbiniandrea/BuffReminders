@@ -210,10 +210,6 @@ BR.BUFF_TABLES = {
             name = L["Buff.Thorns"],
             class = "DRUID",
             overlayText = L["Overlay.NoThorns"],
-            -- Thorns can target an ally, and the plain spell action casts on the current target.
-            clickMacro = function(spellID)
-                return "/cast [@player] " .. (BR.GetSpellName(spellID) or "")
-            end,
         },
     },
     pet = {},

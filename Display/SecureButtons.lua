@@ -1637,7 +1637,7 @@ local function ResolveAction(frame, category, db)
         if frame._br_pet_spell then
             return PetAction(castableID, db)
         end
-        return SpellAction(castableID, category == "raid" and "player" or nil)
+        return SpellAction(castableID, (category == "raid" or category == "self") and "player" or nil)
     end
 
     if db.requestBuffInChat and def and def.chatRequestable and not frame.isPlayerBuff then
