@@ -182,9 +182,9 @@ local function BuildInline(parent, opts)
         end
         register(holder)
 
-        local rowList = rows[category]
+        -- ResetToDefaults replaces rows[category], so each click reads it again.
         local upBtn = CreateArrowButton(row, "Up", L["Options.PoisonMoveUp"], function()
-            local idx = FindRowIndex(rowList, row)
+            local idx = FindRowIndex(rows[category], row)
             if idx and idx > 1 then
                 Swap(category, idx, idx - 1)
             end
@@ -192,8 +192,8 @@ local function BuildInline(parent, opts)
         upBtn:SetPoint("RIGHT", row, "RIGHT", -22, 0)
 
         local downBtn = CreateArrowButton(row, "Down", L["Options.PoisonMoveDown"], function()
-            local idx = FindRowIndex(rowList, row)
-            if idx and idx < #rowList then
+            local idx = FindRowIndex(rows[category], row)
+            if idx and idx < #rows[category] then
                 Swap(category, idx, idx + 1)
             end
         end)
