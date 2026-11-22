@@ -74,6 +74,7 @@ read_globals = {
     "GetPetActionInfo",
     "INVSLOT_RANGED",
     "GetCursorPosition",
+    "GetCurrentKeyBoardFocus",
     "GetMouseFoci",
     "GetNumGroupMembers",
     "GetPartyAssignment",

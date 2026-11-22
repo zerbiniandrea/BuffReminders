@@ -52,6 +52,7 @@ end
 ---@field focus ThemeStyle
 ---@field disabled ThemeStyle
 ---@field readOnly number[]
+---@field defaultText number[] Text of a field that shows the default value
 ---@field cursor? number[] nil = the cursor keeps the client color
 
 ---@class SwatchTokens
@@ -327,6 +328,7 @@ local function BuildRetail()
             focus = With(Flat({ 0.1, 0.1, 0.1, 0.95 }, ACCENT, TEXT), { ring = CLEAR }),
             disabled = With(Flat({ 0.08, 0.08, 0.08, 0.9 }, Alpha(BORDER, 0.4), TEXT), { ring = CLEAR }),
             readOnly = TEXT,
+            defaultText = Grey(0.6),
         },
         ---@type SwatchTokens
         swatch = { normal = BORDER, hover = Grey(0.5), disabled = Grey(0.2), inner = CLEAR },
@@ -647,6 +649,7 @@ local function BuildForever()
             focus = With(Well(P.edgeActive, nil, P.text), { ring = P.focusRing }),
             disabled = With(Well(P.edgeDisabled, nil, P.textDisabled), { ring = CLEAR }),
             readOnly = P.textIdle,
+            defaultText = P.textIdle,
             cursor = P.accent,
         },
         swatch = {

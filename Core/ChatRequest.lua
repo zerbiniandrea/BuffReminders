@@ -17,14 +17,15 @@ local ChatRequest = {}
 -- `chatRequestable`.
 local CATEGORY_ORDER = BR.STATIC_CATEGORIES
 
-local buffList
+---@type table<string, table[]>
+local buffsByCategory
 local categoryList
 local categorySet
 
 -- BR.BUFF_TABLES is static after load (custom buffs are not scanned), so one
 -- build is safe to cache for the session.
 local function build()
-    buffList = {}
+    buffsByCategory = {}
     categoryList = {}
     categorySet = {}
     for _, cat in ipairs(CATEGORY_ORDER) do
@@ -32,24 +33,27 @@ local function build()
         if tbl then
             for _, def in ipairs(tbl) do
                 if def.chatRequestable then
-                    buffList[#buffList + 1] = def
                     if not categorySet[cat] then
                         categorySet[cat] = true
                         categoryList[#categoryList + 1] = cat
+                        buffsByCategory[cat] = {}
                     end
+                    local list = buffsByCategory[cat]
+                    list[#list + 1] = def
                 end
             end
         end
     end
 end
 
---- Ordered list of buff defs flagged `chatRequestable`.
+--- Ordered list of the buff defs of a category flagged `chatRequestable`.
+---@param category string
 ---@return table[] defs
-function ChatRequest.Buffs()
-    if not buffList then
+function ChatRequest.BuffsIn(category)
+    if not buffsByCategory then
         build()
     end
-    return buffList
+    return buffsByCategory[category] or {}
 end
 
 --- Ordered list of categories that host at least one requestable buff.
@@ -96,6 +100,8 @@ end
 ---@return string?
 function ChatRequest.ResolveMessage(key, fallbackName)
     local custom = (BR.profile.chatRequestMessages or {})[key]
+    -- The chat server rejects a message with an escape sequence.
+    custom = custom and custom:gsub("|", "")
     if custom and custom ~= "" then
         return custom
     end

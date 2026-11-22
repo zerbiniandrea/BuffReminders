@@ -32,6 +32,7 @@ BR.Options.Constants = {
     SCROLLBAR_WIDTH = 24,
     COMPONENT_GAP = 6, -- standard gap between components
     SECTION_GAP = 8, -- gap before/after section boundaries
+    BEFORE_HEADER_GAP = 16, -- between the previous section's last item and a section header
     DROPDOWN_EXTRA = 8, -- extra clearance after a dropdown, except the last row of a group
     DEPENDENT_INDENT = 16, -- x indent of a control under the checkbox that gates it
     PAGE_TOP_PADDING = -16, -- y offset where each page's top VerticalLayout cursor starts
@@ -151,7 +152,7 @@ local BORDER_R, BORDER_G, BORDER_B = unpack(BR.Colors.Border)
 local SEP_OFFSET = 4
 local SEP_HEIGHT = 1
 local AFTER_HEADER_GAP = 8 -- between the accent line and the first content row
-local BEFORE_HEADER_GAP = 16 -- between the previous section's last item and this header
+local BEFORE_HEADER_GAP = BR.Options.Constants.BEFORE_HEADER_GAP
 local CONTENT_INDENT = 10 -- how far content nests under each section header
 
 function Helpers.LayoutSectionHeader(layout, parent, text)
@@ -261,6 +262,32 @@ function Helpers.LayoutSectionNote(layout, parent, text)
     layout:AddText(note, h, COMPONENT_GAP)
     layout:SetX(prevX)
     return note
+end
+
+local RESET_TEXTURE = "Interface\\AddOns\\BuffReminders\\Media\\reset.tga"
+
+---The reset glyph: a white circular arrow, tinted by PaintParts.
+---@param frame table
+---@return table[] parts
+function Helpers.AddResetGlyph(frame)
+    local tex = frame:CreateTexture(nil, "ARTWORK")
+    tex:SetTexture(RESET_TEXTURE)
+    tex:SetAllPoints()
+    tex._br_tint = true
+    return { tex }
+end
+
+---@param parts table[] Lines or textures
+---@param color number[]
+function Helpers.PaintParts(parts, color)
+    for _, part in ipairs(parts) do
+        -- A file texture takes a tint; a color texture or line takes the color itself.
+        if part._br_tint then
+            part:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
+        else
+            BR.SetThemeColorTexture(part, color)
+        end
+    end
 end
 
 -- ============================================================================

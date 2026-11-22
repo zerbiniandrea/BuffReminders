@@ -2861,7 +2861,7 @@ end
 ---Create a labeled text input
 ---@param parent table Parent frame
 ---@param config TextInputConfig Configuration table
----@return table holder Frame with .editBox, .SetValue(v), .GetValue()
+---@return table holder Frame with .editBox, .SetValue(v), .GetValue(), .SetTextColor(c)
 function Components.TextInput(parent, config)
     local width = config.width or 150
     -- Explicit labelWidth -> hard. Omitted -> auto-grow.
@@ -2934,6 +2934,11 @@ function Components.TextInput(parent, config)
         editBox:SetEnabled(enabled)
         SetLabelEnabled(label, enabled)
         inputContainer:SetBoxEnabled(enabled)
+    end
+
+    ---@param color? number[] nil = the text color of the theme state
+    function holder:SetTextColor(color)
+        inputContainer:SetBoxTextColor(color)
     end
 
     -- Refresh method for OnShow pattern

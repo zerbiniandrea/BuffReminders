@@ -572,32 +572,7 @@ local function AddNotLearnedSlash(frame)
     return slash
 end
 
----A circular arrow of line segments, centered on the frame: the reset glyph.
----@param frame table
----@return table[] lines
-local function AddResetGlyph(frame)
-    local lines = {}
-    local function Segment(x1, y1, x2, y2)
-        local line = frame:CreateLine(nil, "ARTWORK")
-        line:SetThickness(1.5)
-        line:SetStartPoint("CENTER", frame, x1, y1)
-        line:SetEndPoint("CENTER", frame, x2, y2)
-        lines[#lines + 1] = line
-    end
-    local radius, steps = 4.5, 6
-    local startAngle, span = math.rad(60), math.rad(300)
-    local prevX, prevY = radius * math.cos(startAngle), radius * math.sin(startAngle)
-    for i = 1, steps do
-        local angle = startAngle + span * i / steps
-        local x, y = radius * math.cos(angle), radius * math.sin(angle)
-        Segment(prevX, prevY, x, y)
-        prevX, prevY = x, y
-    end
-    -- The arc ends on the right side, moving up, so the arrowhead points up.
-    Segment(prevX, prevY, prevX - 2, prevY - 2.5)
-    Segment(prevX, prevY, prevX + 2, prevY - 2.5)
-    return lines
-end
+local AddResetGlyph = BR.Options.Helpers.AddResetGlyph
 
 ---A dashed 1 px edge of short textures around the frame.
 ---@param frame table
@@ -621,13 +596,7 @@ local function AddDashedEdge(frame, size)
     return dashes
 end
 
----@param parts table[] Lines or textures
----@param color number[]
-local function PaintParts(parts, color)
-    for _, part in ipairs(parts) do
-        BR.SetThemeColorTexture(part, color)
-    end
-end
+local PaintParts = BR.Options.Helpers.PaintParts
 
 ---Paint an icon as learned or not learned.
 ---@param icon table

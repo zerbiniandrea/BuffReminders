@@ -681,14 +681,17 @@ english["Options.ClickToCast.SnoozeNote"] =
 english["Options.HoverHighlight"] = "Hover highlight"
 english["Options.HoverHighlight.Desc"] = "Show a subtle highlight when hovering over clickable buff icons."
 english["Options.RequestBuffInChat"] = "Request missing buffs in chat"
-english["Options.RequestBuffInChat.Desc"] =
-    "Click a missing buff your class cannot provide to request it in chat. Auto-detects channel (instance/raid/party/say)."
-english["Options.ChatRequest.Cooldown"] = "Chat request cooldown"
-english["Options.ChatRequest.Cooldown.Desc"] =
-    "Waits 5 seconds between chat requests to prevent accidental spam-clicking.\nIf your requests sometimes aren't sent to chat at all, turn this off."
-english["Options.ChatRequest.Cooldown.Hint"] = "Requests not showing up in chat? Turn this off."
-english["Options.ChatRequest.ResetAll"] = "Reset All"
-english["ChatRequests.PerBuffMessages"] = "Per-buff messages"
+english["Options.RequestBuffInChat.Tooltip"] = "Click a missing buff your class can't cast to ask your group for it."
+english["ChatRequests.PageNote"] = "Click a missing buff your class can't cast to ask for it in chat."
+english["Options.ChatRequest.Wait"] = "Wait 5 s between requests"
+english["Options.ChatRequest.Wait.Desc"] = "Stops double clicks from spamming chat."
+english["Options.ChatRequest.Cooldown.Hint"] = "Requests not showing in chat? Turn this off."
+english["Options.ChatRequest.ResetAll"] = "Reset all"
+english["ChatRequests.Messages"] = "Messages"
+english["ChatRequests.Restore"] = "Restore: %s"
+english["ChatRequests.Sends"] = "Sends: %s"
+english["DisabledReason.ChatRequestsOff"] = "Off while requests are off."
+english["DisabledReason.NoCustomMessages"] = "No custom messages."
 -- Chat request messages
 -- EU/US translators: leave untranslated so chat messages stay in English.
 -- Asian translators: translate these so chat messages match your locale.
