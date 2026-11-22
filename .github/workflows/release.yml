@@ -30,12 +30,12 @@ jobs:
           echo "Tag=$TAG  Baseline=${LAST_STABLE:-<none>}  Range=$RANGE"
           curl -sSL https://github.com/orhun/git-cliff/releases/download/v2.10.1/git-cliff-2.10.1-x86_64-unknown-linux-gnu.tar.gz \
             | tar xz -C "$RUNNER_TEMP"
-          # --ignore-tags folds the pre-release alphas into one section labeled
+          # --ignore-tags folds the pre-releases (alpha, beta) into one section labeled
           # with the current tag, so every release lists all changes since the
           # last stable.
           "$RUNNER_TEMP/git-cliff-2.10.1/git-cliff" \
             --config cliff.toml \
-            --ignore-tags '.*-alpha.*' \
+            --ignore-tags '.*-(alpha|beta).*' \
             --tag "$TAG" \
             "$RANGE" \
             --output CHANGELOG.md
