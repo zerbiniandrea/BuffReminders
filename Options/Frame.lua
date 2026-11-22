@@ -133,7 +133,7 @@ StaticPopupDialogs["BUFFREMINDERS_DISCORD_URL"] = {
     hasEditBox = true,
     editBoxWidth = 250,
     OnShow = function(self)
-        self.EditBox:SetText("https://discord.gg/qezQ2hXJJ7")
+        self.EditBox:SetText(BR.DISCORD_URL)
         self.EditBox:HighlightText()
         self.EditBox:SetFocus()
     end,
@@ -164,6 +164,62 @@ StaticPopupDialogs["BUFFREMINDERS_KOFI_URL"] = {
     hideOnEscape = true,
     preferredIndex = 3,
 }
+
+-- ============================================================================
+-- PREVIEW BADGE
+-- ============================================================================
+
+-- Keeps the 2:1 ratio of the 256x128 client logo texture.
+local PREVIEW_LOGO_WIDTH, PREVIEW_LOGO_HEIGHT = 72, 36
+
+---@return number|string|nil
+local function GetClientLogo()
+    if not GetExpansionDisplayInfo or not GetClientDisplayExpansionLevel then
+        return nil
+    end
+    local info = GetExpansionDisplayInfo(GetClientDisplayExpansionLevel())
+    return info and info.logo
+end
+
+---@param panel table
+---@param anchor table Header element that the badge follows
+---@return table label The rightmost element of the badge
+local function CreatePreviewBadge(panel, anchor)
+    local colors = Theme.previewBadge
+    local label = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    label:SetText(L["Options.ClientBeta"])
+    SetTextColor(label, colors.idle)
+
+    local hit = CreateFrame("Button", nil, panel)
+    hit:SetPoint("RIGHT", label, "RIGHT")
+    local logoTexture = GetClientLogo()
+    if logoTexture then
+        local logo = panel:CreateTexture(nil, "ARTWORK")
+        logo:SetTexture(logoTexture)
+        logo:SetSize(PREVIEW_LOGO_WIDTH, PREVIEW_LOGO_HEIGHT)
+        logo:SetPoint("LEFT", anchor, "RIGHT", 2, 0)
+        label:SetPoint("LEFT", logo, "RIGHT", 0, 0)
+        hit:SetPoint("LEFT", logo, "LEFT")
+        hit:SetHeight(PREVIEW_LOGO_HEIGHT)
+    else
+        label:SetPoint("LEFT", anchor, "RIGHT", 6, 0)
+        hit:SetPoint("LEFT", label, "LEFT")
+        hit:SetHeight(16)
+    end
+
+    hit:SetScript("OnClick", function()
+        StaticPopup_Show("BUFFREMINDERS_DISCORD_URL")
+    end)
+    hit:SetScript("OnEnter", function()
+        SetTextColor(label, colors.hover)
+        BR.ShowTooltip(hit, L["Options.ClientBeta.Title"], L["Options.ClientBeta.Desc"], "ANCHOR_BOTTOM")
+    end)
+    hit:SetScript("OnLeave", function()
+        SetTextColor(label, colors.idle)
+        BR.HideTooltip()
+    end)
+    return label
+end
 
 -- ============================================================================
 -- SIDEBAR BUTTON FACTORY
@@ -350,7 +406,7 @@ local function CreateOptionsPanel()
     SetTextColor(version, Theme.version)
 
     local discordSep = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    discordSep:SetPoint("LEFT", version, "RIGHT", 6, 0)
+    discordSep:SetPoint("LEFT", BR.CLIENT_PREVIEW and CreatePreviewBadge(panel, version) or version, "RIGHT", 6, 0)
     discordSep:SetText(headerDot)
 
     local discordLink = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")

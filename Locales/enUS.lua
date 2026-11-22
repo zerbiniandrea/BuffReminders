@@ -378,6 +378,8 @@ english["Display.LoginSnooze"] =
     "The consumable dismiss button is now a right-click: right-click a consumable to snooze its reminders, or type |cFFFFD100/br snooze|r."
 english["Display.LoginCasterName"] =
     "External Buffs can now show who cast each buff. Turn it on in |cFFFFD100/br|r > Categories > External Buffs."
+english["Display.LoginClientBeta"] =
+    "WoW Forever support is in beta. Some reminders are not tested on all classes. Report problems on Discord: %s"
 
 -- ============================================================================
 -- OPTIONS: NAVIGATION LABELS
@@ -1159,6 +1161,10 @@ english["CustomBuff.Error"] = "Error:"
 english["Options.JoinDiscord"] = "Join Discord"
 english["Options.JoinDiscord.Title"] = "Click for invite link"
 english["Options.JoinDiscord.Desc"] = "Got feedback, feature requests, or bug reports?\nJoin the Discord!"
+english["Options.ClientBeta"] = "Beta"
+english["Options.ClientBeta.Title"] = "WoW Forever beta"
+english["Options.ClientBeta.Desc"] =
+    "WoW Forever support is in active development. Some reminders are not tested on all classes.\nReport problems on Discord. Click for the invite link."
 
 -- ============================================================================
 -- OPTIONS: KO-FI

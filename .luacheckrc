@@ -95,6 +95,8 @@ read_globals = {
     "GetShapeshiftFormInfo",
     "GetNumShapeshiftForms",
     "GetBuildInfo",
+    "GetClientDisplayExpansionLevel",
+    "GetExpansionDisplayInfo",
     "GetTime",
     "GetWeaponEnchantInfo",
     "InCombatLockdown",
