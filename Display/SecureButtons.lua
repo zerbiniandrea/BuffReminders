@@ -271,6 +271,25 @@ local function HideLastTargetTooltip()
     nativeOwner = nil
 end
 
+local SNOOZE_HINT = L["Tooltip.RightClickSnooze"]
+
+---@param owner table A consumable button
+local function ShowConsumableTooltip(owner)
+    local defaults = BR.profile.defaults
+    if not defaults or defaults.showConsumableTooltips ~= true or not owner.itemID then
+        return
+    end
+    BR.Display.ShowHoverTooltip(owner, function()
+        GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+        GameTooltip:SetItemByID(owner.itemID)
+        if owner._br_rightClick == "snooze" then
+            local n = TARGET_TIP.note
+            GameTooltip:AddLine(SNOOZE_HINT, n[1], n[2], n[3])
+        end
+        GameTooltip:Show()
+    end)
+end
+
 -- ============================================================================
 -- CLICK-TO-CAST OVERLAY
 -- ============================================================================
@@ -941,16 +960,7 @@ local function CreateClickOverlay(frame)
             return
         end
         if frame.buffCategory == "consumable" then
-            local db = BR.profile
-            if not db or not db.defaults or db.defaults.showConsumableTooltips ~= true then
-                return
-            end
-            local itemID = overlay.itemID
-            if itemID then
-                GameTooltip:SetOwner(overlay, "ANCHOR_RIGHT")
-                GameTooltip:SetItemByID(itemID)
-                GameTooltip:Show()
-            end
+            ShowConsumableTooltip(overlay)
             return
         end
         -- The anchor is the overlay: the cursor is over the overlay, not over the
@@ -964,7 +974,8 @@ local function CreateClickOverlay(frame)
             EndHoverSoon(frame)
         end
         HideLastTargetTooltip()
-        if frame.buffCategory == "consumable" or frame.buffCategory == "raid" or frame.buffCategory == "presence" then
+        BR.Display.EndHoverTooltip(overlay)
+        if GameTooltip:IsOwned(overlay) then
             GameTooltip:Hide()
         end
     end)
@@ -1086,21 +1097,9 @@ local function CreateActionButton()
     btn.highlight:SetTexCoord(BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET, BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET)
     btn.highlight:SetColorTexture(1, 1, 1, 0.2)
 
-    btn:SetScript("OnEnter", function(self)
-        if not BR.profile or not BR.profile.defaults then
-            return
-        end
-        if BR.profile.defaults.showConsumableTooltips ~= true then
-            return
-        end
-        if not self.itemID then
-            return
-        end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetItemByID(self.itemID)
-        GameTooltip:Show()
-    end)
-    btn:SetScript("OnLeave", function()
+    btn:SetScript("OnEnter", ShowConsumableTooltip)
+    btn:SetScript("OnLeave", function(self)
+        BR.Display.EndHoverTooltip(self)
         GameTooltip:Hide()
     end)
 

@@ -5,8 +5,7 @@ local BR = ns
 -- ============================================================================
 -- GENERAL PAGE
 -- ============================================================================
--- Addon-meta settings that are not tied to a buff or a category: language,
--- login messages and the minimap launcher icon.
+-- Addon-wide settings that are not tied to a buff or a category.
 
 local L = BR.L
 local Components = BR.Components
@@ -96,6 +95,25 @@ local function Build(content)
         end,
     })
     layout:Add(minimapHolder, nil, COMPONENT_GAP)
+
+    local tooltipModifierHolder = Components.Dropdown(content, {
+        label = L["Options.TooltipModifier"],
+        width = 90,
+        options = {
+            { label = L["Options.TooltipModifier.None"], value = "NONE" },
+            { label = L["Options.TooltipModifier.Shift"], value = "SHIFT" },
+            { label = L["Options.TooltipModifier.Ctrl"], value = "CTRL" },
+            { label = L["Options.TooltipModifier.Alt"], value = "ALT" },
+        },
+        tooltip = { title = L["Options.TooltipModifier"], desc = L["Options.TooltipModifier.Desc"] },
+        get = function()
+            return BR.Config.Get("defaults.tooltipModifier") or "NONE"
+        end,
+        onChange = function(value)
+            BR.Config.Set("defaults.tooltipModifier", value ~= "NONE" and value or nil)
+        end,
+    })
+    layout:Add(tooltipModifierHolder, nil, COMPONENT_GAP)
 
     content:SetHeight(math.abs(layout:GetY()) + 20)
 end

@@ -85,6 +85,7 @@ local BR = ns
 ---@field consumableDisplayMode? "icon_only"|"sub_icons"|"expanded"
 ---@field consumableBadgeOnSubIcons? boolean
 ---@field showConsumableTooltips? boolean
+---@field tooltipModifier? "SHIFT"|"CTRL"|"ALT" Key that hover tooltips wait for. nil: no key
 ---@field rightClickSnooze? boolean
 ---@field consumableTextScale? number
 ---@field hideConsumableLabels? boolean
@@ -1138,13 +1139,51 @@ end
 BR.Display.IsBuffTooltipOn = IsBuffTooltipOn
 BR.Display.BUFF_TOOLTIP_CATEGORIES = BUFF_TOOLTIP_CATEGORIES
 
--- Show the spell tooltip for a buff frame, with a class-colored "Provided by"
--- line. The caller passes the hovered frame as `anchor`, so the tooltip lines up
--- with the cursor when a click overlay covers the icon.
-local function ShowBuffSpellTooltip(frame, anchor)
-    if not IsBuffTooltipOn(frame.buffCategory) then
+local MODIFIER_DOWN = { SHIFT = IsShiftKeyDown, CTRL = IsControlKeyDown, ALT = IsAltKeyDown }
+
+local hoverOwner, hoverShow, hoverIsDown
+local modifierFrame = CreateFrame("Frame")
+modifierFrame:SetScript("OnEvent", function()
+    if not hoverOwner then
         return
     end
+    if hoverIsDown() then
+        hoverShow()
+    elseif GameTooltip:IsOwned(hoverOwner) then
+        GameTooltip:Hide()
+    end
+end)
+
+---Run `show` now, or, if the user set a tooltip modifier, each time that key goes
+---down while the cursor stays on `owner`. Pair every call with EndHoverTooltip on leave.
+---@param owner table The hovered frame
+---@param show fun() Draws the tooltip on owner
+local function ShowHoverTooltip(owner, show)
+    local profileDefaults = BR.profile.defaults
+    local isDown = profileDefaults and MODIFIER_DOWN[profileDefaults.tooltipModifier]
+    if not isDown then
+        show()
+        return
+    end
+    hoverOwner, hoverShow, hoverIsDown = owner, show, isDown
+    BR.Client.RegisterEvent(modifierFrame, "MODIFIER_STATE_CHANGED")
+    if isDown() then
+        show()
+    end
+end
+
+---@param owner table The frame that the cursor left
+local function EndHoverTooltip(owner)
+    if hoverOwner ~= owner then
+        return
+    end
+    hoverOwner, hoverShow, hoverIsDown = nil, nil, nil
+    modifierFrame:UnregisterEvent("MODIFIER_STATE_CHANGED")
+end
+BR.Display.ShowHoverTooltip = ShowHoverTooltip
+BR.Display.EndHoverTooltip = EndHoverTooltip
+
+local function DrawBuffSpellTooltip(frame, anchor)
     local def = frame.buffDef
     if not def then
         return
@@ -1166,6 +1205,18 @@ local function ShowBuffSpellTooltip(frame, anchor)
     end
     GameTooltip:Show()
 end
+
+-- Show the spell tooltip for a buff frame, with a class-colored "Provided by"
+-- line. The caller passes the hovered frame as `anchor`, so the tooltip lines up
+-- with the cursor when a click overlay covers the icon.
+local function ShowBuffSpellTooltip(frame, anchor)
+    if not IsBuffTooltipOn(frame.buffCategory) then
+        return
+    end
+    ShowHoverTooltip(anchor or frame, function()
+        DrawBuffSpellTooltip(frame, anchor)
+    end)
+end
 BR.Display.ShowBuffSpellTooltip = ShowBuffSpellTooltip
 
 -- Apply mouse interactivity to a buff icon frame. Icons are always click-through
@@ -1181,7 +1232,8 @@ local function ApplyBuffFrameMouse(frame, category)
         frame:SetScript("OnEnter", function(self)
             ShowBuffSpellTooltip(self)
         end)
-        frame:SetScript("OnLeave", function()
+        frame:SetScript("OnLeave", function(self)
+            EndHoverTooltip(self)
             GameTooltip:Hide()
         end)
     else

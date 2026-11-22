@@ -471,6 +471,7 @@ local DefaultSettingKeys = {
     consumableTextScale = "VisualsRefresh",
     hideConsumableLabels = "VisualsRefresh",
     showConsumableTooltips = false, -- No refresh needed, read at tooltip time
+    tooltipModifier = false, -- Read at hover time
     rightClickSnooze = "DisplayRefresh", -- Re-wires the consumable buttons' type2 attribute
     hideLegacyConsumables = "DisplayRefresh",
     preferReusableRunes = "DisplayRefresh",

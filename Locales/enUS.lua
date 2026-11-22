@@ -721,6 +721,14 @@ english["Options.ShowItemTooltips.Desc"] = "When hovering over a consumable icon
 english["Options.ShowBuffTooltips"] = "Show buff tooltips"
 english["Options.ShowBuffTooltips.Desc"] =
     "When the mouse is on a buff icon of this category, show the spell tooltip and which class provides the buff."
+english["Options.TooltipModifier"] = "Tooltip key"
+english["Options.TooltipModifier.Desc"] =
+    "If you select a key, buff and item tooltips show only while you hold that key. You can point at an icon first and push the key after. Turn on the tooltips in the Interaction section of each category."
+english["Options.TooltipModifier.None"] = "None"
+english["Options.TooltipModifier.Shift"] = "Shift"
+english["Options.TooltipModifier.Ctrl"] = "Ctrl"
+english["Options.TooltipModifier.Alt"] = "Alt"
+english["Tooltip.RightClickSnooze"] = "Right-click: snooze consumable reminders"
 english["Options.PetPassiveCombat"] = "Pet passive only in combat"
 english["Options.PetPassiveCombat.Desc"] =
     "Only show the passive pet reminder while in combat. When disabled, the reminder is always shown."
