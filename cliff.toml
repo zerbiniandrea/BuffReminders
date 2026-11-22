@@ -10,7 +10,7 @@
 # clustered and alphabetized by scope (so same-scope entries read together),
 # then the scopeless ones; both keep commit (date) order as the tiebreaker.
 #
-# The alpha-folding and release range live in .github/workflows/release.yml
+# The pre-release folding and release range live in .github/workflows/release.yml
 # (--ignore-tags + an explicit <last-stable>..HEAD range), NOT here, so every
 # release shows all meaningful changes since the last stable, labeled with its
 # own tag.
