@@ -654,6 +654,44 @@ local SPECIAL_SECTIONS = {
         end,
     },
 
+    righteousFury = {
+        build = function(layout)
+            local drop = Components.Dropdown(body, {
+                label = L["BuffPanel.RighteousFuryShow"],
+                labelWidth = DRAWER_LABEL_W,
+                width = DRAWER_FIELD_W,
+                options = {
+                    { label = L["BuffPanel.RighteousFuryShow.Tank"], value = "tank" },
+                    { label = L["BuffPanel.RighteousFuryShow.Always"], value = "always" },
+                },
+                get = function()
+                    return BR.Config.Get("defaults.righteousFuryShow", "tank")
+                end,
+                tooltip = { title = L["BuffPanel.RighteousFuryShow"], desc = L["BuffPanel.RighteousFuryShow.Desc"] },
+                onChange = function(val)
+                    BR.Config.Set("defaults.righteousFuryShow", val)
+                end,
+            })
+            tinsert(bodyHolders, drop)
+            layout:Add(drop, 26, COMPONENT_GAP)
+        end,
+    },
+
+    thorns = {
+        build = function(layout)
+            AddSpecialCheckbox(layout, {
+                label = L["BuffPanel.ThornsRequest"],
+                get = function()
+                    return BR.Config.Get("defaults.thornsRequest") == true
+                end,
+                tooltip = { title = L["BuffPanel.ThornsRequest"], desc = L["BuffPanel.ThornsRequest.Desc"] },
+                onChange = function(checked)
+                    BR.Config.Set("defaults.thornsRequest", checked)
+                end,
+            })
+        end,
+    },
+
     warriorWrongStance = WARRIOR_STANCE_GRID and {
         build = function(layout)
             AddStanceGrid(layout, WARRIOR_STANCE_GRID)
@@ -948,6 +986,79 @@ local function MakeGroupCastSection(buff, desc)
     }
 end
 
+local function IsBlessingGroupScope()
+    return BR.Config.Get("defaults.paladinBlessingScope", "group") ~= "self"
+end
+
+---@param layout table
+---@param grid StanceGrid
+local function AddBlessingControls(layout, grid)
+    local scope = Components.Dropdown(body, {
+        label = L["BuffPanel.BlessingScope"],
+        labelWidth = DRAWER_LABEL_W,
+        width = DRAWER_FIELD_W,
+        options = {
+            { label = L["BuffPanel.BlessingScope.Group"], value = "group" },
+            { label = L["BuffPanel.BlessingScope.Self"], value = "self" },
+        },
+        get = function()
+            return BR.Config.Get("defaults.paladinBlessingScope", "group")
+        end,
+        tooltip = { title = L["BuffPanel.BlessingScope"], desc = L["BuffPanel.BlessingScope.Desc"] },
+        onChange = function(val)
+            BR.Config.Set("defaults.paladinBlessingScope", val)
+            Components.RefreshAll()
+        end,
+    })
+    tinsert(bodyHolders, scope)
+    layout:Add(scope, 26, COMPONENT_GAP)
+
+    local hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetWidth(bodyW)
+    hint:SetJustifyH("LEFT")
+    hint:SetText(L["BuffPanel.BlessingPriority.Hint"])
+    layout:AddText(hint, math.max(12, math.ceil(hint:GetStringHeight())), COMPONENT_GAP)
+
+    local options = {}
+    for i, choice in ipairs(grid.choices) do
+        options[i] = { label = BR.GetSpellName(choice.spellIDs[#choice.spellIDs]) or choice.key, value = choice.key }
+    end
+    local function Priority()
+        local list = {}
+        for i, key in ipairs(BR.Config.Get("defaults.paladinBlessingPriority") or {}) do
+            list[i] = key
+        end
+        return list
+    end
+    for slot = 1, #grid.choices do
+        local drop = Components.Dropdown(body, {
+            label = L["BuffPanel.BlessingPriority." .. slot],
+            labelWidth = DRAWER_LABEL_W,
+            width = DRAWER_FIELD_W,
+            options = options,
+            get = function()
+                return Priority()[slot]
+            end,
+            enabled = IsBlessingGroupScope,
+            disabledReason = L["DisabledReason.BlessingPriority"],
+            onChange = function(val)
+                -- The list stays a permutation: the old slot of the value takes the replaced key.
+                local list = Priority()
+                for other = 1, #grid.choices do
+                    if list[other] == val then
+                        list[other] = list[slot]
+                    end
+                end
+                list[slot] = val
+                BR.Config.Set("defaults.paladinBlessingPriority", list)
+                Components.RefreshAll()
+            end,
+        })
+        tinsert(bodyHolders, drop)
+        layout:Add(drop, 26, COMPONENT_GAP)
+    end
+end
+
 -- Buffs with group ranks get the group cast section. Their definitions belong to
 -- the active client, so the sections build at load time from its buff table.
 -- A choice-grid buff keeps its group ranks on each choice.
@@ -958,6 +1069,9 @@ for _, buff in ipairs(BR.BUFF_TABLES.raid) do
             build = function(layout)
                 AddStanceGrid(layout, buff.choiceGrid)
                 groupCast.build(layout)
+                if buff.fallbackChoices then
+                    AddBlessingControls(layout, buff.choiceGrid)
+                end
             end,
             warn = function()
                 return BR.StateHelpers.IsBuffEnabled(buff.key) and ChoiceGridNeedsSetup(buff)
@@ -965,6 +1079,17 @@ for _, buff in ipairs(BR.BUFF_TABLES.raid) do
         }
     elseif buff.groupCast and not SPECIAL_SECTIONS[buff.key] then
         SPECIAL_SECTIONS[buff.key] = MakeGroupCastSection(buff)
+    end
+end
+
+-- A presence grid row with no choice accepts any choice, so the grid never needs setup.
+for _, buff in ipairs(BR.BUFF_TABLES.presence) do
+    if buff.choiceGrid then
+        SPECIAL_SECTIONS[buff.key] = {
+            build = function(layout)
+                AddStanceGrid(layout, buff.choiceGrid)
+            end,
+        }
     end
 end
 

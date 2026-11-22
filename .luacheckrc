@@ -76,6 +76,7 @@ read_globals = {
     "GetCursorPosition",
     "GetMouseFoci",
     "GetNumGroupMembers",
+    "GetPartyAssignment",
     "GetRaidRosterInfo",
     "GetNumSpecializations",
     "GetUnitName",

@@ -95,6 +95,8 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field visibilityCondition? fun(): boolean Return false to hide the buff
 ---@field choiceGrid? StanceGrid The user picks the tracked buff per content row
 ---@field activeChoice? fun(): StanceChoice?, number? Choice of the current row and the rank to cast. nil = no reminder
+---@field fallbackChoices? fun(): StanceChoice[], number[] Choices to try in order, with the rank to cast, when the active choice reads as a duplicate
+---@field selfScope? fun(): boolean Return true to check and cast the buff on the player only, with no duplicate check
 ---@field infoTooltip? TooltipText
 ---@field duplicateText? string Overlay text when no member misses the buff and some have it only from another caster. A click then casts nothing
 
@@ -125,6 +127,8 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
 ---@field customCheck? fun(isRestricted?: boolean): boolean?
 ---@field casterCheck? fun(isRestricted: boolean): string?, boolean? For a player of the class, replaces the group scan. Returns the overlay text (nil = no reminder) and true when a click must cast nothing
+---@field choiceGrid? StanceGrid The user picks the buff per content row. A row with no choice accepts any
+---@field clickMacro? fun(spellID: number?): string
 
 ---@class TargetedBuff
 ---@field spellID SpellID
@@ -142,6 +146,12 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field clickMacro? fun(spellID: number?): string
 ---@field casterBuffId? number Check this buff on the caster instead of scanning group
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
+---@field selfFallback? boolean Any rank from any caster counts. The target is a tank (TANK role or Main Tank mark), else the player. A tank of another class can request it in chat
+---@field targetHint? string Gray text after the remembered target name in the icon tooltip
+---@field levelRequired? number A caster in the group must have this level to count
+---@field noExpirationGlow? boolean
+---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
+---@field visibilityCondition? fun(): boolean Return false to hide the buff
 
 ---@class SelfBuff
 ---@field spellID? SpellID

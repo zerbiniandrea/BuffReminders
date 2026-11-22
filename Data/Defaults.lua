@@ -257,6 +257,20 @@ BR.defaults = {
             raid = { might = true },
             pvp = { might = true },
         } or nil,
+        -- WoW Forever: "self" checks and blesses only the player, with no duplicate check.
+        paladinBlessingScope = BR.CLIENT == BR.ClientType.Forever and "group" or nil,
+        -- WoW Forever: if the blessing of the row is a duplicate, the reminder suggests
+        -- the first blessing of this list that is not.
+        paladinBlessingPriority = BR.CLIENT == BR.ClientType.Forever and { "might", "kings", "wisdom" } or nil,
+        -- The paladin aura of each content row (WoW Forever). A row with none accepts any aura.
+        paladinAuras = BR.CLIENT == BR.ClientType.Forever and {
+            world = {},
+            dungeon = {},
+            raid = {},
+            pvp = {},
+        } or nil,
+        -- thornsRequest: absent - nil means off
+        righteousFuryShow = BR.CLIENT == BR.ClientType.Forever and "tank" or nil,
         -- Per-text-item size override, as a percentage of the icon size. An
         -- absent key follows consumableTextScale.
         textSizes = {},
@@ -303,7 +317,8 @@ BR.defaults = {
             },
         },
         targeted = {
-            openWorld = false,
+            -- Forever druids keep Thorns on themselves while leveling in the open world.
+            openWorld = BR.CLIENT == BR.ClientType.Forever,
             dungeon = true,
             scenario = true,
             raid = true,

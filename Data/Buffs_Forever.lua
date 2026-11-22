@@ -604,6 +604,26 @@ local function StanceMacro(castID)
     return castID and ("/cast " .. (BR.GetSpellName(castID) or "")) or ""
 end
 
+---@return boolean
+local function RighteousFuryWanted()
+    local defaults = BR.profile.defaults
+    return (defaults ~= nil and defaults.righteousFuryShow == "always") or BR.StateHelpers.IsPlayerTank()
+end
+
+-- State remembers the tank that a role buff goes on. With no tank, the buff goes on the player.
+---@param buffKey string
+---@return fun(spellID: number?): string
+local function TankOrSelfMacro(buffKey)
+    return function(spellID)
+        local name = BR.GetSpellName(spellID) or ""
+        local tank = BR.TargetMemory.Get(buffKey)
+        if tank then
+            return "/cast [@" .. tank .. ",help,nodead] " .. name
+        end
+        return "/cast [@player] " .. name
+    end
+end
+
 local SYMBOL_OF_KINGS = 21177
 
 -- A Greater Blessing reaches every group member of the target's class.
@@ -677,27 +697,88 @@ local function ActiveBlessing()
     return nil
 end
 
--- A unit keeps one aura of each type, whoever casts it. Highest rank first.
-local PALADIN_AURAS = {
-    { 10293, 10292, 1032, 10291, 643, 10290, 465 }, -- Devotion Aura
-    { 10301, 10300, 10299, 10298, 7294 }, -- Retribution Aura
-    { 19746 }, -- Concentration Aura
-    { 19896, 19895, 19876 }, -- Shadow Resistance Aura
-    { 19898, 19897, 19888 }, -- Frost Resistance Aura
-    { 19900, 19899, 19891 }, -- Fire Resistance Aura
-    { 20218 }, -- Sanctity Aura
+---@type table<string, StanceChoice>
+local BLESSING_BY_KEY = {}
+for _, choice in ipairs(PALADIN_BLESSING_GRID.choices) do
+    BLESSING_BY_KEY[choice.key] = choice
+end
+
+-- Reused on every call, so a caller must read the lists before the next call.
+---@type StanceChoice[]
+local fallbackBlessings = {}
+---@type number[]
+local fallbackCastIDs = {}
+
+---Known blessings in the user priority order, without the blessing of the row.
+---@return StanceChoice[]
+---@return number[] castIDs
+local function FallbackBlessings()
+    wipe(fallbackBlessings)
+    wipe(fallbackCastIDs)
+    local primary = ActiveBlessing()
+    local defaults = BR.profile.defaults
+    local priority = defaults and defaults.paladinBlessingPriority or BR.defaults.defaults.paladinBlessingPriority or {}
+    for i = 1, #priority do
+        local choice = BLESSING_BY_KEY[priority[i]]
+        local castID = choice and choice ~= primary and HighestKnownSpell(choice.spellIDs)
+        local listed = false
+        for j = 1, #fallbackBlessings do
+            listed = listed or fallbackBlessings[j] == choice
+        end
+        if castID and not listed then
+            fallbackBlessings[#fallbackBlessings + 1] = choice
+            fallbackCastIDs[#fallbackCastIDs + 1] = castID
+        end
+    end
+    return fallbackBlessings, fallbackCastIDs
+end
+
+-- A unit keeps one aura of each type, whoever casts it. A row with no choice accepts any aura.
+---@type StanceGrid
+local PALADIN_AURA_GRID = {
+    setting = "paladinAuras",
+    hint = L["BuffPanel.PaladinAura.Hint"],
+    single = true,
+    choices = {
+        { key = "devotion", spellIDs = { 10293, 10292, 1032, 10291, 643, 10290, 465 } },
+        { key = "retribution", spellIDs = { 10301, 10300, 10299, 10298, 7294 } },
+        { key = "concentration", spellIDs = { 19746 } },
+        { key = "shadowResistance", spellIDs = { 19896, 19895, 19876 } },
+        { key = "frostResistance", spellIDs = { 19898, 19897, 19888 } },
+        { key = "fireResistance", spellIDs = { 19900, 19899, 19891 } },
+        { key = "sanctity", spellIDs = { 20218 } },
+    },
 }
 ---@type table<number, integer>
 local PALADIN_AURA_TYPE = {}
 local ALL_PALADIN_AURA_IDS = {}
-for auraType, ranks in ipairs(PALADIN_AURAS) do
-    for _, id in ipairs(ranks) do
+for auraType, choice in ipairs(PALADIN_AURA_GRID.choices) do
+    for _, id in ipairs(choice.spellIDs) do
         PALADIN_AURA_TYPE[id] = auraType
         ALL_PALADIN_AURA_IDS[#ALL_PALADIN_AURA_IDS + 1] = id
     end
 end
 
+---The aura type of the current content row and its highest known rank. nil when the
+---row chooses none or the player does not know the chosen aura.
+---@return integer? auraType
+---@return number? castID
+local function ChosenPaladinAura()
+    local row = BR.StateHelpers.GetContentRow()
+    for auraType, choice in ipairs(PALADIN_AURA_GRID.choices) do
+        if BR.StateHelpers.IsContentChoiceAllowed(PALADIN_AURA_GRID.setting, row, choice.key) then
+            local castID = HighestKnownSpell(choice.spellIDs)
+            if castID then
+                return auraType, castID
+            end
+            return nil
+        end
+    end
+    return nil
+end
+
 local NO_AURA_TEXT = L["Overlay.NoAura"]
+local WRONG_AURA_TEXT = L["Overlay.WrongAura"]
 local DUPLICATE_TEXT = L["Overlay.Duplicate"]
 
 ---@type table<integer, true>
@@ -731,11 +812,11 @@ end
 local function KnownAurasOnStanceBar()
     local bar = BR.BuffState.GetStanceBarSpells()
     local anyKnown, allOnBar = false, true
-    for _, ranks in ipairs(PALADIN_AURAS) do
-        if HighestKnownSpell(ranks) then
+    for _, choice in ipairs(PALADIN_AURA_GRID.choices) do
+        if HighestKnownSpell(choice.spellIDs) then
             anyKnown = true
             local onBar = false
-            for _, id in ipairs(ranks) do
+            for _, id in ipairs(choice.spellIDs) do
                 onBar = onBar or bar[id] == true
             end
             allOnBar = allOnBar and onBar
@@ -759,9 +840,13 @@ local function CheckOwnPaladinAura(isAuraRestricted)
     if not anyKnown then
         return nil
     end
+    local chosenType = ChosenPaladinAura()
     local runType = stanceID and PALADIN_AURA_TYPE[stanceID]
     if isAuraRestricted or BR.GameContext.IsInCombat() then
-        if runType or not allOnBar then
+        if runType then
+            return chosenType and runType ~= chosenType and WRONG_AURA_TEXT or nil
+        end
+        if not allOnBar then
             return nil
         end
         return NO_AURA_TEXT
@@ -770,6 +855,9 @@ local function CheckOwnPaladinAura(isAuraRestricted)
     runType = runType or next(ownAuraTypes)
     if not runType then
         return NO_AURA_TEXT
+    end
+    if chosenType and runType ~= chosenType then
+        return WRONG_AURA_TEXT
     end
     if foreignAuraTypes[runType] and not ownAuraTypes[runType] then
         return DUPLICATE_TEXT, true
@@ -1058,6 +1146,11 @@ BR.BUFF_TABLES = {
             requiresKnownSpell = true,
             choiceGrid = PALADIN_BLESSING_GRID,
             activeChoice = ActiveBlessing,
+            fallbackChoices = FallbackBlessings,
+            selfScope = function()
+                local defaults = BR.profile.defaults
+                return defaults ~= nil and defaults.paladinBlessingScope == "self"
+            end,
             duplicateText = DUPLICATE_TEXT,
             infoTooltip = { title = L["Tooltip.PaladinDuplicate"], desc = L["Tooltip.PaladinBlessingDuplicate.Desc"] },
         },
@@ -1070,13 +1163,45 @@ BR.BUFF_TABLES = {
             name = L["Buff.PaladinAura"],
             class = "PALADIN",
             reach = "party",
-            icons = { spells = { 10293 } },
+            icons = {
+                spells = { 10293 },
+                dynamic = function()
+                    local _, castID = ChosenPaladinAura()
+                    return castID and BR.Icons.GetBuffTexture(castID)
+                end,
+            },
             overlayText = L["Overlay.NoAura"],
             casterCheck = CheckOwnPaladinAura,
+            choiceGrid = PALADIN_AURA_GRID,
+            clickMacro = function(spellID)
+                local _, castID = ChosenPaladinAura()
+                return "/cast " .. (BR.GetSpellName(castID or spellID) or "")
+            end,
             infoTooltip = { title = L["Tooltip.PaladinDuplicate"], desc = L["Tooltip.PaladinAuraDuplicate.Desc"] },
         },
     },
-    targeted = {},
+    ---@type TargetedBuff[]
+    targeted = {
+        {
+            spellID = { 9910, 9756, 8914, 1075, 782, 467 },
+            key = "thorns",
+            name = L["Buff.Thorns"],
+            class = "DRUID",
+            overlayText = L["Overlay.NoThorns"],
+            levelRequired = 6, -- Thorns rank 1
+            selfFallback = true,
+            targetHint = L["Tooltip.TankHint"],
+            noExpirationGlow = true,
+            chatRequestable = true,
+            -- A tank of another class sees the request only when the user turns it on.
+            visibilityCondition = function()
+                local defaults = BR.profile.defaults
+                return playerClass == "DRUID" or (defaults ~= nil and defaults.thornsRequest == true)
+            end,
+            clickMacro = TankOrSelfMacro("thorns"),
+            infoTooltip = { title = L["Tooltip.TankTarget"], desc = L["Tooltip.ThornsTank.Desc"] },
+        },
+    },
     ---@type SelfBuff[]
     self = {
         {
@@ -1133,10 +1258,11 @@ BR.BUFF_TABLES = {
         {
             spellID = 25780,
             key = "righteousFury",
-            defaultEnabled = false, -- opt-in: only tanks want it
             name = L["Buff.RighteousFury"],
             class = "PALADIN",
             overlayText = L["Overlay.NoRighteousFury"],
+            visibilityCondition = RighteousFuryWanted,
+            infoTooltip = { title = L["Tooltip.TankOnly"], desc = L["Tooltip.RighteousFuryTank.Desc"] },
         },
         {
             spellID = { 10952, 10951, 1006, 602, 7128, 588 },
@@ -1209,15 +1335,6 @@ BR.BUFF_TABLES = {
             name = L["Buff.WarlockArmor"],
             class = "WARLOCK",
             overlayText = L["Overlay.NoArmor"],
-        },
-        {
-            spellID = { 9910, 9756, 8914, 1075, 782, 467 },
-            key = "thorns",
-            defaultEnabled = false, -- opt-in: only tanks want it
-            name = L["Buff.Thorns"],
-            class = "DRUID",
-            overlayText = L["Overlay.NoThorns"],
-            noExpirationGlow = true,
         },
         -- The stance bar stays readable in combat, so the two stance reminders work there.
         {

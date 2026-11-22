@@ -482,6 +482,10 @@ local DefaultSettingKeys = {
     petSpecIconOnHover = "DisplayRefresh",
     useFelDomination = "DisplayRefresh",
     warlockWrongDemon = "DisplayRefresh",
+    paladinBlessingScope = "DisplayRefresh",
+    paladinBlessingPriority = "DisplayRefresh",
+    thornsRequest = "DisplayRefresh",
+    righteousFuryShow = "DisplayRefresh",
     -- Font (global-only, lives under defaults)
     fontFace = "VisualsRefresh",
     textOutline = "VisualsRefresh",
@@ -495,6 +499,7 @@ local ContentGridKeys = {
     warriorStances = true,
     druidForms = true,
     paladinBlessings = true,
+    paladinAuras = true,
 }
 
 -- Canonical buff category list. The order is the display stacking order.

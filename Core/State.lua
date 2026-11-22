@@ -314,6 +314,12 @@ local currentValidUnits = {}
 local cachedIsAlone = true
 -- Whether any group member is assigned HEALER (nil = not computed this session yet).
 local cachedHealerInGroup = nil
+-- Whether the player is a tank (nil = not read since the last role event).
+---@type boolean?
+local cachedPlayerTank = nil
+-- Main Tank marks by unit token, cleared on role events.
+---@type table<string, boolean>
+local cachedMainTanks = {}
 
 -- Spec cache: playerName -> specId (populated by LibSpecialization callbacks for allies,
 -- and by BuildValidUnitCache for the local player via GetPlayerSpecId())
@@ -580,6 +586,35 @@ local function GetPlayerRole()
         cachedPlayerRole = GetSpecializationRole(specIndex)
     end
     return cachedPlayerRole
+end
+
+---Whether a raid marks the unit as Main Tank. A secret answer reads as false and stays uncached.
+---@param unit string
+---@return boolean
+local function IsMainTank(unit)
+    local known = cachedMainTanks[unit]
+    if known ~= nil then
+        return known
+    end
+    if not GetPartyAssignment then
+        return false
+    end
+    local marked = Plain(GetPartyAssignment("MAINTANK", unit))
+    if marked == nil then
+        return false
+    end
+    known = marked == true or marked == 1
+    cachedMainTanks[unit] = known
+    return known
+end
+
+---A tank has the TANK role or a Main Tank mark. Classic groups often use only the mark.
+---@return boolean
+local function IsPlayerTank()
+    if cachedPlayerTank == nil then
+        cachedPlayerTank = Plain(UnitGroupRolesAssigned("player")) == "TANK" or IsMainTank("player")
+    end
+    return cachedPlayerTank
 end
 
 ---Check if player knows a spell (cached version of C_SpellBook.IsSpellKnown)
@@ -1795,6 +1830,65 @@ local function ShouldShowTargetedBuff(
     return not isActive, remaining
 end
 
+---@param data {unit: string, name: string?}
+---@return boolean
+local function IsUnitTank(data)
+    return GetUnitRole(data) == "TANK" or IsMainTank(data.unit)
+end
+
+---Reminder state of a selfFallback targeted buff. The caster checks the first tank who
+---lacks the buff, else the player when the group has no tank. A tank of another class
+---checks themselves, if a caster who can cast the buff is in the group.
+---@param buff TargetedBuff
+---@param playerOnly boolean
+---@param threshold number A short aura (IsShortAura) reports no remaining time
+---@return boolean? shouldShow nil when the player can neither cast nor request the buff
+---@return number? remainingTime
+local function ShouldShowRoleTargetedBuff(buff, playerOnly, threshold)
+    local spellIDs = buff.spellID
+    if playerClass ~= buff.class then
+        if
+            not buff.chatRequestable
+            or playerOnly
+            or cachedIsAlone
+            or not IsPlayerTank()
+            or not HasCasterForBuff(buff.class, buff.levelRequired)
+        then
+            return nil
+        end
+    else
+        if not KnowsAnySpell(spellIDs) then
+            return nil
+        end
+        local target, hasTank = nil, false
+        if not playerOnly and not cachedIsAlone then
+            for _, data in ipairs(currentValidUnits) do
+                if (data.isPlayer or includeNPCsInCounting) and IsUnitTank(data) then
+                    hasTank = true
+                    -- A phased member cannot receive a cast.
+                    if not data.isPhased and not UnitHasBuff(data.unit, spellIDs) then
+                        target = data
+                        break
+                    end
+                end
+            end
+        end
+        local isSelf = target and (target.unit == "player" or Plain(UnitIsUnit(target.unit, "player")) == true)
+        TargetMemory.Observe(buff.key, true, target and not isSelf and target.name or nil, target and target.class)
+        if target then
+            return true, nil
+        end
+        if hasTank then
+            return false, nil
+        end
+    end
+    local hasBuff, remaining, _, duration = UnitHasBuff("player", spellIDs)
+    if IsShortAura(duration, threshold) then
+        remaining = nil
+    end
+    return not hasBuff, remaining
+end
+
 ---Check if player should cast their self buff or weapon imbue (returns true if missing)
 ---@param buff SelfBuff|CustomBuff
 ---@param skipSpellKnownCheck? boolean Skip the "player knows spell" check (for custom buffs)
@@ -2358,6 +2452,23 @@ local function AcquireMissingUnits(buff, isAuraRestricted)
     return list
 end
 
+-- The fallback choice that replaced a duplicate active choice at the last refresh, by buff key.
+---@type table<string, {choice: StanceChoice?, castID: number?}>
+local choiceFallbacks = {}
+
+---Choice of a choice-grid buff and the rank to cast. A fallback choice from the last
+---refresh wins over the choice of the content row.
+---@param buff RaidBuff
+---@return StanceChoice?
+---@return number? castID
+function BuffState.GetActiveChoice(buff)
+    local fallback = choiceFallbacks[buff.key]
+    if fallback and fallback.choice then
+        return fallback.choice, fallback.castID
+    end
+    return buff.activeChoice()
+end
+
 ---Units that lacked the buff at the last refresh. The player, if listed, is "player".
 ---@param key string
 ---@return string[]?
@@ -2441,7 +2552,7 @@ end
 function BuffState.GetGroupCastSpellID(buff)
     local ranks = buff.groupCast
     if buff.activeChoice then
-        local choice = buff.activeChoice()
+        local choice = BuffState.GetActiveChoice(buff)
         ranks = choice and choice.groupCast
     end
     local enabled = BR.profile.groupCast
@@ -2491,6 +2602,12 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
                 spellIDs, benefitKey = choice.auraIDs or choice.spellIDs, choice.beneficiaries or buff.key
             end
         end
+        local fallback = choiceFallbacks[buff.key]
+        if fallback then
+            fallback.choice, fallback.castID = nil, nil
+        end
+        local selfScoped = buff.selfScope ~= nil and buff.selfScope()
+        local playerOnly = scope.playerOnly or selfScoped
 
         if
             (choice or not buff.activeChoice)
@@ -2502,22 +2619,54 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
             and (not buff.requiresKnownSpell or KnowsAnySpell(buff.spellID))
             and (not buff.visibilityCondition or buff.visibilityCondition())
         then
+            local countDuplicates = buff.duplicateText ~= nil
+                and not selfScoped
+                and not isAuraRestricted
+                and not GameContext.IsInCombat()
             local missing, total, minRemaining, duplicates = CountMissingBuff(
                 spellIDs,
                 benefitKey,
-                scope.playerOnly,
+                playerOnly,
                 buff.playersOnly,
                 buff.reach == "party",
                 raidThreshold,
                 missingUnits,
-                buff.duplicateText ~= nil and not isAuraRestricted and not GameContext.IsInCombat()
+                countDuplicates
             )
+
+            -- A fallback choice replaces a duplicate when a member lacks it or the
+            -- player already gives it to every member who benefits.
+            if missing == 0 and duplicates > 0 and buff.fallbackChoices then
+                local alternatives, castIDs = buff.fallbackChoices()
+                for j = 1, #alternatives do
+                    local alt = alternatives[j]
+                    local altMissing, altTotal, altRemaining, altDuplicates = CountMissingBuff(
+                        alt.auraIDs or alt.spellIDs,
+                        alt.beneficiaries or buff.key,
+                        playerOnly,
+                        buff.playersOnly,
+                        buff.reach == "party",
+                        raidThreshold,
+                        missingUnits,
+                        true
+                    )
+                    if altTotal > 0 and (altMissing > 0 or altDuplicates == 0) then
+                        missing, total, minRemaining, duplicates = altMissing, altTotal, altRemaining, altDuplicates
+                        if not fallback then
+                            fallback = {}
+                            choiceFallbacks[buff.key] = fallback
+                        end
+                        fallback.choice, fallback.castID = alt, castIDs[j]
+                        break
+                    end
+                end
+            end
 
             if missing > 0 then
                 entry.visible = true
                 entry.displayType = "count"
                 local buffed = total - missing
-                entry.countText = scope.playerOnly and ""
+                entry.countText = playerOnly and ""
                     or (missingCountOnly and tostring(missing) or (buffed .. "/" .. total))
                 entry.shouldGlow = raidMissGlow
                 NoteTimedChange(minRemaining, raidThreshold)
@@ -2530,7 +2679,9 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
             elseif not hideExpiring and (not expiringClass or buff.class == expiringClass) then
                 TrySetEntryExpiring(entry, minRemaining, raidThreshold, raidExGlow)
             end
-            if choice and entry.visible then
+            if fallback and fallback.castID and entry.visible then
+                entry.dynamicIcon = BR.Icons.GetBuffTexture(fallback.castID)
+            elseif choice and entry.visible then
                 BR.Icons.ApplyDynamicIcon(entry, buff)
             end
         end
@@ -2710,6 +2861,7 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring,
                 if text then
                     SetEntryText(entry, text, presMissGlow)
                     entry.noClick = noClick
+                    BR.Icons.ApplyDynamicIcon(entry, buff)
                 end
             elseif showBuff and IsBuffEnabled(buff.key) then
                 local trackable = IsAuraTrackable(buff)
@@ -2757,15 +2909,16 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring,
 end
 
 -- Buffs the player must keep on other units. self_only mode tracks only buffs
--- on the player, so it hides this category.
+-- on the player, so it hides this category, except the player check of a selfFallback buff.
 local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring, expiringClass)
-    local targetedVisible = IsCategoryVisibleForContent("targeted") and trackingMode ~= "self_only"
+    local targetedVisible = IsCategoryVisibleForContent("targeted")
+    local selfOnly = trackingMode == "self_only"
     local targExGlow, targMissGlow, targThreshold = GetCategoryGlowSettings("targeted")
     for i, buff in ipairs(TargetedBuffs) do
         local entry = GetOrCreateEntry(buff.key, "targeted", i)
         local settingKey = GetBuffSettingKey(buff)
 
-        if targetedVisible and IsBuffEnabled(settingKey) then
+        if targetedVisible and (not selfOnly or buff.selfFallback) and IsBuffEnabled(settingKey) then
             local trackable = IsAuraTrackable(buff)
             local useGlowDet = isAuraRestricted and not trackable and buff.glowDetectable
             if (not isAuraRestricted or trackable or useGlowDet) and PassesPreChecks(buff, nil, db, trackingMode) then
@@ -2774,20 +2927,26 @@ local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring,
                         SetEntryText(entry, buff.overlayText, targMissGlow)
                     end
                 else
-                    local shouldShow, remaining = ShouldShowTargetedBuff(
-                        buff.spellID,
-                        buff.class,
-                        buff.beneficiaryRole,
-                        buff.requireSpecId,
-                        buff.key,
-                        buff.casterBuffId,
-                        targThreshold
-                    )
+                    local shouldShow, remaining
+                    if buff.selfFallback then
+                        shouldShow, remaining = ShouldShowRoleTargetedBuff(buff, selfOnly, targThreshold)
+                    else
+                        shouldShow, remaining = ShouldShowTargetedBuff(
+                            buff.spellID,
+                            buff.class,
+                            buff.beneficiaryRole,
+                            buff.requireSpecId,
+                            buff.key,
+                            buff.casterBuffId,
+                            targThreshold
+                        )
+                    end
 
                     if shouldShow then
                         SetEntryText(entry, buff.overlayText, targMissGlow)
                     elseif
                         shouldShow == false
+                        and not buff.noExpirationGlow
                         and not hideExpiring
                         and (not expiringClass or buff.class == expiringClass)
                     then
@@ -3416,6 +3575,13 @@ end
 ---Invalidate group-healer cache
 function BuffState.InvalidateHealerCache()
     cachedHealerInGroup = nil
+    wipe(cachedMainTanks)
+    local wasTank = cachedPlayerTank
+    cachedPlayerTank = nil
+    -- A group refresh skips the self category, so a tank change asks for a full render.
+    if wasTank ~= nil and IsPlayerTank() ~= wasTank then
+        BR.CallbackRegistry:TriggerEvent("RenderRequested", false)
+    end
 end
 
 function BuffState.InvalidateSubgroupCache()
@@ -3956,6 +4122,7 @@ BR.StateHelpers = {
     IsBuffEnabled = IsBuffEnabled,
     IsPlayerSpellCached = IsPlayerSpellCached,
     GetItemCountCached = GetItemCountCached,
+    IsPlayerTank = IsPlayerTank,
     AsSpellList = AsSpellList,
 }
 

@@ -516,7 +516,8 @@ local function CreateClickOverlay(frame)
             return
         end
         if self._br_clickMacroFn and not self._br_chatRequestKey then
-            self:SetAttribute("macrotext", self._br_clickMacroFn(self._br_clickMacroSpellID))
+            local noClick = entry and entry.noClick
+            self:SetAttribute("macrotext", noClick and "" or self._br_clickMacroFn(self._br_clickMacroSpellID))
         end
         local pickDef = self._br_pickDef
         if pickDef and not InCombatLockdown() then
@@ -529,7 +530,7 @@ local function CreateClickOverlay(frame)
                 -- active choice of the current content names the spell to cast.
                 local castID
                 if pickDef.activeChoice then
-                    castID = select(2, pickDef.activeChoice())
+                    castID = select(2, BR.BuffState.GetActiveChoice(pickDef))
                 end
                 self:SetAttribute("spell", castID or self._br_action.spellID)
                 self:SetAttribute("unit", PickCastUnit(pickDef.key))
@@ -631,7 +632,7 @@ local function CreateClickOverlay(frame)
                 end
             end
             if name then
-                ShowLastTargetTooltip(overlay, name, class, hint)
+                ShowLastTargetTooltip(overlay, name, class, hint or frame.buffDef.targetHint)
             end
             return
         end

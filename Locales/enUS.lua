@@ -151,6 +151,7 @@ english["Overlay.WrongPet"] = "WRONG\nPET"
 english["Overlay.FeedPet"] = "FEED\nPET"
 english["Overlay.WrongStance"] = "WRONG\nSTANCE"
 english["Overlay.WrongForm"] = "WRONG\nFORM"
+english["Overlay.WrongAura"] = "WRONG\nAURA"
 english["Overlay.NoAspect"] = "NO\nASPECT"
 english["Overlay.NoArmor"] = "NO\nARMOR"
 english["Overlay.NoRighteousFury"] = "NO\nFURY"
@@ -320,7 +321,7 @@ english["Tooltip.PaladinDuplicate"] = "Duplicate Check"
 english["Tooltip.PaladinAuraDuplicate.Desc"] =
     "Out of combat, the icon also shows when another paladin gives you the same aura type as your aura. A player keeps one aura of each type, so pick a different aura. A click on this icon casts nothing."
 english["Tooltip.PaladinBlessingDuplicate.Desc"] =
-    "Out of combat, the icon also shows when no group member misses your blessing, but a member has it only from another paladin. A player keeps one blessing of each type, so pick a different blessing. A click on this icon casts nothing."
+    "Out of combat, the icon checks if no group member lacks your blessing, but a member has it only from another paladin. Then it suggests the next blessing of your priority list. If each blessing in the list is a duplicate, the icon shows DUPE, and a click on it casts nothing. If Bless is set to Myself only, there is no duplicate check."
 english["Tooltip.DriveBy.Desc"] =
     "Out of combat, the icon shows when you target a friendly player outside your group who lacks a buff you can give. A click casts the highest rank that the player can receive."
 english["Tooltip.InstanceEntryReminder"] = "Instance Entry Reminder"
@@ -328,6 +329,13 @@ english["Tooltip.InstanceEntryReminder.Desc"] =
     "Briefly shown when entering a dungeon as a reminder to drop a Soulwell. Dismissed after casting or after 30 seconds."
 english["Tooltip.MageFood"] = "Healers Only"
 english["Tooltip.MageFood.Desc"] = "Only shown while you're playing a healer"
+english["Tooltip.TankOnly"] = "Tank Check"
+english["Tooltip.RighteousFuryTank.Desc"] =
+    "By default, the icon shows only while you tank: your group role is Tank, or the raid marks you as Main Tank. To see it at all times, set Show to Always in the settings of this reminder."
+english["Tooltip.TankHint"] = "(tank)"
+english["Tooltip.TankTarget"] = "Tank Target"
+english["Tooltip.ThornsTank.Desc"] =
+    "In a group, the icon shows when a tank lacks Thorns, and a click casts it on that tank. A tank has the Tank role or a Main Tank mark. Solo or with no tank, the icon checks you, and a click casts Thorns on you."
 english["BuffTooltip.ProvidedBy"] = "Provided by %s"
 
 -- ============================================================================
@@ -691,6 +699,7 @@ english["ChatRequest.devotionAura"] = "Devotion Aura pls"
 english["ChatRequest.soulstone"] = "Soulstone pls"
 english["ChatRequest.healthstone"] = "Healthstones pls"
 english["ChatRequest.mageFood"] = "Mage food pls"
+english["ChatRequest.thorns"] = "Thorns pls"
 
 -- ============================================================================
 -- OPTIONS: PET
@@ -884,6 +893,24 @@ english["BuffPanel.GroupCast.Desc"] =
     "If two or more group members lack the buff, a click casts the group version. You must know it and carry its reagent. Otherwise the click casts the single-target version on a member who lacks the buff."
 english["BuffPanel.GroupCast.Blessing.Desc"] =
     "If two or more members of one class lack the blessing, a click casts the Greater Blessing on one of them. It reaches every group member of that class. You must know it and carry a Symbol of Kings. Otherwise the click casts the single-target blessing on a member who lacks it."
+english["BuffPanel.PaladinAura.Hint"] = "Click an aura to choose it for that content. Each row holds one aura. A click on the icon casts the chosen aura, and the icon shows WRONG AURA if you use a different one. If a row is empty, or you do not know the chosen aura yet, any aura counts."
+english["BuffPanel.BlessingScope"] = "Bless"
+english["BuffPanel.BlessingScope.Group"] = "Group"
+english["BuffPanel.BlessingScope.Self"] = "Myself only"
+english["BuffPanel.BlessingScope.Desc"] =
+    "Group: the icon counts the group members who lack your blessing, and a click casts it on one of them. Myself only: the icon checks only you, and a click casts the blessing on you. There is no duplicate check."
+english["BuffPanel.BlessingPriority.Hint"] = "If another paladin gives your blessing to the group (DUPE), the icon suggests the first blessing in this list that is not a duplicate."
+english["BuffPanel.BlessingPriority.1"] = "1st"
+english["BuffPanel.BlessingPriority.2"] = "2nd"
+english["BuffPanel.BlessingPriority.3"] = "3rd"
+english["BuffPanel.ThornsRequest"] = "Tanks can ask for Thorns"
+english["BuffPanel.ThornsRequest.Desc"] =
+    "If you tank (Tank role or Main Tank mark), you are not a druid, and a druid of level 6 or higher is in your group, the icon shows when you lack Thorns. A click asks for Thorns in chat. \"Request missing buffs in chat\" on the Chat Requests page must be on."
+english["BuffPanel.RighteousFuryShow"] = "Show"
+english["BuffPanel.RighteousFuryShow.Tank"] = "When tanking"
+english["BuffPanel.RighteousFuryShow.Always"] = "Always"
+english["BuffPanel.RighteousFuryShow.Desc"] =
+    "When tanking: the icon shows only if your group role is Tank or the raid marks you as Main Tank. Always: the icon shows solo and in any group."
 english["BuffPanel.Sound"] = "Sound"
 english["BuffPanel.Sound.None"] = "None"
 english["BuffPanel.Detached"] = "Own frame (detached)"
@@ -895,6 +922,7 @@ english["BuffPanel.CasterAlways.Desc"] =
     "Warlocks always see the reminder; everyone else only on ready check."
 english["DisabledReason.NotDetached"] = "This buff isn't detached - it sits inside its category frame."
 english["DisabledReason.CasterAlways"] = 'Only applies in ready-check mode. Switch "Show" back to ready check first.'
+english["DisabledReason.BlessingPriority"] = "Only applies when Bless is set to Group."
 english["Options.DisplayOrder.Note"] =
     "Order inside the combined frame, top to bottom. Split categories are not listed."
 
