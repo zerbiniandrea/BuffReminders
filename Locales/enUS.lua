@@ -970,6 +970,16 @@ english["Options.BuffTracking.Override.Combat.Desc"] =
 english["Options.BuffTracking.Override.Leveling"] = "While leveling"
 english["Options.BuffTracking.Override.Leveling.Desc"] =
     "Tracking mode to use below max level. Once you reach max level, the mode selected above is used."
+english["Options.LevelingExpiring"] = "Expiring while leveling"
+english["Options.LevelingExpiring.Desc"] =
+    "Which buffs warn before they expire while you are below max level. Missing buffs always show. Custom buffs keep their own threshold. At max level, the normal expiration threshold applies."
+english["Options.LevelingExpiring.Own"] = "Your spells only"
+english["Options.LevelingExpiring.Own.Desc"] =
+    "Only buffs that your class casts warn before they expire. Consumables and buffs from other classes show only when missing or low on stock."
+english["Options.LevelingExpiring.All"] = "All buffs"
+english["Options.LevelingExpiring.All.Desc"] = "Every buff warns before it expires, the same as at max level."
+english["Options.LevelingExpiring.Off"] = "Off (missing only)"
+english["Options.LevelingExpiring.Off.Desc"] = "No buff warns before it expires. Buffs show only when missing or low on stock."
 
 -- ============================================================================
 -- OPTIONS: PROFILES TAB
@@ -1255,6 +1265,8 @@ english["DisabledReason.CombatOverride"] =
     '"In combat" hiding is enabled above, so nothing shows in combat and this override would have no effect.\nUncheck it to use a combat tracking override.'
 english["DisabledReason.LevelingOverride"] =
     '"Leveling" hiding is enabled above, so nothing shows while leveling and this override would have no effect.\nUncheck it to use a leveling tracking override.'
+english["DisabledReason.LevelingExpiring"] =
+    '"Leveling" hiding is enabled above, so nothing shows while leveling and this setting has no effect.\nUncheck it to choose which buffs warn before they expire.'
 english["DisabledReason.ExpiringInCombat"] =
     '"In combat" hiding is enabled, so everything is already hidden during combat.'
 english["DisabledReason.HealthstoneThreshold"] = 'Enable "Warn when low" first.'

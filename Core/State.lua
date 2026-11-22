@@ -2470,7 +2470,7 @@ function BuffState.GetGroupCastSpellID(buff)
 end
 
 -- Coverage category: the reminder counts how many group members miss the buff.
-local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, missingCountOnly)
+local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, expiringClass, missingCountOnly)
     local raidVisible = IsCategoryVisibleForContent("raid")
     local raidExGlow, raidMissGlow, raidThreshold = GetCategoryGlowSettings("raid")
     local bronzeHiddenInCombat = GameContext.IsInCombat() and db.bronzeHideInCombat
@@ -2527,7 +2527,7 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, mis
             elseif duplicates > 0 then
                 SetEntryText(entry, buff.duplicateText, raidMissGlow)
                 entry.noClick = true
-            elseif not hideExpiring then
+            elseif not hideExpiring and (not expiringClass or buff.class == expiringClass) then
                 TrySetEntryExpiring(entry, minRemaining, raidThreshold, raidExGlow)
             end
             if choice and entry.visible then
@@ -2640,7 +2640,7 @@ local function RefreshUtility(db, trackingMode, isAuraRestricted)
 end
 
 -- Presence category: one group member with the buff satisfies the reminder.
-local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring)
+local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring, expiringClass)
     local presenceVisible = IsCategoryVisibleForContent("presence")
     local presExGlow, presMissGlow, presThreshold = GetCategoryGlowSettings("presence")
     for i, buff in ipairs(PresenceBuffs) do
@@ -2742,7 +2742,11 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring)
                         end
                         if not hasBuff and customOk then
                             SetEntryText(entry, buff.overlayText, presMissGlow)
-                        elseif not buff.noExpirationGlow and not hideExpiring then
+                        elseif
+                            not buff.noExpirationGlow
+                            and not hideExpiring
+                            and (not expiringClass or buff.class == expiringClass)
+                        then
                             TrySetEntryExpiring(entry, minRemaining, presThreshold, presExGlow)
                         end
                     end
@@ -2754,7 +2758,7 @@ end
 
 -- Buffs the player must keep on other units. self_only mode tracks only buffs
 -- on the player, so it hides this category.
-local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring)
+local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring, expiringClass)
     local targetedVisible = IsCategoryVisibleForContent("targeted") and trackingMode ~= "self_only"
     local targExGlow, targMissGlow, targThreshold = GetCategoryGlowSettings("targeted")
     for i, buff in ipairs(TargetedBuffs) do
@@ -2782,7 +2786,11 @@ local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring)
 
                     if shouldShow then
                         SetEntryText(entry, buff.overlayText, targMissGlow)
-                    elseif shouldShow == false and not hideExpiring then
+                    elseif
+                        shouldShow == false
+                        and not hideExpiring
+                        and (not expiringClass or buff.class == expiringClass)
+                    then
                         TrySetEntryExpiring(entry, remaining, targThreshold, targExGlow)
                     end
                 end
@@ -3129,19 +3137,26 @@ function BuffState.Refresh(refreshMode)
     local missingCountOnly = db.showMissingCountOnly
     local isAuraRestricted = BuffState.IsRestricted()
     local hideExpiring = isAuraRestricted and db.hideExpiringInCombat ~= false
+    -- Below max level, levelingExpiring narrows the expiring state. Custom buffs keep their own threshold.
+    local levelingExpiring = GameContext.GetPlayerLevel() < GameContext.GetMaxExpansionLevel() and db.levelingExpiring
+        or "all"
+    local hideBuffExpiring = hideExpiring or levelingExpiring == "off"
+    local expiringClass = levelingExpiring == "own" and playerClass or nil
+    local hideConsumableExpiring = hideExpiring or levelingExpiring == "own" or levelingExpiring == "off"
 
-    RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, missingCountOnly)
+    RefreshRaid(db, trackingMode, isAuraRestricted, hideBuffExpiring, expiringClass, missingCountOnly)
     if not groupOnly then
         -- Self buffs run before presence so suppressedByEntry can read self entries.
-        RefreshSelf(isAuraRestricted, hideExpiring)
+        -- ShouldShowSelfBuff gates every self buff on the player class, so expiringClass does not apply.
+        RefreshSelf(isAuraRestricted, hideBuffExpiring)
         -- Chores never depend on group state, so a group refresh skips them.
         RefreshUtility(db, trackingMode, isAuraRestricted)
     end
-    RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring)
-    RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring)
+    RefreshPresence(db, trackingMode, isAuraRestricted, hideBuffExpiring, expiringClass)
+    RefreshTargeted(db, trackingMode, isAuraRestricted, hideBuffExpiring, expiringClass)
     if not groupOnly then
         RefreshPet(isAuraRestricted)
-        RefreshConsumables(db, trackingMode, isAuraRestricted, hideExpiring)
+        RefreshConsumables(db, trackingMode, isAuraRestricted, hideConsumableExpiring)
         RefreshCustom(isAuraRestricted, hideExpiring)
         -- Loadout detection is aura-agnostic, but a gear or talent swap is blocked
         -- in every restricted context, so the reminder there is unactionable noise.
