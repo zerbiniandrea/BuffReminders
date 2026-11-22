@@ -371,19 +371,6 @@ function GameContext.Invalidate(id)
     fn()
 end
 
--- A client with pet happiness can report it as a pet power type. The pet unit filter keeps
--- the power events of other units away.
-if GetPetHappiness then
-    local petPowerFrame = CreateFrame("Frame")
-    petPowerFrame:SetScript("OnEvent", function(_, _, _, powerType)
-        if powerType == "HAPPINESS" then
-            GameContext.Invalidate("petHappiness")
-            NotifyChanged(false)
-        end
-    end)
-    BR.Client.RegisterEvent(petPowerFrame, "UNIT_POWER_UPDATE", "pet")
-end
-
 ---@param ids CacheId[]
 local function InvalidateAll(ids)
     for i = 1, #ids do

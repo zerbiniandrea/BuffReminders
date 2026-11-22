@@ -223,10 +223,10 @@ local SATISFIED_LOADOUT_STATE = { satisfied = true }
 local cachedPetFamily = nil
 
 -- Happiness of the current pet (false = no pet or no value, nil = unresolved).
--- GetPetHappiness exists only on a client with pet happiness.
+-- C_PetInfo.GetPetHappiness exists only on a client with pet happiness.
 ---@type number|false|nil
 local cachedPetHappiness = nil
-local GetPetHappiness = GetPetHappiness
+local GetPetHappiness = C_PetInfo and C_PetInfo.GetPetHappiness
 
 -- Warrior stance and druid form rules of the client: the allowed stances and the
 -- stance that the click casts.

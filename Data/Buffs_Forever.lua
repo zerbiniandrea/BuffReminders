@@ -1460,6 +1460,6 @@ BR.BUFF_TABLES = {
 }
 
 -- The happiness reminder exists only on a client with pet happiness.
-if GetPetHappiness then
+if C_PetInfo and C_PetInfo.GetPetHappiness then
     table.insert(BR.BUFF_TABLES.pet, 3, PET_HAPPINESS)
 end
