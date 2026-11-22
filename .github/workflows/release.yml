@@ -23,22 +23,30 @@ jobs:
       - name: Generate changelog
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
-          # Baseline is the previous stable tag (exclude pre-releases and the
-          # tag being built, which already exists on a stable push).
-          LAST_STABLE=$(git tag --sort=-v:refname | grep -vE 'alpha|beta|rc' | grep -vFx "$TAG" | head -1)
-          RANGE="${LAST_STABLE:+${LAST_STABLE}..}HEAD"
-          echo "Tag=$TAG  Baseline=${LAST_STABLE:-<none>}  Range=$RANGE"
+          if [[ "$TAG" =~ -(alpha|beta) ]]; then
+            # A pre-release lists the changes since the previous tag on its history.
+            # After a history rewrite, that is an older tag, so the range only grows.
+            BASELINE=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)
+          else
+            # A stable release lists every change since the previous stable tag.
+            BASELINE=$(git tag --sort=-v:refname | grep -vE 'alpha|beta|rc' | grep -vFx "$TAG" | head -1)
+          fi
+          RANGE="${BASELINE:+${BASELINE}..}HEAD"
+          echo "Tag=$TAG  Baseline=${BASELINE:-<none>}  Range=$RANGE"
           curl -sSL https://github.com/orhun/git-cliff/releases/download/v2.10.1/git-cliff-2.10.1-x86_64-unknown-linux-gnu.tar.gz \
             | tar xz -C "$RUNNER_TEMP"
-          # --ignore-tags folds the pre-releases (alpha, beta) into one section labeled
-          # with the current tag, so every release lists all changes since the
-          # last stable.
+          # --ignore-tags folds the pre-releases (alpha, beta) inside the range into
+          # one section labeled with the current tag.
           "$RUNNER_TEMP/git-cliff-2.10.1/git-cliff" \
             --config cliff.toml \
             --ignore-tags '.*-(alpha|beta).*' \
             --tag "$TAG" \
             "$RANGE" \
             --output CHANGELOG.md
+          # Fixup commits are not in the changelog, so a pre-release can have no entries.
+          if ! grep -q '^### ' CHANGELOG.md; then
+            printf '\n- Fixes and improvements to the features of earlier pre-releases.\n' >> CHANGELOG.md
+          fi
           echo "----- CHANGELOG.md -----"
           cat CHANGELOG.md
 
