@@ -1075,28 +1075,6 @@ BR.BUFF_TABLES = {
             visibilityCondition = BattleShoutReady,
         },
         {
-            spellID = { 9885, 9884, 8907, 5234, 6756, 5232, 1126, 21850, 21849 },
-            key = "versatility",
-            name = L["Buff.MarkOfTheWild"],
-            class = "DRUID",
-            reach = "raid",
-            icons = { spells = { 9885 } },
-            castOnMissing = true,
-            groupCast = { { spellID = 21850, reagent = 17026 }, { spellID = 21849, reagent = 17021 } },
-            chatRequestable = true,
-        },
-        {
-            spellID = { 10938, 10937, 2791, 1245, 1244, 1243, 21564, 21562 },
-            key = "stamina",
-            name = L["Buff.PowerWordFortitude"],
-            class = "PRIEST",
-            reach = "raid",
-            icons = { spells = { 10938 } },
-            castOnMissing = true,
-            groupCast = { { spellID = 21564, reagent = 17029 }, { spellID = 21562, reagent = 17028 } },
-            chatRequestable = true,
-        },
-        {
             spellID = { 27841, 14819, 14818, 14752, 27681 },
             key = "spirit",
             name = L["Buff.DivineSpirit"],
@@ -1109,15 +1087,14 @@ BR.BUFF_TABLES = {
             requiresKnownSpell = true,
         },
         {
-            spellID = { 10958, 10957, 976, 27683 },
-            key = "shadowProtection",
-            name = L["Buff.ShadowProtection"],
-            class = "PRIEST",
+            spellID = { 9885, 9884, 8907, 5234, 6756, 5232, 1126, 21850, 21849 },
+            key = "versatility",
+            name = L["Buff.MarkOfTheWild"],
+            class = "DRUID",
             reach = "raid",
-            icons = { spells = { 10958 } },
+            icons = { spells = { 9885 } },
             castOnMissing = true,
-            groupCast = { { spellID = 27683, reagent = 17029 } },
-            defaultEnabled = false, -- opt-in: only shadow damage fights want it
+            groupCast = { { spellID = 21850, reagent = 17026 }, { spellID = 21849, reagent = 17021 } },
             chatRequestable = true,
         },
         -- Each member gets the blessing of their class list in the options grid.
@@ -1136,6 +1113,29 @@ BR.BUFF_TABLES = {
                 return defaults ~= nil and defaults.paladinBlessingScope == "self"
             end,
             infoTooltip = { title = L["Tooltip.PaladinBlessing"], desc = L["Tooltip.PaladinBlessing.Desc"] },
+        },
+        {
+            spellID = { 10938, 10937, 2791, 1245, 1244, 1243, 21564, 21562 },
+            key = "stamina",
+            name = L["Buff.PowerWordFortitude"],
+            class = "PRIEST",
+            reach = "raid",
+            icons = { spells = { 10938 } },
+            castOnMissing = true,
+            groupCast = { { spellID = 21564, reagent = 17029 }, { spellID = 21562, reagent = 17028 } },
+            chatRequestable = true,
+        },
+        {
+            spellID = { 10958, 10957, 976, 27683 },
+            key = "shadowProtection",
+            name = L["Buff.ShadowProtection"],
+            class = "PRIEST",
+            reach = "raid",
+            icons = { spells = { 10958 } },
+            castOnMissing = true,
+            groupCast = { { spellID = 27683, reagent = 17029 } },
+            defaultEnabled = false, -- opt-in: only shadow damage fights want it
+            chatRequestable = true,
         },
     },
     ---@type PresenceBuff[]
@@ -1189,122 +1189,6 @@ BR.BUFF_TABLES = {
     self = {
         {
             spellID = {
-                25296, -- Aspect of the Hawk
-                14322,
-                14321,
-                14320,
-                14319,
-                14318,
-                13165,
-                13163, -- Aspect of the Monkey
-                20190, -- Aspect of the Wild
-                20043,
-                1299447, -- Aspect of the Beast
-                1299446,
-                1299445,
-                13161,
-                5118, -- Aspect of the Cheetah
-                13159, -- Aspect of the Pack
-            },
-            key = "hunterAspect",
-            icons = { spells = { 25296 } },
-            name = L["Buff.HunterAspect"],
-            class = "HUNTER",
-            overlayText = L["Overlay.NoAspect"],
-        },
-        {
-            spellID = { 20906, 20905, 19506, 1299348, 1299346 },
-            key = "trueshotAura",
-            name = L["Buff.TrueshotAura"],
-            class = "HUNTER",
-            overlayText = L["Overlay.NoAura"],
-        },
-        {
-            spellID = {
-                10220, -- Ice Armor
-                10219,
-                7320,
-                7302,
-                7301, -- Frost Armor
-                7300,
-                168,
-                22783, -- Mage Armor
-                22782,
-                6117,
-            },
-            key = "mageArmor",
-            icons = { spells = { 10220 } },
-            name = L["Buff.MageArmor"],
-            class = "MAGE",
-            overlayText = L["Overlay.NoArmor"],
-        },
-        {
-            spellID = 25780,
-            key = "righteousFury",
-            name = L["Buff.RighteousFury"],
-            class = "PALADIN",
-            overlayText = L["Overlay.NoRighteousFury"],
-            visibilityCondition = RighteousFuryWanted,
-            infoTooltip = { title = L["Tooltip.TankOnly"], desc = L["Tooltip.RighteousFuryTank.Desc"] },
-        },
-        {
-            spellID = { 10952, 10951, 1006, 602, 7128, 588 },
-            key = "innerFire",
-            name = L["Buff.InnerFire"],
-            class = "PRIEST",
-            overlayText = L["Overlay.NoInnerFire"],
-            noExpirationGlow = true,
-        },
-        -- The stance bar shows Shadowform, and it stays readable in combat.
-        {
-            key = "shadowform",
-            name = L["Buff.Shadowform"],
-            class = "PRIEST",
-            overlayText = L["Overlay.NoForm"],
-            icons = { textures = { 136200 } }, -- spell_shadow_shadowform
-            requiresSpellID = BR.SHADOWFORM_SPELL_ID,
-            castSpellID = BR.SHADOWFORM_SPELL_ID,
-            noExpirationGlow = true,
-            customCheck = function()
-                return not BR.BuffState.IsShadowFormActive()
-            end,
-        },
-        {
-            spellID = { 10432, 10431, 8134, 945, 905, 325, 324 },
-            key = "lightningShield",
-            name = L["Buff.LightningShield"],
-            class = "SHAMAN",
-            overlayText = L["Overlay.NoShield"],
-            noExpirationGlow = true,
-        },
-        -- Vanilla shamans do not dual-wield, so any imbue on the weapon counts.
-        {
-            spellID = SHAMAN_IMBUES,
-            key = "shamanImbue",
-            name = L["Buff.ShamanImbue"],
-            class = "SHAMAN",
-            overlayText = L["Overlay.NoImbue"],
-            enchantID = SHAMAN_IMBUE_ENCHANTS,
-            enchantDuration = 3600, -- seconds
-            -- An unarmed hand or a fishing pole takes no imbue.
-            visibilityCondition = function()
-                local subclass = BR.BuffState.GetWeaponSubclass(16)
-                return subclass ~= nil and subclass ~= 20 -- Enum.ItemWeaponSubclass.Fishingpole
-            end,
-            icons = {
-                spells = { 16362, 16342, 16316, 16356 }, -- Windfury, Flametongue, Rockbiter, Frostbrand
-                dynamic = function()
-                    local id = ShamanImbueCastID()
-                    return id and BR.Icons.GetBuffTexture(id)
-                end,
-            },
-            clickMacro = function()
-                local id = ShamanImbueCastID()
-                return id and ("/cast " .. (BR.GetSpellName(id) or "")) or ""
-            end,
-        },
-        {
-            spellID = {
                 11735, -- Demon Armor
                 11734,
                 11733,
@@ -1319,7 +1203,7 @@ BR.BUFF_TABLES = {
             class = "WARLOCK",
             overlayText = L["Overlay.NoArmor"],
         },
-        -- The stance bar stays readable in combat, so the two stance reminders work there.
+        -- The stance bar stays readable in combat, so this reminder works there.
         {
             key = "druidWrongForm",
             defaultEnabled = false, -- opt-in: ships disabled
@@ -1346,6 +1230,97 @@ BR.BUFF_TABLES = {
             end,
         },
         {
+            spellID = {
+                10220, -- Ice Armor
+                10219,
+                7320,
+                7302,
+                7301, -- Frost Armor
+                7300,
+                168,
+                22783, -- Mage Armor
+                22782,
+                6117,
+            },
+            key = "mageArmor",
+            icons = { spells = { 10220 } },
+            name = L["Buff.MageArmor"],
+            class = "MAGE",
+            overlayText = L["Overlay.NoArmor"],
+        },
+        {
+            spellID = {
+                25296, -- Aspect of the Hawk
+                14322,
+                14321,
+                14320,
+                14319,
+                14318,
+                13165,
+                13163, -- Aspect of the Monkey
+                20190, -- Aspect of the Wild
+                20043,
+                1299447, -- Aspect of the Beast
+                1299446,
+                1299445,
+                13161,
+                5118, -- Aspect of the Cheetah
+                13159, -- Aspect of the Pack
+            },
+            key = "hunterAspect",
+            icons = { spells = { 25296 } },
+            name = L["Buff.HunterAspect"],
+            class = "HUNTER",
+            overlayText = L["Overlay.NoAspect"],
+        },
+        {
+            spellID = { 10952, 10951, 1006, 602, 7128, 588 },
+            key = "innerFire",
+            name = L["Buff.InnerFire"],
+            class = "PRIEST",
+            overlayText = L["Overlay.NoInnerFire"],
+            noExpirationGlow = true,
+        },
+        {
+            spellID = { 10432, 10431, 8134, 945, 905, 325, 324 },
+            key = "lightningShield",
+            name = L["Buff.LightningShield"],
+            class = "SHAMAN",
+            overlayText = L["Overlay.NoShield"],
+            noExpirationGlow = true,
+        },
+        {
+            spellID = 25780,
+            key = "righteousFury",
+            name = L["Buff.RighteousFury"],
+            class = "PALADIN",
+            overlayText = L["Overlay.NoRighteousFury"],
+            visibilityCondition = RighteousFuryWanted,
+            infoTooltip = { title = L["Tooltip.TankOnly"], desc = L["Tooltip.RighteousFuryTank.Desc"] },
+        },
+        -- The stance bar shows Shadowform, and it stays readable in combat.
+        {
+            key = "shadowform",
+            name = L["Buff.Shadowform"],
+            class = "PRIEST",
+            overlayText = L["Overlay.NoForm"],
+            icons = { textures = { 136200 } }, -- spell_shadow_shadowform
+            requiresSpellID = BR.SHADOWFORM_SPELL_ID,
+            castSpellID = BR.SHADOWFORM_SPELL_ID,
+            noExpirationGlow = true,
+            customCheck = function()
+                return not BR.BuffState.IsShadowFormActive()
+            end,
+        },
+        {
+            spellID = { 20906, 20905, 19506, 1299348, 1299346 },
+            key = "trueshotAura",
+            name = L["Buff.TrueshotAura"],
+            class = "HUNTER",
+            overlayText = L["Overlay.NoAura"],
+        },
+        -- The stance bar stays readable in combat, so this reminder works there.
+        {
             key = "warriorWrongStance",
             defaultEnabled = false, -- opt-in: ships disabled
             name = L["Buff.WarriorStance"],
@@ -1368,6 +1343,32 @@ BR.BUFF_TABLES = {
             end,
             clickMacro = function()
                 return StanceMacro(BR.BuffState.GetExpectedWarriorStanceID())
+            end,
+        },
+        -- Vanilla shamans do not dual-wield, so any imbue on the weapon counts.
+        {
+            spellID = SHAMAN_IMBUES,
+            key = "shamanImbue",
+            name = L["Buff.ShamanImbue"],
+            class = "SHAMAN",
+            overlayText = L["Overlay.NoImbue"],
+            enchantID = SHAMAN_IMBUE_ENCHANTS,
+            enchantDuration = 3600, -- seconds
+            -- An unarmed hand or a fishing pole takes no imbue.
+            visibilityCondition = function()
+                local subclass = BR.BuffState.GetWeaponSubclass(16)
+                return subclass ~= nil and subclass ~= 20 -- Enum.ItemWeaponSubclass.Fishingpole
+            end,
+            icons = {
+                spells = { 16362, 16342, 16316, 16356 }, -- Windfury, Flametongue, Rockbiter, Frostbrand
+                dynamic = function()
+                    local id = ShamanImbueCastID()
+                    return id and BR.Icons.GetBuffTexture(id)
+                end,
+            },
+            clickMacro = function()
+                local id = ShamanImbueCastID()
+                return id and ("/cast " .. (BR.GetSpellName(id) or "")) or ""
             end,
         },
     },
@@ -1572,18 +1573,53 @@ BR.BUFF_TABLES = {
     },
     ---@type UtilityBuff[]
     utility = {
+        -- spellID gives the click overlay a known spell. PreClick replaces it with the pick.
         {
-            key = "repairGear",
-            defaultEnabled = false, -- opt-in: ships disabled
-            name = L["Buff.RepairGear"],
-            icons = { textures = { 136241 } }, -- Trade_BlackSmithing
-            overlayText = L["Overlay.Repair"],
-            -- floor, not round: 84.9% must never read as the 85% threshold it crossed.
-            overlayTextFn = function()
-                return REPAIR_LABEL .. "\n" .. floor(BR.BuffState.GetLowestDurability() * 100) .. "%"
+            key = "driveByBuffs",
+            defaultEnabled = false, -- opt-in: casts on strangers
+            name = L["Buff.DriveByBuffs"],
+            spellID = DRIVE_BY_SPELLS,
+            icons = {
+                spells = { 10157, 10938, 9885 },
+                dynamic = function()
+                    local spellID = BR.DriveBy.Pick()
+                    return spellID and BR.Icons.GetBuffTexture(spellID)
+                end,
+            },
+            overlayText = L["Overlay.DriveBy"],
+            infoTooltip = { title = L["Buff.DriveByBuffs"], desc = L["Tooltip.DriveBy.Desc"] },
+            castUnit = "target",
+            clickSpell = function()
+                return BR.DriveBy.Pick()
             end,
             customCheck = function()
-                return BR.BuffState.GetLowestDurability() < (BR.Config.Get("defaults.repairThreshold", 20) / 100)
+                return BR.DriveBy.Pick() ~= nil
+            end,
+        },
+        {
+            key = "lowAmmo",
+            name = L["Buff.LowAmmo"],
+            icons = {
+                textures = { AMMO_ICON_ARROW },
+                dynamic = function()
+                    return AmmoWeaponSubclass() == 3 and AMMO_ICON_BULLET or AMMO_ICON_ARROW -- 3 = Gun
+                end,
+            },
+            overlayText = AMMO_TEXT,
+            overlayTextFn = function()
+                local subclass = AmmoWeaponSubclass()
+                return subclass and (AMMO_LABEL .. "\n" .. AmmoCount(subclass)) or AMMO_TEXT
+            end,
+            customCheck = function()
+                if BR.GameContext.IsInCombat() then
+                    return false
+                end
+                local subclass = AmmoWeaponSubclass()
+                if not subclass then
+                    return false
+                end
+                local defaults = BR.profile.defaults
+                return AmmoCount(subclass) < (defaults and defaults.ammoThresholdStacks or 1) * AMMO_STACK_SIZE
             end,
         },
         {
@@ -1614,52 +1650,17 @@ BR.BUFF_TABLES = {
             end,
         },
         {
-            key = "lowAmmo",
-            name = L["Buff.LowAmmo"],
-            icons = {
-                textures = { AMMO_ICON_ARROW },
-                dynamic = function()
-                    return AmmoWeaponSubclass() == 3 and AMMO_ICON_BULLET or AMMO_ICON_ARROW -- 3 = Gun
-                end,
-            },
-            overlayText = AMMO_TEXT,
+            key = "repairGear",
+            defaultEnabled = false, -- opt-in: ships disabled
+            name = L["Buff.RepairGear"],
+            icons = { textures = { 136241 } }, -- Trade_BlackSmithing
+            overlayText = L["Overlay.Repair"],
+            -- floor, not round: 84.9% must never read as the 85% threshold it crossed.
             overlayTextFn = function()
-                local subclass = AmmoWeaponSubclass()
-                return subclass and (AMMO_LABEL .. "\n" .. AmmoCount(subclass)) or AMMO_TEXT
+                return REPAIR_LABEL .. "\n" .. floor(BR.BuffState.GetLowestDurability() * 100) .. "%"
             end,
             customCheck = function()
-                if BR.GameContext.IsInCombat() then
-                    return false
-                end
-                local subclass = AmmoWeaponSubclass()
-                if not subclass then
-                    return false
-                end
-                local defaults = BR.profile.defaults
-                return AmmoCount(subclass) < (defaults and defaults.ammoThresholdStacks or 1) * AMMO_STACK_SIZE
-            end,
-        },
-        -- spellID gives the click overlay a known spell. PreClick replaces it with the pick.
-        {
-            key = "driveByBuffs",
-            defaultEnabled = false, -- opt-in: casts on strangers
-            name = L["Buff.DriveByBuffs"],
-            spellID = DRIVE_BY_SPELLS,
-            icons = {
-                spells = { 10157, 10938, 9885 },
-                dynamic = function()
-                    local spellID = BR.DriveBy.Pick()
-                    return spellID and BR.Icons.GetBuffTexture(spellID)
-                end,
-            },
-            overlayText = L["Overlay.DriveBy"],
-            infoTooltip = { title = L["Buff.DriveByBuffs"], desc = L["Tooltip.DriveBy.Desc"] },
-            castUnit = "target",
-            clickSpell = function()
-                return BR.DriveBy.Pick()
-            end,
-            customCheck = function()
-                return BR.DriveBy.Pick() ~= nil
+                return BR.BuffState.GetLowestDurability() < (BR.Config.Get("defaults.repairThreshold", 20) / 100)
             end,
         },
     },
@@ -1667,5 +1668,5 @@ BR.BUFF_TABLES = {
 
 -- The happiness reminder exists only on a client with pet happiness.
 if C_PetInfo and C_PetInfo.GetPetHappiness then
-    table.insert(BR.BUFF_TABLES.pet, 3, PET_HAPPINESS)
+    table.insert(BR.BUFF_TABLES.pet, 1, PET_HAPPINESS)
 end

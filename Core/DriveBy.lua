@@ -37,15 +37,26 @@ local function HasRankLevels(spellIDs)
     return false
 end
 
--- Table order decides which missing buff the reminder offers.
+-- The reminder offers the first missing candidate. The buff tables sort by name, so
+-- OFFER_PRIORITY sets the order. An unlisted candidate follows in table order.
+local OFFER_PRIORITY = { stamina = 1, spirit = 2 }
 local candidates = {}
+local scanIndex = {}
 for _, category in ipairs({ "raid", "self" }) do
     for _, buff in ipairs(BR.BUFF_TABLES[category]) do
         if buff.class == playerClass and HasRankLevels(buff.spellID) then
             candidates[#candidates + 1] = buff
+            scanIndex[buff] = #candidates
         end
     end
 end
+table.sort(candidates, function(a, b)
+    local pa, pb = OFFER_PRIORITY[a.key] or math.huge, OFFER_PRIORITY[b.key] or math.huge
+    if pa ~= pb then
+        return pa < pb
+    end
+    return scanIndex[a] < scanIndex[b]
+end)
 
 ---@class DriveByTarget
 ---@field name string Name with realm, for the whisper
