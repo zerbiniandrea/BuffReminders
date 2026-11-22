@@ -1675,7 +1675,6 @@ BR.BUFF_TABLES = {
         -- gate; the 18-slot scan is memoized in State.lua (cachedLowestDurability).
         {
             key = "repairGear",
-            defaultEnabled = false, -- opt-in: ships disabled
             addedIn = "6.3.0",
             name = L["Buff.RepairGear"],
             icons = { textures = { 1405803 } },

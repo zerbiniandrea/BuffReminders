@@ -1921,7 +1921,6 @@ BR.BUFF_TABLES = {
         },
         {
             key = "repairGear",
-            defaultEnabled = false, -- opt-in: ships disabled
             name = L["Buff.RepairGear"],
             icons = { textures = { 136241 } }, -- Trade_BlackSmithing
             overlayText = L["Overlay.Repair"],
