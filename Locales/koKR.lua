@@ -580,8 +580,6 @@ L["Options.ClickToCast.DescFull"] =
 L["Options.RightClickSnooze"] = "우클릭으로 알림 일시 중지"
 L["Options.RightClickSnooze.Desc"] =
     "소모품 아이콘을 우클릭하면 알림을 일시 중지합니다. 이 옵션을 끄면 우클릭으로도 소모품을 사용합니다."
-L["Options.ClickToCast.SnoozeNote"] =
-    "일시 중지하면 다음 로딩 화면이 나올 때까지 소모품 알림이 숨겨집니다. |cFFFFD100/br snooze|r 명령어는 항상 동작합니다."
 L["Options.HoverHighlight"] = "마우스오버 강조"
 L["Options.HoverHighlight.Desc"] = "클릭 가능한 버프 아이콘에 마우스를 올리면 희미한 강조 효과가 표시됩니다."
 L["Options.RequestBuffInChat"] = "없는 버프를 채팅으로 요청"

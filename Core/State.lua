@@ -131,7 +131,9 @@ local BuffState = {
 local _, playerClass = UnitClass("player")
 local playerName = GetUnitName("player", true)
 
--- Consumables dismissed state (transient, resets on instance change / reload)
+-- Consumables dismissed state (transient, resets on instance change / reload).
+-- "rest": the snooze started in a rest area and also ends when the player leaves it.
+---@type boolean|"rest"
 local consumablesDismissed = false
 
 -- ============================================================================
@@ -3194,7 +3196,7 @@ local function RefreshConsumables(db, trackingMode, isAuraRestricted, hideExpiri
     -- In follow mode, healthstones use consumable category content gates (without ready check)
     local consumableContentVisible = freeMode == "follow" and IsCategoryVisibleForContent("consumable", true) or false
     -- Dismiss overrides all consumable visibility (transient, resets on instance change)
-    if consumablesDismissed then
+    if BuffState.GetConsumablesDismissed() then
         consumableVisible = false
         consumableVisibleNoReadyCheck = false
         freeVisible = false
@@ -3583,13 +3585,16 @@ end
 ---Set whether consumable reminders are dismissed (transient, resets on instance change)
 ---@param state boolean
 function BuffState.SetConsumablesDismissed(state)
-    consumablesDismissed = state
+    consumablesDismissed = state and GameContext.IsResting() and "rest" or state
 end
 
 ---Get whether consumable reminders are dismissed
 ---@return boolean
 function BuffState.GetConsumablesDismissed()
-    return consumablesDismissed
+    if consumablesDismissed == "rest" and not GameContext.IsResting() then
+        consumablesDismissed = false
+    end
+    return consumablesDismissed ~= false
 end
 
 ---Raw difficultyID from GetInstanceInfo (cached; invalidated with content type)

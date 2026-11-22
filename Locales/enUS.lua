@@ -385,6 +385,8 @@ english["Display.SlashCommands"] = "Slash commands: /br, /br lock, /br unlock, /
 english["Display.MinimapLeftClick"] = "|cFFCFCFCFLeft click|r: Options"
 english["Display.MinimapRightClick"] = "|cFFCFCFCFRight click|r: Test mode"
 english["Display.DismissConsumablesChat"] = "Consumable reminders hidden until next loading screen."
+english["Display.DismissConsumablesRestChat"] = "Consumable reminders hidden until you leave this rest area."
+english["Display.UnsnoozeConsumablesChat"] = "Consumable reminders shown again."
 english["Display.LoginFirstInstall"] =
     "Thanks for installing! Type |cFFFFD100/br unlock|r to move the buff display, or use the button at the bottom of the |cFFFFD100/br|r options panel."
 english["Display.LoginSnooze"] =
@@ -677,7 +679,7 @@ english["Options.RightClickSnooze"] = "Right-click to snooze"
 english["Options.RightClickSnooze.Desc"] =
     "Right-click a consumable icon to snooze its reminders. If this option is off, right-click uses the consumable, like left-click."
 english["Options.ClickToCast.SnoozeNote"] =
-    "A snooze hides the consumable reminders until the next loading screen. The |cFFFFD100/br snooze|r command always works."
+    "A snooze hides the consumable reminders until the next loading screen. A snooze in a city or an inn also ends when you leave it. Type |cFFFFD100/br snooze|r to start or end a snooze."
 english["Options.HoverHighlight"] = "Hover highlight"
 english["Options.HoverHighlight.Desc"] = "Show a subtle highlight when hovering over clickable buff icons."
 english["Options.RequestBuffInChat"] = "Request missing buffs in chat"

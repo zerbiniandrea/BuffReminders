@@ -582,8 +582,6 @@ L["Options.ClickToCast.DescFull"] =
 L["Options.RightClickSnooze"] = "右鍵單擊以暫停"
 L["Options.RightClickSnooze.Desc"] =
     "右鍵點選消耗品圖示可暫停其提醒。如果關閉此選項，右鍵單擊會使用消耗品，就像左鍵單擊一樣。"
-L["Options.ClickToCast.SnoozeNote"] =
-    "右鍵點選消耗品可暫停其提醒，直到下次的登入畫面 (|cFFFFD100/br snooze|r 總是有用)。"
 L["Options.HoverHighlight"] = "懸停高亮"
 L["Options.HoverHighlight.Desc"] = "將鼠標懸停在可點擊的增益圖示上時，顯示微弱的高亮效果。"
 L["Options.RequestBuffInChat"] = "在聊天中請求缺失的增益"

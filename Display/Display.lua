@@ -2556,12 +2556,24 @@ end
 -- CONSUMABLE SNOOZE
 -- ============================================================================
 
---- Snooze every consumable reminder until the next loading screen. Driven by the /br snooze
---- command and by a right click on a consumable icon when consumable click-to-cast is on.
+--- Snooze every consumable reminder until the next loading screen, or until the player leaves
+--- the rest area that the snooze started in.
 function BR.SnoozeConsumables()
     BR.BuffState.SetConsumablesDismissed(true)
     UpdateDisplay()
-    print("|cff00ccffBuffReminders:|r " .. L["Display.DismissConsumablesChat"])
+    local message = BR.GameContext.IsResting() and L["Display.DismissConsumablesRestChat"]
+        or L["Display.DismissConsumablesChat"]
+    print("|cff00ccffBuffReminders:|r " .. message)
+end
+
+local function ToggleConsumableSnooze()
+    if not BR.BuffState.GetConsumablesDismissed() then
+        BR.SnoozeConsumables()
+        return
+    end
+    BR.BuffState.SetConsumablesDismissed(false)
+    UpdateDisplay()
+    print("|cff00ccffBuffReminders:|r " .. L["Display.UnsnoozeConsumablesChat"])
 end
 
 -- Play per-buff sound alert when an icon first appears.
@@ -3517,7 +3529,7 @@ local function SlashHandler(msg)
         ToggleTestMode()
         BR.Components.RefreshAll()
     elseif cmd == "snooze" then
-        BR.SnoozeConsumables()
+        ToggleConsumableSnooze()
     elseif cmd == "lock" then
         SetFrameLocked(true)
         BR.Components.RefreshAll()
