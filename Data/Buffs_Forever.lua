@@ -1107,10 +1107,14 @@ local function AmmoShots(subclass)
     return 0, total
 end
 
+-- Hunters fire ammo all the time; other classes only pull with it.
 ---@return number threshold In ammo, not stacks
 local function AmmoThreshold()
     local defaults = BR.profile.defaults
-    return (defaults and defaults.ammoThresholdStacks or 1) * AMMO_STACK_SIZE
+    if playerClass == "HUNTER" then
+        return (defaults and defaults.ammoThresholdStacks or 1) * AMMO_STACK_SIZE
+    end
+    return defaults and defaults.ammoThresholdShots or 20
 end
 
 local BATTLE_SHOUT = { 25289, 11551, 11550, 11549, 6192, 5242, 6673 }

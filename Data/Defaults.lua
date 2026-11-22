@@ -207,7 +207,8 @@ BR.defaults = {
         repairHideInCombat = true,
         reagentThreshold = 5, -- the reagent reminder shows below this count
         reagentRestedOnly = true,
-        ammoThresholdStacks = 1, -- the ammo reminder shows below this many stacks
+        ammoThresholdStacks = 1, -- hunters: the ammo reminder shows below this many stacks
+        ammoThresholdShots = 20, -- other classes: the ammo reminder shows below this many shots
         driveByGreeting = "none",
         -- driveByWhisper, driveByEmoteText: absent - nil means the localized default text
         driveByEmote = "WAVE",
