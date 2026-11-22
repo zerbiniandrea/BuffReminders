@@ -483,7 +483,7 @@ local DefaultSettingKeys = {
     useFelDomination = "DisplayRefresh",
     warlockWrongDemon = "DisplayRefresh",
     paladinBlessingScope = "DisplayRefresh",
-    paladinBlessingPriority = "DisplayRefresh",
+    paladinBlessingsByClass = "DisplayRefresh",
     thornsRequest = "DisplayRefresh",
     righteousFuryShow = "DisplayRefresh",
     -- Font (global-only, lives under defaults)
@@ -498,7 +498,6 @@ local ContentGridKeys = {
     warlockDemons = true,
     warriorStances = true,
     druidForms = true,
-    paladinBlessings = true,
     paladinAuras = true,
 }
 

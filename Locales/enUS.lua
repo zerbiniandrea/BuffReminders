@@ -319,9 +319,10 @@ english["Tooltip.MayShowExtraIcon.Desc"] =
     "Until you cast this, you might see both this and the Water/Lightning Shield reminder. I can't tell if you want Earth Shield on yourself, or Earth Shield on an ally + Water/Lightning Shield on yourself."
 english["Tooltip.PaladinDuplicate"] = "Duplicate Check"
 english["Tooltip.PaladinAuraDuplicate.Desc"] =
-    "Out of combat, the icon also shows when another paladin gives you the same aura type as your aura. A player keeps one aura of each type, so pick a different aura. A click on this icon casts nothing."
-english["Tooltip.PaladinBlessingDuplicate.Desc"] =
-    "Out of combat, the icon checks if no group member lacks your blessing, but a member has it only from another paladin. Then it suggests the next blessing of your priority list. If each blessing in the list is a duplicate, the icon shows DUPE, and a click on it casts nothing. If Bless is set to Myself only, there is no duplicate check."
+    "Warns when another paladin already runs the same aura type. Switch to a different aura."
+english["Tooltip.PaladinBlessing"] = "Blessing per Class"
+english["Tooltip.PaladinBlessing.Desc"] =
+    "Each class gets its blessing from your list in Extras. If another paladin already gives it, you give the backup."
 english["Tooltip.DriveBy.Desc"] =
     "Out of combat, shows when your target is a friendly player outside your group who lacks one of your buffs. Click to cast the best rank for them."
 english["Tooltip.InstanceEntryReminder"] = "Instance Entry Reminder"
@@ -887,22 +888,35 @@ english["BuffPanel.WarlockDemon.Felguard"] = "Demonology always summons Felguard
 english["BuffPanel.WarriorStance.Hint"] = "Click stances to allow them per content. Unlearned stances do not count. An empty row shows no reminder."
 english["BuffPanel.DruidForm.Hint"] = "Click forms to allow them per content. Unlearned forms do not count. An empty row shows no reminder."
 english["BuffPanel.DruidForm.Caster"] = "Caster (no form)"
-english["BuffPanel.PaladinBlessing.Hint"] = "Click a blessing to give it to the group in that content. Each row holds one blessing. If you do not know the blessing yet, no reminder shows. If a row is empty, no reminder shows there."
+english["BuffPanel.PaladinBlessing.Hint"] =
+    "Main blessing per class. If another paladin gives it, you give the backup."
+english["BuffPanel.Blessing.Give"] = "Give"
+english["BuffPanel.Blessing.IfTaken"] = "If taken"
+english["BuffPanel.Blessing.InGive"] = "in Give"
+english["BuffPanel.Blessing.InBackup"] = "in If taken"
+english["BuffPanel.Blessing.NotLearnedShort"] = "not learned"
+english["BuffPanel.Blessing.Clear"] = "Clear"
+english["BuffPanel.Blessing.MainTip"] = "You give this to each %s."
+english["BuffPanel.Blessing.BackupTip"] = "Used if another paladin gives %s."
+english["BuffPanel.Blessing.NotLearned"] = "Not learned. You give %s instead."
+english["BuffPanel.Blessing.NotLearnedNone"] = "Not learned. Skipped."
+english["BuffPanel.Blessing.None"] = "No blessing"
+english["BuffPanel.Blessing.None.Desc"] = "This class gets no reminder."
+english["BuffPanel.Blessing.AddBackup"] = "Add a backup"
+english["BuffPanel.Blessing.ClickToChange"] = "Click to change."
+english["BuffPanel.Blessing.ResetRow"] = "Reset to default"
+english["BuffPanel.Blessing.SelfOnlyNote"] = "Only the Paladin row applies."
+english["DisabledReason.BlessSelfOnly"] = 'Off while "Only bless myself" is on.'
+english["DisabledReason.BlessingDefaults"] = "All classes use their defaults."
+english["BuffPanel.BlessSelfOnly"] = "Only bless myself"
+english["BuffPanel.BlessSelfOnly.Desc"] =
+    "Check and bless only yourself."
 english["BuffPanel.GroupCast"] = "Cast group version (uses a reagent)"
 english["BuffPanel.GroupCast.Desc"] =
     "If 2+ group members lack the buff and you have the reagent, a click casts the group version. Otherwise it casts the single-target version."
 english["BuffPanel.GroupCast.Blessing.Desc"] =
-    "If two or more members of one class lack the blessing, a click casts the Greater Blessing on one of them. It reaches every group member of that class. You must know it and carry a Symbol of Kings. Otherwise the click casts the single-target blessing on a member who lacks it."
-english["BuffPanel.PaladinAura.Hint"] = "Click an aura to choose it for that content. Each row holds one aura. A click on the icon casts the chosen aura, and the icon shows WRONG AURA if you use a different one. If a row is empty, or you do not know the chosen aura yet, any aura counts."
-english["BuffPanel.BlessingScope"] = "Bless"
-english["BuffPanel.BlessingScope.Group"] = "Group"
-english["BuffPanel.BlessingScope.Self"] = "Myself only"
-english["BuffPanel.BlessingScope.Desc"] =
-    "Group: the icon counts the group members who lack your blessing, and a click casts it on one of them. Myself only: the icon checks only you, and a click casts the blessing on you. There is no duplicate check."
-english["BuffPanel.BlessingPriority.Hint"] = "If another paladin gives your blessing to the group (DUPE), the icon suggests the first blessing in this list that is not a duplicate."
-english["BuffPanel.BlessingPriority.1"] = "1st"
-english["BuffPanel.BlessingPriority.2"] = "2nd"
-english["BuffPanel.BlessingPriority.3"] = "3rd"
+    "If 2+ members of one class lack the same blessing, a click casts the Greater version (needs Symbol of Kings). Only when you give that blessing to the whole class."
+english["BuffPanel.PaladinAura.Hint"] = "Pick one aura per content. The icon shows WRONG AURA if another one is active. An empty row, or an aura you have not learned, accepts any aura."
 english["BuffPanel.ThornsRequest"] = "Tanks can ask for Thorns"
 english["BuffPanel.ThornsRequest.Desc"] =
     "If you tank and a druid (level 6+) is in your group, shows when you lack Thorns. A click asks for it in chat. Needs \"Request missing buffs in chat\" on (Chat Requests page)."
@@ -922,7 +936,6 @@ english["BuffPanel.CasterAlways.Desc"] =
     "Warlocks always see the reminder; everyone else only on ready check."
 english["DisabledReason.NotDetached"] = "This buff isn't detached - it sits inside its category frame."
 english["DisabledReason.CasterAlways"] = 'Only applies in ready-check mode. Switch "Show" back to ready check first.'
-english["DisabledReason.BlessingPriority"] = "Only applies when Bless is set to Group."
 english["Options.DisplayOrder.Note"] =
     "Order inside the combined frame, top to bottom. Split categories are not listed."
 

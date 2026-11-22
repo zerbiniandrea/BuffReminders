@@ -1530,27 +1530,15 @@ end
 ---@param partyOnly? boolean In a raid, count only the player's subgroup
 ---@param threshold number A short aura (IsShortAura) never sets minRemaining
 ---@param missingUnits? string[] Wiped, then filled with the unit of each counted member who lacks the buff
----@param countDuplicates? boolean Count members who have the buff only from another caster. Enumerates auras
 ---@return number missing
 ---@return number total
 ---@return number? minRemaining
----@return number duplicates 0 unless countDuplicates
-local function CountMissingBuff(
-    spellIDs,
-    buffKey,
-    playerOnly,
-    playersOnly,
-    partyOnly,
-    threshold,
-    missingUnits,
-    countDuplicates
-)
+local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, partyOnly, threshold, missingUnits)
     if missingUnits then
         wipe(missingUnits)
     end
     local missing = 0
     local total = 0
-    local duplicates = 0
     local minRemaining = nil
     local beneficiaries = BuffBeneficiaries[buffKey]
     local specBeneficiaries = SpecBeneficiaries[buffKey]
@@ -1558,30 +1546,19 @@ local function CountMissingBuff(
     if playerOnly or #currentValidUnits <= 1 then
         -- Solo/player-only: check if player benefits (spec-aware)
         if not UnitBenefitsFromBuff(specBeneficiaries, beneficiaries, GetPlayerSpecId(), playerClass) then
-            return 0, 0, nil, 0
+            return 0, 0, nil
         end
         total = 1
-        local unitSpellIDs = GetUnitSpellIDs(buffKey, spellIDs, playerClass)
-        local hasBuff, remaining, sourceUnit, duration = UnitHasBuff("player", unitSpellIDs)
+        local hasBuff, remaining, _, duration = UnitHasBuff("player", GetUnitSpellIDs(buffKey, spellIDs, playerClass))
         if not hasBuff then
             missing = 1
             if missingUnits then
                 missingUnits[1] = "player"
             end
-        else
-            if remaining and not IsShortAura(duration, threshold) then
-                minRemaining = remaining
-            end
-            -- GetUnitAuraBySpellID returns one instance, so a foreign one can hide the own one.
-            if
-                countDuplicates
-                and not (sourceUnit and Plain(UnitIsUnit(sourceUnit, "player")) == true)
-                and not UnitHasBuffFromPlayer("player", unitSpellIDs)
-            then
-                duplicates = 1
-            end
+        elseif remaining and not IsShortAura(duration, threshold) then
+            minRemaining = remaining
         end
-        return missing, total, minRemaining, duplicates
+        return missing, total, minRemaining
     end
 
     local countNPCs = includeNPCsInCounting and not GameContext.IsInCombat() and not playersOnly
@@ -1593,8 +1570,8 @@ local function CountMissingBuff(
         -- they still include NPCs.
         if (data.isPlayer or countNPCs) and (data.inPlayerParty or not partyOnly) then
             if UnitBenefitsFromBuff(specBeneficiaries, beneficiaries, allySpecCache[data.name], data.class) then
-                local unitSpellIDs = GetUnitSpellIDs(buffKey, spellIDs, data.class)
-                local hasBuff, remaining, sourceUnit, duration = UnitHasBuff(data.unit, unitSpellIDs)
+                local hasBuff, remaining, _, duration =
+                    UnitHasBuff(data.unit, GetUnitSpellIDs(buffKey, spellIDs, data.class))
                 -- A phased ally counts only when the buff is already on them. A
                 -- phased member without the buff is an unfixable gap - nobody can
                 -- cast on them - so both totals omit them.
@@ -1608,20 +1585,9 @@ local function CountMissingBuff(
                             local isSelf = data.unit == "player" or Plain(UnitIsUnit(data.unit, "player")) == true
                             missingUnits[missing] = isSelf and "player" or data.unit
                         end
-                    else
-                        if
-                            remaining
-                            and not IsShortAura(duration, threshold)
-                            and (not minRemaining or remaining < minRemaining)
-                        then
+                    elseif remaining and not IsShortAura(duration, threshold) then
+                        if not minRemaining or remaining < minRemaining then
                             minRemaining = remaining
-                        end
-                        if
-                            countDuplicates
-                            and not (sourceUnit and Plain(UnitIsUnit(sourceUnit, "player")) == true)
-                            and not UnitHasBuffFromPlayer(data.unit, unitSpellIDs)
-                        then
-                            duplicates = duplicates + 1
                         end
                     end
                 end
@@ -1629,7 +1595,7 @@ local function CountMissingBuff(
         end
     end
 
-    return missing, total, minRemaining, duplicates
+    return missing, total, minRemaining
 end
 
 ---Check if anyone in the group has a presence buff active
@@ -2452,43 +2418,11 @@ local function AcquireMissingUnits(buff, isAuraRestricted)
     return list
 end
 
--- The fallback choice that replaced a duplicate active choice at the last refresh, by buff key.
----@type table<string, {choice: StanceChoice?, castID: number?}>
-local choiceFallbacks = {}
-
----Choice of a choice-grid buff and the rank to cast. A fallback choice from the last
----refresh wins over the choice of the content row.
----@param buff RaidBuff
----@return StanceChoice?
----@return number? castID
-function BuffState.GetActiveChoice(buff)
-    local fallback = choiceFallbacks[buff.key]
-    if fallback and fallback.choice then
-        return fallback.choice, fallback.castID
-    end
-    return buff.activeChoice()
-end
-
 ---Units that lacked the buff at the last refresh. The player, if listed, is "player".
 ---@param key string
 ---@return string[]?
 function BuffState.GetMissingUnits(key)
     return missingUnitsByKey[key]
-end
-
----Class of a unit in the missing-units list, from the roster of the last refresh.
----@param unit string
----@return string?
-local function MissingUnitClass(unit)
-    if unit == "player" then
-        return playerClass
-    end
-    for _, data in ipairs(currentValidUnits) do
-        if data.unit == unit then
-            return data.class
-        end
-    end
-    return nil
 end
 
 ---A secret or unchecked range reads as out of range.
@@ -2498,74 +2432,314 @@ local function IsMissingUnitInRange(unit)
     return unit == "player" or Plain(UnitInRange(unit)) == true
 end
 
----The class with the most members who lack the buff, when two or more lack it.
----Runs only on a click.
----@param missingUnits string[]
----@param inRangeOnly boolean Count only the members in range
----@return string? class
-local function BestMissingClass(missingUnits, inRangeOnly)
-    local counts = {}
-    local bestClass, bestCount = nil, 1
-    for i = 1, #missingUnits do
-        local unit = missingUnits[i]
-        local class = MissingUnitClass(unit)
-        if class and (not inRangeOnly or IsMissingUnitInRange(unit)) then
-            counts[class] = (counts[class] or 0) + 1
-            if counts[class] > bestCount then
-                bestClass, bestCount = class, counts[class]
+---@class ClassChoiceState
+---@field missing number Members who lack their choice at the last refresh
+---@field lists table<string, StanceChoice[]> Known choices of each class list, read once per refresh
+---@field wanted table<string, StanceChoice> The choice that each listed member wants
+---@field classes table<string, string> The class of each listed member
+---@field classWant table<string, StanceChoice|false> The choice that every counted member of a class wants. false when they differ
+---@field inRange table<string, boolean> Range of each listed member, read once per pick
+---@field selfWanted StanceChoice? The choice that the player lacks
+---@field renewUnits string[] Members whose choice from the player is under the threshold. Filled only when sources are read
+---@field renewChoices table<string, StanceChoice>
+---@field renewRemaining table<string, number>
+---@field foreign table<string, table<string, table|false>> Foreign copies found by a scan, by unit, then choice key. Survives refreshes
+
+-- By buff key. A classChoices buff fills its state with its missing-units list.
+---@type table<string, ClassChoiceState>
+local classChoiceStates = {}
+
+---The first choice of the list that no other caster gives the unit. Without a
+---source read, a choice on the unit counts as cast by the player.
+---@param unit string
+---@param choices StanceChoice[]
+---@param readSources boolean Only out of combat, because source reads need plain aura data
+---@param memo? table<string, table<string, table|false>> Scan results by unit, then choice key. nil = no scan, because no other caster is in the group
+---@return StanceChoice? wanted nil when other casters give every choice
+---@return boolean has The unit has the wanted choice from the player
+---@return number? remaining
+---@return number? duration
+local function WantedChoice(unit, choices, readSources, memo)
+    for i = 1, #choices do
+        local choice = choices[i]
+        local auraIDs = choice.auraIDs or choice.spellIDs
+        local has, remaining, sourceUnit, duration = UnitHasBuff(unit, auraIDs)
+        if not has then
+            return choice, false
+        end
+        if not readSources then
+            return choice, true, remaining, duration
+        end
+        -- The same choice from two casters does not stack, so a foreign instance
+        -- covers the unit, also when the player's own instance is present.
+        -- GetUnitAuraBySpellID returns one instance, so only a scan finds a second one.
+        -- A caster outside the group reads as a nil source on that one instance.
+        if sourceUnit and Plain(UnitIsUnit(sourceUnit, "player")) == true then
+            local foreign = false ---@type table|false
+            local unitMemo = memo and memo[unit]
+            local known = unitMemo and unitMemo[choice.key]
+            if known ~= nil then
+                foreign = known
+            elseif memo then
+                local index = 1
+                local aura = AuraByIndex(unit, index, "HELPFUL")
+                while aura do
+                    local source = AuraField(aura, "sourceUnit")
+                    if
+                        AuraMatchesSpellIDs(aura, nil, auraIDs)
+                        and not (source and Plain(UnitIsUnit(source, "player")) == true)
+                    then
+                        foreign = aura
+                        break
+                    end
+                    index = index + 1
+                    aura = AuraByIndex(unit, index, "HELPFUL")
+                end
+                -- The player gets no group UNIT_AURA, which clears an entry, so the
+                -- player is scanned on each refresh.
+                if unit ~= "player" and Plain(UnitIsUnit(unit, "player")) ~= true then
+                    if not unitMemo then
+                        unitMemo = {}
+                        memo[unit] = unitMemo
+                    end
+                    unitMemo[choice.key] = foreign
+                end
+            end
+            if not foreign then
+                return choice, true, remaining, duration
+            end
+            -- The removal of the foreign copy must refresh the group.
+            if unit ~= "player" then
+                RecordAuraInstance(unit, foreign)
             end
         end
     end
-    return bestClass
+    return nil, false
 end
 
----The target of a group rank that reaches one class: a member of the class with the
----most members in range who lack the buff. If no class has two in range, the class
----with the most members who lack it.
----@param missingUnits string[]
----@return string? unit
-local function PickClassCastUnit(missingUnits)
-    local bestClass = BestMissingClass(missingUnits, true) or BestMissingClass(missingUnits, false)
-    if not bestClass then
-        return nil
+---Count the group members who lack the choice that they want from the player.
+---A member of a class with an empty list does not count.
+---@param buff RaidBuff
+---@param playerOnly boolean Only check the player, not the group
+---@param threshold number A short aura (IsShortAura) never sets minRemaining
+---@param missingUnits? string[] Wiped, then filled with the unit of each counted member who lacks the choice
+---@param readSources boolean Tell the choices of the player from the choices of other casters
+---@return number missing
+---@return number total
+---@return number? minRemaining
+---@return StanceChoice? choice Wanted by the first missing member, else the choice that expires first
+local function CountMissingClassChoice(buff, playerOnly, threshold, missingUnits, readSources)
+    local state = classChoiceStates[buff.key]
+    if state then
+        wipe(state.lists)
+        wipe(state.wanted)
+        wipe(state.classes)
+        wipe(state.classWant)
+        wipe(state.renewUnits)
+        wipe(state.renewChoices)
+        wipe(state.renewRemaining)
+        state.selfWanted = nil
+    else
+        state = {
+            missing = 0,
+            lists = {},
+            wanted = {},
+            classes = {},
+            classWant = {},
+            inRange = {},
+            renewUnits = {},
+            renewChoices = {},
+            renewRemaining = {},
+            foreign = {},
+        }
+        classChoiceStates[buff.key] = state
     end
-    local fallback
-    for i = 1, #missingUnits do
-        local unit = missingUnits[i]
-        if MissingUnitClass(unit) == bestClass then
-            if IsMissingUnitInRange(unit) then
-                return unit
-            end
-            fallback = fallback or unit
+    if missingUnits then
+        wipe(missingUnits)
+    end
+
+    local forClass = buff.classChoices.forClass
+    local lists = state.lists
+    local selfOnly = playerOnly or #currentValidUnits <= 1
+    local partyOnly = buff.reach == "party"
+    local countNPCs = includeNPCsInCounting and not GameContext.IsInCombat() and not buff.playersOnly
+    local missing, total, minRemaining, firstWanted, minChoice = 0, 0, nil, nil, nil
+    -- The roster includes the player, so a second member of the class is another caster.
+    local casters = 0
+    for _, data in ipairs(currentValidUnits) do
+        if data.class == buff.class then
+            casters = casters + 1
         end
     end
-    return fallback
+    local memo = readSources and casters > 1 and state.foreign or nil
+    for _, data in ipairs(currentValidUnits) do
+        local class = data.class
+        local isSelf = data.unit == "player" or (selfOnly and Plain(UnitIsUnit(data.unit, "player")) == true)
+        if
+            class
+            and (isSelf or not selfOnly)
+            and (data.isPlayer or countNPCs)
+            and (data.inPlayerParty or not partyOnly)
+        then
+            local choices = lists[class]
+            if not choices then
+                choices = forClass(class)
+                lists[class] = choices
+            end
+            if #choices > 0 then
+                local choice, has, remaining, duration = WantedChoice(data.unit, choices, readSources, memo)
+                -- A phased member cannot receive a cast, so a gap on them does not count.
+                if not (data.isPhased and choice and not has) then
+                    total = total + 1
+                    if choice then
+                        local want = state.classWant[class]
+                        if want == nil then
+                            state.classWant[class] = choice
+                        elseif want ~= choice then
+                            state.classWant[class] = false
+                        end
+                    end
+                    if choice and not has then
+                        missing = missing + 1
+                        firstWanted = firstWanted or choice
+                        -- In a raid the player is a raidN unit. The range check reads "player" as in range.
+                        local listed = data.unit
+                        if isSelf or Plain(UnitIsUnit(listed, "player")) == true then
+                            listed = "player"
+                            state.selfWanted = choice
+                        end
+                        if missingUnits then
+                            missingUnits[missing] = listed
+                            state.wanted[listed] = choice
+                            state.classes[listed] = class
+                        end
+                    elseif has and remaining and not data.isPhased and not IsShortAura(duration, threshold) then
+                        if not minRemaining or remaining < minRemaining then
+                            minRemaining, minChoice = remaining, choice
+                        end
+                        -- Without a source read, the copy can come from another caster.
+                        if readSources and remaining < threshold then
+                            state.renewUnits[#state.renewUnits + 1] = data.unit
+                            state.renewChoices[data.unit] = choice
+                            state.renewRemaining[data.unit] = remaining
+                        end
+                    end
+                end
+            end
+        end
+    end
+    state.missing = missing
+    return missing, total, minRemaining, firstWanted or minChoice
+end
+
+---A member of the largest set of listed members who share a class and want the same
+---choice. Members in range come first. Runs on a click and on a refresh that shows the icon.
+---@param key string
+---@return string? unit
+---@return StanceChoice? choice
+---@return number count Members in the set
+local function PickChoiceTarget(key)
+    local units = missingUnitsByKey[key]
+    local state = classChoiceStates[key]
+    if not units or not units[1] or not state then
+        return nil, nil, 0
+    end
+    local wanted, classes, inRange = state.wanted, state.classes, state.inRange
+    wipe(inRange)
+    local anyInRange = false
+    for i = 1, #units do
+        local unitInRange = IsMissingUnitInRange(units[i])
+        inRange[units[i]] = unitInRange
+        anyInRange = anyInRange or unitInRange
+    end
+    local bestUnit, bestCount = nil, 0
+    for i = 1, #units do
+        local unit = units[i]
+        if inRange[unit] or not anyInRange then
+            local count = 0
+            for j = 1, #units do
+                local other = units[j]
+                if
+                    (inRange[other] or not anyInRange)
+                    and wanted[other] == wanted[unit]
+                    and classes[other] == classes[unit]
+                then
+                    count = count + 1
+                end
+            end
+            if count > bestCount then
+                bestUnit, bestCount = unit, count
+            end
+        end
+    end
+    return bestUnit, bestUnit and wanted[bestUnit], bestCount
+end
+
+---Single-target cast of a click on a classChoices buff: the picked choice and its
+---target. With no member missing, it renews the expiring choice that ends first on a
+---member in range. If the target of a missing choice is unknown, only the choice
+---that the player lacks is cast. nil = the click casts nothing.
+---@param buff RaidBuff
+---@return number? spellID
+---@return string? unit
+function BuffState.GetChoiceCast(buff)
+    local state = classChoiceStates[buff.key]
+    if not state then
+        return nil
+    end
+    local unit, choice = PickChoiceTarget(buff.key)
+    if unit and choice then
+        return buff.classChoices.castID(choice), unit
+    end
+    if state.missing > 0 then
+        if not state.selfWanted then
+            return nil
+        end
+        return buff.classChoices.castID(state.selfWanted), "player"
+    end
+    local renewUnits, renewRemaining = state.renewUnits, state.renewRemaining
+    for i = 1, #renewUnits do
+        local candidate = renewUnits[i]
+        if
+            (not unit or renewRemaining[candidate] < renewRemaining[unit])
+            and (IsMissingUnitInRange(candidate) or Plain(UnitIsUnit(candidate, "player")) == true)
+        then
+            unit = candidate
+        end
+    end
+    if not unit then
+        return nil
+    end
+    return buff.classChoices.castID(state.renewChoices[unit]), unit
 end
 
 ---Highest group rank of the buff that the player knows and has the reagent for,
 ---when the user turned on the group cast and two or more members lack the buff.
----A buff with a choice grid casts the group rank of its active choice on a member
----of one class, because that rank reaches only the class of its target.
+---A classChoices buff casts the group rank of the picked choice on a member of its
+---class, because that rank reaches only the class of its target. Every counted member
+---of that class must want the choice, because the group rank replaces the choice
+---that the player gives each of them.
 ---@param buff RaidBuff
 ---@return number? spellID
 ---@return string? unit Target of a class-wide rank. nil = the player
 function BuffState.GetGroupCastSpellID(buff)
-    local ranks = buff.groupCast
-    if buff.activeChoice then
-        local choice = BuffState.GetActiveChoice(buff)
-        ranks = choice and choice.groupCast
-    end
     local enabled = BR.profile.groupCast
     local missingUnits = missingUnitsByKey[buff.key]
-    if not ranks or not (enabled and enabled[buff.key]) or not missingUnits or #missingUnits < 2 then
+    if not (enabled and enabled[buff.key]) or not missingUnits or #missingUnits < 2 then
         return nil
     end
-    local unit
-    if buff.activeChoice then
-        unit = PickClassCastUnit(missingUnits)
-        if not unit then
+    local ranks, unit = buff.groupCast, nil
+    if buff.classChoices then
+        local choice, count
+        unit, choice, count = PickChoiceTarget(buff.key)
+        local state = classChoiceStates[buff.key]
+        if not unit or not choice or count < 2 or not state or state.classWant[state.classes[unit]] ~= choice then
             return nil
         end
+        ranks = choice.groupCast
+    end
+    if not ranks then
+        return nil
     end
     -- The spellbook reports only the highest learned rank as known. A lower rank is
     -- known when a higher one is.
@@ -2585,6 +2759,7 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
     local raidVisible = IsCategoryVisibleForContent("raid")
     local raidExGlow, raidMissGlow, raidThreshold = GetCategoryGlowSettings("raid")
     local bronzeHiddenInCombat = GameContext.IsInCombat() and db.bronzeHideInCombat
+    local readSources = not isAuraRestricted and not GameContext.IsInCombat()
     for i, buff in ipairs(RaidBuffs) do
         local entry = GetOrCreateEntry(buff.key, "raid", i)
         local missingUnits = AcquireMissingUnits(buff, isAuraRestricted)
@@ -2594,24 +2769,10 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
             "raid",
             HasCasterForBuff(buff.class, buff.levelRequired, buff.reach)
         )
-        local spellIDs, benefitKey = buff.spellID, buff.key
-        local choice
-        if buff.activeChoice then
-            choice = buff.activeChoice()
-            if choice then
-                spellIDs, benefitKey = choice.auraIDs or choice.spellIDs, choice.beneficiaries or buff.key
-            end
-        end
-        local fallback = choiceFallbacks[buff.key]
-        if fallback then
-            fallback.choice, fallback.castID = nil, nil
-        end
-        local selfScoped = buff.selfScope ~= nil and buff.selfScope()
-        local playerOnly = scope.playerOnly or selfScoped
+        local playerOnly = scope.playerOnly or (buff.selfScope ~= nil and buff.selfScope())
 
         if
-            (choice or not buff.activeChoice)
-            and not (bronzeHiddenInCombat and buff.key == "bronze")
+            not (bronzeHiddenInCombat and buff.key == "bronze")
             and IsBuffEnabled(buff.key)
             and (not isAuraRestricted or IsAuraTrackable(buff))
             and raidVisible
@@ -2619,47 +2780,20 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
             and (not buff.requiresKnownSpell or KnowsAnySpell(buff.spellID))
             and (not buff.visibilityCondition or buff.visibilityCondition())
         then
-            local countDuplicates = buff.duplicateText ~= nil
-                and not selfScoped
-                and not isAuraRestricted
-                and not GameContext.IsInCombat()
-            local missing, total, minRemaining, duplicates = CountMissingBuff(
-                spellIDs,
-                benefitKey,
-                playerOnly,
-                buff.playersOnly,
-                buff.reach == "party",
-                raidThreshold,
-                missingUnits,
-                countDuplicates
-            )
-
-            -- A fallback choice replaces a duplicate when a member lacks it or the
-            -- player already gives it to every member who benefits.
-            if missing == 0 and duplicates > 0 and buff.fallbackChoices then
-                local alternatives, castIDs = buff.fallbackChoices()
-                for j = 1, #alternatives do
-                    local alt = alternatives[j]
-                    local altMissing, altTotal, altRemaining, altDuplicates = CountMissingBuff(
-                        alt.auraIDs or alt.spellIDs,
-                        alt.beneficiaries or buff.key,
-                        playerOnly,
-                        buff.playersOnly,
-                        buff.reach == "party",
-                        raidThreshold,
-                        missingUnits,
-                        true
-                    )
-                    if altTotal > 0 and (altMissing > 0 or altDuplicates == 0) then
-                        missing, total, minRemaining, duplicates = altMissing, altTotal, altRemaining, altDuplicates
-                        if not fallback then
-                            fallback = {}
-                            choiceFallbacks[buff.key] = fallback
-                        end
-                        fallback.choice, fallback.castID = alt, castIDs[j]
-                        break
-                    end
-                end
+            local missing, total, minRemaining, choice
+            if buff.classChoices then
+                missing, total, minRemaining, choice =
+                    CountMissingClassChoice(buff, playerOnly, raidThreshold, missingUnits, readSources)
+            else
+                missing, total, minRemaining = CountMissingBuff(
+                    buff.spellID,
+                    buff.key,
+                    playerOnly,
+                    buff.playersOnly,
+                    buff.reach == "party",
+                    raidThreshold,
+                    missingUnits
+                )
             end
 
             if missing > 0 then
@@ -2673,16 +2807,15 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
                 if minRemaining and minRemaining < raidThreshold then
                     entry.expiringTime = minRemaining
                 end
-            elseif duplicates > 0 then
-                SetEntryText(entry, buff.duplicateText, raidMissGlow)
-                entry.noClick = true
             elseif not hideExpiring and (not expiringClass or buff.class == expiringClass) then
                 TrySetEntryExpiring(entry, minRemaining, raidThreshold, raidExGlow)
             end
-            if fallback and fallback.castID and entry.visible then
-                entry.dynamicIcon = BR.Icons.GetBuffTexture(fallback.castID)
-            elseif choice and entry.visible then
-                BR.Icons.ApplyDynamicIcon(entry, buff)
+            -- If a click casts a choice, the icon shows that choice.
+            if choice and entry.visible then
+                local castID = BuffState.GetChoiceCast(buff) or buff.classChoices.castID(choice)
+                if castID then
+                    entry.dynamicIcon = BR.Icons.GetBuffTexture(castID)
+                end
             end
         end
     end
@@ -3518,6 +3651,10 @@ end
 ---@param updateInfo table?
 ---@return boolean
 function BuffState.GroupAuraUpdateMatters(unit, updateInfo)
+    -- Any aura change can add or remove a foreign copy, so the scan result of the unit is stale.
+    for _, state in pairs(classChoiceStates) do
+        state.foreign[unit] = nil
+    end
     if not updateInfo then
         return true
     end
@@ -3557,6 +3694,13 @@ end
 ---Invalidate content type cache
 function BuffState.InvalidateContentTypeCache()
     wipe(instanceCache)
+end
+
+---Invalidate the scan results of foreign classChoices copies.
+function BuffState.InvalidateForeignAuraCache()
+    for _, state in pairs(classChoiceStates) do
+        wipe(state.foreign)
+    end
 end
 
 ---Invalidate the aura-trackable caches.
@@ -4143,3 +4287,4 @@ BR.GameContext.RegisterCache("pet", BuffState.InvalidatePetCache)
 BR.GameContext.RegisterCache("petHappiness", BuffState.InvalidatePetHappinessCache)
 BR.GameContext.RegisterCache("stance", BuffState.InvalidateStanceCache)
 BR.GameContext.RegisterCache("spellUsable", BuffState.InvalidateSpellUsableCache)
+BR.GameContext.RegisterCache("foreignAura", BuffState.InvalidateForeignAuraCache)

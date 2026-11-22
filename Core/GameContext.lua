@@ -9,7 +9,7 @@ local BR = ns
 -- handler reads fresh values.
 -- RenderRequested asks for the render that a change needs. urgent = true asks for it now.
 
----@alias CacheId "auraTrackable"|"consumables"|"contentType"|"durability"|"healer"|"item"|"loadout"|"offHand"|"pet"|"petActions"|"petHappiness"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"spellUsable"|"stance"|"subgroup"
+---@alias CacheId "auraTrackable"|"consumables"|"contentType"|"durability"|"foreignAura"|"healer"|"item"|"loadout"|"offHand"|"pet"|"petActions"|"petHappiness"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"spellUsable"|"stance"|"subgroup"
 
 ---@class GameContextEventSpec
 ---@field caches? CacheId[] Cache ids to clear, in order
@@ -189,7 +189,7 @@ local CONTENT_TYPE = { caches = { "contentType" } }
 ---@type GameContextEventSpec
 local HEALER = { caches = { "healer" } }
 ---@type GameContextEventSpec
-local ROSTER = { caches = { "healer", "subgroup" } }
+local ROSTER = { caches = { "healer", "subgroup", "foreignAura" } }
 ---@type GameContextEventSpec
 local STANCE = { caches = { "stance" } }
 ---@type GameContextEventSpec
@@ -220,6 +220,7 @@ local EVENT_CACHES = {
             "spellNameMisses",
             "subgroup",
             "spellUsable",
+            "foreignAura",
         },
         handle = function()
             inCombat = InCombatLockdown()
@@ -249,7 +250,7 @@ local EVENT_CACHES = {
     },
     PLAYER_REGEN_DISABLED = { caches = { "spellUsable" }, handle = OnCombatStart },
     PLAYER_REGEN_ENABLED = {
-        caches = { "spellUsable" },
+        caches = { "spellUsable", "foreignAura" },
         handle = function()
             inCombat = inEncounter
         end,
@@ -261,6 +262,7 @@ local EVENT_CACHES = {
         end,
     },
     ENCOUNTER_END = {
+        caches = { "foreignAura" },
         handle = function()
             inEncounter = false
             inCombat = inCombat and InCombatLockdown()

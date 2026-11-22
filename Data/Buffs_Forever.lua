@@ -626,43 +626,40 @@ end
 
 local SYMBOL_OF_KINGS = 21177
 
--- A Greater Blessing reaches every group member of the target's class.
----@type StanceGrid
-local PALADIN_BLESSING_GRID = {
-    setting = "paladinBlessings",
-    hint = L["BuffPanel.PaladinBlessing.Hint"],
-    single = true,
-    choices = {
-        {
-            key = "might",
-            spellIDs = { 25291, 19838, 19837, 19836, 19835, 19834, 19740 },
-            groupCast = {
-                { spellID = 25916, reagent = SYMBOL_OF_KINGS },
-                { spellID = 25782, reagent = SYMBOL_OF_KINGS },
-            },
-            beneficiaries = "meleeAttackPower",
+-- A player keeps one blessing from each paladin, and the same blessing from two
+-- paladins does not stack. A Greater Blessing reaches every group member of the
+-- target's class.
+---@type StanceChoice[]
+local PALADIN_BLESSINGS = {
+    {
+        key = "might",
+        spellIDs = { 25291, 19838, 19837, 19836, 19835, 19834, 19740 },
+        groupCast = {
+            { spellID = 25916, reagent = SYMBOL_OF_KINGS },
+            { spellID = 25782, reagent = SYMBOL_OF_KINGS },
         },
-        {
-            key = "wisdom",
-            spellIDs = { 25290, 19854, 19853, 19852, 19850, 19742 },
-            groupCast = {
-                { spellID = 25918, reagent = SYMBOL_OF_KINGS },
-                { spellID = 25894, reagent = SYMBOL_OF_KINGS },
-            },
-            beneficiaries = "intellect",
+    },
+    {
+        key = "wisdom",
+        spellIDs = { 25290, 19854, 19853, 19852, 19850, 19742 },
+        groupCast = {
+            { spellID = 25918, reagent = SYMBOL_OF_KINGS },
+            { spellID = 25894, reagent = SYMBOL_OF_KINGS },
         },
-        {
-            key = "kings",
-            spellIDs = { 20217 },
-            groupCast = { { spellID = 25898, reagent = SYMBOL_OF_KINGS } },
-        },
+    },
+    {
+        key = "kings",
+        spellIDs = { 20217 },
+        groupCast = { { spellID = 25898, reagent = SYMBOL_OF_KINGS } },
     },
 }
 
 -- Every rank of a blessing covers the member, whoever cast it. The stored click
 -- action is the first known ID in spellID, so the single-target ranks come first.
 local ALL_BLESSING_IDS = {}
-for _, choice in ipairs(PALADIN_BLESSING_GRID.choices) do
+---@type table<string, StanceChoice>
+local BLESSING_BY_KEY = {}
+for _, choice in ipairs(PALADIN_BLESSINGS) do
     local auraIDs = {}
     for _, id in ipairs(choice.spellIDs) do
         auraIDs[#auraIDs + 1] = id
@@ -672,66 +669,61 @@ for _, choice in ipairs(PALADIN_BLESSING_GRID.choices) do
         auraIDs[#auraIDs + 1] = rank.spellID
     end
     choice.auraIDs = auraIDs
+    BLESSING_BY_KEY[choice.key] = choice
 end
-for _, choice in ipairs(PALADIN_BLESSING_GRID.choices) do
+for _, choice in ipairs(PALADIN_BLESSINGS) do
     for _, rank in ipairs(choice.groupCast) do
         ALL_BLESSING_IDS[#ALL_BLESSING_IDS + 1] = rank.spellID
     end
 end
 
----The blessing of the current content row and its highest known rank. nil when the
----row chooses none or the player does not know the chosen blessing.
----@return StanceChoice?
----@return number? castID
-local function ActiveBlessing()
-    local row = BR.StateHelpers.GetContentRow()
-    for _, choice in ipairs(PALADIN_BLESSING_GRID.choices) do
-        if BR.StateHelpers.IsContentChoiceAllowed(PALADIN_BLESSING_GRID.setting, row, choice.key) then
-            local castID = HighestKnownSpell(choice.spellIDs)
-            if castID then
-                return choice, castID
-            end
-            return nil
-        end
-    end
-    return nil
-end
+---@type table<string, StanceChoice[]>
+local knownBlessingsByClass = {}
 
----@type table<string, StanceChoice>
-local BLESSING_BY_KEY = {}
-for _, choice in ipairs(PALADIN_BLESSING_GRID.choices) do
-    BLESSING_BY_KEY[choice.key] = choice
-end
-
--- Reused on every call, so a caller must read the lists before the next call.
----@type StanceChoice[]
-local fallbackBlessings = {}
----@type number[]
-local fallbackCastIDs = {}
-
----Known blessings in the user priority order, without the blessing of the row.
+---The blessings of the class list that the player knows, in priority order.
+---The list is reused, so a caller must read it before the next call for the class.
+---@param class string
 ---@return StanceChoice[]
----@return number[] castIDs
-local function FallbackBlessings()
-    wipe(fallbackBlessings)
-    wipe(fallbackCastIDs)
-    local primary = ActiveBlessing()
+local function KnownBlessingsForClass(class)
+    local list = knownBlessingsByClass[class]
+    if list then
+        wipe(list)
+    else
+        list = {}
+        knownBlessingsByClass[class] = list
+    end
     local defaults = BR.profile.defaults
-    local priority = defaults and defaults.paladinBlessingPriority or BR.defaults.defaults.paladinBlessingPriority or {}
-    for i = 1, #priority do
-        local choice = BLESSING_BY_KEY[priority[i]]
-        local castID = choice and choice ~= primary and HighestKnownSpell(choice.spellIDs)
-        local listed = false
-        for j = 1, #fallbackBlessings do
-            listed = listed or fallbackBlessings[j] == choice
-        end
-        if castID and not listed then
-            fallbackBlessings[#fallbackBlessings + 1] = choice
-            fallbackCastIDs[#fallbackCastIDs + 1] = castID
+    local byClass = defaults and defaults.paladinBlessingsByClass
+    local order = type(byClass) == "table" and byClass[class]
+    if type(order) ~= "table" then
+        return list
+    end
+    for i = 1, #PALADIN_BLESSINGS do
+        local choice = BLESSING_BY_KEY[order[i]]
+        if choice and HighestKnownSpell(choice.spellIDs) then
+            local listed = false
+            for j = 1, #list do
+                listed = listed or list[j] == choice
+            end
+            if not listed then
+                list[#list + 1] = choice
+            end
         end
     end
-    return fallbackBlessings, fallbackCastIDs
+    return list
 end
+
+---@type ClassChoiceGrid
+local PALADIN_BLESSING_GRID = {
+    setting = "paladinBlessingsByClass",
+    choices = PALADIN_BLESSINGS,
+    classes = { "WARRIOR", "ROGUE", "HUNTER", "MAGE", "WARLOCK", "PRIEST", "DRUID", "SHAMAN", "PALADIN" },
+    clusterEnds = { ROGUE = true, HUNTER = true },
+    forClass = KnownBlessingsForClass,
+    castID = function(choice)
+        return HighestKnownSpell(choice.spellIDs)
+    end,
+}
 
 -- A unit keeps one aura of each type, whoever casts it. A row with no choice accepts any aura.
 ---@type StanceGrid
@@ -1128,31 +1120,22 @@ BR.BUFF_TABLES = {
             defaultEnabled = false, -- opt-in: only shadow damage fights want it
             chatRequestable = true,
         },
-        -- The blessing of each content row comes from the options grid.
+        -- Each member gets the blessing of their class list in the options grid.
         {
             spellID = ALL_BLESSING_IDS,
             key = "paladinBlessing",
             name = L["Buff.PaladinBlessing"],
             class = "PALADIN",
             reach = "raid",
-            icons = {
-                spells = { 25291 },
-                dynamic = function()
-                    local _, castID = ActiveBlessing()
-                    return castID and BR.Icons.GetBuffTexture(castID)
-                end,
-            },
+            icons = { spells = { 25291 } },
             castOnMissing = true,
             requiresKnownSpell = true,
-            choiceGrid = PALADIN_BLESSING_GRID,
-            activeChoice = ActiveBlessing,
-            fallbackChoices = FallbackBlessings,
+            classChoices = PALADIN_BLESSING_GRID,
             selfScope = function()
                 local defaults = BR.profile.defaults
                 return defaults ~= nil and defaults.paladinBlessingScope == "self"
             end,
-            duplicateText = DUPLICATE_TEXT,
-            infoTooltip = { title = L["Tooltip.PaladinDuplicate"], desc = L["Tooltip.PaladinBlessingDuplicate.Desc"] },
+            infoTooltip = { title = L["Tooltip.PaladinBlessing"], desc = L["Tooltip.PaladinBlessing.Desc"] },
         },
     },
     ---@type PresenceBuff[]

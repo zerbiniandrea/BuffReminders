@@ -16,6 +16,7 @@ local StateHelpers = BR.StateHelpers
 local IsBuffEnabled = StateHelpers.IsBuffEnabled
 local IsPlayerSpellCached = StateHelpers.IsPlayerSpellCached
 local Plain = BR.Secret.Plain
+local AuraField = BR.Secret.AuraField
 local BuffBeneficiaries = BR.BuffBeneficiaries
 local GetUnitAuraBySpellID = C_UnitAuras.GetUnitAuraBySpellID
 
@@ -56,12 +57,13 @@ end
 ---@type DriveByTarget
 local target = { name = "", shortName = "", class = "", level = -1, pvp = false }
 local targetState = nil ---@type boolean? nil = not read, false = no target that qualifies
----@type table<table, boolean> Aura ID list -> the target has one of the auras
-local targetHasAura = {}
+local NO_AURA, OTHER_AURA, OWN_AURA = 0, 1, 2
+---@type table<table, integer> Aura ID list -> NO_AURA, OTHER_AURA or OWN_AURA
+local targetAuraState = {}
 
 local function InvalidateCache()
     targetState = nil
-    wipe(targetHasAura)
+    wipe(targetAuraState)
 end
 
 ---@return DriveByTarget?
@@ -96,20 +98,23 @@ end
 
 -- Any rank from any caster counts as the buff.
 ---@param auraIDs number[]
----@return boolean
+---@return boolean has
+---@return boolean own The player cast the aura
 local function TargetHasAura(auraIDs)
-    local has = targetHasAura[auraIDs]
-    if has == nil then
-        has = false
+    local state = targetAuraState[auraIDs]
+    if state == nil then
+        state = NO_AURA
         for _, id in ipairs(auraIDs) do
-            if GetUnitAuraBySpellID("target", id) then
-                has = true
+            local aura = GetUnitAuraBySpellID("target", id)
+            if aura then
+                local source = AuraField(aura, "sourceUnit")
+                state = (source and Plain(UnitIsUnit(source, "player")) == true) and OWN_AURA or OTHER_AURA
                 break
             end
         end
-        targetHasAura[auraIDs] = has
+        targetAuraState[auraIDs] = state
     end
-    return has
+    return state ~= NO_AURA, state == OWN_AURA
 end
 
 ---@param beneficiaryKey string
@@ -154,22 +159,30 @@ local function Pick()
         return nil
     end
     for _, buff in ipairs(candidates) do
-        local auraIDs, ranks, beneficiaryKey = buff.spellID, buff.spellID, buff.key
-        if buff.activeChoice then
-            local choice = buff.activeChoice()
-            auraIDs = choice and choice.auraIDs
-            ranks = choice and choice.spellIDs
-            beneficiaryKey = choice and choice.beneficiaries or buff.key
-        end
-        if
-            ranks
-            and TargetBenefits(beneficiaryKey, current.class)
-            and not TargetHasAura(StateHelpers.AsSpellList(auraIDs))
-        then
-            local spellID = PickRank(StateHelpers.AsSpellList(ranks), current.level)
-            if spellID then
-                return spellID
+        local spellID
+        if buff.classChoices then
+            -- The target gets the first choice of its class list that no other caster
+            -- gives. A choice from the player stops the search, because a new choice
+            -- from the player replaces it.
+            for _, choice in ipairs(buff.classChoices.forClass(current.class)) do
+                local has, own = TargetHasAura(choice.auraIDs or choice.spellIDs)
+                if own then
+                    break
+                end
+                if not has then
+                    spellID = PickRank(choice.spellIDs, current.level)
+                    if spellID then
+                        break
+                    end
+                end
             end
+        elseif
+            TargetBenefits(buff.key, current.class) and not TargetHasAura(StateHelpers.AsSpellList(buff.spellID))
+        then
+            spellID = PickRank(StateHelpers.AsSpellList(buff.spellID), current.level)
+        end
+        if spellID then
+            return spellID
         end
     end
     return nil

@@ -381,48 +381,685 @@ local function AddStanceGrid(layout, grid)
     AddContentGrid(layout, grid.setting, grid.hint, choices, grid.single)
 end
 
----@param choice StanceChoice
----@return boolean
-local function KnowsChoice(choice)
-    for _, id in ipairs(choice.spellIDs) do
-        if BR.StateHelpers.IsPlayerSpellCached(id) then
-            return true
+---A stored list without unknown keys, repeats and empty slots.
+---@param grid ClassChoiceGrid
+---@param stored any
+---@return string[]
+local function CleanChoiceOrder(grid, stored)
+    local order = {}
+    if type(stored) ~= "table" then
+        return order
+    end
+    for i = 1, #grid.choices do
+        local key = stored[i]
+        local valid, listed = false, false
+        for _, choice in ipairs(grid.choices) do
+            valid = valid or choice.key == key
+        end
+        for _, other in ipairs(order) do
+            listed = listed or other == key
+        end
+        if valid and not listed then
+            order[#order + 1] = key
         end
     end
-    return false
+    return order
 end
 
----True when no row chooses a buff, or a row chooses one that this character of the
----buff's class does not know. Either way a row stays silent. A character who knows
----no choice yet is not flagged.
----@param buff RaidBuff
+---@param grid ClassChoiceGrid
+---@param class string
+---@return string[]
+local function ClassChoiceOrder(grid, class)
+    local byClass = BR.Config.Get("defaults." .. grid.setting)
+    return CleanChoiceOrder(grid, type(byClass) == "table" and byClass[class])
+end
+
+---@param grid ClassChoiceGrid
+---@param class string
+---@return string[]
+local function DefaultChoiceOrder(grid, class)
+    local byClass = BR.defaults.defaults[grid.setting]
+    return CleanChoiceOrder(grid, type(byClass) == "table" and byClass[class])
+end
+
+---@param a string[]
+---@param b string[]
 ---@return boolean
-local function ChoiceGridNeedsSetup(buff)
-    local grid = buff.choiceGrid --[[@as StanceGrid]]
-    if StanceGridNeedsSetup(grid) then
-        return true
-    end
-    local _, playerClass = UnitClass("player")
-    if playerClass ~= buff.class then
+local function SameOrder(a, b)
+    if #a ~= #b then
         return false
     end
-    local knowsAny = false
+    for i = 1, #a do
+        if a[i] ~= b[i] then
+            return false
+        end
+    end
+    return true
+end
+
+---Store the list of every class. A slot past the end of a list stores false, so that
+---AceDB cannot fill it from the default.
+---@param grid ClassChoiceGrid
+---@param orderFor fun(class: string): string[]
+local function WriteClassChoices(grid, orderFor)
+    local map = {}
+    for _, class in ipairs(grid.classes) do
+        local order = orderFor(class)
+        local slots = {}
+        for i = 1, #grid.choices do
+            slots[i] = order[i] or false
+        end
+        map[class] = slots
+    end
+    BR.Config.Set("defaults." .. grid.setting, map)
+end
+
+---Write one class list and keep the others.
+---@param grid ClassChoiceGrid
+---@param class string
+---@param order string[]
+local function WriteClassOrder(grid, class, order)
+    WriteClassChoices(grid, function(other)
+        return other == class and order or ClassChoiceOrder(grid, other)
+    end)
+    Components.RefreshAll()
+end
+
+---Put a key in a slot of the list. A key that is in another slot swaps with the slot.
+---A key for the first empty slot appends. A nil key removes the slot, and later slots
+---shift left.
+---@param order string[]
+---@param slot number
+---@param key string?
+local function SetChoiceSlot(order, slot, key)
+    if not key then
+        table.remove(order, slot)
+        return
+    end
+    local from
+    for i, other in ipairs(order) do
+        if other == key then
+            from = i
+        end
+    end
+    if slot > #order then
+        if from then
+            table.remove(order, from)
+        end
+        order[#order + 1] = key
+        return
+    end
+    if from then
+        order[from] = order[slot]
+    end
+    order[slot] = key
+end
+
+---True when every class list is empty, so no reminder can fire.
+---@param grid ClassChoiceGrid
+---@return boolean
+local function ClassChoiceGridNeedsSetup(grid)
+    for _, class in ipairs(grid.classes) do
+        if #ClassChoiceOrder(grid, class) > 0 then
+            return false
+        end
+    end
+    return true
+end
+
+local CHOICE_SLOT_SIZES = { 26, 20, 20 }
+local CHOICE_SLOT_ALPHA = { 1, 0.85, 0.7 }
+local CHOICE_ROW_H = 28
+local CHOICE_CLUSTER_GAP = 6
+local CHOICE_HEADER_H = 14
+local CHOICE_DOT_W = 12
+local CHOICE_MAIN_W = 34
+local CHOICE_ARROW_W = 14
+local CHOICE_BACKUP_W = 26
+local CHOICE_RESET_W = 14
+local CHOICE_DIM_ALPHA = 0.35
+local FLYOUT_ITEM_H = 20
+local FLYOUT_PAD = 4
+local WHITE8 = "Interface\\Buttons\\WHITE8x8"
+local DOT_TEXTURE = "Interface\\AddOns\\BuffReminders\\Media\\dot.tga"
+
+---A thin diagonal slash over an icon: the choice is not learned.
+---@param frame table
+---@return table line
+local function AddNotLearnedSlash(frame)
+    local slash = frame:CreateLine(nil, "OVERLAY")
+    slash:SetThickness(2)
+    slash:SetStartPoint("TOPRIGHT", frame, -2, -2)
+    slash:SetEndPoint("BOTTOMLEFT", frame, 2, 2)
+    BR.SetThemeColorTexture(slash, Theme.cell.unlearned)
+    return slash
+end
+
+---A circular arrow of line segments, centered on the frame: the reset glyph.
+---@param frame table
+---@return table[] lines
+local function AddResetGlyph(frame)
+    local lines = {}
+    local function Segment(x1, y1, x2, y2)
+        local line = frame:CreateLine(nil, "ARTWORK")
+        line:SetThickness(1.5)
+        line:SetStartPoint("CENTER", frame, x1, y1)
+        line:SetEndPoint("CENTER", frame, x2, y2)
+        lines[#lines + 1] = line
+    end
+    local radius, steps = 4.5, 6
+    local startAngle, span = math.rad(60), math.rad(300)
+    local prevX, prevY = radius * math.cos(startAngle), radius * math.sin(startAngle)
+    for i = 1, steps do
+        local angle = startAngle + span * i / steps
+        local x, y = radius * math.cos(angle), radius * math.sin(angle)
+        Segment(prevX, prevY, x, y)
+        prevX, prevY = x, y
+    end
+    -- The arc ends on the right side, moving up, so the arrowhead points up.
+    Segment(prevX, prevY, prevX - 2, prevY - 2.5)
+    Segment(prevX, prevY, prevX + 2, prevY - 2.5)
+    return lines
+end
+
+---A dashed 1 px edge of short textures around the frame.
+---@param frame table
+---@param size number Side length of the square frame
+---@return table[] dashes
+local function AddDashedEdge(frame, size)
+    local dashes = {}
+    for offset = 0, size - 3, 5 do
+        for side = 1, 4 do
+            local dash = frame:CreateTexture(nil, "BORDER")
+            if side <= 2 then
+                dash:SetSize(3, 1)
+                dash:SetPoint(side == 1 and "TOPLEFT" or "BOTTOMLEFT", offset, 0)
+            else
+                dash:SetSize(1, 3)
+                dash:SetPoint(side == 3 and "TOPLEFT" or "TOPRIGHT", 0, -offset)
+            end
+            dashes[#dashes + 1] = dash
+        end
+    end
+    return dashes
+end
+
+---@param parts table[] Lines or textures
+---@param color number[]
+local function PaintParts(parts, color)
+    for _, part in ipairs(parts) do
+        BR.SetThemeColorTexture(part, color)
+    end
+end
+
+---Paint an icon as learned or not learned.
+---@param icon table
+---@param slash table
+---@param learned boolean
+local function PaintLearned(icon, slash, learned)
+    icon:SetDesaturated(not learned)
+    local shade = learned and 1 or 0.55
+    icon:SetVertexColor(shade, shade, shade)
+    slash:SetShown(not learned)
+end
+
+---The picker under a slot: every choice, a separator, then Clear. Escape or a click
+---outside closes it. The flyout is a child of the body, so a teardown removes it.
+---@param grid ClassChoiceGrid
+---@param isLearned fun(choice: StanceChoice): boolean
+---@return table flyout With :Open(anchor, class, slot) and :Close()
+local function CreateChoiceFlyout(grid, isLearned)
+    local flyout = CreateFrame("Frame", nil, body)
+    flyout:SetFrameStrata("FULLSCREEN_DIALOG")
+    flyout:SetClampedToScreen(true)
+    flyout:EnableMouse(true)
+    flyout:Hide()
+    BR.PaintSurface(BR.CreateSurface(flyout), Theme.menu)
+    local itemColors = Theme.menuItem
+
+    local roleNotes =
+        { L["BuffPanel.Blessing.InGive"], L["BuffPanel.Blessing.InBackup"], L["BuffPanel.Blessing.InBackup"] }
+    local items = {}
+    local function AddItem(choice)
+        local item = CreateFrame("Button", nil, flyout)
+        item:SetHeight(FLYOUT_ITEM_H)
+        item.bg = item:CreateTexture(nil, "BACKGROUND")
+        item.bg:SetAllPoints()
+        item.bar = item:CreateTexture(nil, "BORDER")
+        item.bar:SetPoint("TOPLEFT")
+        item.bar:SetPoint("BOTTOMLEFT")
+        item.bar:SetWidth(2)
+        BR.SetThemeColorTexture(item.bar, itemColors.bar)
+        item.bar:Hide()
+        local textLeft = 6
+        if choice then
+            local iconHolder = CreateFrame("Frame", nil, item)
+            iconHolder:SetSize(16, 16)
+            iconHolder:SetPoint("LEFT", 6, 0)
+            item.icon = BR.CreateBuffIcon(iconHolder, 16, C_Spell.GetSpellTexture(choice.spellIDs[#choice.spellIDs]))
+            item.icon:SetPoint("CENTER")
+            item.slash = AddNotLearnedSlash(iconHolder)
+            textLeft = 28
+        end
+        item.label = item:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        item.label:SetPoint("LEFT", textLeft, 0)
+        item.label:SetJustifyH("LEFT")
+        item.label:SetWordWrap(false)
+        item.label:SetText(
+            choice and (BR.GetSpellName(choice.spellIDs[#choice.spellIDs]) or choice.key)
+                or L["BuffPanel.Blessing.Clear"]
+        )
+        item.note = item:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        item.note:SetPoint("RIGHT", -6, 0)
+        item.note:SetJustifyH("RIGHT")
+        item.choice = choice
+        item.textLeft = textLeft
+        item:SetScript("OnEnter", function(self)
+            BR.PaintGradient(self.bg, "HORIZONTAL", itemColors.hoverLeft, itemColors.hoverRight)
+            self.bar:Show()
+            BR.SetThemeTextColor(self.label, itemColors.textHover)
+        end)
+        item:SetScript("OnLeave", function(self)
+            self.bg:SetColorTexture(0, 0, 0, 0)
+            self.bar:Hide()
+            BR.SetThemeTextColor(self.label, self.isCurrent and Theme.cell.check or itemColors.text)
+        end)
+        item:SetScript("OnClick", function(self)
+            local order = ClassChoiceOrder(grid, flyout.class)
+            SetChoiceSlot(order, flyout.slot, self.choice and self.choice.key)
+            flyout:Close()
+            WriteClassOrder(grid, flyout.class, order)
+        end)
+        items[#items + 1] = item
+        return item
+    end
     for _, choice in ipairs(grid.choices) do
-        knowsAny = knowsAny or KnowsChoice(choice)
+        AddItem(choice)
     end
-    if not knowsAny then
-        return false
+    local separator = flyout:CreateTexture(nil, "ARTWORK")
+    separator:SetHeight(1)
+    BR.SetThemeColorTexture(separator, Theme.cell.separator)
+    local clearItem = AddItem(nil)
+
+    local wasMouseDown = false
+    flyout:SetScript("OnUpdate", function(self)
+        local isMouseDown = IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton")
+        if isMouseDown and not wasMouseDown and not self:IsMouseOver() then
+            if not (self.anchor and self.anchor:IsMouseOver()) then
+                self:Close()
+            end
+        end
+        wasMouseDown = isMouseDown
+    end)
+    flyout:EnableKeyboard(true)
+    flyout:SetScript("OnKeyDown", function(self, keyPressed)
+        if keyPressed == "ESCAPE" then
+            self:SetPropagateKeyboardInput(false)
+            self:Close()
+        else
+            self:SetPropagateKeyboardInput(true)
+        end
+    end)
+
+    function flyout:Close()
+        self.anchor = nil
+        self:Hide()
     end
-    for _, row in ipairs(GRID_ROWS) do
+
+    function flyout:Open(anchor, class, slot)
+        self.anchor, self.class, self.slot = anchor, class, slot
+        local order = ClassChoiceOrder(grid, class)
+        local width = 0
+        for _, item in ipairs(items) do
+            local note
+            item.isCurrent = false
+            if item.choice then
+                local learned = isLearned(item.choice)
+                PaintLearned(item.icon, item.slash, learned)
+                item.isCurrent = order[slot] == item.choice.key
+                for i, key in ipairs(order) do
+                    if key == item.choice.key and i ~= slot then
+                        note = roleNotes[i]
+                    end
+                end
+                note = note or (not learned and L["BuffPanel.Blessing.NotLearnedShort"]) or nil
+            end
+            BR.SetThemeTextColor(item.label, item.isCurrent and Theme.cell.check or itemColors.text)
+            item.note:SetText(note or "")
+            item.bg:SetColorTexture(0, 0, 0, 0)
+            item.bar:Hide()
+            local noteW = note and item.note:GetStringWidth() + 12 or 0
+            width = math.max(width, item.textLeft + item.label:GetStringWidth() + noteW + 10)
+        end
+        local hasClear = slot <= #order
+        local y = -FLYOUT_PAD
+        for _, item in ipairs(items) do
+            if item == clearItem then
+                item:SetShown(hasClear)
+                if hasClear then
+                    separator:ClearAllPoints()
+                    separator:SetPoint("TOPLEFT", 6, y - 3)
+                    separator:SetPoint("TOPRIGHT", -6, y - 3)
+                    y = y - 7
+                end
+                separator:SetShown(hasClear)
+            end
+            if item:IsShown() then
+                item:ClearAllPoints()
+                item:SetPoint("TOPLEFT", 1, y)
+                item:SetPoint("TOPRIGHT", -1, y)
+                y = y - FLYOUT_ITEM_H
+            end
+        end
+        self:SetSize(math.max(140, math.ceil(width)), -y + FLYOUT_PAD)
+        self:ClearAllPoints()
+        self:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -4)
+        self:SetFrameLevel(anchor:GetFrameLevel() + 50)
+        wasMouseDown = IsMouseButtonDown("LeftButton")
+        BR.HideTooltip()
+        self:Show()
+    end
+
+    return flyout
+end
+
+-- One row per class: the main choice, then up to two backups. A backup applies when
+-- another caster already gives the choice before it.
+---@param layout table
+---@param grid ClassChoiceGrid
+---@param hintText string
+---@param ownerClass string The class that casts the choices
+---@param selfOnly fun(): boolean Only the row of ownerClass applies
+local function AddClassChoiceGrid(layout, grid, hintText, ownerClass, selfOnly)
+    local hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetWidth(bodyW)
+    hint:SetJustifyH("LEFT")
+    hint:SetText(hintText)
+    layout:AddText(hint, math.max(12, math.ceil(hint:GetStringHeight())), GRID_GAP + 2)
+
+    -- The spellbook of another class tells nothing, so there every choice reads as learned.
+    local _, playerClass = UnitClass("player")
+    local function IsLearned(choice)
+        return playerClass ~= ownerClass or grid.castID(choice) ~= nil
+    end
+    local function ChoiceName(key)
         for _, choice in ipairs(grid.choices) do
-            if
-                BR.StateHelpers.IsContentChoiceAllowed(grid.setting, row.key, choice.key) and not KnowsChoice(choice)
-            then
+            if choice.key == key then
+                return BR.GetSpellName(choice.spellIDs[#choice.spellIDs]) or key, choice
+            end
+        end
+        return key
+    end
+
+    local names = {}
+    for i, class in ipairs(grid.classes) do
+        names[i] = LOCALIZED_CLASS_NAMES_MALE[class] or class
+    end
+    local labelW = Components.MeasureSharedLabelWidth(names, "GameFontHighlightSmall", 60)
+    local mainX = CHOICE_DOT_W + labelW
+    local backupX = mainX + CHOICE_MAIN_W + CHOICE_ARROW_W
+    local resetX = backupX + 2 * CHOICE_BACKUP_W + 4
+
+    local height = CHOICE_HEADER_H + #grid.classes * CHOICE_ROW_H
+    for _, class in ipairs(grid.classes) do
+        if grid.clusterEnds and grid.clusterEnds[class] then
+            height = height + CHOICE_CLUSTER_GAP
+        end
+    end
+    local holder = CreateFrame("Frame", nil, body)
+    holder:SetSize(bodyW, height)
+    local flyout = CreateChoiceFlyout(grid, IsLearned)
+
+    local giveHead = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    giveHead:SetPoint("TOP", holder, "TOPLEFT", mainX + CHOICE_MAIN_W / 2, 0)
+    giveHead:SetText(L["BuffPanel.Blessing.Give"])
+    BR.ApplyNoteColor(giveHead)
+    local backupHead = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    backupHead:SetPoint("TOP", holder, "TOPLEFT", backupX + CHOICE_BACKUP_W, 0)
+    backupHead:SetText(L["BuffPanel.Blessing.IfTaken"])
+    BR.ApplyNoteColor(backupHead)
+
+    local rows = {}
+
+    local function PaintSlot(slot)
+        local hovered = slot.hovered and slot:IsMouseEnabled()
+        local color = slot.edge
+        if hovered then
+            color = slot.isAdd and Theme.cell.addHover or Theme.cell.hover
+        end
+        if slot.isAdd then
+            slot.dashes = slot.dashes or AddDashedEdge(slot, slot.size)
+            PaintParts(slot.dashes, color)
+            slot:SetBackdropBorderColor(0, 0, 0, 0)
+        else
+            slot:SetBackdropBorderColor(unpack(color))
+        end
+        if slot.dashes then
+            for _, dash in ipairs(slot.dashes) do
+                dash:SetShown(slot.isAdd)
+            end
+        end
+        BR.SetThemeTextColor(slot.plus, hovered and Theme.cell.addHover or Theme.cell.add)
+    end
+
+    local function UpdateRowHover(row)
+        local over = row:IsMouseOver()
+        row.reset:SetShown(row.changed and not row.dimmed and over)
+        if row.dimmed and over then
+            BR.ShowTooltip(row, L["Component.DisabledReason.Title"], L["DisabledReason.BlessSelfOnly"], "ANCHOR_TOP")
+        elseif row.dimmed then
+            BR.HideTooltip()
+        end
+    end
+
+    local function SlotTooltip(slot)
+        local row = slot.row
+        local order = row.order
+        local key = order[slot.index]
+        if not key then
+            if slot.index == 1 then
+                BR.ShowTooltip(slot, L["BuffPanel.Blessing.None"], L["BuffPanel.Blessing.None.Desc"], "ANCHOR_TOP")
+            else
+                BR.ShowTooltip(slot, L["BuffPanel.Blessing.AddBackup"], nil, "ANCHOR_TOP")
+            end
+            return
+        end
+        local title, choice = ChoiceName(key)
+        local desc
+        if choice and not IsLearned(choice) then
+            local nextName
+            for i = slot.index + 1, #order do
+                local nextTitle, nextChoice = ChoiceName(order[i])
+                if not nextName and nextChoice and IsLearned(nextChoice) then
+                    nextName = nextTitle
+                end
+            end
+            desc = nextName and string.format(L["BuffPanel.Blessing.NotLearned"], nextName)
+                or L["BuffPanel.Blessing.NotLearnedNone"]
+        elseif slot.index == 1 then
+            desc = string.format(L["BuffPanel.Blessing.MainTip"], row.className)
+        else
+            desc = string.format(L["BuffPanel.Blessing.BackupTip"], (ChoiceName(order[slot.index - 1])))
+        end
+        BR.ShowTooltip(slot, title, desc .. "\n" .. L["BuffPanel.Blessing.ClickToChange"], "ANCHOR_TOP")
+    end
+
+    local y = -CHOICE_HEADER_H
+    for r, class in ipairs(grid.classes) do
+        local row = CreateFrame("Frame", nil, holder)
+        row:SetPoint("TOPLEFT", 0, y)
+        row:SetSize(bodyW, CHOICE_ROW_H)
+        row:EnableMouse(true)
+        row.class = class
+        row.className = names[r]
+        row:SetScript("OnEnter", UpdateRowHover)
+        row:SetScript("OnLeave", UpdateRowHover)
+
+        row.dot = row:CreateTexture(nil, "ARTWORK")
+        row.dot:SetSize(5, 5)
+        row.dot:SetPoint("CENTER", row, "LEFT", CHOICE_DOT_W / 2, 0)
+        row.dot:SetTexture(DOT_TEXTURE)
+        local dotColor = Theme.cell.changed
+        row.dot:SetVertexColor(dotColor[1], dotColor[2], dotColor[3], dotColor[4] or 1)
+
+        row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        row.label:SetPoint("LEFT", CHOICE_DOT_W, 0)
+        row.label:SetWidth(labelW)
+        row.label:SetJustifyH("LEFT")
+        row.label:SetWordWrap(false)
+        row.label:SetText(names[r])
+        local color = C_ClassColor.GetClassColor(class)
+        if color then
+            row.label:SetTextColor(color:GetRGB())
+        end
+
+        local arrow = row:CreateTexture(nil, "ARTWORK")
+        arrow:SetSize(10, 10)
+        arrow:SetPoint("CENTER", row, "LEFT", mainX + CHOICE_MAIN_W + CHOICE_ARROW_W / 2, 0)
+        arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
+        local arrowColor = Theme.cell.arrow
+        arrow:SetVertexColor(arrowColor[1], arrowColor[2], arrowColor[3], arrowColor[4] or 1)
+
+        row.slots = {}
+        for s, size in ipairs(CHOICE_SLOT_SIZES) do
+            local slot = CreateFrame("Button", nil, row, "BackdropTemplate")
+            slot:SetSize(size, size)
+            slot.size = size
+            local colX = s == 1 and mainX + (CHOICE_MAIN_W - size) / 2
+                or backupX + (s - 2) * CHOICE_BACKUP_W + (CHOICE_BACKUP_W - size) / 2
+            slot:SetPoint("LEFT", colX, 0)
+            slot:SetBackdrop({ bgFile = WHITE8, edgeFile = WHITE8, edgeSize = 1 })
+            slot:SetBackdropColor(unpack(Theme.cell.well))
+            slot.icon = BR.CreateBuffIcon(slot, size - 2)
+            slot.icon:SetPoint("CENTER")
+            slot.slash = AddNotLearnedSlash(slot)
+            slot.plus = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            slot.plus:SetPoint("CENTER", 0, 1)
+            slot.plus:SetText("+")
+            slot.row = row
+            slot.index = s
+            slot:SetScript("OnClick", function(self)
+                if flyout:IsShown() and flyout.anchor == self then
+                    flyout:Close()
+                else
+                    flyout:Open(self, class, s)
+                end
+            end)
+            slot:SetScript("OnEnter", function(self)
+                self.hovered = true
+                PaintSlot(self)
+                UpdateRowHover(row)
+                if not flyout:IsShown() then
+                    SlotTooltip(self)
+                end
+            end)
+            slot:SetScript("OnLeave", function(self)
+                self.hovered = false
+                PaintSlot(self)
+                BR.HideTooltip()
+                UpdateRowHover(row)
+            end)
+            row.slots[s] = slot
+        end
+
+        row.reset = CreateFrame("Button", nil, row)
+        row.reset:SetSize(CHOICE_RESET_W, CHOICE_RESET_W)
+        row.reset:SetPoint("LEFT", resetX, 0)
+        row.reset.glyph = AddResetGlyph(row.reset)
+        PaintParts(row.reset.glyph, Theme.cell.reset)
+        row.reset:Hide()
+        row.reset:SetScript("OnClick", function()
+            BR.HideTooltip()
+            WriteClassOrder(grid, class, DefaultChoiceOrder(grid, class))
+        end)
+        row.reset:SetScript("OnEnter", function(self)
+            PaintParts(self.glyph, Theme.cell.resetHover)
+            BR.ShowTooltip(self, L["BuffPanel.Blessing.ResetRow"], nil, "ANCHOR_TOP")
+        end)
+        row.reset:SetScript("OnLeave", function(self)
+            PaintParts(self.glyph, Theme.cell.reset)
+            BR.HideTooltip()
+            UpdateRowHover(row)
+        end)
+
+        rows[r] = row
+        y = y - CHOICE_ROW_H
+        if grid.clusterEnds and grid.clusterEnds[class] then
+            y = y - CHOICE_CLUSTER_GAP
+        end
+    end
+
+    local function AnyRowChanged()
+        for _, class in ipairs(grid.classes) do
+            if not SameOrder(ClassChoiceOrder(grid, class), DefaultChoiceOrder(grid, class)) then
                 return true
             end
         end
+        return false
     end
-    return false
+
+    local resetRow = CreateFrame("Frame", nil, body)
+    resetRow:SetSize(bodyW, 22)
+    local resetAll = CreateButton(resetRow, L["Options.ResetToDefaults"], function()
+        flyout:Close()
+        WriteClassChoices(grid, function(class)
+            return DefaultChoiceOrder(grid, class)
+        end)
+        Components.RefreshAll()
+    end)
+    resetAll:SetPoint("LEFT")
+    resetAll:SetDisabledReason(L["DisabledReason.BlessingDefaults"])
+    resetAll:BindEnabled(AnyRowChanged)
+    tinsert(bodyHolders, resetAll)
+    local selfNote = resetRow:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    selfNote:SetPoint("LEFT", resetAll, "RIGHT", 8, 0)
+    selfNote:SetPoint("RIGHT", resetRow, "RIGHT")
+    selfNote:SetJustifyH("LEFT")
+    selfNote:SetText(L["BuffPanel.Blessing.SelfOnlyNote"])
+
+    function holder:Refresh()
+        local dimOthers = selfOnly()
+        selfNote:SetShown(dimOthers)
+        for _, row in ipairs(rows) do
+            local order = ClassChoiceOrder(grid, row.class)
+            row.order = order
+            row.changed = not SameOrder(order, DefaultChoiceOrder(grid, row.class))
+            row.dimmed = dimOthers and row.class ~= ownerClass
+            row:SetAlpha(row.dimmed and CHOICE_DIM_ALPHA or 1)
+            row.dot:SetShown(row.changed)
+            row.label:SetAlpha(#order == 0 and 0.5 or 1)
+            for s, slot in ipairs(row.slots) do
+                local key = order[s]
+                local _, choice = ChoiceName(key)
+                local isAdd = not key and s == #order + 1
+                slot.isAdd = isAdd
+                slot.icon:SetShown(choice ~= nil)
+                slot.plus:SetShown(isAdd)
+                slot.slash:SetShown(false)
+                if choice then
+                    slot.icon:SetTexture(C_Spell.GetSpellTexture(choice.spellIDs[#choice.spellIDs]))
+                    PaintLearned(slot.icon, slot.slash, IsLearned(choice))
+                    slot.edge = s == 1 and Theme.cell.selected or Theme.cell.edge
+                    slot:SetAlpha(CHOICE_SLOT_ALPHA[s])
+                elseif isAdd then
+                    slot.edge = Theme.cell.add
+                    slot:SetAlpha(1)
+                else
+                    slot.edge = Theme.cell.wellEdge
+                    slot:SetAlpha(1)
+                end
+                slot:EnableMouse(not row.dimmed and (choice ~= nil or isAdd))
+                PaintSlot(slot)
+            end
+            row.reset:SetShown(row.changed and not row.dimmed and row:IsMouseOver())
+        end
+    end
+
+    holder:Refresh()
+    tinsert(BR.RefreshableComponents, holder)
+    tinsert(bodyHolders, holder)
+    layout:Add(holder, height, GRID_GAP + 2)
+    layout:Add(resetRow, 22, COMPONENT_GAP)
 end
 
 local function AddPlaceAtPlayerCheckbox(layout)
@@ -986,95 +1623,32 @@ local function MakeGroupCastSection(buff, desc)
     }
 end
 
-local function IsBlessingGroupScope()
-    return BR.Config.Get("defaults.paladinBlessingScope", "group") ~= "self"
-end
-
----@param layout table
----@param grid StanceGrid
-local function AddBlessingControls(layout, grid)
-    local scope = Components.Dropdown(body, {
-        label = L["BuffPanel.BlessingScope"],
-        labelWidth = DRAWER_LABEL_W,
-        width = DRAWER_FIELD_W,
-        options = {
-            { label = L["BuffPanel.BlessingScope.Group"], value = "group" },
-            { label = L["BuffPanel.BlessingScope.Self"], value = "self" },
-        },
-        get = function()
-            return BR.Config.Get("defaults.paladinBlessingScope", "group")
-        end,
-        tooltip = { title = L["BuffPanel.BlessingScope"], desc = L["BuffPanel.BlessingScope.Desc"] },
-        onChange = function(val)
-            BR.Config.Set("defaults.paladinBlessingScope", val)
-            Components.RefreshAll()
-        end,
-    })
-    tinsert(bodyHolders, scope)
-    layout:Add(scope, 26, COMPONENT_GAP)
-
-    local hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetWidth(bodyW)
-    hint:SetJustifyH("LEFT")
-    hint:SetText(L["BuffPanel.BlessingPriority.Hint"])
-    layout:AddText(hint, math.max(12, math.ceil(hint:GetStringHeight())), COMPONENT_GAP)
-
-    local options = {}
-    for i, choice in ipairs(grid.choices) do
-        options[i] = { label = BR.GetSpellName(choice.spellIDs[#choice.spellIDs]) or choice.key, value = choice.key }
-    end
-    local function Priority()
-        local list = {}
-        for i, key in ipairs(BR.Config.Get("defaults.paladinBlessingPriority") or {}) do
-            list[i] = key
-        end
-        return list
-    end
-    for slot = 1, #grid.choices do
-        local drop = Components.Dropdown(body, {
-            label = L["BuffPanel.BlessingPriority." .. slot],
-            labelWidth = DRAWER_LABEL_W,
-            width = DRAWER_FIELD_W,
-            options = options,
-            get = function()
-                return Priority()[slot]
-            end,
-            enabled = IsBlessingGroupScope,
-            disabledReason = L["DisabledReason.BlessingPriority"],
-            onChange = function(val)
-                -- The list stays a permutation: the old slot of the value takes the replaced key.
-                local list = Priority()
-                for other = 1, #grid.choices do
-                    if list[other] == val then
-                        list[other] = list[slot]
-                    end
-                end
-                list[slot] = val
-                BR.Config.Set("defaults.paladinBlessingPriority", list)
-                Components.RefreshAll()
-            end,
-        })
-        tinsert(bodyHolders, drop)
-        layout:Add(drop, 26, COMPONENT_GAP)
-    end
-end
-
 -- Buffs with group ranks get the group cast section. Their definitions belong to
 -- the active client, so the sections build at load time from its buff table.
--- A choice-grid buff keeps its group ranks on each choice.
+-- A classChoices buff keeps its group ranks on each choice.
 for _, buff in ipairs(BR.BUFF_TABLES.raid) do
-    if buff.choiceGrid then
+    local grid = buff.classChoices
+    if grid then
         local groupCast = MakeGroupCastSection(buff, L["BuffPanel.GroupCast.Blessing.Desc"])
         SPECIAL_SECTIONS[buff.key] = {
             build = function(layout)
-                AddStanceGrid(layout, buff.choiceGrid)
-                groupCast.build(layout)
-                if buff.fallbackChoices then
-                    AddBlessingControls(layout, buff.choiceGrid)
+                local function IsSelfOnly()
+                    return BR.Config.Get("defaults.paladinBlessingScope") == "self"
                 end
+                AddClassChoiceGrid(layout, grid, L["BuffPanel.PaladinBlessing.Hint"], buff.class, IsSelfOnly)
+                AddSpecialCheckbox(layout, {
+                    label = L["BuffPanel.BlessSelfOnly"],
+                    get = IsSelfOnly,
+                    tooltip = { title = L["BuffPanel.BlessSelfOnly"], desc = L["BuffPanel.BlessSelfOnly.Desc"] },
+                    onChange = function(checked)
+                        BR.Config.Set("defaults.paladinBlessingScope", checked and "self" or "group")
+                        Components.RefreshAll()
+                    end,
+                })
+                groupCast.build(layout)
             end,
             warn = function()
-                return BR.StateHelpers.IsBuffEnabled(buff.key) and ChoiceGridNeedsSetup(buff)
+                return BR.StateHelpers.IsBuffEnabled(buff.key) and ClassChoiceGridNeedsSetup(grid)
             end,
         }
     elseif buff.groupCast and not SPECIAL_SECTIONS[buff.key] then

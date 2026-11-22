@@ -525,14 +525,16 @@ local function CreateClickOverlay(frame)
             if groupSpellID then
                 self:SetAttribute("spell", groupSpellID)
                 self:SetAttribute("unit", groupUnit or "player")
+            elseif pickDef.classChoices then
+                -- The stored action holds any known spell of a classChoices buff. The
+                -- member that the click picks names the spell to cast. With no pick,
+                -- the click casts nothing, and PostClick writes the spell back.
+                local castID, castUnit = BR.BuffState.GetChoiceCast(pickDef)
+                self:SetAttribute("spell", castID)
+                self._br_spellCleared = castID == nil or nil
+                self:SetAttribute("unit", castUnit or "player")
             else
-                -- The stored action holds any known spell of a choice-grid buff. The
-                -- active choice of the current content names the spell to cast.
-                local castID
-                if pickDef.activeChoice then
-                    castID = select(2, BR.BuffState.GetActiveChoice(pickDef))
-                end
-                self:SetAttribute("spell", castID or self._br_action.spellID)
+                self:SetAttribute("spell", self._br_action.spellID)
                 self:SetAttribute("unit", PickCastUnit(pickDef.key))
             end
         end

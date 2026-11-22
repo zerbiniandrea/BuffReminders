@@ -93,12 +93,9 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field groupCast? GroupCastRank[] Group ranks that use a reagent, highest first. The user turns them on per buff
 ---@field requiresKnownSpell? boolean Only a player who knows one of the spells sees it. The talents of other members are unreadable
 ---@field visibilityCondition? fun(): boolean Return false to hide the buff
----@field choiceGrid? StanceGrid The user picks the tracked buff per content row
----@field activeChoice? fun(): StanceChoice?, number? Choice of the current row and the rank to cast. nil = no reminder
----@field fallbackChoices? fun(): StanceChoice[], number[] Choices to try in order, with the rank to cast, when the active choice reads as a duplicate
----@field selfScope? fun(): boolean Return true to check and cast the buff on the player only, with no duplicate check
+---@field classChoices? ClassChoiceGrid Each member wants a choice of their class list. The click casts the choice of the largest class set
+---@field selfScope? fun(): boolean Return true to check and cast the buff on the player only
 ---@field infoTooltip? TooltipText
----@field duplicateText? string Overlay text when no member misses the buff and some have it only from another caster. A click then casts nothing
 
 ---@class GroupCastRank
 ---@field spellID number
@@ -372,7 +369,14 @@ BR.PET_SPELLS = {
 ---@field iconSpellID? number Icon of a choice with no spell
 ---@field groupCast? GroupCastRank[] Group ranks of a buff choice, highest first
 ---@field auraIDs? number[] Every aura ID that counts as the buff choice
----@field beneficiaries? string BuffBeneficiaries key of a buff choice. nil = the beneficiaries of the buff key
+
+---@class ClassChoiceGrid
+---@field setting string Key in profile.defaults: class token -> choice keys in priority order, false in an unused slot
+---@field choices StanceChoice[] Grid columns. A class list holds at most this many keys
+---@field classes string[] Grid rows
+---@field clusterEnds? table<string, boolean> Classes that end a cluster of rows. A gap follows each one
+---@field forClass fun(class: string): StanceChoice[] Known choices of the class list in priority order. The list is reused
+---@field castID fun(choice: StanceChoice): number? Highest known single-target rank of the choice
 
 ---@class StanceGrid
 ---@field setting string Key of the grid in profile.defaults

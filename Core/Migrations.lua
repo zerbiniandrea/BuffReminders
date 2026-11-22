@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 61
+BR.Migrations.DB_VERSION = 62
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -276,6 +276,16 @@ function BR.Migrations.RunProfile(profile)
         -- (BR.Migrations.RenameFeastAtPlayer).
         [61] = function()
             BR.Migrations.RenameFeastAtPlayer(profile)
+        end,
+        -- [62] The paladin blessings move to a priority list per class
+        -- (defaults.paladinBlessingsByClass). No code reads the blessing of each
+        -- content row or the global blessing priority, so this pass clears them.
+        [62] = function()
+            local profileDefaults = profile.defaults
+            if type(profileDefaults) == "table" then
+                profileDefaults.paladinBlessings = nil
+                profileDefaults.paladinBlessingPriority = nil
+            end
         end,
     }
 

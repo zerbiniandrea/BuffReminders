@@ -351,7 +351,22 @@ local function BuildRetail()
             },
         },
         mover = { body = { 0, 0.7, 0, 0.6 }, edge = CLEAR, text = { 0.4, 1, 0.4, 1 } },
-        cell = { edge = BORDER, selected = ACCENT, check = ACCENT },
+        cell = {
+            edge = BORDER,
+            selected = ACCENT,
+            check = ACCENT,
+            hover = Grey(0.5),
+            add = MUTED,
+            addHover = ACCENT,
+            well = { 0.05, 0.05, 0.05, 1 },
+            wellEdge = Grey(0.2),
+            arrow = MUTED,
+            changed = ACCENT,
+            reset = TEXT_DISABLED,
+            resetHover = ACCENT,
+            unlearned = { 0.8, 0.2, 0.2, 1 },
+            separator = Grey(0.25),
+        },
     }
     return theme
 end
@@ -661,7 +676,22 @@ local function BuildForever()
             },
         },
         mover = { body = { 0.08, 0.055, 0.03, 0.88 }, edge = { 0.72, 0.54, 0.29, 1 }, text = { 1.0, 0.929, 0.824, 1 } },
-        cell = { edge = P.edge, selected = P.edgeActive, check = P.accent },
+        cell = {
+            edge = P.edge,
+            selected = P.edgeActive,
+            check = P.accent,
+            hover = P.edgeHover,
+            add = P.accentLow,
+            addHover = P.accent,
+            well = Alpha(P.fieldTop, 1),
+            wellEdge = P.edgeDisabled,
+            arrow = P.accentLow,
+            changed = P.accent,
+            reset = P.textDisabled,
+            resetHover = P.accent,
+            unlearned = { 0.769, 0.318, 0.243, 0.9 },
+            separator = P.edgeDisabled,
+        },
     }
     return theme
 end

@@ -250,18 +250,22 @@ BR.defaults = {
             pvp = { felhunter = true },
         },
         warlockWrongDemon = true,
-        -- The paladin blessing of each content row (WoW Forever). One choice per row.
-        paladinBlessings = BR.CLIENT == BR.ClientType.Forever and {
-            world = { might = true },
-            dungeon = { might = true },
-            raid = { might = true },
-            pvp = { might = true },
+        -- The blessings of each class (WoW Forever), in priority order. A member gets the
+        -- first one that no other paladin gives them. Every slot holds a value, so that
+        -- AceDB cannot fill a slot that the user emptied.
+        paladinBlessingsByClass = BR.CLIENT == BR.ClientType.Forever and {
+            WARRIOR = { "might", "kings", false },
+            ROGUE = { "might", "kings", false },
+            HUNTER = { "kings", "wisdom", false },
+            MAGE = { "wisdom", "kings", false },
+            WARLOCK = { "wisdom", "kings", false },
+            PRIEST = { "wisdom", "kings", false },
+            DRUID = { "wisdom", "kings", false },
+            SHAMAN = { "wisdom", "kings", false },
+            PALADIN = { "wisdom", "kings", false },
         } or nil,
-        -- WoW Forever: "self" checks and blesses only the player, with no duplicate check.
+        -- WoW Forever: "self" checks and blesses only the player.
         paladinBlessingScope = BR.CLIENT == BR.ClientType.Forever and "group" or nil,
-        -- WoW Forever: if the blessing of the row is a duplicate, the reminder suggests
-        -- the first blessing of this list that is not.
-        paladinBlessingPriority = BR.CLIENT == BR.ClientType.Forever and { "might", "kings", "wisdom" } or nil,
         -- The paladin aura of each content row (WoW Forever). A row with none accepts any aura.
         paladinAuras = BR.CLIENT == BR.ClientType.Forever and {
             world = {},
