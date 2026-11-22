@@ -171,7 +171,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field showOnInstanceEntry? boolean Only show when entering an instance (not M+), skip normal buff checks
 ---@field showWhenPresent? boolean Show when buff IS active (inverts normal "show when missing" logic)
 ---@field noClickToCast? boolean Suppress click-to-cast overlay (e.g., CastSpellByID can't toggle this spell)
----@field noExpirationGlow? boolean Suppress expiration glow (for permanent enchants or intentionally short buffs)
+---@field noExpirationGlow? boolean Show only the missing state, never the expiring state (permanent enchants, short buffs)
 ---@field skipSpellKnownCheck? boolean Skip the "player knows spell" check (for custom/dynamic entries)
 
 ---A known sacrifice spell hides the reminder while a sacrifice buff is up. If a restricted
@@ -188,6 +188,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field groupId? string
 ---@field checkWeaponEnchant? boolean Check if any weapon enchant exists (oils, stones, imbues)
 ---@field checkWeaponEnchantOH? boolean Check if off-hand weapon enchant exists
+---@field enchantDuration? number Full weapon enchant duration in seconds, for the short-buff expiration rule
 ---@field excludeIfSpellKnown? number[] Don't show if player knows any of these spells
 ---@field buffIconID? number Detection-only: any aura whose icon matches counts as the buff (e.g., 136000 for food). Does not affect the displayed icon: a buff that detects by icon still needs icons.textures to show it.
 ---@field icons? IconSpec
@@ -301,6 +302,7 @@ BR.CLIENT_PREVIEW = false
 ---@field difficultyIDs table<string, table<number, string>> Difficulty key per GetInstanceInfo difficultyID
 ---@field titles? table<string, string> Content segment titles that replace the shared titles
 ---@field legacyLoot boolean Old instances can run in legacy loot mode
+---@field keystones boolean Dungeons can run as Mythic Keystones
 
 ---@type InstanceContent
 BR.INSTANCE_CONTENT = {
@@ -328,6 +330,7 @@ BR.INSTANCE_CONTENT = {
         },
     },
     legacyLoot = true,
+    keystones = true,
 }
 
 ---@class PetSpells

@@ -74,6 +74,7 @@ BR.INSTANCE_CONTENT = {
         pvp = L["Content.Battlegrounds"],
     },
     legacyLoot = false,
+    keystones = false,
 }
 
 BR.DEFAULT_POISON_PREFERENCES = {
@@ -1086,6 +1087,7 @@ BR.BUFF_TABLES = {
             name = L["Buff.InnerFire"],
             class = "PRIEST",
             overlayText = L["Overlay.NoInnerFire"],
+            noExpirationGlow = true,
         },
         -- The stance bar shows Shadowform, and it stays readable in combat.
         {
@@ -1107,6 +1109,7 @@ BR.BUFF_TABLES = {
             name = L["Buff.LightningShield"],
             class = "SHAMAN",
             overlayText = L["Overlay.NoShield"],
+            noExpirationGlow = true,
         },
         -- Vanilla shamans do not dual-wield, so any imbue on the weapon counts.
         {
@@ -1157,6 +1160,7 @@ BR.BUFF_TABLES = {
             name = L["Buff.Thorns"],
             class = "DRUID",
             overlayText = L["Overlay.NoThorns"],
+            noExpirationGlow = true,
         },
         -- The stance bar stays readable in combat, so the two stance reminders work there.
         {
@@ -1380,6 +1384,7 @@ BR.BUFF_TABLES = {
         },
         {
             checkWeaponEnchant = true,
+            enchantDuration = 1800, -- seconds
             key = "weaponBuff",
             name = L["Buff.Weapon"],
             overlayText = L["Overlay.NoWeaponBuff"],
@@ -1394,6 +1399,7 @@ BR.BUFF_TABLES = {
         },
         {
             checkWeaponEnchantOH = true,
+            enchantDuration = 1800, -- seconds
             key = "weaponBuffOH",
             name = L["Buff.WeaponOH"],
             overlayText = L["Overlay.NoWeaponBuff"],

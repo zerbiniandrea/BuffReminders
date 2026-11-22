@@ -2950,7 +2950,15 @@ local function RefreshConsumables(db, trackingMode, isAuraRestricted, hideExpiri
                                 NoteChangeIn(CHARGE_RECHECK)
                             end
                         elseif not buff.noExpirationGlow and not hideExpiring then
-                            if TrySetEntryExpiring(entry, remainingTime, consThreshold, consExGlow, auraDuration) then
+                            if
+                                TrySetEntryExpiring(
+                                    entry,
+                                    remainingTime,
+                                    consThreshold,
+                                    consExGlow,
+                                    auraDuration or buff.enchantDuration
+                                )
+                            then
                                 if activeSpellID and type(buff.spellID) == "table" then
                                     entry.dynamicIcon = BR.Icons.GetBuffTexture(activeSpellID)
                                 end

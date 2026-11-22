@@ -77,18 +77,20 @@ local function Build(content)
     })
     layout:Add(defThresholdHolder, nil, COMPONENT_GAP)
 
-    local preKeyThresholdHolder = Components.Slider(content, {
-        label = L["Options.PreKeyThreshold"],
-        labelWidth = thresholdLW,
-        tooltip = { title = L["Options.PreKeyThreshold"], desc = L["Options.PreKeyThreshold.Desc"] },
-        min = 0,
-        max = 60,
-        step = 5,
-        get = MakeDefaultsGetter("preKeyThreshold", 0),
-        formatValue = formatMinutes,
-        onChange = MakeDefaultsSetter("preKeyThreshold"),
-    })
-    layout:Add(preKeyThresholdHolder, nil, COMPONENT_GAP)
+    if BR.INSTANCE_CONTENT.keystones then
+        local preKeyThresholdHolder = Components.Slider(content, {
+            label = L["Options.PreKeyThreshold"],
+            labelWidth = thresholdLW,
+            tooltip = { title = L["Options.PreKeyThreshold"], desc = L["Options.PreKeyThreshold.Desc"] },
+            min = 0,
+            max = 60,
+            step = 5,
+            get = MakeDefaultsGetter("preKeyThreshold", 0),
+            formatValue = formatMinutes,
+            onChange = MakeDefaultsSetter("preKeyThreshold"),
+        })
+        layout:Add(preKeyThresholdHolder, nil, COMPONENT_GAP)
+    end
 
     -- ========================================================================
     -- LAYOUT
