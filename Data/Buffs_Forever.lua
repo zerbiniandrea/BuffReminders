@@ -77,9 +77,28 @@ BR.INSTANCE_CONTENT = {
     keystones = false,
 }
 
+-- One poison column per hand. Each entry is the rank 1 spell of a poison type.
 BR.DEFAULT_POISON_PREFERENCES = {
-    lethal = {},
-    nonLethal = {},
+    mainHand = {
+        { spellID = 8679, enabled = true }, -- Instant
+        { spellID = 2823, enabled = true }, -- Deadly
+        { spellID = 13219, enabled = true }, -- Wound
+        { spellID = 3408, enabled = true }, -- Crippling
+        { spellID = 5761, enabled = true }, -- Mind-numbing
+    },
+    offHand = {
+        { spellID = 2823, enabled = true }, -- Deadly
+        { spellID = 8679, enabled = true }, -- Instant
+        { spellID = 13219, enabled = true }, -- Wound
+        { spellID = 3408, enabled = true }, -- Crippling
+        { spellID = 5761, enabled = true }, -- Mind-numbing
+    },
+}
+
+---@type PoisonColumn[]
+BR.POISON_COLUMNS = {
+    { key = "mainHand", label = L["Options.PoisonMainHand"] },
+    { key = "offHand", label = L["Options.PoisonOffHand"] },
 }
 
 BR.REPAIR_SOURCES = {
@@ -231,27 +250,6 @@ BR.CONSUMABLE_ITEMS = {
         [13513] = true, -- Flask of Chromatic Resistance
     },
     weapon = {
-        -- Poisons. A lethal poison sorts before a non-lethal one. The remembered poison wins inside a priority.
-        [6947] = { priority = 1 }, -- Instant Poison
-        [6949] = { priority = 1 }, -- Instant Poison II
-        [6950] = { priority = 1 }, -- Instant Poison III
-        [8926] = { priority = 1 }, -- Instant Poison IV
-        [8927] = { priority = 1 }, -- Instant Poison V
-        [8928] = { priority = 1 }, -- Instant Poison VI
-        [2892] = { priority = 1 }, -- Deadly Poison
-        [2893] = { priority = 1 }, -- Deadly Poison II
-        [8984] = { priority = 1 }, -- Deadly Poison III
-        [8985] = { priority = 1 }, -- Deadly Poison IV
-        [20844] = { priority = 1 }, -- Deadly Poison V
-        [3775] = { priority = 2 }, -- Crippling Poison
-        [3776] = { priority = 2 }, -- Crippling Poison II
-        [5237] = { priority = 2 }, -- Mind-numbing Poison
-        [6951] = { priority = 2 }, -- Mind-numbing Poison II
-        [9186] = { priority = 2 }, -- Mind-numbing Poison III
-        [10918] = { priority = 1 }, -- Wound Poison
-        [10920] = { priority = 1 }, -- Wound Poison II
-        [10921] = { priority = 1 }, -- Wound Poison III
-        [10922] = { priority = 1 }, -- Wound Poison IV
         -- Sharpening stones. Elemental and Consecrated fit any melee weapon.
         [2862] = { weaponClass = "edged" }, -- Rough Sharpening Stone
         [2863] = { weaponClass = "edged" }, -- Coarse Sharpening Stone
@@ -514,6 +512,118 @@ local function ShamanImbueCastID()
         end
     end
     return nil
+end
+
+-- A poison sits in the imbue slot of a weapon, beside a stone or an oil in the temporary slot.
+-- Poison items per type, highest rank first. The rank 1 spell names the type.
+local POISON_ITEMS = {
+    [8679] = { 8928, 8927, 8926, 6950, 6949, 6947 }, -- Instant Poison
+    [2823] = { 20844, 8985, 8984, 2893, 2892 }, -- Deadly Poison
+    [13219] = { 10922, 10921, 10920, 10918 }, -- Wound Poison
+    [3408] = { 3776, 3775 }, -- Crippling Poison
+    [5761] = { 9186, 6951, 5237 }, -- Mind-numbing Poison
+}
+local POISONS_SKILL = 2842
+local POISON_HANDS = { { slot = 16, column = "mainHand" }, { slot = 17, column = "offHand" } }
+
+---@param slot number 16 (main hand) or 17 (off hand)
+---@return boolean
+local function HandHoldsWeapon(slot)
+    if slot == 17 then
+        return BR.BuffState.HasOffHandWeapon()
+    end
+    local subclass = BR.BuffState.GetWeaponSubclass(16)
+    return subclass ~= nil and subclass ~= 20 -- Enum.ItemWeaponSubclass.Fishingpole
+end
+
+---@param column string
+---@return { spellID: number, enabled: boolean }[]
+local function PoisonList(column)
+    local prefs = BR.profile.roguePoisonPreferences
+    local list = prefs and prefs[column]
+    if not list or #list == 0 then
+        list = BR.DEFAULT_POISON_PREFERENCES[column]
+    end
+    return list
+end
+
+---First enabled poison of the hand that the bags hold, as its highest rank item.
+---@param column string
+---@return number? itemID
+---@return number? spellID rank 1 spell of the poison type
+local function PickPoison(column)
+    local GetItemCountCached = BR.StateHelpers.GetItemCountCached
+    for _, entry in ipairs(PoisonList(column)) do
+        local items = entry.enabled and POISON_ITEMS[entry.spellID]
+        if items then
+            for _, itemID in ipairs(items) do
+                if GetItemCountCached(itemID) > 0 then
+                    return itemID, entry.spellID
+                end
+            end
+        end
+    end
+    return nil
+end
+
+---@param column string
+---@return boolean
+local function HasEnabledPoison(column)
+    for _, entry in ipairs(PoisonList(column)) do
+        if entry.enabled and POISON_ITEMS[entry.spellID] then
+            return true
+        end
+    end
+    return false
+end
+
+---First hand with a weapon, no imbue, and an enabled poison.
+---@return { slot: number, column: string }?
+local function HandMissingPoison()
+    for _, hand in ipairs(POISON_HANDS) do
+        if
+            HandHoldsWeapon(hand.slot)
+            and not BR.BuffState.GetWeaponImbue(hand.slot)
+            and HasEnabledPoison(hand.column)
+        then
+            return hand
+        end
+    end
+    return nil
+end
+
+---@return number? remaining seconds on the poison that expires first
+local function PoisonRemaining()
+    local soonest
+    for _, hand in ipairs(POISON_HANDS) do
+        if HandHoldsWeapon(hand.slot) then
+            local id, remaining = BR.BuffState.GetWeaponImbue(hand.slot)
+            if id and remaining and (not soonest or remaining < soonest) then
+                soonest = remaining
+            end
+        end
+    end
+    return soonest
+end
+
+---Applies a poison to the first hand that misses one, else to the hand whose poison expires first.
+---@return string
+local function PoisonMacro()
+    local hand = HandMissingPoison()
+    if not hand then
+        local soonest
+        for _, h in ipairs(POISON_HANDS) do
+            local id, remaining = BR.BuffState.GetWeaponImbue(h.slot)
+            if HandHoldsWeapon(h.slot) and id and remaining and (not soonest or remaining < soonest) then
+                hand, soonest = h, remaining
+            end
+        end
+    end
+    if not hand then
+        return ""
+    end
+    local itemID = PickPoison(hand.column)
+    return itemID and ("/use item:" .. itemID .. "\n/use " .. hand.slot) or ""
 end
 
 local NO_STANCE = BR.NO_STANCE
@@ -1400,6 +1510,30 @@ BR.BUFF_TABLES = {
             visibilityCondition = RighteousFuryWanted,
             infoTooltip = { title = L["Tooltip.TankOnly"], desc = L["Tooltip.RighteousFuryTank.Desc"] },
         },
+        {
+            icons = {
+                spells = { 8679, 2823 }, -- Instant Poison, Deadly Poison
+                dynamic = function()
+                    local hand = HandMissingPoison()
+                    local _, spellID = PickPoison(hand and hand.column or "mainHand")
+                    return spellID and BR.Icons.GetBuffTexture(spellID)
+                end,
+            },
+            key = "roguePoisons",
+            name = L["Buff.RoguePoisons"],
+            class = "ROGUE",
+            overlayText = L["Overlay.ApplyPoison"],
+            requiresSpellID = POISONS_SKILL,
+            castSpellID = POISONS_SKILL,
+            visibilityCondition = function()
+                return not BR.BuffState.IsRestricted()
+            end,
+            customCheck = function()
+                return HandMissingPoison() ~= nil
+            end,
+            getExpirationInfo = PoisonRemaining,
+            clickMacro = PoisonMacro,
+        },
         -- The stance bar shows Shadowform, and it stays readable in combat.
         {
             key = "shadowform",
@@ -1649,9 +1783,8 @@ BR.BUFF_TABLES = {
             name = L["Buff.Weapon"],
             overlayText = L["Overlay.NoWeaponBuff"],
             groupId = "weaponBuff",
-            icons = { textures = { 134727, 135252, 132273 } }, -- Brilliant Wizard Oil, Dense Sharpening Stone, Instant Poison
+            icons = { textures = { 134727, 135252 } }, -- Brilliant Wizard Oil, Dense Sharpening Stone
             consumableCategory = "weapon",
-            excludeIfSpellKnown = SHAMAN_IMBUES,
             visibilityCondition = function()
                 return not BR.BuffState.IsRestricted()
             end,
@@ -1664,9 +1797,8 @@ BR.BUFF_TABLES = {
             name = L["Buff.WeaponOH"],
             overlayText = L["Overlay.NoWeaponBuff"],
             groupId = "weaponBuff",
-            icons = { textures = { 134727, 135252, 132273 } }, -- Brilliant Wizard Oil, Dense Sharpening Stone, Instant Poison
+            icons = { textures = { 134727, 135252 } }, -- Brilliant Wizard Oil, Dense Sharpening Stone
             consumableCategory = "weapon",
-            excludeIfSpellKnown = SHAMAN_IMBUES,
             visibilityCondition = function()
                 return not BR.BuffState.IsRestricted() and BR.BuffState.HasOffHandWeapon()
             end,

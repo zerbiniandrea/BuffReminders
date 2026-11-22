@@ -2,15 +2,11 @@ local _, ns = ...
 ---@class BR
 local BR = ns
 
-if BR.CLIENT ~= BR.ClientType.Retail then
-    return
-end
-
 -- ============================================================================
 -- ROGUE POISON EDITOR (inline section)
 -- ============================================================================
--- Two reorderable columns (Lethal | Non-lethal) of poison checkboxes. The top
--- row is the highest priority.
+-- One reorderable column of poison checkboxes per BR.POISON_COLUMNS entry. The
+-- top row is the highest priority.
 --
 -- BuildInline(parent, opts) draws the editor into `parent` at (opts.x, opts.y)
 -- within opts.width and returns the vertical space it consumed. The buff panel
@@ -42,7 +38,8 @@ local function EnsureRoguePoisonPrefs()
         db.roguePoisonPreferences = {}
     end
     local prefs = db.roguePoisonPreferences
-    for _, cat in ipairs({ "lethal", "nonLethal" }) do
+    for _, column in ipairs(BR.POISON_COLUMNS) do
+        local cat = column.key
         if not prefs[cat] or #prefs[cat] == 0 then
             prefs[cat] = {}
             for _, seed in ipairs(BR.DEFAULT_POISON_PREFERENCES[cat]) do
@@ -97,11 +94,15 @@ end
 local function BuildInline(parent, opts)
     local x, y, width = opts.x, opts.y, opts.width
     local register = opts.registerHolder or function(_) end
-    local colWidth = width / 2
-    local colX = { lethal = x, nonLethal = x + colWidth }
+    local columns = BR.POISON_COLUMNS
+    local colWidth = width / #columns
+    local colX, rows = {}, {}
+    for i, column in ipairs(columns) do
+        colX[column.key] = x + (i - 1) * colWidth
+        rows[column.key] = {}
+    end
 
     local prefs = EnsureRoguePoisonPrefs()
-    local rows = { lethal = {}, nonLethal = {} }
 
     local note = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     note:SetPoint("TOPLEFT", x, y)
@@ -111,12 +112,11 @@ local function BuildInline(parent, opts)
     local noteH = math.max(math.ceil(note:GetStringHeight()), 12)
 
     local labelY = y - noteH - NOTE_TO_LABEL_GAP
-    local lethalLabel = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    lethalLabel:SetPoint("TOPLEFT", colX.lethal, labelY)
-    lethalLabel:SetText("|cffffcc00" .. L["Options.PoisonLethal"] .. "|r")
-    local nonLethalLabel = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    nonLethalLabel:SetPoint("TOPLEFT", colX.nonLethal, labelY)
-    nonLethalLabel:SetText("|cffffcc00" .. L["Options.PoisonNonLethal"] .. "|r")
+    for _, column in ipairs(columns) do
+        local label = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        label:SetPoint("TOPLEFT", colX[column.key], labelY)
+        label:SetText("|cffffcc00" .. column.label .. "|r")
+    end
 
     local rowsTop = labelY - LABEL_TO_ROW_GAP
 
@@ -131,7 +131,10 @@ local function BuildInline(parent, opts)
     end
 
     local function ApplyChange()
-        BR.InvalidatePoisonCache()
+        -- Nil on a client whose poison reminder keeps no cache.
+        if BR.InvalidatePoisonCache then
+            BR.InvalidatePoisonCache()
+        end
         UpdateDisplay()
         -- Repaint the All Buffs row: its trailing link flips gold <-> orange as
         -- the poison selection goes set <-> unset.
@@ -205,17 +208,21 @@ local function BuildInline(parent, opts)
         return row
     end
 
-    for _, category in ipairs({ "lethal", "nonLethal" }) do
+    local maxRows = 0
+    for _, column in ipairs(columns) do
+        local category = column.key
         for _, entry in ipairs(prefs[category]) do
             tinsert(rows[category], CreatePoisonRow(category, entry))
         end
         Reposition(category)
+        maxRows = math.max(maxRows, #prefs[category])
     end
 
     -- Rows bind to their entry table by closure, and entry identity survives
     -- table.sort. The row frames reorder to match the sorted prefs.
     local function ResetToDefaults()
-        for _, category in ipairs({ "lethal", "nonLethal" }) do
+        for _, column in ipairs(columns) do
+            local category = column.key
             local catDefaults = BR.DEFAULT_POISON_PREFERENCES[category]
             local defaultIndex = {}
             for i, e in ipairs(catDefaults) do
@@ -245,7 +252,6 @@ local function BuildInline(parent, opts)
         ApplyChange()
     end
 
-    local maxRows = math.max(#prefs.lethal, #prefs.nonLethal)
     local rowsBottom = rowsTop - maxRows * ROW_HEIGHT
 
     -- CreateButton auto-sizes to its text (height 22); just anchor it.

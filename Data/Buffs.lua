@@ -479,6 +479,16 @@ BR.DEFAULT_POISON_PREFERENCES = {
     },
 }
 
+---@class PoisonColumn
+---@field key string Key of the column list in roguePoisonPreferences
+---@field label string
+
+---@type PoisonColumn[]
+BR.POISON_COLUMNS = {
+    { key = "lethal", label = L["Options.PoisonLethal"] },
+    { key = "nonLethal", label = L["Options.PoisonNonLethal"] },
+}
+
 local poisonCache = {
     time = -1,
     activeL = 0,

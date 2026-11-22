@@ -366,23 +366,19 @@ end
 -- ROW WARNING
 -- ============================================================================
 
--- True when neither poison category has an enabled entry, so no reminder can
+-- True when no poison column has an enabled entry, so no reminder can
 -- fire. GetSpecialState colors the All Buffs row link orange for it.
 local function PoisonNeedsSetup()
     local prefs = BR.profile.roguePoisonPreferences
-    local function noneEnabled(cat)
-        local list = prefs and prefs[cat]
-        if not list then
-            return true
-        end
-        for _, entry in ipairs(list) do
+    for _, column in ipairs(BR.POISON_COLUMNS) do
+        local list = prefs and prefs[column.key]
+        for _, entry in ipairs(list or {}) do
             if entry.enabled and entry.spellID then
                 return false
             end
         end
-        return true
     end
-    return noneEnabled("lethal") and noneEnabled("nonLethal")
+    return true
 end
 
 -- Stance grids of the client. A client with spec-based stance rules has none.

@@ -271,6 +271,16 @@ local currentWeaponEnchants = {
     hasOffHand = false,
     offHandID = nil,
     offHandExpiration = nil,
+    -- The temporary slot holds stones and oils. On a client with no separate imbue slot, it holds any enchant.
+    mainHandTempID = nil,
+    mainHandTempExpiration = nil,
+    offHandTempID = nil,
+    offHandTempExpiration = nil,
+    -- The imbue slot holds poisons and shaman imbues, on a client that has it.
+    mainHandImbueID = nil,
+    mainHandImbueExpiration = nil,
+    offHandImbueID = nil,
+    offHandImbueExpiration = nil,
     permanentMH = nil, -- permanent enchant ID from item link (MH)
     permanentOH = nil, -- permanent enchant ID from item link (OH)
 }
@@ -414,6 +424,32 @@ local AuraList = BR.Secret.AuraList
 local AuraField = BR.Secret.AuraField
 local AuraByIndex = BR.Secret.AuraByIndex
 local AuraByInstanceID = BR.Secret.AuraByInstanceID
+
+-- The per-slot enchant list exists only on a client where one weapon holds a
+-- temporary enchant and an imbue together. The legacy GetWeaponEnchantInfo
+-- reports only the imbue then. Nil on a client without the list.
+---@type (fun(weaponSlot: number): number?, number?, number?, number?)?
+local ReadWeaponEnchantSlots
+do
+    local GetWeaponEnchantList = C_Item.GetWeaponEnchantInfo
+    local ENCHANT_TYPE_IMBUE = Enum.ItemEnchantType and Enum.ItemEnchantType.Imbue
+    if GetWeaponEnchantList then
+        ---@return number? tempID, number? tempExpirationMs, number? imbueID, number? imbueExpirationMs
+        ReadWeaponEnchantSlots = function(weaponSlot)
+            local tempID, tempExp, imbueID, imbueExp
+            for _, info in ipairs(AuraList(GetWeaponEnchantList(weaponSlot))) do
+                if AuraField(info, "hasEnchant") then
+                    if AuraField(info, "enchantType") == ENCHANT_TYPE_IMBUE then
+                        imbueID, imbueExp = AuraField(info, "enchantID"), AuraField(info, "timeLeft")
+                    else
+                        tempID, tempExp = AuraField(info, "enchantID"), AuraField(info, "timeLeft")
+                    end
+                end
+            end
+            return tempID, tempExp, imbueID, imbueExp
+        end
+    end
+end
 
 -- Set of spell IDs the addon queries on GROUP MEMBERS, per-class variants
 -- included. Used to filter group-unit UNIT_AURA payloads: an aura change outside
@@ -2121,22 +2157,14 @@ local function ShouldShowConsumableBuff(buff)
     end
 
     -- Check if any weapon enchant exists (oils, stones, shaman imbues, etc.)
-    if buff.checkWeaponEnchant then
-        if currentWeaponEnchants.hasMainHand then
-            local remaining = currentWeaponEnchants.mainHandExpiration
-                    and (currentWeaponEnchants.mainHandExpiration / 1000)
-                or nil
-            return false, remaining -- Has a weapon enchant
-        end
+    if buff.checkWeaponEnchant and currentWeaponEnchants.mainHandTempID then
+        local exp = currentWeaponEnchants.mainHandTempExpiration
+        return false, exp and exp / 1000 or nil
     end
 
-    if buff.checkWeaponEnchantOH then
-        if currentWeaponEnchants.hasOffHand then
-            local remaining = currentWeaponEnchants.offHandExpiration
-                    and (currentWeaponEnchants.offHandExpiration / 1000)
-                or nil
-            return false, remaining
-        end
+    if buff.checkWeaponEnchantOH and currentWeaponEnchants.offHandTempID then
+        local exp = currentWeaponEnchants.offHandTempExpiration
+        return false, exp and exp / 1000 or nil
     end
 
     -- Check inventory for item (counts cached, invalidated on bag/equipment events)
@@ -3426,13 +3454,34 @@ function BuffState.Refresh(refreshMode)
 
     if not groupOnly then
         -- Fetch weapon enchant info once per refresh cycle
-        local hasMain, mainExp, _, mainID, hasOff, offExp, _, offID = GetWeaponEnchantInfo()
-        currentWeaponEnchants.hasMainHand = hasMain or false
-        currentWeaponEnchants.mainHandID = mainID
-        currentWeaponEnchants.mainHandExpiration = mainExp
-        currentWeaponEnchants.hasOffHand = hasOff or false
-        currentWeaponEnchants.offHandID = offID
-        currentWeaponEnchants.offHandExpiration = offExp
+        local we = currentWeaponEnchants
+        if ReadWeaponEnchantSlots then
+            local mhTemp, mhTempExp, mhImbue, mhImbueExp = ReadWeaponEnchantSlots(Enum.WeaponSlot.MainHand)
+            local ohTemp, ohTempExp, ohImbue, ohImbueExp = ReadWeaponEnchantSlots(Enum.WeaponSlot.OffHand)
+            we.mainHandTempID, we.mainHandTempExpiration = mhTemp, mhTempExp
+            we.mainHandImbueID, we.mainHandImbueExpiration = mhImbue, mhImbueExp
+            we.offHandTempID, we.offHandTempExpiration = ohTemp, ohTempExp
+            we.offHandImbueID, we.offHandImbueExpiration = ohImbue, ohImbueExp
+            -- The combined fields report the imbue first, as the legacy API does.
+            we.mainHandID = mhImbue or mhTemp
+            we.mainHandExpiration = mhImbue and mhImbueExp or mhTempExp
+            we.offHandID = ohImbue or ohTemp
+            we.offHandExpiration = ohImbue and ohImbueExp or ohTempExp
+            we.hasMainHand = we.mainHandID ~= nil
+            we.hasOffHand = we.offHandID ~= nil
+        else
+            local hasMain, mainExp, _, mainID, hasOff, offExp, _, offID = GetWeaponEnchantInfo()
+            we.hasMainHand = hasMain or false
+            we.mainHandID = mainID
+            we.mainHandExpiration = mainExp
+            we.hasOffHand = hasOff or false
+            we.offHandID = offID
+            we.offHandExpiration = offExp
+            we.mainHandTempID = hasMain and (mainID or 0) or nil
+            we.mainHandTempExpiration = mainExp
+            we.offHandTempID = hasOff and (offID or 0) or nil
+            we.offHandTempExpiration = offExp
+        end
 
         -- Fetch permanent enchant IDs from item links once per refresh cycle
         local mhLink = GetInventoryItemLink("player", 16)
@@ -3823,6 +3872,21 @@ end
 ---@return number|nil
 function BuffState.GetOffHandEnchantID()
     return currentWeaponEnchants.offHandID
+end
+
+---The imbue on a weapon slot, from the current refresh cycle. Always nil on a client with no imbue slot.
+---@param slot number Inventory slot ID (16 = MH, 17 = OH)
+---@return number? imbueID
+---@return number? remaining seconds
+function BuffState.GetWeaponImbue(slot)
+    local we = currentWeaponEnchants
+    local id, exp
+    if slot == 16 then
+        id, exp = we.mainHandImbueID, we.mainHandImbueExpiration
+    else
+        id, exp = we.offHandImbueID, we.offHandImbueExpiration
+    end
+    return id, exp and exp / 1000 or nil
 end
 
 ---Get the permanent enchant ID on a weapon slot (cached per refresh cycle)
