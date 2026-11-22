@@ -4051,6 +4051,28 @@ function BuffState.InvalidatePetCache()
     cachedPetFamily = nil
 end
 
+do
+    local ammoID, ammoCount -- false = read and empty, nil = not read
+
+    ---Equipped ammo item and its count (cached). nil when the client has no ammo slot or it is empty.
+    ---@return number? itemID
+    ---@return number count
+    function BuffState.GetEquippedAmmo()
+        if not INVSLOT_AMMO then
+            return nil, 0
+        end
+        if ammoID == nil then
+            ammoID = Plain(GetInventoryItemID("player", INVSLOT_AMMO)) or false
+            ammoCount = ammoID and Plain(GetInventoryItemCount("player", INVSLOT_AMMO)) or 0
+        end
+        return ammoID or nil, ammoCount or 0
+    end
+
+    function BuffState.InvalidateAmmoCache()
+        ammoID, ammoCount = nil, nil
+    end
+end
+
 ---Happiness of the current pet (cached): 1 unhappy, 2 content, 3 happy.
 ---@return number? happiness nil without a pet or on a client without pet happiness
 function BuffState.GetPetHappiness()
@@ -4361,6 +4383,7 @@ BR.GameContext.RegisterCache("durability", BuffState.InvalidateDurabilityCache)
 BR.GameContext.RegisterCache("repairSource", BuffState.InvalidateRepairSourceCache)
 BR.GameContext.RegisterCache("loadout", BuffState.InvalidateLoadoutCache)
 BR.GameContext.RegisterCache("pet", BuffState.InvalidatePetCache)
+BR.GameContext.RegisterCache("ammo", BuffState.InvalidateAmmoCache)
 BR.GameContext.RegisterCache("petHappiness", BuffState.InvalidatePetHappinessCache)
 BR.GameContext.RegisterCache("stance", BuffState.InvalidateStanceCache)
 BR.GameContext.RegisterCache("spellUsable", BuffState.InvalidateSpellUsableCache)

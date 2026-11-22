@@ -67,6 +67,8 @@ read_globals = {
     "GetInstanceInfo",
     "GetInventoryItemDurability",
     "GetInventoryItemID",
+    "GetInventoryItemCount",
+    "INVSLOT_AMMO",
     "GetInventoryItemLink",
     "GetItemInfoInstant",
     "GetItemSpell",

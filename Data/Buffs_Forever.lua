@@ -19,6 +19,7 @@ local REAGENT_LABEL = L["Overlay.ReagentLabel"]
 local AMMO_LABEL = L["Overlay.AmmoLabel"]
 local REAGENTS_TEXT = L["Overlay.Reagents"]
 local AMMO_TEXT = L["Overlay.Ammo"]
+local AMMO_EQUIP_TEXT = L["Overlay.EquipAmmo"]
 
 local _, playerClass = UnitClass("player")
 
@@ -1085,6 +1086,33 @@ local function AmmoCount(subclass)
     return total
 end
 
+---Shots left before the weapon stops firing: the game fires only the equipped ammo type
+---and never swaps to another one. A client without an ammo slot fires any matching ammo.
+---@param subclass number
+---@return number shots
+---@return number total All matching ammo in the bags
+local function AmmoShots(subclass)
+    local total = AmmoCount(subclass)
+    if not INVSLOT_AMMO then
+        return total, total
+    end
+    local itemID, count = BR.BuffState.GetEquippedAmmo()
+    if itemID then
+        for _, id in ipairs(AMMO_BY_WEAPON[subclass]) do
+            if id == itemID then
+                return count, total
+            end
+        end
+    end
+    return 0, total
+end
+
+---@return number threshold In ammo, not stacks
+local function AmmoThreshold()
+    local defaults = BR.profile.defaults
+    return (defaults and defaults.ammoThresholdStacks or 1) * AMMO_STACK_SIZE
+end
+
 local BATTLE_SHOUT = { 25289, 11551, 11550, 11549, 6192, 5242, 6673 }
 
 -- Rage drains between fights, so the reminder shows only while the shout is castable.
@@ -1843,7 +1871,15 @@ BR.BUFF_TABLES = {
             overlayText = AMMO_TEXT,
             overlayTextFn = function()
                 local subclass = AmmoWeaponSubclass()
-                return subclass and (AMMO_LABEL .. "\n" .. AmmoCount(subclass)) or AMMO_TEXT
+                if not subclass then
+                    return AMMO_TEXT
+                end
+                -- Enough other ammo in the bags: a swap fixes it, not a vendor.
+                local shots, total = AmmoShots(subclass)
+                if total - shots >= AmmoThreshold() or (shots == 0 and total > 0) then
+                    return AMMO_EQUIP_TEXT
+                end
+                return AMMO_LABEL .. "\n" .. shots
             end,
             customCheck = function()
                 if BR.GameContext.IsInCombat() then
@@ -1853,8 +1889,7 @@ BR.BUFF_TABLES = {
                 if not subclass then
                     return false
                 end
-                local defaults = BR.profile.defaults
-                return AmmoCount(subclass) < (defaults and defaults.ammoThresholdStacks or 1) * AMMO_STACK_SIZE
+                return AmmoShots(subclass) < AmmoThreshold()
             end,
         },
         {

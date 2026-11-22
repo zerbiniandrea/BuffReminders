@@ -9,7 +9,7 @@ local BR = ns
 -- handler reads fresh values.
 -- RenderRequested asks for the render that a change needs. urgent = true asks for it now.
 
----@alias CacheId "auraTrackable"|"consumables"|"contentType"|"durability"|"foreignAura"|"healer"|"item"|"loadout"|"offHand"|"pet"|"petActions"|"petHappiness"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"spellUsable"|"stance"|"subgroup"
+---@alias CacheId "ammo"|"auraTrackable"|"consumables"|"contentType"|"durability"|"foreignAura"|"healer"|"item"|"loadout"|"offHand"|"pet"|"petActions"|"petHappiness"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"spellUsable"|"stance"|"subgroup"
 
 ---@class GameContextEventSpec
 ---@field caches? CacheId[] Cache ids to clear, in order
@@ -205,6 +205,7 @@ local EVENT_CACHES = {
     PLAYER_ENTERING_WORLD = {
         caches = {
             "contentType",
+            "ammo",
             "auraTrackable",
             "spell",
             "spec",
@@ -345,7 +346,7 @@ local EVENT_CACHES = {
             end
         end,
     },
-    PLAYER_EQUIPMENT_CHANGED = { caches = { "item", "offHand", "loadout", "durability" } },
+    PLAYER_EQUIPMENT_CHANGED = { caches = { "item", "offHand", "loadout", "durability", "ammo" } },
     UPDATE_INVENTORY_DURABILITY = { caches = { "durability" } },
     -- A temporary weapon enchant starts and ends with no aura event.
     UNIT_INVENTORY_CHANGED = {
@@ -354,7 +355,7 @@ local EVENT_CACHES = {
             NotifyChanged(false)
         end,
     },
-    BAG_UPDATE_DELAYED = { caches = { "item", "repairSource", "consumables" } },
+    BAG_UPDATE_DELAYED = { caches = { "item", "repairSource", "consumables", "ammo" } },
     NEW_MOUNT_ADDED = { caches = { "repairSource" } },
     PLAYER_MOUNT_DISPLAY_CHANGED = {
         handle = function()
