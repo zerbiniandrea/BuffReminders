@@ -9,6 +9,10 @@ end
 local L = BR.L
 
 local floor = math.floor
+local AuraByIndex = BR.Secret.AuraByIndex
+local AuraField = BR.Secret.AuraField
+local Plain = BR.Secret.Plain
+local UnitIsUnit = UnitIsUnit
 
 local REPAIR_LABEL = L["Overlay.RepairLabel"]
 local REAGENT_LABEL = L["Overlay.ReagentLabel"]
@@ -379,7 +383,7 @@ end
 ---@return number? itemID
 local function FindPetFood()
     local _, familyID = UnitCreatureFamily("pet")
-    familyID = BR.Secret.Plain(familyID)
+    familyID = Plain(familyID)
     local diet = type(familyID) == "number" and PET_DIETS[familyID] or nil
     local buffFood = BR.CONSUMABLE_ITEMS.food
     local bestID, bestLevel = nil, -1
@@ -412,7 +416,7 @@ local function FeedPetMacro()
         return macro
     end
     local info = C_Spell.GetSpellCooldown(FEED_PET)
-    local startTime = info and BR.Secret.Plain(info.startTime)
+    local startTime = info and Plain(info.startTime)
     if startTime ~= 0 then
         return macro
     end
@@ -672,6 +676,106 @@ local function ActiveBlessing()
     return nil
 end
 
+-- A unit keeps one aura of each type, whoever casts it. Highest rank first.
+local PALADIN_AURAS = {
+    { 10293, 10292, 1032, 10291, 643, 10290, 465 }, -- Devotion Aura
+    { 10301, 10300, 10299, 10298, 7294 }, -- Retribution Aura
+    { 19746 }, -- Concentration Aura
+    { 19896, 19895, 19876 }, -- Shadow Resistance Aura
+    { 19898, 19897, 19888 }, -- Frost Resistance Aura
+    { 19900, 19899, 19891 }, -- Fire Resistance Aura
+    { 20218 }, -- Sanctity Aura
+}
+---@type table<number, integer>
+local PALADIN_AURA_TYPE = {}
+local ALL_PALADIN_AURA_IDS = {}
+for auraType, ranks in ipairs(PALADIN_AURAS) do
+    for _, id in ipairs(ranks) do
+        PALADIN_AURA_TYPE[id] = auraType
+        ALL_PALADIN_AURA_IDS[#ALL_PALADIN_AURA_IDS + 1] = id
+    end
+end
+
+local NO_AURA_TEXT = L["Overlay.NoAura"]
+local DUPLICATE_TEXT = L["Overlay.Duplicate"]
+
+---@type table<integer, true>
+local ownAuraTypes = {}
+---@type table<integer, true>
+local foreignAuraTypes = {}
+
+-- Only for use out of combat. In a restricted context, the enumeration finds no aura.
+local function ScanPlayerAuraTypes()
+    wipe(ownAuraTypes)
+    wipe(foreignAuraTypes)
+    local i = 1
+    local aura = AuraByIndex("player", i, "HELPFUL")
+    while aura do
+        local auraType = PALADIN_AURA_TYPE[AuraField(aura, "spellId")]
+        if auraType then
+            local source = AuraField(aura, "sourceUnit")
+            if source and Plain(UnitIsUnit(source, "player")) == true then
+                ownAuraTypes[auraType] = true
+            else
+                foreignAuraTypes[auraType] = true
+            end
+        end
+        i = i + 1
+        aura = AuraByIndex("player", i, "HELPFUL")
+    end
+end
+
+---@return boolean anyKnown The player knows an aura
+---@return boolean allOnBar Each known aura type has a slot on the stance bar
+local function KnownAurasOnStanceBar()
+    local bar = BR.BuffState.GetStanceBarSpells()
+    local anyKnown, allOnBar = false, true
+    for _, ranks in ipairs(PALADIN_AURAS) do
+        if HighestKnownSpell(ranks) then
+            anyKnown = true
+            local onBar = false
+            for _, id in ipairs(ranks) do
+                onBar = onBar or bar[id] == true
+            end
+            allOnBar = allOnBar and onBar
+        end
+    end
+    return anyKnown, allOnBar
+end
+
+---Overlay text for the aura reminder of a paladin, or nil when the own aura is fine
+---or unknown. The stance bar shows the active aura also in combat. Out of combat, an
+---own aura instance stands in for an aura with no stance bar slot.
+---@param isAuraRestricted boolean
+---@return string?
+---@return boolean? noClick
+local function CheckOwnPaladinAura(isAuraRestricted)
+    local stanceID, unstanced = BR.BuffState.GetActiveStance()
+    if not stanceID and not unstanced then
+        return nil
+    end
+    local anyKnown, allOnBar = KnownAurasOnStanceBar()
+    if not anyKnown then
+        return nil
+    end
+    local runType = stanceID and PALADIN_AURA_TYPE[stanceID]
+    if isAuraRestricted or BR.GameContext.IsInCombat() then
+        if runType or not allOnBar then
+            return nil
+        end
+        return NO_AURA_TEXT
+    end
+    ScanPlayerAuraTypes()
+    runType = runType or next(ownAuraTypes)
+    if not runType then
+        return NO_AURA_TEXT
+    end
+    if foreignAuraTypes[runType] and not ownAuraTypes[runType] then
+        return DUPLICATE_TEXT, true
+    end
+    return nil
+end
+
 ---@class ForeverReagent
 ---@field item number
 ---@field icon number
@@ -878,42 +982,22 @@ BR.BUFF_TABLES = {
             requiresKnownSpell = true,
             choiceGrid = PALADIN_BLESSING_GRID,
             activeChoice = ActiveBlessing,
+            duplicateText = DUPLICATE_TEXT,
+            infoTooltip = { title = L["Tooltip.PaladinDuplicate"], desc = L["Tooltip.PaladinBlessingDuplicate.Desc"] },
         },
     },
     ---@type PresenceBuff[]
     presence = {
         {
-            spellID = {
-                10293, -- Devotion Aura
-                10292,
-                1032,
-                10291,
-                643,
-                10290,
-                465,
-                10301, -- Retribution Aura
-                10300,
-                10299,
-                10298,
-                7294,
-                19746, -- Concentration Aura
-                19896, -- Shadow Resistance Aura
-                19895,
-                19876,
-                19898, -- Frost Resistance Aura
-                19897,
-                19888,
-                19900, -- Fire Resistance Aura
-                19899,
-                19891,
-                20218, -- Sanctity Aura
-            },
+            spellID = ALL_PALADIN_AURA_IDS,
             key = "paladinAura",
             name = L["Buff.PaladinAura"],
             class = "PALADIN",
             reach = "party",
             icons = { spells = { 10293 } },
             overlayText = L["Overlay.NoAura"],
+            casterCheck = CheckOwnPaladinAura,
+            infoTooltip = { title = L["Tooltip.PaladinDuplicate"], desc = L["Tooltip.PaladinAuraDuplicate.Desc"] },
         },
     },
     targeted = {},

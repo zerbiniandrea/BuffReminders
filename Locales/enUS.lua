@@ -110,6 +110,7 @@ english["Loadout.Tag.Loadout"] = "WRONG\nBUILD"
 -- These must be kept very short (2-4 chars per line) to fit on small icons.
 english["Overlay.NoDrPoison"] = "NO\nDR\nPOISON"
 english["Overlay.NoAura"] = "NO\nAURA"
+english["Overlay.Duplicate"] = "DUPE"
 english["Overlay.NoStone"] = "NO\nSTONE"
 english["Overlay.NoGem"] = "NO\nGEM"
 english["Overlay.NoSoulstone"] = "NO\nSS"
@@ -313,6 +314,11 @@ english["Group.WeaponBuff"] = "Weapon Buff"
 english["Tooltip.MayShowExtraIcon"] = "May Show Extra Icon"
 english["Tooltip.MayShowExtraIcon.Desc"] =
     "Until you cast this, you might see both this and the Water/Lightning Shield reminder. I can't tell if you want Earth Shield on yourself, or Earth Shield on an ally + Water/Lightning Shield on yourself."
+english["Tooltip.PaladinDuplicate"] = "Duplicate Check"
+english["Tooltip.PaladinAuraDuplicate.Desc"] =
+    "Out of combat, the icon also shows when another paladin gives you the same aura type as your aura. A player keeps one aura of each type, so pick a different aura. A click on this icon casts nothing."
+english["Tooltip.PaladinBlessingDuplicate.Desc"] =
+    "Out of combat, the icon also shows when no group member misses your blessing, but a member has it only from another paladin. A player keeps one blessing of each type, so pick a different blessing. A click on this icon casts nothing."
 english["Tooltip.InstanceEntryReminder"] = "Instance Entry Reminder"
 english["Tooltip.InstanceEntryReminder.Desc"] =
     "Briefly shown when entering a dungeon as a reminder to drop a Soulwell. Dismissed after casting or after 30 seconds."

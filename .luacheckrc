@@ -93,6 +93,7 @@ read_globals = {
     "GetShapeshiftForm",
     "GetShapeshiftFormID",
     "GetShapeshiftFormInfo",
+    "GetNumShapeshiftForms",
     "GetBuildInfo",
     "GetClientDisplayExpansionLevel",
     "GetExpansionDisplayInfo",

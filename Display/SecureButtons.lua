@@ -506,6 +506,13 @@ local function CreateClickOverlay(frame)
     -- can read the attribute snapshot before the write propagates, which sends a
     -- stale channel prefix. RefreshChatRequestMacros rewires those overlays instead.
     overlay:SetScript("PreClick", function(self)
+        -- A spell action with no spell casts nothing. PostClick writes the spell back.
+        local entry = BR.BuffState.entries[frame.key]
+        if entry and entry.noClick and self._br_action_type == "spell" and not InCombatLockdown() then
+            self:SetAttribute("spell", nil)
+            self._br_spellCleared = true
+            return
+        end
         if self._br_clickMacroFn and not self._br_chatRequestKey then
             self:SetAttribute("macrotext", self._br_clickMacroFn(self._br_clickMacroSpellID))
         end
@@ -528,6 +535,12 @@ local function CreateClickOverlay(frame)
         end
     end)
     overlay:SetScript("PostClick", function(self, button, down)
+        if self._br_spellCleared then
+            self._br_spellCleared = nil
+            if not InCombatLockdown() then
+                self:SetAttribute("spell", self._br_action.spellID)
+            end
+        end
         -- Fire the snooze once, on the up event, and skip the refresh below.
         if button == "RightButton" and not down and self._br_snoozeRightClick then
             BR.SnoozeConsumables()

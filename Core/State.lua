@@ -30,6 +30,7 @@ local BR = ns
 ---@field dynamicIcon number|string|nil      -- Dynamic icon texture override (e.g. next poison to cast)
 ---@field glowKindOverride "expiring"|"missing"|nil -- Override glow kind (e.g. healthstone low stock uses expiring glow)
 ---@field subLabel string?                    -- Wrapping label rendered below the icon (loadout reminders: the set/talent name)
+---@field noClick boolean?                    -- The click casts nothing
 
 -- Lua stdlib locals (avoid repeated global lookups in hot paths)
 local ceil = math.ceil
@@ -258,6 +259,7 @@ local DRUID_TRAVEL_FORM_IDS = {
 ---@field currentStanceIcon number|false|nil  -- false = unstanced
 ---@field shadowFormActive boolean|nil
 ---@field activeSpellID number|false|nil        -- false = unstanced; nil = not computed / transient
+---@field barSpells table<number, true>|nil      -- spell IDs of the stance bar slots
 ---@type StanceCache
 local stanceCache = {}
 
@@ -1493,15 +1495,27 @@ end
 ---@param partyOnly? boolean In a raid, count only the player's subgroup
 ---@param threshold number A short aura (IsShortAura) never sets minRemaining
 ---@param missingUnits? string[] Wiped, then filled with the unit of each counted member who lacks the buff
+---@param countDuplicates? boolean Count members who have the buff only from another caster. Enumerates auras
 ---@return number missing
 ---@return number total
 ---@return number? minRemaining
-local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, partyOnly, threshold, missingUnits)
+---@return number duplicates 0 unless countDuplicates
+local function CountMissingBuff(
+    spellIDs,
+    buffKey,
+    playerOnly,
+    playersOnly,
+    partyOnly,
+    threshold,
+    missingUnits,
+    countDuplicates
+)
     if missingUnits then
         wipe(missingUnits)
     end
     local missing = 0
     local total = 0
+    local duplicates = 0
     local minRemaining = nil
     local beneficiaries = BuffBeneficiaries[buffKey]
     local specBeneficiaries = SpecBeneficiaries[buffKey]
@@ -1509,19 +1523,30 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
     if playerOnly or #currentValidUnits <= 1 then
         -- Solo/player-only: check if player benefits (spec-aware)
         if not UnitBenefitsFromBuff(specBeneficiaries, beneficiaries, GetPlayerSpecId(), playerClass) then
-            return 0, 0, nil
+            return 0, 0, nil, 0
         end
         total = 1
-        local hasBuff, remaining, _, duration = UnitHasBuff("player", GetUnitSpellIDs(buffKey, spellIDs, playerClass))
+        local unitSpellIDs = GetUnitSpellIDs(buffKey, spellIDs, playerClass)
+        local hasBuff, remaining, sourceUnit, duration = UnitHasBuff("player", unitSpellIDs)
         if not hasBuff then
             missing = 1
             if missingUnits then
                 missingUnits[1] = "player"
             end
-        elseif remaining and not IsShortAura(duration, threshold) then
-            minRemaining = remaining
+        else
+            if remaining and not IsShortAura(duration, threshold) then
+                minRemaining = remaining
+            end
+            -- GetUnitAuraBySpellID returns one instance, so a foreign one can hide the own one.
+            if
+                countDuplicates
+                and not (sourceUnit and Plain(UnitIsUnit(sourceUnit, "player")) == true)
+                and not UnitHasBuffFromPlayer("player", unitSpellIDs)
+            then
+                duplicates = 1
+            end
         end
-        return missing, total, minRemaining
+        return missing, total, minRemaining, duplicates
     end
 
     local countNPCs = includeNPCsInCounting and not GameContext.IsInCombat() and not playersOnly
@@ -1533,8 +1558,8 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
         -- they still include NPCs.
         if (data.isPlayer or countNPCs) and (data.inPlayerParty or not partyOnly) then
             if UnitBenefitsFromBuff(specBeneficiaries, beneficiaries, allySpecCache[data.name], data.class) then
-                local hasBuff, remaining, _, duration =
-                    UnitHasBuff(data.unit, GetUnitSpellIDs(buffKey, spellIDs, data.class))
+                local unitSpellIDs = GetUnitSpellIDs(buffKey, spellIDs, data.class)
+                local hasBuff, remaining, sourceUnit, duration = UnitHasBuff(data.unit, unitSpellIDs)
                 -- A phased ally counts only when the buff is already on them. A
                 -- phased member without the buff is an unfixable gap - nobody can
                 -- cast on them - so both totals omit them.
@@ -1548,9 +1573,20 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
                             local isSelf = data.unit == "player" or Plain(UnitIsUnit(data.unit, "player")) == true
                             missingUnits[missing] = isSelf and "player" or data.unit
                         end
-                    elseif remaining and not IsShortAura(duration, threshold) then
-                        if not minRemaining or remaining < minRemaining then
+                    else
+                        if
+                            remaining
+                            and not IsShortAura(duration, threshold)
+                            and (not minRemaining or remaining < minRemaining)
+                        then
                             minRemaining = remaining
+                        end
+                        if
+                            countDuplicates
+                            and not (sourceUnit and Plain(UnitIsUnit(sourceUnit, "player")) == true)
+                            and not UnitHasBuffFromPlayer(data.unit, unitSpellIDs)
+                        then
+                            duplicates = duplicates + 1
                         end
                     end
                 end
@@ -1558,7 +1594,7 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
         end
     end
 
-    return missing, total, minRemaining
+    return missing, total, minRemaining, duplicates
 end
 
 ---Check if anyone in the group has a presence buff active
@@ -2464,14 +2500,15 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, mis
             and scope.show
             and (not buff.requiresKnownSpell or KnowsAnySpell(buff.spellID))
         then
-            local missing, total, minRemaining = CountMissingBuff(
+            local missing, total, minRemaining, duplicates = CountMissingBuff(
                 spellIDs,
                 benefitKey,
                 scope.playerOnly,
                 buff.playersOnly,
                 buff.reach == "party",
                 raidThreshold,
-                missingUnits
+                missingUnits,
+                buff.duplicateText ~= nil and not isAuraRestricted and not GameContext.IsInCombat()
             )
 
             if missing > 0 then
@@ -2485,6 +2522,9 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, mis
                 if minRemaining and minRemaining < raidThreshold then
                     entry.expiringTime = minRemaining
                 end
+            elseif duplicates > 0 then
+                SetEntryText(entry, buff.duplicateText, raidMissGlow)
+                entry.noClick = true
             elseif not hideExpiring then
                 TrySetEntryExpiring(entry, minRemaining, raidThreshold, raidExGlow)
             end
@@ -2663,7 +2703,13 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring)
                     targetEntry and targetEntry.class
                 )
             end
-            if showBuff and IsBuffEnabled(buff.key) then
+            if showBuff and buff.casterCheck and buff.class == playerClass and IsBuffEnabled(buff.key) then
+                local text, noClick = buff.casterCheck(isAuraRestricted)
+                if text then
+                    SetEntryText(entry, text, presMissGlow)
+                    entry.noClick = noClick
+                end
+            elseif showBuff and IsBuffEnabled(buff.key) then
                 local trackable = IsAuraTrackable(buff)
                 local useGlowDet = isAuraRestricted and not trackable and buff.glowDetectable
                 if not isAuraRestricted or trackable or useGlowDet then
@@ -3053,6 +3099,7 @@ function BuffState.Refresh(refreshMode)
             entry.dynamicIcon = nil
             entry.glowKindOverride = nil
             entry.subLabel = nil
+            entry.noClick = nil
         end
     end
 
@@ -3635,6 +3682,39 @@ local function GetActiveStanceSpellID()
         return spellID
     end
     return nil
+end
+
+---Active stance spell ID, and true as second value when the stance bar has no active
+---form. Both values are nil while the spell data of an active form is unresolved.
+---@return number? spellID
+---@return boolean? unstanced
+function BuffState.GetActiveStance()
+    local spellID = GetActiveStanceSpellID()
+    return spellID, stanceCache.activeSpellID == false or nil
+end
+
+---Set of the spell IDs on the stance bar. Cached. A slot with unresolved spell data is
+---a transient load state, so that set stays uncached to retry.
+---@return table<number, true>
+function BuffState.GetStanceBarSpells()
+    local spells = stanceCache.barSpells
+    if spells then
+        return spells
+    end
+    spells = {}
+    local resolved = true
+    for i = 1, GetNumShapeshiftForms() do
+        local _, _, _, spellID = GetShapeshiftFormInfo(i)
+        if type(spellID) == "number" then
+            spells[spellID] = true
+        else
+            resolved = false
+        end
+    end
+    if resolved then
+        stanceCache.barSpells = spells
+    end
+    return spells
 end
 
 ---Whether the active stance is outside the allowed stances of the rule. A form

@@ -94,6 +94,8 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field requiresKnownSpell? boolean Only a player who knows one of the spells sees it. The talents of other members are unreadable
 ---@field choiceGrid? StanceGrid The user picks the tracked buff per content row
 ---@field activeChoice? fun(): StanceChoice?, number? Choice of the current row and the rank to cast. nil = no reminder
+---@field infoTooltip? TooltipText
+---@field duplicateText? string Overlay text when no member misses the buff and some have it only from another caster. A click then casts nothing
 
 ---@class GroupCastRank
 ---@field spellID number
@@ -121,6 +123,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field suppressedByEntry? string Hide when this entry key is already visible (e.g., self buff covers it)
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
 ---@field customCheck? fun(isRestricted?: boolean): boolean?
+---@field casterCheck? fun(isRestricted: boolean): string?, boolean? For a player of the class, replaces the group scan. Returns the overlay text (nil = no reminder) and true when a click must cast nothing
 
 ---@class TargetedBuff
 ---@field spellID SpellID
