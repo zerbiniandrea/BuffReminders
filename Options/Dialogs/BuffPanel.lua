@@ -781,6 +781,134 @@ local SPECIAL_SECTIONS = {
         end,
     },
 
+    driveByBuffs = {
+        build = function(layout, relayout)
+            local function GreetingMode()
+                return BR.Config.Get("defaults.driveByGreeting", "none")
+            end
+            local function EmoteChoice()
+                return BR.Config.Get("defaults.driveByEmote", "WAVE")
+            end
+            -- The chat server rejects a message with an escape sequence. nil keeps the localized default.
+            local function CleanGreetingText(text, defaultText)
+                text = strtrim(((text or ""):gsub("|", "")))
+                if text == "" or text == defaultText then
+                    return nil
+                end
+                return text
+            end
+            AddSpecialCheckbox(layout, {
+                label = L["BuffPanel.DriveBy.AllowPvP"],
+                get = function()
+                    return BR.Config.Get("defaults.driveByAllowPvP") == true
+                end,
+                tooltip = { title = L["BuffPanel.DriveBy.AllowPvP"], desc = L["BuffPanel.DriveBy.AllowPvP.Desc"] },
+                onChange = function(checked)
+                    BR.Config.Set("defaults.driveByAllowPvP", checked)
+                end,
+            })
+            local greeting = Components.Dropdown(body, {
+                label = L["BuffPanel.DriveBy.Greeting"],
+                labelWidth = DRAWER_LABEL_W,
+                width = DRAWER_FIELD_W,
+                options = {
+                    { label = L["BuffPanel.DriveBy.Greeting.None"], value = "none" },
+                    { label = L["BuffPanel.DriveBy.Greeting.Whisper"], value = "whisper" },
+                    { label = L["BuffPanel.DriveBy.Greeting.Emote"], value = "emote" },
+                },
+                get = GreetingMode,
+                tooltip = { title = L["BuffPanel.DriveBy.Greeting"], desc = L["BuffPanel.DriveBy.Greeting.Desc"] },
+                onChange = function(val)
+                    BR.Config.Set("defaults.driveByGreeting", val)
+                    Components.RefreshAll()
+                end,
+            })
+            tinsert(bodyHolders, greeting)
+            layout:Add(greeting, 26, COMPONENT_GAP)
+
+            -- One slot holds the detail control of the selected mode.
+            local slot = CreateFrame("Frame", nil, body)
+            slot:SetSize(bodyW, 26)
+            local whisper = Components.TextInput(slot, {
+                label = L["BuffPanel.DriveBy.Whisper"],
+                labelWidth = DRAWER_LABEL_W,
+                width = DRAWER_FIELD_W,
+                get = function()
+                    return BR.Config.Get("defaults.driveByWhisper") or L["DriveBy.WhisperDefault"]
+                end,
+                onChange = function(text)
+                    BR.Config.Set("defaults.driveByWhisper", CleanGreetingText(text, L["DriveBy.WhisperDefault"]))
+                end,
+            })
+            whisper.editBox:SetMaxLetters(200)
+            whisper:SetPoint("TOPLEFT")
+            tinsert(bodyHolders, whisper)
+            local emote = Components.Dropdown(slot, {
+                label = L["BuffPanel.DriveBy.Emote"],
+                labelWidth = DRAWER_LABEL_W,
+                width = DRAWER_FIELD_W,
+                options = {
+                    { label = L["BuffPanel.DriveBy.Emote.Wave"], value = "WAVE" },
+                    { label = L["BuffPanel.DriveBy.Emote.Hello"], value = "HELLO" },
+                    { label = L["BuffPanel.DriveBy.Emote.Bow"], value = "BOW" },
+                    { label = L["BuffPanel.DriveBy.Emote.Salute"], value = "SALUTE" },
+                    { label = L["BuffPanel.DriveBy.Emote.Smile"], value = "SMILE" },
+                    { label = L["BuffPanel.DriveBy.Emote.Cheer"], value = "CHEER" },
+                    { label = L["BuffPanel.DriveBy.Emote.Custom"], value = "CUSTOM" },
+                },
+                get = EmoteChoice,
+                onChange = function(val)
+                    BR.Config.Set("defaults.driveByEmote", val)
+                    Components.RefreshAll()
+                end,
+            })
+            emote:SetPoint("TOPLEFT")
+            tinsert(bodyHolders, emote)
+            local emoteText = Components.TextInput(slot, {
+                label = L["BuffPanel.DriveBy.Whisper"],
+                labelWidth = DRAWER_LABEL_W,
+                width = DRAWER_FIELD_W,
+                get = function()
+                    return BR.Config.Get("defaults.driveByEmoteText") or L["DriveBy.EmoteDefault"]
+                end,
+                onChange = function(text)
+                    BR.Config.Set("defaults.driveByEmoteText", CleanGreetingText(text, L["DriveBy.EmoteDefault"]))
+                end,
+            })
+            emoteText.editBox:SetMaxLetters(200)
+            emoteText:SetPoint("TOPLEFT", 0, -(26 + COMPONENT_GAP))
+            tinsert(bodyHolders, emoteText)
+
+            local function CustomEmote()
+                return GreetingMode() == "emote" and EmoteChoice() == "CUSTOM"
+            end
+            local function SlotHeight()
+                local mode = GreetingMode()
+                if mode == "none" then
+                    return 0
+                end
+                return CustomEmote() and 2 * (26 + COMPONENT_GAP) or 26 + COMPONENT_GAP
+            end
+            local shownHeight
+            function slot:Refresh()
+                local mode = GreetingMode()
+                whisper:SetShown(mode == "whisper")
+                emote:SetShown(mode == "emote")
+                emoteText:SetShown(CustomEmote())
+                local height = SlotHeight()
+                slot:SetHeight(math.max(height - COMPONENT_GAP, 1))
+                if shownHeight ~= nil and shownHeight ~= height and relayout then
+                    relayout()
+                end
+                shownHeight = height
+            end
+            slot:Refresh()
+            tinsert(BR.RefreshableComponents, slot)
+            tinsert(bodyHolders, slot)
+            layout:AddDynamic(slot, SlotHeight)
+        end,
+    },
+
     dkRunes = {
         editor = "Runeforge",
     },
@@ -860,12 +988,13 @@ end
 ---section's own inline controls.
 ---@param section table
 ---@param layout table
-local function BuildSpecial(section, layout)
+---@param relayout? fun() Fits the surface after an :AddDynamic block changes height
+local function BuildSpecial(section, layout, relayout)
     local module = EditorModule(section)
     if module then
         AddInlineEditor(layout, module.BuildInline)
     elseif section.build then
-        section.build(layout)
+        section.build(layout, relayout)
     end
 end
 
@@ -1205,7 +1334,7 @@ end
 ---@param title string
 ---@param icon number|string|nil
 ---@param anchor? table Frame to anchor the drawer beside
----@param fill fun(layout: table, body: table, width: number)
+---@param fill fun(layout: table, body: table, width: number, relayout: fun())
 ---@param width? number Card width; defaults to the one the per-buff cards use
 local function OpenDrawer(title, icon, anchor, fill, width)
     EnsureDrawer()
@@ -1235,14 +1364,19 @@ local function OpenDrawer(title, icon, anchor, fill, width)
     bodyHolders = drawerHolders
 
     local layout = Components.VerticalLayout(drawerBody, { x = 0, y = 0 })
-    fill(layout, drawerBody, bodyW)
-
-    local h = math.abs(layout:GetY())
-    drawerBody:SetHeight(h)
-    drawer:SetHeight(DRAWER_BODY_TOP + h + 12)
-    -- The height decides the scale clamp, and a reopen on an already-shown
-    -- drawer skips OnShow.
-    BR.ApplyDialogScale(drawer)
+    local function FitHeight()
+        local h = math.abs(layout:GetY())
+        drawerBody:SetHeight(h)
+        drawer:SetHeight(DRAWER_BODY_TOP + h + 12)
+        -- The height decides the scale clamp, and a reopen on an already-shown
+        -- drawer skips OnShow.
+        BR.ApplyDialogScale(drawer)
+    end
+    fill(layout, drawerBody, bodyW, function()
+        layout:Reflow()
+        FitHeight()
+    end)
+    FitHeight()
 
     drawer:ClearAllPoints()
     catcher:Show()
@@ -1280,7 +1414,7 @@ end
 ---@param anchor? table Frame to anchor the drawer beside (the row's link)
 local function Show(info, anchor)
     local key = info.key
-    OpenDrawer(info.displayName or key, info.icons and info.icons[1], anchor, function(layout)
+    OpenDrawer(info.displayName or key, info.icons and info.icons[1], anchor, function(layout, _, _, relayout)
         local special = SPECIAL_SECTIONS[key]
         if special then
             local module = EditorModule(special)
@@ -1296,15 +1430,13 @@ local function Show(info, anchor)
                 editBtn:SetSize(bodyW, 24)
                 layout:Add(editBtn, 24, COMPONENT_GAP)
             else
-                BuildSpecial(special, layout)
+                BuildSpecial(special, layout, relayout)
             end
             layout:Space(4)
             local sep = drawerBody:CreateTexture(nil, "ARTWORK")
-            sep:SetHeight(1)
+            sep:SetSize(bodyW, 1)
             sep:SetColorTexture(0.4, 0.32, 0.05, 0.6)
-            sep:SetPoint("TOPLEFT", drawerBody, "TOPLEFT", 0, layout:GetY())
-            sep:SetPoint("TOPRIGHT", drawerBody, "TOPRIGHT", 0, layout:GetY())
-            layout:Space(8)
+            layout:Add(sep, 0, 8)
         end
 
         AddShowRow(layout, info)

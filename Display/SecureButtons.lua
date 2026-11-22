@@ -268,6 +268,7 @@ end
 ---@field chatKey string? Buff key when the action is a chat request
 ---@field chatMsg string? Request text without the channel prefix
 ---@field pickDef RaidBuff? PreClick picks the spell and the unit for this buff
+---@field spellFn (fun(): number?)? PreClick writes the spell that this function returns
 
 -- Every resolver fills this one table, and ApplyAction copies what it needs before
 -- the next fill. A resolve runs for every frame on every display cycle, so it must
@@ -349,6 +350,7 @@ local function ApplyAction(button, action)
     button._br_clickMacroFn = action.macroFn
     button._br_clickMacroSpellID = action.macroSpellID
     button._br_pickDef = action.pickDef
+    button._br_clickSpellFn = action.spellFn
     button._br_chatRequestKey = action.chatKey
     button._br_chatRequestMsg = action.chatMsg
     if not action.chatKey then
@@ -532,6 +534,10 @@ local function CreateClickOverlay(frame)
                 self:SetAttribute("spell", castID or self._br_action.spellID)
                 self:SetAttribute("unit", PickCastUnit(pickDef.key))
             end
+        end
+        local spellFn = self._br_clickSpellFn
+        if spellFn and not InCombatLockdown() then
+            self:SetAttribute("spell", spellFn())
         end
     end)
     overlay:SetScript("PostClick", function(self, button, down)
@@ -1493,6 +1499,7 @@ local function DisableOverlay(overlay)
     overlay._br_clickMacroFn = nil
     overlay._br_clickMacroSpellID = nil
     overlay._br_pickDef = nil
+    overlay._br_clickSpellFn = nil
     overlay._br_chatRequestKey = nil
     overlay._br_chatRequestMsg = nil
     overlay._br_chatRequestCooldownUntil = nil
@@ -1766,6 +1773,11 @@ local function ResolveAction(frame, category, db)
         if category == "raid" and def and def.castOnMissing then
             local action = SpellAction(castableID, "player")
             action.pickDef = def
+            return action
+        end
+        if def and def.clickSpell then
+            local action = SpellAction(castableID, def.castUnit)
+            action.spellFn = def.clickSpell
             return action
         end
         return SpellAction(castableID, (category == "raid" or category == "self") and "player" or nil)

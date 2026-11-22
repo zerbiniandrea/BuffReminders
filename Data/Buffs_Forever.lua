@@ -908,6 +908,63 @@ local function BattleShoutReady()
     return castID ~= nil and BR.BuffState.IsSpellUsable(castID)
 end
 
+-- Drive-by buffs: the single-target ranks that can buff another player, with the
+-- SpellLevel of each rank from the SpellLevels DB2 table. A rank lands only on a
+-- target whose level is at least the rank level minus levelSpan.
+local DRIVE_BY_RANKS = {
+    { 10157, 56 }, -- Arcane Intellect
+    { 10156, 42 },
+    { 1461, 28 },
+    { 1460, 14 },
+    { 1459, 1 },
+    { 9885, 60 }, -- Mark of the Wild
+    { 9884, 50 },
+    { 8907, 40 },
+    { 5234, 30 },
+    { 6756, 20 },
+    { 5232, 10 },
+    { 1126, 1 },
+    { 10938, 60 }, -- Power Word: Fortitude
+    { 10937, 48 },
+    { 2791, 36 },
+    { 1245, 24 },
+    { 1244, 12 },
+    { 1243, 1 },
+    { 27841, 60 }, -- Divine Spirit
+    { 14819, 50 },
+    { 14818, 40 },
+    { 14752, 30 },
+    { 25291, 60 }, -- Blessing of Might
+    { 19838, 52 },
+    { 19837, 42 },
+    { 19836, 32 },
+    { 19835, 22 },
+    { 19834, 12 },
+    { 19740, 4 },
+    { 25290, 60 }, -- Blessing of Wisdom
+    { 19854, 54 },
+    { 19853, 44 },
+    { 19852, 34 },
+    { 19850, 24 },
+    { 19742, 14 },
+    { 20217, 20 }, -- Blessing of Kings
+}
+local DRIVE_BY_SPELLS = {}
+---@type table<number, number>
+local DRIVE_BY_RANK_LEVELS = {}
+for i, rank in ipairs(DRIVE_BY_RANKS) do
+    DRIVE_BY_SPELLS[i] = rank[1]
+    DRIVE_BY_RANK_LEVELS[rank[1]] = rank[2]
+end
+
+---@class DriveByData
+---@field levelSpan number
+---@field rankLevels table<number, number> Spell ID of a single-target rank -> spell level
+
+-- Only code of this client reads this export, so retail has no mirror.
+---@type DriveByData
+BR.DRIVE_BY = { levelSpan = 10, rankLevels = DRIVE_BY_RANK_LEVELS }
+
 -- Spells have ranks, and every rank ID counts as the buff. Click-to-cast casts the
 -- first ID in spellID that the player knows, so each list starts with the highest rank.
 -- A raid buff lists its single-target ranks before its reagent group version.
@@ -1480,6 +1537,29 @@ BR.BUFF_TABLES = {
                 end
                 local defaults = BR.profile.defaults
                 return AmmoCount(subclass) < (defaults and defaults.ammoThresholdStacks or 1) * AMMO_STACK_SIZE
+            end,
+        },
+        -- spellID gives the click overlay a known spell. PreClick replaces it with the pick.
+        {
+            key = "driveByBuffs",
+            defaultEnabled = false, -- opt-in: casts on strangers
+            name = L["Buff.DriveByBuffs"],
+            spellID = DRIVE_BY_SPELLS,
+            icons = {
+                spells = { 10157, 10938, 9885 },
+                dynamic = function()
+                    local spellID = BR.DriveBy.Pick()
+                    return spellID and BR.Icons.GetBuffTexture(spellID)
+                end,
+            },
+            overlayText = L["Overlay.DriveBy"],
+            infoTooltip = { title = L["Buff.DriveByBuffs"], desc = L["Tooltip.DriveBy.Desc"] },
+            castUnit = "target",
+            clickSpell = function()
+                return BR.DriveBy.Pick()
+            end,
+            customCheck = function()
+                return BR.DriveBy.Pick() ~= nil
             end,
         },
     },

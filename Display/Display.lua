@@ -74,6 +74,11 @@ local BR = ns
 ---@field reagentThreshold? number
 ---@field reagentRestedOnly? boolean
 ---@field ammoThresholdStacks? number
+---@field driveByGreeting? "none"|"whisper"|"emote"
+---@field driveByWhisper? string Greeting whisper. nil = the localized default
+---@field driveByEmote? string Emote token for DoEmote, or "CUSTOM" for driveByEmoteText
+---@field driveByEmoteText? string Custom greeting emote. nil = the localized default
+---@field driveByAllowPvP? boolean Drive-by buffs also offer PvP-flagged targets
 ---@field mageFoodContent? "all"|"dungeon"|"raid"
 ---@field shamanImbue? "windfury"|"flametongue"|"rockbiter"|"frostbrand" The imbue that the WoW Forever click casts
 ---@field placeAtPlayer? boolean

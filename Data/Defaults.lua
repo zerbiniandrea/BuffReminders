@@ -208,6 +208,10 @@ BR.defaults = {
         reagentThreshold = 5, -- the reagent reminder shows below this count
         reagentRestedOnly = true,
         ammoThresholdStacks = 1, -- the ammo reminder shows below this many stacks
+        driveByGreeting = "none",
+        -- driveByWhisper, driveByEmoteText: absent - nil means the localized default text
+        driveByEmote = "WAVE",
+        driveByAllowPvP = false,
         soulstoneVisibility = "readyCheck",
         soulstoneHideCooldown = false,
         -- soulstonePinnedTarget: deliberately absent - nil means "no pin" (set via BuffPanel drawer)
