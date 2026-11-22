@@ -323,7 +323,7 @@ english["Tooltip.PaladinAuraDuplicate.Desc"] =
 english["Tooltip.PaladinBlessingDuplicate.Desc"] =
     "Out of combat, the icon checks if no group member lacks your blessing, but a member has it only from another paladin. Then it suggests the next blessing of your priority list. If each blessing in the list is a duplicate, the icon shows DUPE, and a click on it casts nothing. If Bless is set to Myself only, there is no duplicate check."
 english["Tooltip.DriveBy.Desc"] =
-    "Out of combat, the icon shows when you target a friendly player outside your group who lacks a buff you can give. A click casts the highest rank that the player can receive."
+    "Out of combat, shows when your target is a friendly player outside your group who lacks one of your buffs. Click to cast the best rank for them."
 english["Tooltip.InstanceEntryReminder"] = "Instance Entry Reminder"
 english["Tooltip.InstanceEntryReminder.Desc"] =
     "Briefly shown when entering a dungeon as a reminder to drop a Soulwell. Dismissed after casting or after 30 seconds."
@@ -331,11 +331,11 @@ english["Tooltip.MageFood"] = "Healers Only"
 english["Tooltip.MageFood.Desc"] = "Only shown while you're playing a healer"
 english["Tooltip.TankOnly"] = "Tank Check"
 english["Tooltip.RighteousFuryTank.Desc"] =
-    "By default, the icon shows only while you tank: your group role is Tank, or the raid marks you as Main Tank. To see it at all times, set Show to Always in the settings of this reminder."
+    "Shows only while you tank (Tank role or Main Tank). To always show it, set Show to Always in its settings."
 english["Tooltip.TankHint"] = "(tank)"
 english["Tooltip.TankTarget"] = "Tank Target"
 english["Tooltip.ThornsTank.Desc"] =
-    "In a group, the icon shows when a tank lacks Thorns, and a click casts it on that tank. A tank has the Tank role or a Main Tank mark. Solo or with no tank, the icon checks you, and a click casts Thorns on you."
+    "In a group, checks your tanks (Tank role or Main Tank) and a click casts Thorns on them. Solo or with no tank, it checks you."
 english["BuffTooltip.ProvidedBy"] = "Provided by %s"
 
 -- ============================================================================
@@ -391,7 +391,7 @@ english["Display.LoginSnooze"] =
 english["Display.LoginCasterName"] =
     "External Buffs can now show who cast each buff. Turn it on in |cFFFFD100/br|r > Categories > External Buffs."
 english["Display.LoginClientBeta"] =
-    "WoW Forever support is in beta. Some reminders are not tested on all classes. Report problems on Discord: %s"
+    "WoW Forever support is in beta. Report problems on Discord: %s"
 
 -- ============================================================================
 -- OPTIONS: NAVIGATION LABELS
@@ -583,13 +583,13 @@ english["Options.RepairHideInCombat.Desc"] =
     "Hide the repair reminder in combat. You cannot repair during a fight."
 english["Options.Reagent.Threshold"] = "Warn below"
 english["Options.Reagent.Threshold.Desc"] =
-    "Show the reagent reminder when you have fewer than this many of a reagent. Only reagents for spells that you know count."
+    "Warn when you carry fewer than this many of a reagent for a spell you know."
 english["Options.Reagent.RestedOnly"] = "Only in rested areas"
 english["Options.Reagent.RestedOnly.Desc"] =
-    "Show the reagent reminder only in inns and cities, where you can buy reagents.\n\nIf |cffffcc00Hide while resting|r is on, the reminder with this option never shows."
+    "Warn only in inns and cities, where vendors sell reagents.\n\nIf |cffffcc00Hide while resting|r is on, the warning never shows."
 english["Options.Ammo.Threshold"] = "Warn below (stacks)"
 english["Options.Ammo.Threshold.Desc"] =
-    "Show the ammo reminder when you have fewer than this many stacks of arrows or bullets for your ranged weapon. One stack is 200."
+    "Warn when you carry fewer than this many stacks (200 each) of ammo for your ranged weapon."
 
 -- ============================================================================
 -- OPTIONS: SOULSTONE
@@ -616,13 +616,13 @@ english["Options.FreeConsumables.Override.Desc"] =
 english["Options.Icons"] = "Icons"
 english["Options.IconStyle"] = "Icon style"
 english["Options.IconStyle.Desc"] =
-    "Modern draws a flat square border. The other style draws the action-button frame of the game, with rounded corners. The style applies to the buff icons of all categories. It does not apply to the externals display or to the clickable consumable item buttons. When Masque is active, Masque styles the icons."
+    "Modern: a flat square border. The other option: the game's rounded action-button frame. Not used on externals or consumable item buttons."
 english["Options.IconStyle.Modern"] = "Modern"
 english["Options.IconStyle.Blizzard"] = "Blizzard"
 english["Options.IconStyle.Forever"] = "Forever"
-english["DisabledReason.IconStyleFrame"] = 'The icon style draws its own frame. To use a border, select "%s" in Icon style on the Defaults page.'
-english["DisabledReason.IconStyleMasque"] = "Masque styles the icons. To use an icon style, disable the BuffReminders group in Masque."
-english["DisabledReason.IconStyleNoArt"] = "This game client lacks the action-button art, so the icons keep the Modern style."
+english["DisabledReason.IconStyleFrame"] = 'This icon style has its own frame. For a border, set Icon style to "%s" (Defaults page).'
+english["DisabledReason.IconStyleMasque"] = "Masque styles the icons. Disable the BuffReminders group in Masque to use this."
+english["DisabledReason.IconStyleNoArt"] = "This game client lacks the button art. Icons stay Modern."
 english["Options.ShowTextToggle"] = "Show"
 english["Options.MainText.Desc"] =
     "Show the main text on the icons: a count like 17/20, or a label like NO PET. The Defaults page sets its position. The expiring countdown always stays visible."
@@ -854,13 +854,13 @@ english["BuffPanel.MageFoodContent.Dungeon"] = "Dungeons only"
 english["BuffPanel.MageFoodContent.Raid"] = "Raids only"
 english["BuffPanel.ShamanImbue"] = "Click casts"
 english["BuffPanel.ShamanImbue.Desc"] =
-    "The imbue that a click casts. If you do not know it yet, the click casts Windfury, Flametongue or Rockbiter, in that order."
+    "Until you learn it, the click casts Windfury, then Flametongue, then Rockbiter."
 english["BuffPanel.DriveBy.AllowPvP"] = "Allow PvP-flagged targets"
 english["BuffPanel.DriveBy.AllowPvP.Desc"] =
-    "If you are not flagged for PvP, a buff on a flagged player flags you too. When this is off, the reminder ignores a flagged player until you are flagged."
+    "Buffing a PvP-flagged player flags you too. When off, flagged players are ignored unless you are flagged."
 english["BuffPanel.DriveBy.Greeting"] = "Greeting"
 english["BuffPanel.DriveBy.Greeting.Desc"] =
-    "After your buff lands, send the player a whisper or an emote. Each player gets one greeting per session. Not in combat.\n\nIn your own text, {name} becomes the player name and {spell} the buff."
+    "Whisper or emote at the player after your buff lands, once per player per session. Not in combat.\n\n{name} = player name, {spell} = buff."
 english["BuffPanel.DriveBy.Greeting.None"] = "Nothing"
 english["BuffPanel.DriveBy.Greeting.Whisper"] = "Whisper"
 english["BuffPanel.DriveBy.Greeting.Emote"] = "Emote"
@@ -884,13 +884,13 @@ english["BuffPanel.WarlockDemon.Dungeon.Desc"] = "Also covers scenarios and Delv
 english["BuffPanel.WarlockDemon.Raid"] = "Raid"
 english["BuffPanel.WarlockDemon.PvP"] = "PvP"
 english["BuffPanel.WarlockDemon.Felguard"] = "Demonology always summons Felguard if talented."
-english["BuffPanel.WarriorStance.Hint"] = "Click a stance to allow it for that content. You can allow more than one. A stance that you have not learned yet does not count. If a row is empty, no reminder shows there."
-english["BuffPanel.DruidForm.Hint"] = "Click a form to allow it for that content. You can allow more than one. A form that you have not learned yet does not count. If a row is empty, no reminder shows there."
+english["BuffPanel.WarriorStance.Hint"] = "Click stances to allow them per content. Unlearned stances do not count. An empty row shows no reminder."
+english["BuffPanel.DruidForm.Hint"] = "Click forms to allow them per content. Unlearned forms do not count. An empty row shows no reminder."
 english["BuffPanel.DruidForm.Caster"] = "Caster (no form)"
 english["BuffPanel.PaladinBlessing.Hint"] = "Click a blessing to give it to the group in that content. Each row holds one blessing. If you do not know the blessing yet, no reminder shows. If a row is empty, no reminder shows there."
 english["BuffPanel.GroupCast"] = "Cast group version (uses a reagent)"
 english["BuffPanel.GroupCast.Desc"] =
-    "If two or more group members lack the buff, a click casts the group version. You must know it and carry its reagent. Otherwise the click casts the single-target version on a member who lacks the buff."
+    "If 2+ group members lack the buff and you have the reagent, a click casts the group version. Otherwise it casts the single-target version."
 english["BuffPanel.GroupCast.Blessing.Desc"] =
     "If two or more members of one class lack the blessing, a click casts the Greater Blessing on one of them. It reaches every group member of that class. You must know it and carry a Symbol of Kings. Otherwise the click casts the single-target blessing on a member who lacks it."
 english["BuffPanel.PaladinAura.Hint"] = "Click an aura to choose it for that content. Each row holds one aura. A click on the icon casts the chosen aura, and the icon shows WRONG AURA if you use a different one. If a row is empty, or you do not know the chosen aura yet, any aura counts."
@@ -905,12 +905,12 @@ english["BuffPanel.BlessingPriority.2"] = "2nd"
 english["BuffPanel.BlessingPriority.3"] = "3rd"
 english["BuffPanel.ThornsRequest"] = "Tanks can ask for Thorns"
 english["BuffPanel.ThornsRequest.Desc"] =
-    "If you tank (Tank role or Main Tank mark), you are not a druid, and a druid of level 6 or higher is in your group, the icon shows when you lack Thorns. A click asks for Thorns in chat. \"Request missing buffs in chat\" on the Chat Requests page must be on."
+    "If you tank and a druid (level 6+) is in your group, shows when you lack Thorns. A click asks for it in chat. Needs \"Request missing buffs in chat\" on (Chat Requests page)."
 english["BuffPanel.RighteousFuryShow"] = "Show"
 english["BuffPanel.RighteousFuryShow.Tank"] = "When tanking"
 english["BuffPanel.RighteousFuryShow.Always"] = "Always"
 english["BuffPanel.RighteousFuryShow.Desc"] =
-    "When tanking: the icon shows only if your group role is Tank or the raid marks you as Main Tank. Always: the icon shows solo and in any group."
+    "When tanking: only with the Tank role or a Main Tank mark. Always: solo and in any group."
 english["BuffPanel.Sound"] = "Sound"
 english["BuffPanel.Sound.None"] = "None"
 english["BuffPanel.Detached"] = "Own frame (detached)"
@@ -1024,14 +1024,14 @@ english["Options.BuffTracking.Override.Leveling.Desc"] =
     "Tracking mode to use below max level. Once you reach max level, the mode selected above is used."
 english["Options.LevelingExpiring"] = "Expiring while leveling"
 english["Options.LevelingExpiring.Desc"] =
-    "Which buffs warn before they expire while you are below max level. Missing buffs always show. Custom buffs keep their own threshold. At max level, the normal expiration threshold applies."
+    "Below max level, choose which buffs warn before they expire. Missing buffs always show. Custom buffs keep their own threshold."
 english["Options.LevelingExpiring.Own"] = "Your spells only"
 english["Options.LevelingExpiring.Own.Desc"] =
-    "Only buffs that your class casts warn before they expire. Consumables and buffs from other classes show only when missing or low on stock."
+    "Only your own class buffs warn. Everything else shows only when missing or low."
 english["Options.LevelingExpiring.All"] = "All buffs"
-english["Options.LevelingExpiring.All.Desc"] = "Every buff warns before it expires, the same as at max level."
+english["Options.LevelingExpiring.All.Desc"] = "Every buff warns, as at max level."
 english["Options.LevelingExpiring.Off"] = "Off (missing only)"
-english["Options.LevelingExpiring.Off.Desc"] = "No buff warns before it expires. Buffs show only when missing or low on stock."
+english["Options.LevelingExpiring.Off.Desc"] = "Buffs show only when missing or low on stock."
 
 -- ============================================================================
 -- OPTIONS: PROFILES TAB
@@ -1226,7 +1226,7 @@ english["Options.JoinDiscord.Desc"] = "Got feedback, feature requests, or bug re
 english["Options.ClientBeta"] = "Beta"
 english["Options.ClientBeta.Title"] = "WoW Forever beta"
 english["Options.ClientBeta.Desc"] =
-    "WoW Forever support is in active development. Some reminders are not tested on all classes.\nReport problems on Discord. Click for the invite link."
+    "Some reminders are not tested on all classes yet. Click for the Discord invite to report problems."
 
 -- ============================================================================
 -- OPTIONS: KO-FI
@@ -1316,9 +1316,9 @@ english["DisabledReason.OverrideSection"] = 'Turn on "Override" at the top of th
 english["DisabledReason.CombatOverride"] =
     '"In combat" hiding is enabled above, so nothing shows in combat and this override would have no effect.\nUncheck it to use a combat tracking override.'
 english["DisabledReason.LevelingOverride"] =
-    '"Leveling" hiding is enabled above, so nothing shows while leveling and this override would have no effect.\nUncheck it to use a leveling tracking override.'
+    '"Leveling" is checked under Hide when above, so nothing shows while leveling. Uncheck it to use this.'
 english["DisabledReason.LevelingExpiring"] =
-    '"Leveling" hiding is enabled above, so nothing shows while leveling and this setting has no effect.\nUncheck it to choose which buffs warn before they expire.'
+    '"Leveling" is checked under Hide when above, so nothing shows while leveling. Uncheck it to use this.'
 english["DisabledReason.ExpiringInCombat"] =
     '"In combat" hiding is enabled, so everything is already hidden during combat.'
 english["DisabledReason.HealthstoneThreshold"] = 'Enable "Warn when low" first.'
@@ -1326,7 +1326,7 @@ english["DisabledReason.ClickToCast"] = 'Turn on "Click to cast" first.'
 english["DisabledReason.ShowWithoutItems"] = 'Turn on "Show when not in bags" first.'
 english["DisabledReason.PetLabelsOff"] = 'Pick a position for "Pet labels" first.'
 english["DisabledReason.OverrideRow"] = 'Tick "Override" on this row first.'
-english["DisabledReason.RaidClickToCast"] = 'Turn on "Click to cast" on the Raid tab of the Categories page first.'
+english["DisabledReason.RaidClickToCast"] = 'Needs "Click to cast" on (Categories > Raid tab).'
 
 -- Direction labels
 english["Direction.Left"] = "Left"
