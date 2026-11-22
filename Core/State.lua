@@ -2018,11 +2018,12 @@ end
 ---@return number? remainingTime seconds remaining if buff is present and has a duration
 ---@return number? activeSpellID the specific spell ID that matched (for multi-spell consumables)
 ---@return number? itemCount total count of items in inventory (for item-based consumables)
+---@return number? duration Full duration of the matched aura. A weapon enchant reports nil
 local function ShouldShowConsumableBuff(buff)
     if buff.spellID then
         local category = buff.consumableCategory
         for _, id in ipairs(AsSpellList(buff.spellID)) do
-            local hasBuff, remaining = UnitHasBuff("player", id)
+            local hasBuff, remaining, _, duration = UnitHasBuff("player", id)
             if hasBuff then
                 local CM = BR.ConsumableMemory
                 -- A count-tracked category remembers the item use spell, which can
@@ -2033,7 +2034,7 @@ local function ShouldShowConsumableBuff(buff)
                 if category then
                     SetActiveConsumableSpell(category, id)
                 end
-                return false, remaining, id -- Has at least one of the consumable buffs
+                return false, remaining, id, nil, duration -- Has at least one of the consumable buffs
             end
         end
         if category then
@@ -2052,7 +2053,7 @@ local function ShouldShowConsumableBuff(buff)
                 if exp and exp > 0 then
                     remaining = exp - GetTime()
                 end
-                return false, remaining -- Has a buff with this icon
+                return false, remaining, nil, nil, AuraField(auraData, "duration") -- Has a buff with this icon
             end
             i = i + 1
             auraData = AuraByIndex("player", i, "HELPFUL")
@@ -2917,7 +2918,8 @@ local function RefreshConsumables(db, trackingMode, isAuraRestricted, hideExpiri
                             SetEntryText(entry, buff.overlayText, consMissGlow)
                         end
                     else
-                        local shouldShow, remainingTime, activeSpellID, itemCount = ShouldShowConsumableBuff(buff)
+                        local shouldShow, remainingTime, activeSpellID, itemCount, auraDuration =
+                            ShouldShowConsumableBuff(buff)
                         if shouldShow then
                             SetEntryText(entry, buff.overlayText, consMissGlow)
                         elseif
@@ -2940,7 +2942,7 @@ local function RefreshConsumables(db, trackingMode, isAuraRestricted, hideExpiri
                                 NoteChangeIn(CHARGE_RECHECK)
                             end
                         elseif not buff.noExpirationGlow and not hideExpiring then
-                            if TrySetEntryExpiring(entry, remainingTime, consThreshold, consExGlow) then
+                            if TrySetEntryExpiring(entry, remainingTime, consThreshold, consExGlow, auraDuration) then
                                 if activeSpellID and type(buff.spellID) == "table" then
                                     entry.dynamicIcon = BR.Icons.GetBuffTexture(activeSpellID)
                                 end
