@@ -2807,7 +2807,8 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
             "raid",
             HasCasterForBuff(buff.class, buff.levelRequired, buff.reach)
         )
-        local playerOnly = scope.playerOnly or (buff.selfScope ~= nil and buff.selfScope())
+        local requester = buff.chatRequestSpell ~= nil and playerClass ~= buff.class
+        local playerOnly = requester or scope.playerOnly or (buff.selfScope ~= nil and buff.selfScope())
 
         if
             not (bronzeHiddenInCombat and buff.key == "bronze")
@@ -2815,11 +2816,30 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
             and (not isAuraRestricted or IsAuraTrackable(buff))
             and raidVisible
             and scope.show
-            and (not buff.requiresKnownSpell or KnowsAnySpell(buff.spellID))
+            and (not requester or (readSources and db.requestBuffInChat == true))
+            and (not buff.requiresKnownSpell or requester or KnowsAnySpell(buff.spellID))
             and (not buff.visibilityCondition or buff.visibilityCondition())
         then
             local missing, total, minRemaining, choice
-            if buff.classChoices then
+            if requester then
+                -- Any copy of the buff covers the player, so only a missing buff shows.
+                local spellID = buff.chatRequestSpell()
+                missing, total = 0, 0
+                if spellID then
+                    missing, total = CountMissingBuff(
+                        buff.spellID,
+                        buff.key,
+                        true,
+                        buff.playersOnly,
+                        false,
+                        raidThreshold,
+                        missingUnits
+                    )
+                end
+                if missing > 0 then
+                    entry.dynamicIcon = BR.Icons.GetBuffTexture(spellID)
+                end
+            elseif buff.classChoices then
                 missing, total, minRemaining, choice =
                     CountMissingClassChoice(buff, playerOnly, raidThreshold, missingUnits, readSources)
             else

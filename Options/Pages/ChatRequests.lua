@@ -69,7 +69,7 @@ local function Build(content, scrollFrame)
         tooltip = { title = L["Options.RequestBuffInChat"], desc = L["Options.RequestBuffInChat.Tooltip"] },
         onChange = function(checked)
             CommitFocus()
-            BR.profile.requestBuffInChat = checked
+            BR.Config.Set("requestBuffInChat", checked)
             RefreshChatActions()
             Components.RefreshAll()
         end,
@@ -147,7 +147,7 @@ local function Build(content, scrollFrame)
     for _, cat in ipairs(ChatRequest.Categories()) do
         Helpers.LayoutSubsectionHeader(layout, content, labels[cat])
         for _, def in ipairs(ChatRequest.BuffsIn(cat)) do
-            local row = { key = def.key, default = L["ChatRequest." .. def.key] or def.name }
+            local row = { key = def.key, default = ChatRequest.DefaultMessage(def.key, def.name) }
             local frame = CreateFrame("Frame", nil, content)
             frame:SetSize(rowsWidth, ROW_H)
 
@@ -159,6 +159,10 @@ local function Build(content, scrollFrame)
                 labelWidth = nameWidth,
                 width = fieldWidth,
                 get = function()
+                    -- The default text and the icon can name a spell that a setting picks.
+                    row.default = ChatRequest.DefaultMessage(def.key, def.name)
+                    local requested = def.chatRequestSpell and def.chatRequestSpell()
+                    icon:SetTexture(requested and BR.Icons.GetBuffTexture(requested) or BR.Icons.GetBuffIcons(def)[1])
                     return SavedMessage(row) or row.default
                 end,
                 onChange = function(text)

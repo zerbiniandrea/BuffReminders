@@ -315,7 +315,7 @@ local RootSettings = {
     petPassiveOnlyInCombat = "VisibilityRefresh",
     bronzeHideInCombat = "VisibilityRefresh",
     druidIgnoreTravelForm = "DisplayRefresh", -- recompute wrong-form state, then render
-    requestBuffInChat = false, -- No auto-refresh, handled manually
+    requestBuffInChat = "DisplayRefresh", -- A request reminder shows only while requests are on
     chatRequestCooldown = false, -- No auto-refresh, read live in PostClick + SyncSecureButtons
 }
 
