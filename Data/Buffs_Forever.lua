@@ -841,6 +841,35 @@ local PALADIN_BLESSING_GRID = {
     end,
 }
 
+---@param order any
+---@return StanceChoice?
+local function FirstBlessing(order)
+    if type(order) ~= "table" then
+        return nil
+    end
+    for i = 1, #PALADIN_BLESSINGS do
+        local choice = order[i] and BLESSING_BY_KEY[order[i]]
+        if choice then
+            return choice
+        end
+    end
+    return nil
+end
+
+---The blessing that the player asks for: the first one of the class list in the
+---options grid. A missing list uses the default list. An empty list asks for none.
+---@return number? spellID
+local function RequestedBlessing()
+    local defaults = BR.profile.defaults
+    local byClass = defaults and defaults.paladinBlessingsByClass
+    local order = type(byClass) == "table" and byClass[playerClass]
+    if order == nil or order == false then
+        order = BR.defaults.defaults.paladinBlessingsByClass[playerClass]
+    end
+    local choice = FirstBlessing(order)
+    return choice and choice.spellIDs[1]
+end
+
 -- A unit keeps one aura of each type, whoever casts it. A row with no choice accepts any aura.
 ---@type StanceGrid
 local PALADIN_AURA_GRID = {
@@ -1352,6 +1381,9 @@ BR.BUFF_TABLES = {
             requiresKnownSpell = true,
             classChoices = PALADIN_BLESSING_GRID,
             subChoices = BLESSING_ROW,
+            levelRequired = 4, -- Blessing of Might rank 1
+            chatRequestable = true,
+            chatRequestSpell = RequestedBlessing,
             selfScope = function()
                 local defaults = BR.profile.defaults
                 return defaults ~= nil and defaults.paladinBlessingScope == "self"

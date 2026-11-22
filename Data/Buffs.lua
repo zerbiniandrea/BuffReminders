@@ -91,7 +91,8 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
 ---@field castOnMissing? boolean The cast takes one target: the click casts on a member who lacks the buff
 ---@field groupCast? GroupCastRank[] Group ranks that use a reagent, highest first. The user turns them on per buff
----@field requiresKnownSpell? boolean Only a player who knows one of the spells sees it. The talents of other members are unreadable
+---@field requiresKnownSpell? boolean Only a player who knows one of the spells sees it, except a chatRequestSpell requester. The talents of other members are unreadable
+---@field chatRequestSpell? fun(): number? The spell that a player of another class asks for. That player checks only their own aura, out of combat. The chat request names the spell
 ---@field visibilityCondition? fun(): boolean Return false to hide the buff
 ---@field classChoices? ClassChoiceGrid Each member wants a choice of their class list. The click casts the choice of the largest class set
 ---@field selfScope? fun(): boolean Return true to check and cast the buff on the player only

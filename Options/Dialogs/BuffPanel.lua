@@ -485,6 +485,8 @@ local function WriteClassChoices(grid, orderFor)
         map[class] = slots
     end
     BR.Config.Set("defaults." .. grid.setting, map)
+    -- A chat request macro can name a choice of the class list. Only a rebuild rewrites the macro.
+    BR.SecureButtons.UpdateActionButtons("raid")
 end
 
 ---Write one class list and keep the others.

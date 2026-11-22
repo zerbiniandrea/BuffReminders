@@ -712,6 +712,7 @@ english["ChatRequest.soulstone"] = "Soulstone pls"
 english["ChatRequest.healthstone"] = "Healthstones pls"
 english["ChatRequest.mageFood"] = "Mage food pls"
 english["ChatRequest.thorns"] = "Thorns pls"
+english["ChatRequest.paladinBlessing"] = "%s pls"
 
 -- ============================================================================
 -- OPTIONS: PET

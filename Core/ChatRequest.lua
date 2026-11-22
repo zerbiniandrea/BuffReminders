@@ -21,6 +21,8 @@ local CATEGORY_ORDER = BR.STATIC_CATEGORIES
 local buffsByCategory
 local categoryList
 local categorySet
+---@type table<string, table>
+local defsByKey
 
 -- BR.BUFF_TABLES is static after load (custom buffs are not scanned), so one
 -- build is safe to cache for the session.
@@ -28,6 +30,7 @@ local function build()
     buffsByCategory = {}
     categoryList = {}
     categorySet = {}
+    defsByKey = {}
     for _, cat in ipairs(CATEGORY_ORDER) do
         local tbl = BR.BUFF_TABLES[cat]
         if tbl then
@@ -40,6 +43,7 @@ local function build()
                     end
                     local list = buffsByCategory[cat]
                     list[#list + 1] = def
+                    defsByKey[def.key] = def
                 end
             end
         end
@@ -94,7 +98,27 @@ function ChatRequest.GetPrefix()
     return "/say "
 end
 
---- Resolve the message for a buff key: custom (profile) > localized default > fallback name.
+--- The message of a buff key when the profile has no custom message.
+--- A buff with chatRequestSpell puts the spell name into the %s of the localized text.
+---@param key string
+---@param fallbackName string? used only when no locale entry exists
+---@return string?
+function ChatRequest.DefaultMessage(key, fallbackName)
+    if not defsByKey then
+        build()
+    end
+    local text = L["ChatRequest." .. key]
+    local def = defsByKey[key]
+    if text and def and def.chatRequestSpell then
+        local spellID = def.chatRequestSpell()
+        -- A translation with another format sequence must not throw.
+        local ok, formatted = pcall(string.format, text, spellID and BR.GetSpellName(spellID) or def.name)
+        return ok and formatted or text
+    end
+    return text or fallbackName
+end
+
+--- Resolve the message for a buff key: custom (profile) > default message.
 ---@param key string buff key (matches BR.profile.chatRequestMessages keys)
 ---@param fallbackName string? used only when no custom message and no locale entry exist
 ---@return string?
@@ -105,7 +129,7 @@ function ChatRequest.ResolveMessage(key, fallbackName)
     if custom and custom ~= "" then
         return custom
     end
-    return L["ChatRequest." .. key] or fallbackName
+    return ChatRequest.DefaultMessage(key, fallbackName)
 end
 
 BR.ChatRequest = ChatRequest
