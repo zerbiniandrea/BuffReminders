@@ -52,6 +52,7 @@ commit_preprocessors = [
 # HTML-comment sort keys order the sections; the template strips them so they
 # never render. The final catch-all routes everything else to Other Changes.
 commit_parsers = [
+  { footer = "^(?i)changelog: ?skip", skip = true },
   { message = "^feat", group = "<!-- 0 -->New Features ✨" },
   { message = "^fix", group = "<!-- 1 -->Bug Fixes 🐛" },
   { message = "^perf", group = "<!-- 2 -->Performance ⚡️" },
