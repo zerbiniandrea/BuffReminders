@@ -591,9 +591,11 @@ english["Options.Reagent.Threshold.Desc"] =
 english["Options.Reagent.RestedOnly"] = "Only in rested areas"
 english["Options.Reagent.RestedOnly.Desc"] =
     "Warn only in inns and cities, where vendors sell reagents.\n\nIf |cffffcc00Hide while resting|r is on, the warning never shows."
-english["Options.Ammo.Threshold"] = "Warn below (stacks)"
+english["Options.Ammo.Threshold"] = "Hunters (stacks)"
 english["Options.Ammo.Threshold.Desc"] =
-    "Warn when you carry fewer than this many stacks (200 each) of ammo for your ranged weapon."
+    "A hunter is warned below this many stacks (200 each) of equipped ammo."
+english["Options.Ammo.Shots"] = "Others (shots)"
+english["Options.Ammo.Shots.Desc"] = "Warriors and rogues pull with a bow or gun. They are warned below this many shots."
 
 -- ============================================================================
 -- OPTIONS: SOULSTONE

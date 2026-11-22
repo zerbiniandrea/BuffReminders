@@ -1216,6 +1216,22 @@ local SPECIAL_SECTIONS = {
             })
             tinsert(bodyHolders, thresholdHolder)
             layout:Add(thresholdHolder, nil, COMPONENT_GAP)
+            local shotsHolder = Components.Slider(body, {
+                label = L["Options.Ammo.Shots"],
+                labelWidth = 110,
+                min = 5,
+                max = 200,
+                step = 5,
+                get = function()
+                    return BR.Config.Get("defaults.ammoThresholdShots") or 20
+                end,
+                tooltip = { title = L["Options.Ammo.Shots"], desc = L["Options.Ammo.Shots.Desc"] },
+                onChange = function(val)
+                    BR.Config.Set("defaults.ammoThresholdShots", val)
+                end,
+            })
+            tinsert(bodyHolders, shotsHolder)
+            layout:Add(shotsHolder, nil, COMPONENT_GAP)
         end,
     },
 

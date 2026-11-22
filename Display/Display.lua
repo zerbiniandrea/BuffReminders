@@ -74,6 +74,7 @@ local BR = ns
 ---@field reagentThreshold? number
 ---@field reagentRestedOnly? boolean
 ---@field ammoThresholdStacks? number
+---@field ammoThresholdShots? number
 ---@field driveByGreeting? "none"|"whisper"|"emote"
 ---@field driveByWhisper? string Greeting whisper. nil = the localized default
 ---@field driveByEmote? string Emote token for DoEmote, or "CUSTOM" for driveByEmoteText

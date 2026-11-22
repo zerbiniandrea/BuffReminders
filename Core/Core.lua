@@ -456,6 +456,7 @@ local DefaultSettingKeys = {
     reagentThreshold = "DisplayRefresh",
     reagentRestedOnly = "DisplayRefresh",
     ammoThresholdStacks = "DisplayRefresh",
+    ammoThresholdShots = "DisplayRefresh",
     driveByAllowPvP = "DisplayRefresh",
     driveByGreeting = false, -- read when a drive-by cast succeeds
     driveByWhisper = false,
