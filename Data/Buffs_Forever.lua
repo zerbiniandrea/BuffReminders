@@ -659,6 +659,8 @@ local PALADIN_BLESSINGS = {
 local ALL_BLESSING_IDS = {}
 ---@type table<string, StanceChoice>
 local BLESSING_BY_KEY = {}
+---@type table<number, StanceChoice> Every aura ID of a blessing -> the blessing
+local BLESSING_BY_SPELL = {}
 for _, choice in ipairs(PALADIN_BLESSINGS) do
     local auraIDs = {}
     for _, id in ipairs(choice.spellIDs) do
@@ -670,6 +672,9 @@ for _, choice in ipairs(PALADIN_BLESSINGS) do
     end
     choice.auraIDs = auraIDs
     BLESSING_BY_KEY[choice.key] = choice
+    for _, id in ipairs(auraIDs) do
+        BLESSING_BY_SPELL[id] = choice
+    end
 end
 for _, choice in ipairs(PALADIN_BLESSINGS) do
     for _, rank in ipairs(choice.groupCast) do
@@ -1045,6 +1050,102 @@ end
 ---@type DriveByData
 BR.DRIVE_BY = { levelSpan = 10, rankLevels = DRIVE_BY_RANK_LEVELS }
 
+---A single-target blessing rank that the level of the unit accepts.
+---@param spellID number
+---@param unit string
+---@return number
+local function FitBlessingRank(spellID, unit)
+    local choice = BLESSING_BY_SPELL[spellID]
+    local pickRank = BR.DriveBy and BR.DriveBy.PickRank
+    if not choice or not pickRank or not DRIVE_BY_RANK_LEVELS[spellID] or unit == "player" then
+        return spellID
+    end
+    return pickRank(choice.spellIDs, BR.Secret.Plain(UnitLevel(unit)) or -1) or spellID
+end
+
+---@param def RaidBuff
+---@return number? spellID
+---@return string? unit
+local function BlessingPick(def)
+    local spellID, unit = BR.BuffState.GetGroupCastSpellID(def)
+    if spellID then
+        return spellID, unit or "player"
+    end
+    spellID, unit = BR.BuffState.GetChoiceCast(def)
+    if not spellID then
+        return nil
+    end
+    unit = unit or "player"
+    return FitBlessingRank(spellID, unit), unit
+end
+
+local otherBlessings = {}
+
+---@param unit string
+---@param auraIDs number[]
+---@return boolean
+local function UnitHasAnyAura(unit, auraIDs)
+    for _, id in ipairs(auraIDs) do
+        if C_UnitAuras.GetUnitAuraBySpellID(unit, id) then
+            return true
+        end
+    end
+    return false
+end
+
+---Every known blessing except the one that the main click casts and the ones that
+---the unit has from any paladin. The class lists do not apply, so the row can
+---override them. A blessing needs a rank that the level of the unit accepts.
+---@param unit string
+---@param spellID number
+---@return number[][]
+local function OtherBlessings(_, unit, spellID)
+    wipe(otherBlessings)
+    local main = BLESSING_BY_SPELL[spellID]
+    local pickRank = BR.DriveBy and BR.DriveBy.PickRank
+    local level = BR.Secret.Plain(UnitLevel(unit)) or -1
+    for _, choice in ipairs(PALADIN_BLESSINGS) do
+        local castID
+        if pickRank then
+            castID = pickRank(choice.spellIDs, level)
+        else
+            castID = HighestKnownSpell(choice.spellIDs)
+        end
+        if choice ~= main and castID and not UnitHasAnyAura(unit, choice.auraIDs) then
+            otherBlessings[#otherBlessings + 1] = choice.spellIDs
+        end
+    end
+    return otherBlessings
+end
+
+---@type SubChoiceRow
+local BLESSING_ROW = {
+    setting = "blessingSubIcons",
+    label = L["BuffPanel.SubChoices"],
+    desc = L["BuffPanel.SubChoices.Desc"],
+    hint = L["Tooltip.ChoiceRightClick"],
+    pick = BlessingPick,
+    others = OtherBlessings,
+}
+
+---@type SubChoiceRow
+local DRIVE_BY_ROW = {
+    setting = "driveBySubIcons",
+    label = L["BuffPanel.SubChoices.DriveBy"],
+    desc = L["BuffPanel.SubChoices.DriveBy.Desc"],
+    hint = L["Tooltip.ChoiceRightClick.DriveBy"],
+    pick = function()
+        local spellID = BR.DriveBy.Pick()
+        if spellID then
+            return spellID, "target"
+        end
+        return nil
+    end,
+    others = function(_, _, spellID)
+        return BR.DriveBy.Others(spellID)
+    end,
+}
+
 -- Spells have ranks, and every rank ID counts as the buff. Click-to-cast casts the
 -- first ID in spellID that the player knows, so each list starts with the highest rank.
 -- A raid buff lists its single-target ranks before its reagent group version.
@@ -1108,6 +1209,7 @@ BR.BUFF_TABLES = {
             castOnMissing = true,
             requiresKnownSpell = true,
             classChoices = PALADIN_BLESSING_GRID,
+            subChoices = BLESSING_ROW,
             selfScope = function()
                 local defaults = BR.profile.defaults
                 return defaults ~= nil and defaults.paladinBlessingScope == "self"
@@ -1589,6 +1691,7 @@ BR.BUFF_TABLES = {
             overlayText = L["Overlay.DriveBy"],
             infoTooltip = { title = L["Buff.DriveByBuffs"], desc = L["Tooltip.DriveBy.Desc"] },
             castUnit = "target",
+            subChoices = DRIVE_BY_ROW,
             clickSpell = function()
                 return BR.DriveBy.Pick()
             end,

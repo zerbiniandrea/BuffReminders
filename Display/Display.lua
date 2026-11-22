@@ -102,6 +102,8 @@ local BR = ns
 ---@field druidForms? table<string, table<string, boolean>> Content row -> allowed form keys
 ---@field paladinBlessingsByClass? table<string, (string|false)[]> Class token -> blessing keys in priority order
 ---@field paladinBlessingScope? "group"|"self"
+---@field blessingSubIcons? "rightclick"|"always"
+---@field driveBySubIcons? "rightclick"|"always"
 ---@field paladinAuras? table<string, table<string, boolean>> Content row -> chosen aura key. A row with none accepts any aura
 ---@field thornsRequest? boolean A tank of another class sees a Thorns request reminder
 ---@field righteousFuryShow? "tank"|"always"

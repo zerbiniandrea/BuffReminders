@@ -199,6 +199,70 @@ local function Pick()
     return nil
 end
 
+-- The single-target ranks of each candidate.
+---@type table<table, number[]>
+local rankLists = {}
+for _, buff in ipairs(candidates) do
+    local ranks = {}
+    for _, id in ipairs(StateHelpers.AsSpellList(buff.spellID)) do
+        if RANK_LEVELS[id] then
+            ranks[#ranks + 1] = id
+        end
+    end
+    rankLists[buff] = ranks
+end
+
+---@param list number[]
+---@param spellID number
+---@return boolean
+local function Contains(list, spellID)
+    for _, id in ipairs(list) do
+        if id == spellID then
+            return true
+        end
+    end
+    return false
+end
+
+local others = {}
+
+---The rank lists of the other buffs that the player can give the target of the
+---pick. A buff that the target has from any caster, or that has no rank for the
+---target level, is left out. The class lists and beneficiaries do not apply, so the
+---row can override them. The list is reused.
+---@param mainSpellID number The spell of the pick
+---@return number[][]
+local function Others(mainSpellID)
+    wipe(others)
+    local current = Pick() and GetTarget()
+    if not current then
+        return others
+    end
+    for _, buff in ipairs(candidates) do
+        if buff.classChoices then
+            for _, choice in ipairs(buff.classChoices.choices) do
+                if
+                    not Contains(choice.spellIDs, mainSpellID)
+                    and not TargetHasAura(choice.auraIDs or choice.spellIDs)
+                    and PickRank(choice.spellIDs, current.level)
+                then
+                    others[#others + 1] = choice.spellIDs
+                end
+            end
+        else
+            local ranks = rankLists[buff]
+            if
+                not Contains(ranks, mainSpellID)
+                and not TargetHasAura(StateHelpers.AsSpellList(buff.spellID))
+                and PickRank(ranks, current.level)
+            then
+                others[#others + 1] = ranks
+            end
+        end
+    end
+    return others
+end
+
 -- ============================================================================
 -- GREETING
 -- ============================================================================
@@ -311,4 +375,6 @@ end)
 
 BR.DriveBy = {
     Pick = Pick,
+    PickRank = PickRank,
+    Others = Others,
 }

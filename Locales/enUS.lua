@@ -600,6 +600,10 @@ english["Options.Soulstone.HideCooldown.Desc"] =
     "When enabled, warlocks won't see the soulstone reminder while the spell is on cooldown. Only applies to warlocks."
 english["Options.Soulstone.PinnedTarget"] = "Always cast on"
 english["Tooltip.PinNotInGroup"] = "(not in group)"
+english["Tooltip.Next"] = "Next:"
+english["Tooltip.ChoiceSpell"] = "· %s"
+english["Tooltip.ChoiceRightClick"] = "Right-click: other blessings"
+english["Tooltip.ChoiceRightClick.DriveBy"] = "Right-click: other buffs"
 
 -- ============================================================================
 -- OPTIONS: FREE CONSUMABLES
@@ -911,6 +915,12 @@ english["DisabledReason.BlessingDefaults"] = "All classes use their defaults."
 english["BuffPanel.BlessSelfOnly"] = "Only bless myself"
 english["BuffPanel.BlessSelfOnly.Desc"] =
     "Check and bless only yourself."
+english["BuffPanel.SubChoices"] = "Blessing icons"
+english["BuffPanel.SubChoices.RightClick"] = "On right-click"
+english["BuffPanel.SubChoices.Always"] = "Always"
+english["BuffPanel.SubChoices.Desc"] = "Icons for your other blessings, on the same person."
+english["BuffPanel.SubChoices.DriveBy"] = "Buff icons"
+english["BuffPanel.SubChoices.DriveBy.Desc"] = "Icons for your other buffs, on your target."
 english["BuffPanel.GroupCast"] = "Cast group version (uses a reagent)"
 english["BuffPanel.GroupCast.Desc"] =
     "If 2+ group members lack the buff and you have the reagent, a click casts the group version. Otherwise it casts the single-target version."
@@ -1340,6 +1350,7 @@ english["DisabledReason.ShowWithoutItems"] = 'Turn on "Show when not in bags" fi
 english["DisabledReason.PetLabelsOff"] = 'Pick a position for "Pet labels" first.'
 english["DisabledReason.OverrideRow"] = 'Tick "Override" on this row first.'
 english["DisabledReason.RaidClickToCast"] = 'Needs "Click to cast" on (Categories > Raid tab).'
+english["DisabledReason.UtilityClickToCast"] = 'Needs "Click to cast" on (Categories > Utility tab).'
 
 -- Direction labels
 english["Direction.Left"] = "Left"

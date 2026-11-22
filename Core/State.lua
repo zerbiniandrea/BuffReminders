@@ -2713,6 +2713,14 @@ function BuffState.GetChoiceCast(buff)
     return buff.classChoices.castID(state.renewChoices[unit]), unit
 end
 
+---Members whose choice from the player expires soon. The list is reused.
+---@param key string
+---@return string[]?
+function BuffState.GetChoiceRenewUnits(key)
+    local state = classChoiceStates[key]
+    return state and state.renewUnits
+end
+
 ---Highest group rank of the buff that the player knows and has the reagent for,
 ---when the user turned on the group cast and two or more members lack the buff.
 ---A classChoices buff casts the group rank of the picked choice on a member of its

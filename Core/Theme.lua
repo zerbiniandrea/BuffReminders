@@ -160,6 +160,13 @@ local function BuildRetail()
         note = { 0.502, 0.502, 0.502 },
         ownTooltip = false,
         tooltip = With(Flat({ 0.12, 0.12, 0.12, 0.98 }, BORDER), { title = TEXT, desc = Grey(0.7) }),
+        targetTooltip = {
+            native = false,
+            bg = { 0.08, 0.08, 0.08, 0.95 },
+            edge = Grey(0.25),
+            spell = { 1, 0.82, 0 },
+            note = Grey(0.533),
+        },
 
         shell = {
             panel = {
@@ -479,6 +486,7 @@ local function BuildForever()
         note = NOTE,
         ownTooltip = true,
         tooltip = With(Style(P.menuBg, P.menuBg, P.edgeHover, CLEAR), { title = TITLE, desc = NOTE }),
+        targetTooltip = { native = true, bg = P.menuBg, edge = P.edge, spell = P.accent, note = NOTE },
 
         shell = {
             panel = { lines = lines, band = band, body = body },

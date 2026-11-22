@@ -95,6 +95,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field visibilityCondition? fun(): boolean Return false to hide the buff
 ---@field classChoices? ClassChoiceGrid Each member wants a choice of their class list. The click casts the choice of the largest class set
 ---@field selfScope? fun(): boolean Return true to check and cast the buff on the player only
+---@field subChoices? SubChoiceRow Choice icons beside the reminder
 ---@field infoTooltip? TooltipText
 
 ---@class GroupCastRank
@@ -378,6 +379,14 @@ BR.PET_SPELLS = {
 ---@field forClass fun(class: string): StanceChoice[] Known choices of the class list in priority order. The list is reused
 ---@field castID fun(choice: StanceChoice): number? Highest known single-target rank of the choice
 
+---@class SubChoiceRow
+---@field setting string Key in profile.defaults: "rightclick" (a right-click opens the row) or "always"
+---@field label string Drawer label of the setting
+---@field desc string Drawer tooltip of the setting
+---@field hint string Hover tooltip line that names the right click
+---@field pick fun(def: table): number?, string? Spell and unit of the main click. nil = no cast
+---@field others fun(def: table, unit: string, spellID: number): number[][] Rank lists of the other choices for the unit, highest rank first. The list is reused
+
 ---@class StanceGrid
 ---@field setting string Key of the grid in profile.defaults
 ---@field choices StanceChoice[] In grid order. The click prefers the first allowed choice
@@ -653,6 +662,7 @@ BR.REPAIR_SOURCES = {
 ---@field castSpellID? number           -- Spell ID used for click-to-cast (else spellID)
 ---@field castUnit? string              -- Unit that the click casts on (nil = default targeting)
 ---@field clickSpell? fun(): number?    -- Spell that the click casts, read at click time. nil casts nothing
+---@field subChoices? SubChoiceRow      -- Choice icons beside the reminder
 ---@field noClickToCast? boolean        -- Suppress the click-to-cast overlay
 ---@field showOnInstanceEntry? boolean  -- Only show briefly on dungeon entry (grouped, non-M+)
 ---@field visibilityCondition? fun(): boolean?

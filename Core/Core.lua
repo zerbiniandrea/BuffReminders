@@ -484,6 +484,8 @@ local DefaultSettingKeys = {
     warlockWrongDemon = "DisplayRefresh",
     paladinBlessingScope = "DisplayRefresh",
     paladinBlessingsByClass = "DisplayRefresh",
+    blessingSubIcons = "DisplayRefresh",
+    driveBySubIcons = "DisplayRefresh",
     thornsRequest = "DisplayRefresh",
     righteousFuryShow = "DisplayRefresh",
     -- Font (global-only, lives under defaults)
