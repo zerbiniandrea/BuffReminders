@@ -692,7 +692,6 @@ english["Options.ChatRequest.Cooldown.Hint"] = "Requests not showing in chat? Tu
 english["Options.ChatRequest.ResetAll"] = "Reset all"
 english["ChatRequests.Messages"] = "Messages"
 english["ChatRequests.Restore"] = "Restore: %s"
-english["ChatRequests.Sends"] = "Sends: %s"
 english["DisabledReason.ChatRequestsOff"] = "Off while requests are off."
 english["DisabledReason.NoCustomMessages"] = "No custom messages."
 -- Chat request messages

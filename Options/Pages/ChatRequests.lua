@@ -110,8 +110,6 @@ local function Build(content, scrollFrame)
     local fieldWidth = rowsWidth - ICON_SIZE - ICON_GAP - nameWidth - LABEL_GAP - GLYPH_GAP - GLYPH_SIZE
 
     local rows = {}
-    local activeRow
-    local previewLead, previewMessage
     local resetAll
 
     local function SavedMessage(row)
@@ -130,23 +128,6 @@ local function Build(content, scrollFrame)
         row.reset:SetShown(isCustom)
     end
 
-    local function UpdatePreview()
-        local row = activeRow or rows[1]
-        if not row then
-            return
-        end
-        local message
-        if activeRow then
-            message = CleanMessage(row.input:GetValue(), row.default)
-        else
-            message = SavedMessage(row)
-        end
-        previewLead:SetText(
-            L["ChatRequests.Sends"]:format(BR.ColorCode(Theme.text) .. strtrim(ChatRequest.GetPrefix()) .. "|r")
-        )
-        previewMessage:SetText(message or row.default)
-    end
-
     local function Save(row, text)
         if not BR.profile.chatRequestMessages then
             BR.profile.chatRequestMessages = {}
@@ -160,7 +141,6 @@ local function Build(content, scrollFrame)
         row.input:SetValue(saved or row.default)
         PaintRow(row, saved ~= nil)
         resetAll:Refresh()
-        UpdatePreview()
     end
 
     local labels = BR.Options.GetCategoryLabels()
@@ -188,14 +168,9 @@ local function Build(content, scrollFrame)
             row.input:SetPoint("LEFT", ICON_SIZE + ICON_GAP, 0)
             local editBox = row.input.editBox
             editBox:SetMaxLetters(MAX_LETTERS)
-            editBox:HookScript("OnEditFocusGained", function()
-                activeRow = row
-                UpdatePreview()
-            end)
             editBox:HookScript("OnTextChanged", function(_, userInput)
                 if userInput then
                     PaintRow(row, CleanMessage(editBox:GetText(), row.default) ~= nil)
-                    UpdatePreview()
                 end
             end)
 
@@ -233,30 +208,6 @@ local function Build(content, scrollFrame)
         end
     end
 
-    layout:Space(COMPONENT_GAP)
-    local previewFrame = CreateFrame("Frame", nil, content)
-    previewFrame:SetSize(rowsWidth, 14)
-    previewLead = previewFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    previewLead:SetPoint("LEFT", 0, 0)
-    previewLead:SetWordWrap(false)
-    BR.ApplyNoteColor(previewLead)
-    previewMessage = previewFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    previewMessage:SetPoint("LEFT", previewLead, "RIGHT", 4, 0)
-    previewMessage:SetPoint("RIGHT", previewFrame, "RIGHT", 0, 0)
-    previewMessage:SetJustifyH("LEFT")
-    previewMessage:SetWordWrap(false)
-    BR.SetThemeTextColor(previewMessage, Theme.text)
-    -- The channel prefix follows the group, so the preview listens only while the page shows.
-    previewFrame:SetScript("OnShow", function(self)
-        BR.Client.RegisterEvent(self, "GROUP_ROSTER_UPDATE")
-        UpdatePreview()
-    end)
-    previewFrame:SetScript("OnHide", function(self)
-        self:UnregisterEvent("GROUP_ROSTER_UPDATE")
-    end)
-    previewFrame:SetScript("OnEvent", UpdatePreview)
-    layout:Add(previewFrame, 14, COMPONENT_GAP)
-
     local function AnyCustom()
         for _, row in ipairs(rows) do
             if SavedMessage(row) then
@@ -280,11 +231,9 @@ local function Build(content, scrollFrame)
 
     local rowsRefresher = {
         Refresh = function()
-            activeRow = nil
             for _, row in ipairs(rows) do
                 PaintRow(row, SavedMessage(row) ~= nil)
             end
-            UpdatePreview()
         end,
     }
     tinsert(BR.RefreshableComponents, rowsRefresher)
