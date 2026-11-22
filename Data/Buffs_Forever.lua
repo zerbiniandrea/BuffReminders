@@ -813,7 +813,6 @@ BR.BUFF_TABLES = {
             reach = "raid",
             -- Opt-in: it costs rage, which is empty between fights, and lasts 3 minutes.
             defaultEnabled = false,
-            chatRequestable = true,
         },
         {
             spellID = { 9885, 9884, 8907, 5234, 6756, 5232, 1126, 21850, 21849 },
