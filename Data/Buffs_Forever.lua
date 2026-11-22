@@ -45,6 +45,9 @@ BR.CONSUMABLE_PREVIEW_TEXTURES = {
 -- Forever items have no crafted quality, stat labels, Delve food or legacy tier.
 BR.CONSUMABLE_FEATURES = { itemLabels = false, delveFood = false, legacyItems = false }
 
+-- Support for this client is in development, so it shows the preview badge and notice.
+BR.CLIENT_PREVIEW = true
+
 -- Forever has no housing, scenarios or arenas, and all its dungeons have one difficulty.
 -- The raid map holds the raid difficultyIDs that Forever raids use.
 ---@type InstanceContent

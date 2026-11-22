@@ -131,6 +131,8 @@ BR.DEFAULT_ICON_ZOOM = 0 -- percentage; base crop (TEXCOORD_INSET) is always app
 BR.PANEL_DENSITY = 1.2
 BR.PANEL_ZOOM = { MIN = 80, MAX = 150, STEP = 10, DEFAULT = 100 }
 
+BR.DISCORD_URL = "https://discord.gg/qezQ2hXJJ7"
+
 BR.Colors = {
     Border = { 0.27, 0.27, 0.32, 1 },
     Accent = { 1, 0.82, 0, 1 },

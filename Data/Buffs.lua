@@ -288,6 +288,9 @@ BR.CONSUMABLE_PREVIEW_TEXTURES = {
 -- Consumable options that only apply to this client's item data.
 BR.CONSUMABLE_FEATURES = { itemLabels = true, delveFood = true, legacyItems = true }
 
+-- True shows the preview badge in the options header and the preview notice at login.
+BR.CLIENT_PREVIEW = false
+
 ---@class InstanceContent
 ---@field contentTypes string[] Segments of the content visibility bar, in bar order
 ---@field difficulties table<string, string[]> Sub-toggle keys per content type, in bar order. No entry = no sub-row
