@@ -1635,6 +1635,14 @@ local function MakeGroupCastSection(buff, desc)
     end
     return {
         build = function(layout)
+            -- A buff with a choice row keeps the right click for that row.
+            if not buff.subChoices then
+                local note = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+                note:SetWidth(bodyW)
+                note:SetJustifyH("LEFT")
+                note:SetText(L["BuffPanel.GroupCast.RightClick"])
+                layout:AddText(note, math.max(12, math.ceil(note:GetStringHeight())), COMPONENT_GAP)
+            end
             AddSpecialCheckbox(layout, {
                 label = L["BuffPanel.GroupCast"],
                 get = IsGroupCastOn,

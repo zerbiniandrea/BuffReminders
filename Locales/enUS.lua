@@ -735,6 +735,7 @@ english["Options.TooltipModifier.Shift"] = "Shift"
 english["Options.TooltipModifier.Ctrl"] = "Ctrl"
 english["Options.TooltipModifier.Alt"] = "Alt"
 english["Tooltip.RightClickSnooze"] = "Right-click: snooze consumable reminders"
+english["Tooltip.RightClickGroup"] = "Right-click: group version"
 english["Options.PetPassiveCombat"] = "Pet passive only in combat"
 english["Options.PetPassiveCombat.Desc"] =
     "Only show the passive pet reminder while in combat. When disabled, the reminder is always shown."
@@ -940,16 +941,17 @@ english["BuffPanel.SubChoices.Always"] = "Always"
 english["BuffPanel.SubChoices.Desc"] = "Icons for your other blessings, on the same person."
 english["BuffPanel.SubChoices.DriveBy"] = "Buff icons"
 english["BuffPanel.SubChoices.DriveBy.Desc"] = "Icons for your other buffs, on your target."
-english["BuffPanel.GroupCast"] = "Cast group version (uses a reagent)"
+english["BuffPanel.GroupCast"] = "Auto group version (uses a reagent)"
 english["BuffPanel.GroupCast.Desc"] =
-    "If enough members of your party lack the buff and are in range, and you have the reagent, a click casts the group version on you. Otherwise it casts the single-target version."
+    "If enough members of your party lack the buff and are in range, and you have the reagent, a left click casts the group version on you. Otherwise it casts the single-target version."
 english["BuffPanel.GroupCast.Blessing.Desc"] =
     "If enough members of one class lack the same blessing, a click casts the Greater version (needs Symbol of Kings). Only when you give that blessing to the whole class."
 english["BuffPanel.GroupCastMin"] = "Group version at"
 english["BuffPanel.GroupCastMin.Suffix"] = " missing"
 english["BuffPanel.GroupCastMin.Desc"] =
     "How many members must lack the buff before a click casts the group version: in your party, or in one class for a Greater Blessing. One value for all buffs."
-english["DisabledReason.GroupCast"] = 'Turn on "Cast group version" first.'
+english["DisabledReason.GroupCast"] = 'Turn on "Auto group version" first.'
+english["BuffPanel.GroupCast.RightClick"] = "Right-click the icon: the group version, if you have the reagent."
 english["BuffPanel.PaladinAura.Hint"] = "Pick one aura per content. The icon shows WRONG AURA if another one is active. An empty row, or an aura you have not learned, accepts any aura."
 english["BuffPanel.ThornsRequest"] = "Tanks can ask for Thorns"
 english["BuffPanel.ThornsRequest.Desc"] =
