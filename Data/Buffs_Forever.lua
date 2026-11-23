@@ -1940,6 +1940,9 @@ BR.BUFF_TABLES = {
                 return BR.Tracking.Pick()
             end,
             customCheck = function()
+                if BR.GameContext.IsInCombat() then
+                    return false
+                end
                 return BR.Tracking.Pick() ~= nil and not BR.BuffState.IsTrackingActive()
             end,
         },
