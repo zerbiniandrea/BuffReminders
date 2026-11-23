@@ -1629,21 +1629,50 @@ end
 ---@return table section
 local function MakeGroupCastSection(buff, desc)
     local key = buff.key
+    local function IsGroupCastOn()
+        local groupCast = BR.profile.groupCast
+        return groupCast ~= nil and groupCast[key] == true
+    end
     return {
         build = function(layout)
             AddSpecialCheckbox(layout, {
                 label = L["BuffPanel.GroupCast"],
-                get = function()
-                    local groupCast = BR.profile.groupCast
-                    return groupCast ~= nil and groupCast[key] == true
-                end,
+                get = IsGroupCastOn,
                 enabled = IsRaidClickable,
                 disabledReason = L["DisabledReason.RaidClickToCast"],
                 tooltip = { title = L["BuffPanel.GroupCast"], desc = desc or L["BuffPanel.GroupCast.Desc"] },
                 onChange = function(checked)
                     BR.Config.Set("groupCast." .. key, checked or nil)
+                    Components.RefreshAll()
                 end,
             })
+            local minHolder = Components.Slider(body, {
+                label = L["BuffPanel.GroupCastMin"],
+                labelWidth = 96,
+                sliderWidth = 80,
+                min = 2,
+                max = 5,
+                step = 1,
+                suffix = L["BuffPanel.GroupCastMin.Suffix"],
+                get = function()
+                    return BR.Config.Get("defaults.groupCastMin") or 2
+                end,
+                enabled = function()
+                    return IsRaidClickable() and IsGroupCastOn()
+                end,
+                disabledReason = function()
+                    if not IsRaidClickable() then
+                        return L["DisabledReason.RaidClickToCast"]
+                    end
+                    return L["DisabledReason.GroupCast"]
+                end,
+                tooltip = { title = L["BuffPanel.GroupCastMin"], desc = L["BuffPanel.GroupCastMin.Desc"] },
+                onChange = function(val)
+                    BR.Config.Set("defaults.groupCastMin", val)
+                end,
+            })
+            tinsert(bodyHolders, minHolder)
+            layout:Add(minHolder, nil, COMPONENT_GAP)
         end,
     }
 end

@@ -209,6 +209,7 @@ BR.defaults = {
         reagentRestedOnly = true,
         ammoThresholdStacks = 1, -- hunters: the ammo reminder shows below this many stacks
         ammoThresholdShots = 20, -- other classes: the ammo reminder shows below this many shots
+        groupCastMin = 2, -- group members who lack a buff before the click casts its group version
         driveByGreeting = "none",
         -- driveByWhisper, driveByEmoteText: absent - nil means the localized default text
         driveByEmote = "WAVE",

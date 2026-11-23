@@ -75,6 +75,7 @@ local BR = ns
 ---@field reagentRestedOnly? boolean
 ---@field ammoThresholdStacks? number
 ---@field ammoThresholdShots? number
+---@field groupCastMin? number Members of one party (one class for a blessing) who lack a buff before a group cast
 ---@field driveByGreeting? "none"|"whisper"|"emote"
 ---@field driveByWhisper? string Greeting whisper. nil = the localized default
 ---@field driveByEmote? string Emote token for DoEmote, or "CUSTOM" for driveByEmoteText

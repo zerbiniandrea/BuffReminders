@@ -2751,30 +2751,57 @@ function BuffState.GetChoiceRenewUnits(key)
     return state and state.renewUnits
 end
 
----Highest group rank of the buff that the player knows and has the reagent for,
----when the user turned on the group cast and two or more members lack the buff.
+---Highest group rank of the buff that the player knows and has the reagent for, and
+---its target, when the user turned on the group cast and enough members lack the buff.
+---A group rank reaches only the party of its target. In a raid, each subgroup is a
+---party. The rank goes on the player, so only the in-range members of the player's party count.
 ---A classChoices buff casts the group rank of the picked choice on a member of its
 ---class, because that rank reaches only the class of its target. Every counted member
 ---of that class must want the choice, because the group rank replaces the choice
 ---that the player gives each of them.
 ---@param buff RaidBuff
 ---@return number? spellID
----@return string? unit Target of a class-wide rank. nil = the player
+---@return string? unit
 function BuffState.GetGroupCastSpellID(buff)
     local enabled = BR.profile.groupCast
     local missingUnits = missingUnitsByKey[buff.key]
-    if not (enabled and enabled[buff.key]) or not missingUnits or #missingUnits < 2 then
+    local defaults = BR.profile.defaults
+    local minCount = defaults and defaults.groupCastMin or 2
+    if not (enabled and enabled[buff.key]) or not missingUnits or #missingUnits < minCount then
         return nil
     end
-    local ranks, unit = buff.groupCast, nil
+    local ranks = buff.groupCast
+    local unit = "player" ---@type string?
     if buff.classChoices then
         local choice, count
         unit, choice, count = PickChoiceTarget(buff.key)
         local state = classChoiceStates[buff.key]
-        if not unit or not choice or count < 2 or not state or state.classWant[state.classes[unit]] ~= choice then
+        if
+            not unit
+            or not choice
+            or count < minCount
+            or not state
+            or state.classWant[state.classes[unit]] ~= choice
+        then
             return nil
         end
         ranks = choice.groupCast
+    else
+        local subgroups = IsInRaid() and GetRaidSubgroups()
+        local playerGroup = subgroups and subgroups.player
+        if subgroups and not playerGroup then
+            return nil
+        end
+        local count = 0
+        for i = 1, #missingUnits do
+            local member = missingUnits[i]
+            if (not subgroups or subgroups[member] == playerGroup) and IsMissingUnitInRange(member) then
+                count = count + 1
+            end
+        end
+        if count < minCount then
+            return nil
+        end
     end
     if not ranks then
         return nil
