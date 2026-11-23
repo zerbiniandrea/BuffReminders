@@ -887,6 +887,7 @@ english["BuffRow.Glyph.Detached.Desc"] =
     "This icon is placed freely on screen. Manage it in the buff's Settings or on the Layout page."
 english["BuffRow.Glyph.New"] = "New buff"
 english["BuffRow.Glyph.New.Desc"] = "Added in the latest update."
+english["BuffRow.SearchPlaceholder"] = "Search by reminder, spell, or class"
 -- %s is the option name
 english["BuffPanel.EditOption"] = "Edit %s"
 english["BuffPanel.Show"] = "Show"

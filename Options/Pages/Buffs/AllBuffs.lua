@@ -32,6 +32,10 @@ local NOTE_TO_ROWS_GAP = 16
 local ROW_INDENT = 6
 -- Vertical gap between the last row of one section and the next header.
 local INTER_SECTION_GAP = 10
+local SEARCH_TO_SECTIONS_GAP = 14
+local SEARCH_DIM_ALPHA = 0.25
+-- Space kept above the first match after a scroll, so its section header stays in view.
+local SEARCH_SCROLL_MARGIN = 40
 
 local SECTIONS = {
     {
@@ -81,40 +85,149 @@ local function CreateSectionWithNote(parent, x, y, headerText, noteText)
     note:SetPoint("TOPLEFT", x, y - HEADER_TO_NOTE_GAP)
     note:SetText(noteText)
 
-    return y - HEADER_TO_NOTE_GAP - NOTE_TO_ROWS_GAP
+    return y - HEADER_TO_NOTE_GAP - NOTE_TO_ROWS_GAP, header, note
 end
 
--- Masonry: each section, in list order, goes to the shorter column. A tie goes left.
+-- Tries every split that keeps list order in each column and the first section on the left.
+-- Picks the split with the shortest tallest column. A greedy fill leaves the last section unbalanced.
 local function AssignColumns()
     local Measure = BR.Options.BuffRow.Measure
-    local columns = { {}, {} }
-    local heights = { 0, 0 }
+    local sections, heights = {}, {}
     for _, section in ipairs(SECTIONS) do
         if BR.IsCategoryAvailable(section.category) then
-            local col = heights[2] < heights[1] and 2 or 1
-            local gap = #columns[col] > 0 and INTER_SECTION_GAP or 0
-            local buffs = BUFF_TABLES[section.category] or {}
-            heights[col] = heights[col] + gap + HEADER_TO_NOTE_GAP + NOTE_TO_ROWS_GAP + Measure(buffs)
-            columns[col][#columns[col] + 1] = section
+            sections[#sections + 1] = section
+            heights[#heights + 1] = HEADER_TO_NOTE_GAP + NOTE_TO_ROWS_GAP + Measure(BUFF_TABLES[section.category] or {})
         end
+    end
+
+    local n = #sections
+    local bestMask, bestMax, bestDiff = 0, math.huge, math.huge
+    for mask = 0, 2 ^ math.max(n - 1, 0) - 1 do
+        local h, count = { 0, 0 }, { 0, 0 }
+        local m = mask
+        for i = 1, n do
+            local col = 1
+            if i > 1 then
+                col = m % 2 + 1
+                m = math.floor(m / 2)
+            end
+            h[col] = h[col] + (count[col] > 0 and INTER_SECTION_GAP or 0) + heights[i]
+            count[col] = count[col] + 1
+        end
+        local tallest, diff = math.max(h[1], h[2]), math.abs(h[1] - h[2])
+        if tallest < bestMax or (tallest == bestMax and diff < bestDiff) then
+            bestMask, bestMax, bestDiff = mask, tallest, diff
+        end
+    end
+
+    local columns = { {}, {} }
+    for i = 1, n do
+        local col = 1
+        if i > 1 then
+            col = bestMask % 2 + 1
+            bestMask = math.floor(bestMask / 2)
+        end
+        columns[col][#columns[col] + 1] = sections[i]
     end
     return columns[1], columns[2]
 end
 
-local function RenderColumn(parent, x, y, sections, colWidth)
+local function RenderColumn(parent, x, y, sections, colWidth, rendered)
     local Render = BR.Options.BuffRow.Render
     local rowsX = x + ROW_INDENT
     -- Rows start ROW_INDENT in from the column's left edge; span the rest of
     -- the column so the "Settings" link lands on the column's right edge.
     local rowWidth = colWidth - ROW_INDENT
     for i, section in ipairs(sections) do
-        y = CreateSectionWithNote(parent, x, y, L[section.titleKey], L[section.noteKey])
-        y = Render(parent, rowsX, y, BUFF_TABLES[section.category] or {}, rowWidth)
+        local title = L[section.titleKey]
+        local header, note
+        y, header, note = CreateSectionWithNote(parent, x, y, title, L[section.noteKey])
+        local rows = {}
+        y = Render(parent, rowsX, y, BUFF_TABLES[section.category] or {}, rowWidth, rows)
+        rendered[#rendered + 1] = { header = header, note = note, title = title:lower(), rows = rows }
         if i < #sections then
             y = y - INTER_SECTION_GAP
         end
     end
     return y
+end
+
+-- A section title match keeps the whole section lit. Returns the lit frames, or nil for an empty query.
+local function ApplySearch(rendered, query)
+    query = query:lower():match("^%s*(.-)%s*$")
+    local matches = query ~= "" and {} or nil
+    for _, section in ipairs(rendered) do
+        local titleHit = query == "" or section.title:find(query, 1, true) ~= nil
+        local anyHit = titleHit
+        for _, row in ipairs(section.rows) do
+            local hit = titleHit or row.text:find(query, 1, true) ~= nil
+            row.frame:SetAlpha(hit and 1 or SEARCH_DIM_ALPHA)
+            if hit and matches then
+                matches[#matches + 1] = row.frame
+            end
+            anyHit = anyHit or hit
+        end
+        local alpha = anyHit and 1 or SEARCH_DIM_ALPHA
+        section.header:SetAlpha(alpha)
+        section.note:SetAlpha(alpha)
+        if titleHit and matches then
+            matches[#matches + 1] = section.header
+        end
+    end
+    return matches
+end
+
+-- Scrolls only when no match is in view, so the list does not jump while the user types.
+local function ScrollToMatches(scrollFrame, content, matches)
+    if not matches or #matches == 0 then
+        return
+    end
+    local contentTop = content:GetTop()
+    if not contentTop then
+        return
+    end
+    local scroll = scrollFrame:GetVerticalScroll() or 0
+    local viewHeight = scrollFrame:GetHeight()
+    local first = math.huge
+    for _, frame in ipairs(matches) do
+        local top = frame:GetTop()
+        if top then
+            local offset = contentTop - top
+            if offset >= scroll and offset + frame:GetHeight() <= scroll + viewHeight then
+                return
+            end
+            first = math.min(first, offset)
+        end
+    end
+    if first == math.huge then
+        return
+    end
+    local range = scrollFrame:GetVerticalScrollRange() or 0
+    scrollFrame:SetVerticalScroll(math.max(0, math.min(range, first - SEARCH_SCROLL_MARGIN)))
+end
+
+local function CreateSearchBox(content, scrollFrame, x, y, width, rendered)
+    local holder = BR.Components.TextInput(content, { labelWidth = 0, width = width })
+    holder:SetPoint("TOPLEFT", x - 5, y)
+    local editBox = holder.editBox
+
+    local placeholder = editBox:GetParent():CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    placeholder:SetPoint("LEFT", 6, 0)
+    placeholder:SetText(L["BuffRow.SearchPlaceholder"])
+
+    editBox:HookScript("OnTextChanged", function(self)
+        local text = self:GetText()
+        placeholder:SetShown(text == "")
+        ScrollToMatches(scrollFrame, content, ApplySearch(rendered, text))
+    end)
+    editBox:HookScript("OnEscapePressed", function(self)
+        self:SetText("")
+    end)
+    -- The page builds once, so a kept query would dim rows on the next visit with no visible reason.
+    content:HookScript("OnHide", function()
+        editBox:SetText("")
+    end)
+    return y - holder:GetHeight() - SEARCH_TO_SECTIONS_GAP
 end
 
 local function Build(content, scrollFrame)
@@ -123,13 +236,14 @@ local function Build(content, scrollFrame)
     local leftX = COL_PADDING
     local rightX = COL_PADDING + colWidth + COL_PADDING
 
-    -- Match the standard page top margin so the first section header sits at
-    -- the same Y as on every other page (VerticalLayout starts at PAGE_TOP_PADDING).
-    local startY = PAGE_TOP_PADDING
+    local rendered = {}
+    -- PAGE_TOP_PADDING is the standard page top margin, so the search box sits
+    -- at the same Y as the first element on every other page.
+    local startY = CreateSearchBox(content, scrollFrame, leftX, PAGE_TOP_PADDING, colWidth, rendered)
 
     local leftSections, rightSections = AssignColumns()
-    local leftEndY = RenderColumn(content, leftX, startY, leftSections, colWidth)
-    local rightEndY = RenderColumn(content, rightX, startY, rightSections, colWidth)
+    local leftEndY = RenderColumn(content, leftX, startY, leftSections, colWidth, rendered)
+    local rightEndY = RenderColumn(content, rightX, startY, rightSections, colWidth, rendered)
 
     content:SetHeight(math.max(math.abs(leftEndY), math.abs(rightEndY)) + 16)
 end
