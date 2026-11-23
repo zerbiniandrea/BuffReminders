@@ -272,6 +272,7 @@ BR.defaults = {
         -- WoW Forever: the choice icons beside the reminder show on a right-click or always.
         blessingSubIcons = BR.CLIENT == BR.ClientType.Forever and "rightclick" or nil,
         driveBySubIcons = BR.CLIENT == BR.ClientType.Forever and "rightclick" or nil,
+        trackingSubIcons = BR.CLIENT == BR.ClientType.Forever and "rightclick" or nil,
         -- The paladin aura of each content row (WoW Forever). A row with none accepts any aura.
         paladinAuras = BR.CLIENT == BR.ClientType.Forever and {
             world = {},

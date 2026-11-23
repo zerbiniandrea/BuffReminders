@@ -750,8 +750,26 @@ local function ShowNextPick(overlay, frame)
     if ChoiceRowMode(def) == "rightclick" and #sub.others(def, unit, spellID) > 0 then
         note = sub.hint
     end
-    ShowPickTooltip(overlay, unit, spellID, NEXT_LEAD, note)
     BR.SecureButtons.ScheduleSecureSync()
+    if unit ~= "player" then
+        ShowPickTooltip(overlay, unit, spellID, NEXT_LEAD, note)
+        return true
+    end
+    -- A self pick names no person: the spell tooltip shows the pick, else only the hint shows.
+    local function ShowNote()
+        ShowLastTargetTooltip(overlay, "", nil, nil, note)
+    end
+    if BR.Display.IsBuffTooltipOn(frame.buffCategory) then
+        BR.Display.ShowBuffSpellTooltip(frame, overlay, note and function(tooltip)
+            if lastTargetTooltip then
+                lastTargetTooltip:Hide()
+            end
+            local n = TARGET_TIP.note
+            tooltip:AddLine(note, n[1], n[2], n[3])
+        end or nil, note and ShowNote or nil, spellID)
+    elseif note then
+        ShowNote()
+    end
     return true
 end
 

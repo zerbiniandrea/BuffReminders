@@ -490,6 +490,7 @@ local DefaultSettingKeys = {
     paladinBlessingsByClass = "DisplayRefresh",
     blessingSubIcons = "DisplayRefresh",
     driveBySubIcons = "DisplayRefresh",
+    trackingSubIcons = "DisplayRefresh",
     thornsRequest = "DisplayRefresh",
     righteousFuryShow = "DisplayRefresh",
     -- Font (global-only, lives under defaults)

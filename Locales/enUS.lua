@@ -134,6 +134,7 @@ english["Overlay.Ammo"] = "LOW\nAMMO"
 english["Overlay.AmmoLabel"] = "AMMO"
 english["Overlay.EquipAmmo"] = "EQUIP\nAMMO"
 english["Overlay.DriveBy"] = "BUFF\nTARGET"
+english["Overlay.NoTracking"] = "NO\nTRACK"
 english["Overlay.NoGrim"] = "NO\nGRIM"
 english["Overlay.BurningRush"] = "RUSH"
 english["Overlay.NoRite"] = "NO\nRITE"
@@ -247,6 +248,7 @@ english["Buff.RepairGear"] = "Repair Equipment"
 english["Buff.LowReagents"] = "Low Reagents"
 english["Buff.LowAmmo"] = "Low Ammo"
 english["Buff.DriveByBuffs"] = "Drive-by Buffs"
+english["Buff.Tracking"] = "Gathering Tracking"
 english["Buff.DruidForm"] = "Druid Form"
 english["Buff.GrimoireOfSacrifice"] = "Grimoire of Sacrifice"
 english["Buff.BurningRush"] = "Burning Rush"
@@ -326,6 +328,8 @@ english["Tooltip.PaladinBlessing.Desc"] =
     "Each class gets its blessing from your list in Extras. If another paladin already gives it, you give the backup."
 english["Tooltip.DriveBy.Desc"] =
     "Out of combat, shows when your target is a friendly player outside your group who lacks one of your buffs. Click to cast the best rank for them."
+english["Tooltip.Tracking.Desc"] =
+    "Shows when you know Find Herbs or Find Minerals and no tracking is active, for example after you die. Click to cast the last one you used."
 english["Tooltip.InstanceEntryReminder"] = "Instance Entry Reminder"
 english["Tooltip.InstanceEntryReminder.Desc"] =
     "Briefly shown when entering a dungeon as a reminder to drop a Soulwell. Dismissed after casting or after 30 seconds."
@@ -622,6 +626,7 @@ english["Tooltip.Next"] = "Next:"
 english["Tooltip.ChoiceSpell"] = "· %s"
 english["Tooltip.ChoiceRightClick"] = "Right-click: other blessings"
 english["Tooltip.ChoiceRightClick.DriveBy"] = "Right-click: other buffs"
+english["Tooltip.ChoiceRightClick.Tracking"] = "Right-click: other tracking"
 
 -- ============================================================================
 -- OPTIONS: FREE CONSUMABLES
@@ -953,6 +958,8 @@ english["BuffPanel.SubChoices.Always"] = "Always"
 english["BuffPanel.SubChoices.Desc"] = "Icons for your other blessings, on the same person."
 english["BuffPanel.SubChoices.DriveBy"] = "Buff icons"
 english["BuffPanel.SubChoices.DriveBy.Desc"] = "Icons for your other buffs, on your target."
+english["BuffPanel.SubChoices.Tracking"] = "Tracking icons"
+english["BuffPanel.SubChoices.Tracking.Desc"] = "An icon for your other gathering tracking."
 english["BuffPanel.GroupCast"] = "Auto group version (uses a reagent)"
 english["BuffPanel.GroupCast.Desc"] =
     "If enough members of your party lack the buff and are in range, and you have the reagent, a left click casts the group version on you. Otherwise it casts the single-target version."

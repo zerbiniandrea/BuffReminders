@@ -69,6 +69,7 @@ Core\Loadouts.lua
 Core\LoadoutActions.lua
 Core\State.lua
 Core\DriveBy.lua
+Core\Tracking.lua
 UI\Components.lua
 UI\Glow.lua
 Display\Icons.lua

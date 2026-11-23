@@ -1317,6 +1317,30 @@ local DRIVE_BY_ROW = {
     end,
 }
 
+-- Minimap tracking spells, in the order of the fallback pick.
+BR.TRACKING_SPELLS = {
+    2383, -- Find Herbs
+    2580, -- Find Minerals
+}
+
+---@type SubChoiceRow
+local TRACKING_ROW = {
+    setting = "trackingSubIcons",
+    label = L["BuffPanel.SubChoices.Tracking"],
+    desc = L["BuffPanel.SubChoices.Tracking.Desc"],
+    hint = L["Tooltip.ChoiceRightClick.Tracking"],
+    pick = function()
+        local spellID = BR.Tracking.Pick()
+        if spellID then
+            return spellID, "player"
+        end
+        return nil
+    end,
+    others = function(_, _, spellID)
+        return BR.Tracking.Others(spellID)
+    end,
+}
+
 -- Spells have ranks, and every rank ID counts as the buff. Click-to-cast casts the
 -- first ID in spellID that the player knows, so each list starts with the highest rank.
 -- A raid buff lists its single-target ranks before its reagent group version.
@@ -1891,6 +1915,27 @@ BR.BUFF_TABLES = {
             end,
             customCheck = function()
                 return BR.DriveBy.Pick() ~= nil
+            end,
+        },
+        {
+            key = "tracking",
+            name = L["Buff.Tracking"],
+            spellID = BR.TRACKING_SPELLS,
+            icons = {
+                spells = { 2383, 2580, 1494 },
+                dynamic = function()
+                    local spellID = BR.Tracking.Pick()
+                    return spellID and BR.Icons.GetBuffTexture(spellID)
+                end,
+            },
+            overlayText = L["Overlay.NoTracking"],
+            infoTooltip = { title = L["Buff.Tracking"], desc = L["Tooltip.Tracking.Desc"] },
+            subChoices = TRACKING_ROW,
+            clickSpell = function()
+                return BR.Tracking.Pick()
+            end,
+            customCheck = function()
+                return BR.Tracking.Pick() ~= nil and not BR.BuffState.IsTrackingActive()
             end,
         },
         {
