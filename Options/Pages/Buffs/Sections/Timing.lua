@@ -46,7 +46,7 @@ local function Build(ctx, layout)
         label = L["Options.ExpirationWarning"],
         min = 0,
         max = 45,
-        step = 5,
+        step = 1,
         formatValue = function(val)
             return val == 0 and L["Options.Off"] or (val .. " " .. L["Options.Min"])
         end,

@@ -182,6 +182,7 @@ BR.defaults = {
         showExpirationGlow = false,
         showMissingGlow = false,
         expirationThreshold = BR.CLIENT == BR.ClientType.Forever and 5 or 15, -- minutes
+        expirationShare = 25, -- percent of a buff duration, capped by expirationThreshold
         preKeyThreshold = 0, -- minutes (0 = off); used in M0 before inserting a keystone
         glowType = 2, -- BR.Glow.Type: Pixel=1, AutoCast=2, Border=3, Proc=4 (expiring default)
         glowSize = 2,

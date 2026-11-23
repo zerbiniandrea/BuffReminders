@@ -23,6 +23,7 @@ local BR = ns
 ---@field showExpirationGlow boolean
 ---@field showMissingGlow boolean
 ---@field expirationThreshold number
+---@field expirationShare? number Percent of a buff duration
 ---@field preKeyThreshold number
 ---@field glowType number
 ---@field glowColor? number[]
@@ -1720,7 +1721,6 @@ local function GenerateTestEntries()
         entry.shouldGlow = false
         entry.countText = nil
         entry.overlayText = nil
-        entry.expiringTime = nil
         entry.isEating = nil
         entry.petActions = nil
         entry.iconByRole = nil
@@ -1734,6 +1734,9 @@ local function GenerateTestEntries()
         local exGlowEnabled = BR.Config.GetCategorySetting(category, "showExpirationGlow") ~= false
         local missGlowEnabled = BR.Config.GetCategorySetting(category, "showMissingGlow") ~= false
         local threshold = BR.Config.GetCategorySetting(category, "expirationThreshold") or 15
+        -- The sample buff lasts 60 min.
+        local testLead = BR.StateHelpers.AuraLead(3600, threshold * 60) or 0
+        local testRemaining = min(testModeData.fakeRemaining, testLead)
         local expiringShown = false
 
         for i, buff in ipairs(BUFF_TABLES[category]) do
@@ -1758,7 +1761,7 @@ local function GenerateTestEntries()
                 if category == "raid" then
                     if threshold > 0 and not expiringShown then
                         entry.displayType = "expiring"
-                        entry.countText = FormatRemainingTime(testModeData.fakeRemaining)
+                        entry.countText = FormatRemainingTime(testRemaining)
                         entry.shouldGlow = exGlowEnabled
                         expiringShown = true
                     else
@@ -1797,7 +1800,7 @@ local function GenerateTestEntries()
                     -- Show first buff as expiring to preview expiration countdown
                     if threshold > 0 and not buff.noExpirationGlow and not expiringShown then
                         entry.displayType = "expiring"
-                        entry.countText = FormatRemainingTime(testModeData.fakeRemaining)
+                        entry.countText = FormatRemainingTime(testRemaining)
                         entry.shouldGlow = exGlowEnabled
                         expiringShown = true
                     end

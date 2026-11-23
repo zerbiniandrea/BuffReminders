@@ -20,7 +20,6 @@ local BR = ns
 ---@field displayType "count"|"text"|"expiring"
 ---@field countText string?                  -- "17/20" for raid buffs, "5m" for expiring consumables
 ---@field overlayText string?                -- "NO\nAURA" for non-raid
----@field expiringTime number?               -- Seconds remaining if expiring
 ---@field shouldGlow boolean                 -- Expiration glow?
 ---@field iconByRole table<RoleType,number>? -- Role-based icon override
 ---@field rebuffWarning boolean?             -- Consumable rebuff pulsing border?
@@ -916,13 +915,71 @@ local function HasCasterForBuff(requiredClass, levelRequired, reach)
     return not levelRequired or maxLevel >= levelRequired
 end
 
----An aura whose full duration fits in the threshold is below it from the cast on,
----so it never counts as expiring. It shows again only when it is missing.
+-- The warning window of an aura copy (its lead), and the choice of the copy that a
+-- multi-member scan reports.
+local Lead = {}
+-- Fraction of the full duration, set from the defaults on each settings read.
+Lead.share = 0.25
+
+---Seconds before the end of an aura when its warning starts: a share of its full
+---duration, at most the threshold. An aura of 5 min or less shows only when missing.
+---An unknown duration (nil, 0, or secret) uses the threshold.
 ---@param duration? number
----@param threshold number
----@return boolean
-local function IsShortAura(duration, threshold)
-    return duration ~= nil and duration > 0 and duration <= threshold
+---@param threshold number Seconds
+---@param floor? number Seconds. Ignores the share cap, but stays a minute under the full duration
+---@param share? number Fraction of the duration. Default Lead.share
+---@return number? lead nil when the aura never warns
+function Lead.Of(duration, threshold, floor, share)
+    floor = floor or 0
+    if not duration or duration <= 0 then
+        return threshold > floor and threshold or floor
+    end
+    if duration <= 300 then
+        return nil
+    end
+    local lead = duration * (share or Lead.share)
+    if lead > threshold then
+        lead = threshold
+    end
+    if floor > lead then
+        lead = floor < duration - 60 and floor or duration - 60
+    end
+    return lead
+end
+
+---Fold one copy into the best copy of a scan. A copy in its window beats one outside
+---it. Among copies in their window, the one that ends first wins. Among the others,
+---the one that enters its window first wins. nextSlack is the earliest entry into a
+---window, so a render can follow it.
+---@param remaining number
+---@param lead number
+---@param bestRemaining? number
+---@param bestLead? number
+---@param nextSlack? number
+---@return number bestRemaining
+---@return number bestLead
+---@return number? nextSlack
+function Lead.Pick(remaining, lead, bestRemaining, bestLead, nextSlack)
+    local slack = remaining - lead
+    if slack >= 0 and (not nextSlack or slack < nextSlack) then
+        nextSlack = slack
+    end
+    if not bestRemaining or not bestLead then
+        return remaining, lead, nextSlack
+    end
+    local inWindow = slack < 0
+    local better
+    if inWindow ~= (bestRemaining < bestLead) then
+        better = inWindow
+    elseif inWindow then
+        better = remaining < bestRemaining
+    else
+        better = slack < bestRemaining - bestLead
+    end
+    if better then
+        return remaining, lead, nextSlack
+    end
+    return bestRemaining, bestLead, nextSlack
 end
 
 ---Check if unit has a specific buff (handles single spellID or table of spellIDs)
@@ -1566,18 +1623,21 @@ end
 ---@param playerOnly? boolean Only check the player, not the group
 ---@param playersOnly? boolean Exclude NPCs from the count (e.g. buffs NPCs provide themselves)
 ---@param partyOnly? boolean In a raid, count only the player's subgroup
----@param threshold number A short aura (IsShortAura) never sets minRemaining
+---@param threshold number Input of Lead.Of
+---@param floor number Input of Lead.Of
 ---@param missingUnits? string[] Wiped, then filled with the unit of each counted member who lacks the buff
 ---@return number missing
 ---@return number total
----@return number? minRemaining
-local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, partyOnly, threshold, missingUnits)
+---@return number? minRemaining Remaining time of the copy that Lead.Pick chose
+---@return number? minLead Lead of that copy
+---@return number? nextSlack Seconds until the next copy enters its window
+local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, partyOnly, threshold, floor, missingUnits)
     if missingUnits then
         wipe(missingUnits)
     end
     local missing = 0
     local total = 0
-    local minRemaining = nil
+    local minRemaining, minLead, nextSlack = nil, nil, nil
     local beneficiaries = BuffBeneficiaries[buffKey]
     local specBeneficiaries = SpecBeneficiaries[buffKey]
 
@@ -1593,10 +1653,11 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
             if missingUnits then
                 missingUnits[1] = "player"
             end
-        elseif remaining and not IsShortAura(duration, threshold) then
-            minRemaining = remaining
+        elseif remaining then
+            minLead = Lead.Of(duration, threshold, floor)
+            minRemaining = minLead and remaining
         end
-        return missing, total, minRemaining
+        return missing, total, minRemaining, minLead
     end
 
     local countNPCs = includeNPCsInCounting and not GameContext.IsInCombat() and not playersOnly
@@ -1623,9 +1684,11 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
                             local isSelf = data.unit == "player" or Plain(UnitIsUnit(data.unit, "player")) == true
                             missingUnits[missing] = isSelf and "player" or data.unit
                         end
-                    elseif remaining and not IsShortAura(duration, threshold) then
-                        if not minRemaining or remaining < minRemaining then
-                            minRemaining = remaining
+                    elseif remaining then
+                        local lead = Lead.Of(duration, threshold, floor)
+                        if lead then
+                            minRemaining, minLead, nextSlack =
+                                Lead.Pick(remaining, lead, minRemaining, minLead, nextSlack)
                         end
                     end
                 end
@@ -1633,7 +1696,7 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
         end
     end
 
-    return missing, total, minRemaining
+    return missing, total, minRemaining, minLead, nextSlack
 end
 
 ---Check if anyone in the group has a presence buff active
@@ -1642,11 +1705,14 @@ end
 ---@param playerOnly? boolean Only check the player, not the group
 ---@param playerCastOnly? boolean Count only auras cast by the player (e.g. castOnOthers for the caster class)
 ---@param partyOnly? boolean In a raid, look only in the player's subgroup
----@param threshold number A short aura (IsShortAura) never sets minRemaining
+---@param threshold number Input of Lead.Of
+---@param floor number Input of Lead.Of
 ---@return boolean hasBuff
----@return number? minRemaining
+---@return number? minRemaining Remaining time of the copy that Lead.Pick chose
 ---@return table? targetEntry First non-player unit entry that has the buff
-local function HasPresenceBuff(spellIDs, playerOnly, playerCastOnly, partyOnly, threshold)
+---@return number? minLead Lead of that copy
+---@return number? nextSlack Seconds until the next copy enters its window
+local function HasPresenceBuff(spellIDs, playerOnly, playerCastOnly, partyOnly, threshold, floor)
     if playerOnly or #currentValidUnits <= 1 then
         local hasBuff, remaining, duration, _
         if playerCastOnly then
@@ -1654,13 +1720,11 @@ local function HasPresenceBuff(spellIDs, playerOnly, playerCastOnly, partyOnly, 
         else
             hasBuff, remaining, _, duration = UnitHasBuff("player", spellIDs)
         end
-        if IsShortAura(duration, threshold) then
-            remaining = nil
-        end
-        return hasBuff, remaining, nil
+        local lead = remaining and Lead.Of(duration, threshold, floor)
+        return hasBuff, lead and remaining, nil, lead
     end
 
-    local minRemaining = nil
+    local minRemaining, minLead, nextSlack = nil, nil, nil
     local found = false
     local targetEntry = nil
 
@@ -1682,14 +1746,15 @@ local function HasPresenceBuff(spellIDs, playerOnly, playerCastOnly, partyOnly, 
                 if not remaining then
                     return true, nil, targetEntry -- no expiration, no need to keep scanning
                 end
-                if not IsShortAura(duration, threshold) and (not minRemaining or remaining < minRemaining) then
-                    minRemaining = remaining
+                local lead = Lead.Of(duration, threshold, floor)
+                if lead then
+                    minRemaining, minLead, nextSlack = Lead.Pick(remaining, lead, minRemaining, minLead, nextSlack)
                 end
             end
         end
     end
 
-    return found, minRemaining, targetEntry
+    return found, minRemaining, targetEntry, minLead, nextSlack
 end
 
 ---Assigned role of a group member, or nil when it does not resolve. A secret role
@@ -1714,12 +1779,15 @@ end
 ---Uses currentValidUnits cache built at start of refresh cycle
 ---@param spellID number
 ---@param role? RoleType Only check units with this role
----@param threshold number A short aura (IsShortAura) never sets minRemaining
+---@param threshold number Input of Lead.Of
+---@param floor number Input of Lead.Of
 ---@return boolean
----@return number? minRemaining
+---@return number? minRemaining Remaining time of the copy that Lead.Pick chose
 ---@return table? targetEntry Unit entry of a non-player target with the buff (for last target cache)
-local function IsPlayerBuffActive(spellID, role, threshold)
-    local minRemaining = nil
+---@return number? minLead Lead of that copy
+---@return number? nextSlack Seconds until the next copy enters its window
+local function IsPlayerBuffActive(spellID, role, threshold, floor)
+    local minRemaining, minLead, nextSlack = nil, nil, nil
     local found = false
     local targetEntry = nil
     local hasBeneficiary = not role
@@ -1746,8 +1814,10 @@ local function IsPlayerBuffActive(spellID, role, threshold)
                         if not remaining then
                             return true, nil, targetEntry
                         end
-                        if not IsShortAura(duration, threshold) and (not minRemaining or remaining < minRemaining) then
-                            minRemaining = remaining
+                        local lead = Lead.Of(duration, threshold, floor)
+                        if lead then
+                            minRemaining, minLead, nextSlack =
+                                Lead.Pick(remaining, lead, minRemaining, minLead, nextSlack)
                         end
                     end
                 end
@@ -1758,7 +1828,7 @@ local function IsPlayerBuffActive(spellID, role, threshold)
     if not hasBeneficiary then
         return true
     end
-    return found, minRemaining, targetEntry
+    return found, minRemaining, targetEntry, minLead, nextSlack
 end
 
 ---Check if player should cast their targeted buff (returns true if a beneficiary needs it)
@@ -1768,9 +1838,12 @@ end
 ---@param requireSpecId? number
 ---@param buffKey? string Used for last target cache
 ---@param casterBuffId? number Check this buff on the caster instead of scanning the group
----@param threshold number A short aura (IsShortAura) reports no remaining time
+---@param threshold number Input of Lead.Of
+---@param floor number Input of Lead.Of
 ---@return boolean? shouldShow Returns nil if player can't provide this buff
 ---@return number? remainingTime
+---@return number? lead Lead of the copy that remainingTime reads
+---@return number? nextSlack Seconds until the next copy enters its window
 local function ShouldShowTargetedBuff(
     spellIDs,
     requiredClass,
@@ -1778,7 +1851,8 @@ local function ShouldShowTargetedBuff(
     requireSpecId,
     buffKey,
     casterBuffId,
-    threshold
+    threshold,
+    floor
 )
     if playerClass ~= requiredClass then
         return nil
@@ -1817,13 +1891,12 @@ local function ShouldShowTargetedBuff(
                 end
             end
         end
-        if IsShortAura(duration, threshold) then
-            remaining = nil
-        end
-        return not hasBuff, remaining
+        local lead = remaining and Lead.Of(duration, threshold, floor)
+        return not hasBuff, lead and remaining, lead
     end
 
-    local isActive, remaining, targetEntry = IsPlayerBuffActive(spellID, beneficiaryRole, threshold)
+    local isActive, remaining, targetEntry, lead, nextSlack =
+        IsPlayerBuffActive(spellID, beneficiaryRole, threshold, floor)
 
     -- Update target memory (records even in combat: this path only runs for
     -- whitelist-safe queries, gated by IsAuraTrackable at the call site)
@@ -1831,7 +1904,7 @@ local function ShouldShowTargetedBuff(
         TargetMemory.Observe(buffKey, isActive, targetEntry and targetEntry.name, targetEntry and targetEntry.class)
     end
 
-    return not isActive, remaining
+    return not isActive, remaining, lead, nextSlack
 end
 
 ---@param data {unit: string, name: string?}
@@ -1845,10 +1918,13 @@ end
 ---checks themselves, if a caster who can cast the buff is in the group.
 ---@param buff TargetedBuff
 ---@param playerOnly boolean
----@param threshold number A short aura (IsShortAura) reports no remaining time
+---@param threshold number Input of Lead.Of
+---@param floor number Input of Lead.Of
 ---@return boolean? shouldShow nil when the player can neither cast nor request the buff
 ---@return number? remainingTime
-local function ShouldShowRoleTargetedBuff(buff, playerOnly, threshold)
+---@return number? lead Lead of the copy that remainingTime reads
+---@return number? nextSlack Seconds until the next tank copy enters its window
+local function ShouldShowRoleTargetedBuff(buff, playerOnly, threshold, floor)
     local spellIDs = buff.spellID
     if playerClass ~= buff.class then
         if
@@ -1865,14 +1941,23 @@ local function ShouldShowRoleTargetedBuff(buff, playerOnly, threshold)
             return nil
         end
         local target, hasTank = nil, false
+        local minRemaining, minLead, nextSlack
         if not playerOnly and not cachedIsAlone then
             for _, data in ipairs(currentValidUnits) do
                 if (data.isPlayer or includeNPCsInCounting) and IsUnitTank(data) then
                     hasTank = true
                     -- A phased member cannot receive a cast.
-                    if not data.isPhased and not UnitHasBuff(data.unit, spellIDs) then
-                        target = data
-                        break
+                    if not data.isPhased then
+                        local has, remaining, _, duration = UnitHasBuff(data.unit, spellIDs)
+                        if not has then
+                            target = data
+                            break
+                        end
+                        local lead = remaining and Lead.Of(duration, threshold, floor)
+                        if remaining and lead then
+                            minRemaining, minLead, nextSlack =
+                                Lead.Pick(remaining, lead, minRemaining, minLead, nextSlack)
+                        end
                     end
                 end
             end
@@ -1883,14 +1968,12 @@ local function ShouldShowRoleTargetedBuff(buff, playerOnly, threshold)
             return true, nil
         end
         if hasTank then
-            return false, nil
+            return false, minRemaining, minLead, nextSlack
         end
     end
     local hasBuff, remaining, _, duration = UnitHasBuff("player", spellIDs)
-    if IsShortAura(duration, threshold) then
-        remaining = nil
-    end
-    return not hasBuff, remaining
+    local lead = remaining and Lead.Of(duration, threshold, floor)
+    return not hasBuff, lead and remaining, lead
 end
 
 ---Check if player should cast their self buff or weapon imbue (returns true if missing)
@@ -2298,25 +2381,25 @@ end
 ---@param cat CategoryName
 ---@return boolean expiringGlow
 ---@return boolean missingGlow
----@return number threshold
+---@return number threshold Seconds
+---@return number floor Seconds of the pre-key threshold in an M0 dungeon, else 0
 local function GetCategoryGlowSettings(cat)
     local expiringGlow = BR.Config.GetCategorySetting(cat, "showExpirationGlow") ~= false
     local missingGlow = BR.Config.GetCategorySetting(cat, "showMissingGlow") ~= false
     local threshold = (BR.Config.GetCategorySetting(cat, "expirationThreshold") or 15) * 60
-    -- In M0 dungeons (before inserting a keystone), use pre-key threshold if higher
+    -- In an M0 dungeon (before a keystone goes in), the pre-key threshold forces a refresh.
     local defs = BR.profile and BR.profile.defaults
+    Lead.share = (defs and defs.expirationShare or 25) / 100
     local preKey = defs and defs.preKeyThreshold or 0
+    local floor = 0
     if preKey > 0 and GetCurrentContentType() == "dungeon" and GetCurrentDifficultyKey() == "mythic" then
-        local preKeySec = preKey * 60
-        if preKeySec > threshold then
-            threshold = preKeySec
-        end
+        floor = preKey * 60
     end
-    return expiringGlow, missingGlow, threshold
+    return expiringGlow, missingGlow, threshold, floor
 end
 
 -- Seconds until the earliest display change that no event announces: the countdown
--- text ticks a minute, remaining time crosses the expiration threshold, an
+-- text ticks a minute, remaining time crosses the warning lead, an
 -- expiring buff runs out, or item charges change.
 -- Accumulated per refresh; Display arms one timer for it instead of polling.
 local nextTimedChangeIn = nil
@@ -2329,14 +2412,18 @@ local function NoteChangeIn(seconds)
 end
 
 ---@param remaining? number
----@param threshold number
-local function NoteTimedChange(remaining, threshold)
+---@param lead number
+---@param nextSlack? number Seconds until another copy enters its window
+local function NoteTimedChange(remaining, lead, nextSlack)
+    if nextSlack and nextSlack > 0 then
+        NoteChangeIn(nextSlack)
+    end
     if not remaining or remaining <= 0 then
         return
     end
     local candidate
-    if remaining >= threshold then
-        candidate = remaining - threshold -- future crossing into "expiring"
+    if remaining >= lead then
+        candidate = remaining - lead -- future crossing into "expiring"
     elseif remaining > 60 then
         candidate = remaining % 60 -- next minute tick of the countdown text
         if candidate == 0 then
@@ -2359,26 +2446,25 @@ function BuffState.GetNextTimedChange()
     return nextTimedChangeIn
 end
 
----If remaining time is below threshold, mark entry as visible+expiring with glow.
+---If remaining time is below the lead, mark entry as visible+expiring with glow.
 ---@param entry BuffStateEntry
 ---@param remaining? number
----@param threshold number
+---@param lead? number Lead.Of of the aura, nil when it never warns
 ---@param shouldGlow boolean
----@param duration? number Full duration of the aura
+---@param nextSlack? number Seconds until another copy enters its window
 ---@return boolean wasSet true if the entry was marked as expiring
-local function TrySetEntryExpiring(entry, remaining, threshold, shouldGlow, duration)
-    if IsShortAura(duration, threshold) then
+local function TrySetEntryExpiring(entry, remaining, lead, shouldGlow, nextSlack)
+    if not lead then
         -- A weapon enchant ends with no event, so the expiry needs its own render.
         if remaining and remaining > 0 then
             NoteChangeIn(remaining)
         end
         return false
     end
-    NoteTimedChange(remaining, threshold)
-    if remaining and remaining < threshold then
+    NoteTimedChange(remaining, lead, nextSlack)
+    if remaining and remaining < lead then
         entry.visible = true
         entry.displayType = "expiring"
-        entry.expiringTime = remaining
         entry.countText = FormatRemainingTime(remaining)
         entry.shouldGlow = shouldGlow
         return true
@@ -2470,7 +2556,7 @@ end
 ---@field classWant table<string, StanceChoice|false> The choice that every counted member of a class wants. false when they differ
 ---@field inRange table<string, boolean> Range of each listed member, read once per pick
 ---@field selfWanted StanceChoice? The choice that the player lacks
----@field renewUnits string[] Members whose choice from the player is under the threshold. Filled only when sources are read
+---@field renewUnits string[] Members whose choice from the player is in its warning window. Filled only when sources are read
 ---@field renewChoices table<string, StanceChoice>
 ---@field renewRemaining table<string, number>
 ---@field foreign table<string, table<string, table|false>> Foreign copies found by a scan, by unit, then choice key. Survives refreshes
@@ -2551,14 +2637,17 @@ end
 ---A member of a class with an empty list does not count.
 ---@param buff RaidBuff
 ---@param playerOnly boolean Only check the player, not the group
----@param threshold number A short aura (IsShortAura) never sets minRemaining
+---@param threshold number Input of Lead.Of
+---@param floor number Input of Lead.Of
 ---@param missingUnits? string[] Wiped, then filled with the unit of each counted member who lacks the choice
 ---@param readSources boolean Tell the choices of the player from the choices of other casters
 ---@return number missing
 ---@return number total
----@return number? minRemaining
----@return StanceChoice? choice Wanted by the first missing member, else the choice that expires first
-local function CountMissingClassChoice(buff, playerOnly, threshold, missingUnits, readSources)
+---@return number? minRemaining Remaining time of the copy that Lead.Pick chose
+---@return StanceChoice? choice Wanted by the first missing member, else the choice closest to its warning
+---@return number? minLead Lead of that copy
+---@return number? nextSlack Seconds until the next copy enters its window
+local function CountMissingClassChoice(buff, playerOnly, threshold, floor, missingUnits, readSources)
     local state = classChoiceStates[buff.key]
     if state then
         wipe(state.lists)
@@ -2593,7 +2682,7 @@ local function CountMissingClassChoice(buff, playerOnly, threshold, missingUnits
     local selfOnly = playerOnly or #currentValidUnits <= 1
     local partyOnly = buff.reach == "party"
     local countNPCs = includeNPCsInCounting and not GameContext.IsInCombat() and not buff.playersOnly
-    local missing, total, minRemaining, firstWanted, minChoice = 0, 0, nil, nil, nil
+    local missing, total, minRemaining, firstWanted, minChoice, minLead, nextSlack = 0, 0, nil, nil, nil, nil, nil
     -- The roster includes the player, so a second member of the class is another caster.
     local casters = 0
     for _, data in ipairs(currentValidUnits) do
@@ -2643,12 +2732,17 @@ local function CountMissingClassChoice(buff, playerOnly, threshold, missingUnits
                             state.wanted[listed] = choice
                             state.classes[listed] = class
                         end
-                    elseif has and remaining and not data.isPhased and not IsShortAura(duration, threshold) then
-                        if not minRemaining or remaining < minRemaining then
-                            minRemaining, minChoice = remaining, choice
+                    elseif has and remaining and not data.isPhased then
+                        local lead = Lead.Of(duration, threshold, floor)
+                        if lead then
+                            minRemaining, minLead, nextSlack =
+                                Lead.Pick(remaining, lead, minRemaining, minLead, nextSlack)
+                            if minRemaining == remaining and minLead == lead then
+                                minChoice = choice
+                            end
                         end
                         -- Without a source read, the copy can come from another caster.
-                        if readSources and remaining < threshold then
+                        if lead and readSources and remaining < lead then
                             state.renewUnits[#state.renewUnits + 1] = data.unit
                             state.renewChoices[data.unit] = choice
                             state.renewRemaining[data.unit] = remaining
@@ -2659,7 +2753,7 @@ local function CountMissingClassChoice(buff, playerOnly, threshold, missingUnits
         end
     end
     state.missing = missing
-    return missing, total, minRemaining, firstWanted or minChoice
+    return missing, total, minRemaining, firstWanted or minChoice, minLead, nextSlack
 end
 
 ---A member of the largest set of listed members who share a class and want the same
@@ -2834,7 +2928,7 @@ end
 -- Coverage category: the reminder counts how many group members miss the buff.
 local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, expiringClass, missingCountOnly)
     local raidVisible = IsCategoryVisibleForContent("raid")
-    local raidExGlow, raidMissGlow, raidThreshold = GetCategoryGlowSettings("raid")
+    local raidExGlow, raidMissGlow, raidThreshold, raidFloor = GetCategoryGlowSettings("raid")
     local bronzeHiddenInCombat = GameContext.IsInCombat() and db.bronzeHideInCombat
     local readSources = not isAuraRestricted and not GameContext.IsInCombat()
     for i, buff in ipairs(RaidBuffs) do
@@ -2859,7 +2953,7 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
             and (not buff.requiresKnownSpell or requester or KnowsAnySpell(buff.spellID))
             and (not buff.visibilityCondition or buff.visibilityCondition())
         then
-            local missing, total, minRemaining, choice
+            local missing, total, minRemaining, choice, minLead, nextSlack
             if requester then
                 -- Any copy of the buff covers the player, so only a missing buff shows.
                 local spellID = buff.chatRequestSpell()
@@ -2872,6 +2966,7 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
                         buff.playersOnly,
                         false,
                         raidThreshold,
+                        raidFloor,
                         missingUnits
                     )
                 end
@@ -2879,16 +2974,17 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
                     entry.dynamicIcon = BR.Icons.GetBuffTexture(spellID)
                 end
             elseif buff.classChoices then
-                missing, total, minRemaining, choice =
-                    CountMissingClassChoice(buff, playerOnly, raidThreshold, missingUnits, readSources)
+                missing, total, minRemaining, choice, minLead, nextSlack =
+                    CountMissingClassChoice(buff, playerOnly, raidThreshold, raidFloor, missingUnits, readSources)
             else
-                missing, total, minRemaining = CountMissingBuff(
+                missing, total, minRemaining, minLead, nextSlack = CountMissingBuff(
                     buff.spellID,
                     buff.key,
                     playerOnly,
                     buff.playersOnly,
                     buff.reach == "party",
                     raidThreshold,
+                    raidFloor,
                     missingUnits
                 )
             end
@@ -2900,12 +2996,11 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
                 entry.countText = playerOnly and ""
                     or (missingCountOnly and tostring(missing) or (buffed .. "/" .. total))
                 entry.shouldGlow = raidMissGlow
-                NoteTimedChange(minRemaining, raidThreshold)
-                if minRemaining and minRemaining < raidThreshold then
-                    entry.expiringTime = minRemaining
+                if minLead then
+                    NoteTimedChange(minRemaining, minLead, nextSlack)
                 end
             elseif not hideExpiring and (not expiringClass or buff.class == expiringClass) then
-                TrySetEntryExpiring(entry, minRemaining, raidThreshold, raidExGlow)
+                TrySetEntryExpiring(entry, minRemaining, minLead, raidExGlow, nextSlack)
             end
             -- If a click casts a choice, the icon shows that choice.
             if choice and entry.visible then
@@ -2921,7 +3016,7 @@ end
 -- The player's own buffs on themselves, weapon imbues included.
 local function RefreshSelf(isAuraRestricted, hideExpiring)
     local selfVisible = IsCategoryVisibleForContent("self")
-    local selfExGlow, selfMissGlow, selfThreshold = GetCategoryGlowSettings("self")
+    local selfExGlow, selfMissGlow, selfThreshold, selfFloor = GetCategoryGlowSettings("self")
     for i, buff in ipairs(SelfBuffs) do
         local entry = GetOrCreateEntry(buff.key, "self", i)
         local settingKey = buff.groupId or buff.key
@@ -2975,11 +3070,19 @@ local function RefreshSelf(isAuraRestricted, hideExpiring)
                                 duration = buff.enchantDuration
                             elseif buff.getExpirationInfo then
                                 remaining, expiringCastID = buff.getExpirationInfo()
+                                duration = buff.enchantDuration
                             elseif buff.buffIdOverride or buff.spellID then
                                 _, remaining, _, duration =
                                     UnitHasBuff("player", (buff.buffIdOverride or buff.spellID) --[[@as SpellID]])
                             end
-                            if TrySetEntryExpiring(entry, remaining, selfThreshold, selfExGlow, duration) then
+                            if
+                                TrySetEntryExpiring(
+                                    entry,
+                                    remaining,
+                                    Lead.Of(duration, selfThreshold, selfFloor),
+                                    selfExGlow
+                                )
+                            then
                                 if expiringCastID then
                                     entry.dynamicIcon = BR.Icons.GetBuffTexture(expiringCastID)
                                 elseif buff.enchantID then
@@ -3023,7 +3126,7 @@ end
 -- Presence category: one group member with the buff satisfies the reminder.
 local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring, expiringClass)
     local presenceVisible = IsCategoryVisibleForContent("presence")
-    local presExGlow, presMissGlow, presThreshold = GetCategoryGlowSettings("presence")
+    local presExGlow, presMissGlow, presThreshold, presFloor = GetCategoryGlowSettings("presence")
     for i, buff in ipairs(PresenceBuffs) do
         local entry = GetOrCreateEntry(buff.key, "presence", i)
         -- If a self-buff entry already covers this, skip entirely
@@ -3066,7 +3169,7 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring,
             -- at all times. The display branch below reuses this scan result, so the
             -- buff is never scanned twice in one refresh.
             local isOwnCaster = buff.castOnOthers and buff.class == playerClass
-            local hasBuff, minRemaining, targetEntry
+            local hasBuff, minRemaining, targetEntry, minLead, nextSlack
             local scanned = false
             if
                 isOwnCaster
@@ -3077,7 +3180,8 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring,
             then
                 -- Full-group sweep (playerOnly=false): the buff lives on the target,
                 -- so a player-only scan never finds it.
-                hasBuff, minRemaining, targetEntry = HasPresenceBuff(buff.spellID, false, true, false, presThreshold)
+                hasBuff, minRemaining, targetEntry, minLead, nextSlack =
+                    HasPresenceBuff(buff.spellID, false, true, false, presThreshold, presFloor)
                 scanned = true
                 TargetMemory.Observe(
                     buff.key,
@@ -3106,12 +3210,14 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring,
                         -- own cast. That resolves the right target and keeps another
                         -- caster's coverage from hiding the icon.
                         if not scanned then
-                            hasBuff, minRemaining = HasPresenceBuff(
+                            local _
+                            hasBuff, minRemaining, _, minLead, nextSlack = HasPresenceBuff(
                                 buff.spellID,
                                 scope.playerOnly,
                                 isOwnCaster,
                                 buff.reach == "party",
-                                presThreshold
+                                presThreshold,
+                                presFloor
                             )
                         end
                         -- customCheck gates display (e.g., soulstone CD tracking for warlocks)
@@ -3129,7 +3235,7 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring,
                             and not hideExpiring
                             and (not expiringClass or buff.class == expiringClass)
                         then
-                            TrySetEntryExpiring(entry, minRemaining, presThreshold, presExGlow)
+                            TrySetEntryExpiring(entry, minRemaining, minLead, presExGlow, nextSlack)
                         end
                     end
                 end
@@ -3143,7 +3249,7 @@ end
 local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring, expiringClass)
     local targetedVisible = IsCategoryVisibleForContent("targeted")
     local selfOnly = trackingMode == "self_only"
-    local targExGlow, targMissGlow, targThreshold = GetCategoryGlowSettings("targeted")
+    local targExGlow, targMissGlow, targThreshold, targFloor = GetCategoryGlowSettings("targeted")
     for i, buff in ipairs(TargetedBuffs) do
         local entry = GetOrCreateEntry(buff.key, "targeted", i)
         local settingKey = GetBuffSettingKey(buff)
@@ -3157,18 +3263,20 @@ local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring,
                         SetEntryText(entry, buff.overlayText, targMissGlow)
                     end
                 else
-                    local shouldShow, remaining
+                    local shouldShow, remaining, lead, nextSlack
                     if buff.selfFallback then
-                        shouldShow, remaining = ShouldShowRoleTargetedBuff(buff, selfOnly, targThreshold)
+                        shouldShow, remaining, lead, nextSlack =
+                            ShouldShowRoleTargetedBuff(buff, selfOnly, targThreshold, targFloor)
                     else
-                        shouldShow, remaining = ShouldShowTargetedBuff(
+                        shouldShow, remaining, lead, nextSlack = ShouldShowTargetedBuff(
                             buff.spellID,
                             buff.class,
                             buff.beneficiaryRole,
                             buff.requireSpecId,
                             buff.key,
                             buff.casterBuffId,
-                            targThreshold
+                            targThreshold,
+                            targFloor
                         )
                     end
 
@@ -3180,7 +3288,7 @@ local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring,
                         and not hideExpiring
                         and (not expiringClass or buff.class == expiringClass)
                     then
-                        TrySetEntryExpiring(entry, remaining, targThreshold, targExGlow)
+                        TrySetEntryExpiring(entry, remaining, lead, targExGlow, nextSlack)
                     end
                 end
             end
@@ -3248,7 +3356,7 @@ local function RefreshConsumables(db, trackingMode, isAuraRestricted, hideExpiri
     local consumableVisible = IsCategoryVisibleForContent("consumable")
     -- Delve food ignores the consumable ready-check-only filter (still respects content gates)
     local consumableVisibleNoReadyCheck = IsCategoryVisibleForContent("consumable", true)
-    local consExGlow, consMissGlow, consThreshold = GetCategoryGlowSettings("consumable")
+    local consExGlow, consMissGlow, consThreshold, consFloor = GetCategoryGlowSettings("consumable")
     local delveFoodOnly = db.defaults and db.defaults.delveFoodOnly and BR.IsInDelve()
     local freeMode = db.defaults and db.defaults.freeConsumableMode or "override"
     local freeVisible = freeMode == "override" and IsFreeConsumableVisible(db) or false
@@ -3343,9 +3451,8 @@ local function RefreshConsumables(db, trackingMode, isAuraRestricted, hideExpiri
                                 TrySetEntryExpiring(
                                     entry,
                                     remainingTime,
-                                    consThreshold,
-                                    consExGlow,
-                                    auraDuration or buff.enchantDuration
+                                    Lead.Of(auraDuration or buff.enchantDuration, consThreshold, consFloor),
+                                    consExGlow
                                 )
                             then
                                 if activeSpellID and type(buff.spellID) == "table" then
@@ -3438,7 +3545,13 @@ local function RefreshCustom(isAuraRestricted, hideExpiring)
             then
                 -- Buff is present (not missing), check if expiring (per-buff threshold)
                 local _, remaining, _, duration = UnitHasBuff("player", buff.spellID)
-                TrySetEntryExpiring(entry, remaining, buff.expirationThreshold * 60, true, duration)
+                -- No proportional lead: the per-buff threshold is exact. An aura that
+                -- fits in it never warns.
+                local lead = buff.expirationThreshold * 60 ---@type number?
+                if duration and duration > 0 and duration <= lead then
+                    lead = nil
+                end
+                TrySetEntryExpiring(entry, remaining, lead, true)
             end
         end
     end
@@ -3499,7 +3612,6 @@ function BuffState.Refresh(refreshMode)
             entry.shouldGlow = false
             entry.countText = nil
             entry.overlayText = nil
-            entry.expiringTime = nil
             entry.rebuffWarning = nil -- legacy field, still cleared for safety
             entry.isEating = nil
             entry.eatingExpirationTime = nil
@@ -4411,6 +4523,7 @@ end
 BR.StateHelpers = {
     GetPlayerSpecId = GetPlayerSpecId,
     FormatRemainingTime = FormatRemainingTime,
+    AuraLead = Lead.Of,
     FormatEatingTime = FormatEatingTime,
     IsPlayerEating = IsPlayerEating,
     UpdateEatingState = UpdateEatingState,
