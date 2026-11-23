@@ -1236,7 +1236,7 @@ BR.Display.BUFF_TOOLTIP_CATEGORIES = BUFF_TOOLTIP_CATEGORIES
 
 local MODIFIER_DOWN = { SHIFT = IsShiftKeyDown, CTRL = IsControlKeyDown, ALT = IsAltKeyDown }
 
-local hoverOwner, hoverShow, hoverIsDown
+local hoverOwner, hoverShow, hoverIsDown, hoverFallback
 local modifierFrame = CreateFrame("Frame")
 modifierFrame:SetScript("OnEvent", function()
     if not hoverOwner then
@@ -1244,8 +1244,13 @@ modifierFrame:SetScript("OnEvent", function()
     end
     if hoverIsDown() then
         hoverShow()
-    elseif GameTooltip:IsOwned(hoverOwner) then
+        return
+    end
+    if GameTooltip:IsOwned(hoverOwner) then
         GameTooltip:Hide()
+    end
+    if hoverFallback then
+        hoverFallback()
     end
 end)
 
@@ -1253,17 +1258,20 @@ end)
 ---down while the cursor stays on `owner`. Pair every call with EndHoverTooltip on leave.
 ---@param owner table The hovered frame
 ---@param show fun() Draws the tooltip on owner
-local function ShowHoverTooltip(owner, show)
+---@param fallback? fun() Draws a short tooltip while the key is up
+local function ShowHoverTooltip(owner, show, fallback)
     local profileDefaults = BR.profile.defaults
     local isDown = profileDefaults and MODIFIER_DOWN[profileDefaults.tooltipModifier]
     if not isDown then
         show()
         return
     end
-    hoverOwner, hoverShow, hoverIsDown = owner, show, isDown
+    hoverOwner, hoverShow, hoverIsDown, hoverFallback = owner, show, isDown, fallback
     BR.Client.RegisterEvent(modifierFrame, "MODIFIER_STATE_CHANGED")
     if isDown() then
         show()
+    elseif fallback then
+        fallback()
     end
 end
 
@@ -1272,7 +1280,7 @@ local function EndHoverTooltip(owner)
     if hoverOwner ~= owner then
         return
     end
-    hoverOwner, hoverShow, hoverIsDown = nil, nil, nil
+    hoverOwner, hoverShow, hoverIsDown, hoverFallback = nil, nil, nil, nil
     modifierFrame:UnregisterEvent("MODIFIER_STATE_CHANGED")
 end
 BR.Display.ShowHoverTooltip = ShowHoverTooltip
@@ -1309,13 +1317,14 @@ end
 -- line. The caller passes the hovered frame as `anchor`, so the tooltip lines up
 -- with the cursor when a click overlay covers the icon.
 ---@param addLines? fun(tooltip: table) Adds lines under the spell before the tooltip shows
-local function ShowBuffSpellTooltip(frame, anchor, addLines)
+---@param fallback? fun() Draws a short tooltip while the tooltip key is up
+local function ShowBuffSpellTooltip(frame, anchor, addLines, fallback)
     if not IsBuffTooltipOn(frame.buffCategory) then
         return
     end
     ShowHoverTooltip(anchor or frame, function()
         DrawBuffSpellTooltip(frame, anchor, addLines)
-    end)
+    end, fallback)
 end
 BR.Display.ShowBuffSpellTooltip = ShowBuffSpellTooltip
 
