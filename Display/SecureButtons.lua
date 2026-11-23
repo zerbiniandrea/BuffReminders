@@ -272,6 +272,13 @@ local function HideLastTargetTooltip()
 end
 
 local SNOOZE_HINT = L["Tooltip.RightClickSnooze"]
+local GROUP_HINT = L["Tooltip.RightClickGroup"]
+
+---@param tooltip table
+local function AddGroupHint(tooltip)
+    local n = TARGET_TIP.note
+    tooltip:AddLine(GROUP_HINT, n[1], n[2], n[3])
+end
 
 ---@param owner table A consumable button
 local function ShowConsumableTooltip(owner)
@@ -312,20 +319,33 @@ end
 -- "snooze" and "choices" neutralise the right button with an empty type2, which
 -- resolves to no handler. PostClick reads the mode: "snooze" snoozes, "choices"
 -- toggles the choice row. "own" gives the button's own action to the right click,
--- also when the user turned the snooze off.
+-- also when the user turned the snooze off. "group" casts rightSpellID on the
+-- player, and PreClick picks the target out of combat.
+-- spell2 and unit2 override spell and unit for the right click, so every other
+-- mode clears them.
 -- Call it after SetActionType, which overwrites type2. Self-gated, so callers can
 -- re-apply on every display cycle. Must run out of combat.
 ---@param button table
----@param mode "snooze"|"choices"|"own"
-local function SetRightClickMode(button, mode)
+---@param mode "snooze"|"choices"|"own"|"group"
+---@param rightSpellID number? The spell of "group"
+local function SetRightClickMode(button, mode, rightSpellID)
     if mode == "snooze" and BR.profile.defaults.rightClickSnooze == false then
         mode = "own"
     end
-    if button._br_rightClick == mode then
+    if button._br_rightClick == mode and button._br_rightSpell == rightSpellID then
         return
     end
     button._br_rightClick = mode
+    button._br_rightSpell = rightSpellID
+    if mode == "group" then
+        button:SetAttribute("type2", "spell")
+        button:SetAttribute("spell2", rightSpellID)
+        button:SetAttribute("unit2", "player")
+        return
+    end
     button:SetAttribute("type2", mode == "own" and button._br_action_type or "")
+    button:SetAttribute("spell2", nil)
+    button:SetAttribute("unit2", nil)
 end
 
 -- ============================================================================
@@ -354,6 +374,7 @@ end
 ---@field chatMsg string? Request text without the channel prefix
 ---@field pickDef RaidBuff? PreClick picks the spell and the unit for this buff
 ---@field spellFn (fun(): number?)? PreClick writes the spell that this function returns
+---@field groupSpellID number? Right-click spell: a group rank, else the single-target spell
 
 -- Every resolver fills this one table, and ApplyAction copies what it needs before
 -- the next fill. A resolve runs for every frame on every display cycle, so it must
@@ -477,7 +498,13 @@ local function ApplyAction(button, action)
         end
         StoreAction(button, action)
     end
-    SetRightClickMode(button, action.snooze and "snooze" or ChoiceRightClick(button._br_hostFrame))
+    if action.snooze then
+        SetRightClickMode(button, "snooze")
+    elseif action.groupSpellID then
+        SetRightClickMode(button, "group", action.groupSpellID)
+    else
+        SetRightClickMode(button, ChoiceRightClick(button._br_hostFrame))
+    end
 end
 
 ---@param itemID number
@@ -797,6 +824,17 @@ local function CreateClickOverlay(frame)
         if button == "RightButton" and self._br_rightClick == "choices" then
             return
         end
+        -- The group rank ignores the group-cast toggle and the minimum count.
+        if button == "RightButton" and self._br_rightClick == "group" then
+            local pickDef = self._br_pickDef
+            if pickDef and not InCombatLockdown() then
+                local spellID = BR.BuffState.GetGroupRank(pickDef.groupCast) or self._br_action.spellID
+                self._br_rightSpell = spellID
+                self:SetAttribute("spell2", spellID)
+                self:SetAttribute("unit2", PickCastUnit(pickDef.key))
+            end
+            return
+        end
         -- A spell action with no spell casts nothing. PostClick writes the spell back.
         local entry = BR.BuffState.entries[frame.key]
         if entry and entry.noClick and self._br_action_type == "spell" and not InCombatLockdown() then
@@ -847,6 +885,9 @@ local function CreateClickOverlay(frame)
             if not InCombatLockdown() then
                 self:SetAttribute("spell", self._br_action.spellID)
             end
+        end
+        if button == "RightButton" and not down and self._br_rightClick == "group" and not InCombatLockdown() then
+            self:SetAttribute("unit2", "player")
         end
         if button == "RightButton" and self._br_rightClick == "choices" then
             if not down then
@@ -981,8 +1022,13 @@ local function CreateClickOverlay(frame)
         end
         -- The anchor is the overlay: the cursor is over the overlay, not over the
         -- buff frame below it.
+        local groupHint = overlay._br_rightClick == "group" and overlay._br_rightSpell ~= overlay._br_action.spellID
         if BR.Display.IsBuffTooltipOn(frame.buffCategory) then
-            BR.Display.ShowBuffSpellTooltip(frame, overlay)
+            BR.Display.ShowBuffSpellTooltip(frame, overlay, groupHint and AddGroupHint or nil)
+        elseif groupHint then
+            BR.Display.ShowHoverTooltip(overlay, function()
+                ShowLastTargetTooltip(overlay, "", nil, nil, GROUP_HINT)
+            end)
         end
     end)
     overlay:HookScript("OnLeave", function()
@@ -2244,6 +2290,13 @@ local function ResolveAction(frame, category, db)
         if category == "raid" and def and def.castOnMissing then
             local action = SpellAction(castableID, "player")
             action.pickDef = def
+            if def.groupCast and not def.subChoices then
+                -- With the reagent missing, the right click falls back to the single-target spell.
+                local groupID, known = BR.BuffState.GetGroupRank(def.groupCast)
+                if known then
+                    action.groupSpellID = groupID or castableID
+                end
+            end
             return action
         end
         if def and def.clickSpell then

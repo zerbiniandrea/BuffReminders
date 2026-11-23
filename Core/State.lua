@@ -2806,6 +2806,18 @@ function BuffState.GetGroupCastSpellID(buff)
     if not ranks then
         return nil
     end
+    local spellID = BuffState.GetGroupRank(ranks)
+    if spellID then
+        return spellID, unit
+    end
+    return nil
+end
+
+---Highest rank in the list that the player knows and has the reagent for.
+---@param ranks GroupCastRank[]
+---@return number? spellID nil when no known rank has its reagent in the bags
+---@return boolean known The player knows a rank of the list
+function BuffState.GetGroupRank(ranks)
     -- The spellbook reports only the highest learned rank as known. A lower rank is
     -- known when a higher one is.
     local known = false
@@ -2813,10 +2825,10 @@ function BuffState.GetGroupCastSpellID(buff)
         local rank = ranks[i]
         known = known or IsPlayerSpellCached(rank.spellID)
         if known and GetItemCountCached(rank.reagent) > 0 then
-            return rank.spellID, unit
+            return rank.spellID, true
         end
     end
-    return nil
+    return nil, known
 end
 
 -- Coverage category: the reminder counts how many group members miss the buff.
