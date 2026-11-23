@@ -1450,7 +1450,6 @@ BR.BUFF_TABLES = {
             levelRequired = 6, -- Thorns rank 1
             selfFallback = true,
             targetHint = L["Tooltip.TankHint"],
-            noExpirationGlow = true,
             chatRequestable = true,
             -- A tank of another class sees the request only when the user turns it on.
             visibilityCondition = function()
@@ -1555,7 +1554,6 @@ BR.BUFF_TABLES = {
             name = L["Buff.InnerFire"],
             class = "PRIEST",
             overlayText = L["Overlay.NoInnerFire"],
-            noExpirationGlow = true,
         },
         {
             spellID = { 10432, 10431, 8134, 945, 905, 325, 324 },
@@ -1563,7 +1561,6 @@ BR.BUFF_TABLES = {
             name = L["Buff.LightningShield"],
             class = "SHAMAN",
             overlayText = L["Overlay.NoShield"],
-            noExpirationGlow = true,
         },
         {
             spellID = 25780,
@@ -1596,6 +1593,7 @@ BR.BUFF_TABLES = {
                 return HandMissingPoison() ~= nil
             end,
             getExpirationInfo = PoisonRemaining,
+            enchantDuration = 1800, -- seconds
             clickMacro = PoisonMacro,
         },
         -- The stance bar shows Shadowform, and it stays readable in combat.

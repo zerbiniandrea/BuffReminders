@@ -161,7 +161,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field groupId? string
 ---@field defaultEnabled? boolean Ships disabled when false (opt-in); enabled otherwise. Resolved at read time by IsBuffEnabled.
 ---@field enchantID? number|table<number, true> One enchant ID, or a set of accepted IDs
----@field enchantDuration? number Full enchant duration in seconds, for the short-buff expiration rule
+---@field enchantDuration? number Full enchant duration in seconds, that sets its warning lead
 ---@field visibilityCondition? fun(): boolean Return false to hide the buff
 ---@field requiresBuffWithEnchant? boolean -- When true, require both enchant AND buff to be present (for Paladin Rites)
 ---@field getExpirationInfo? fun(): number?, number? -- Remaining seconds and expiring spell ID, for a buff with no single aura
@@ -197,7 +197,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field groupId? string
 ---@field checkWeaponEnchant? boolean Check if any weapon enchant exists (oils, stones, imbues)
 ---@field checkWeaponEnchantOH? boolean Check if off-hand weapon enchant exists
----@field enchantDuration? number Full weapon enchant duration in seconds, for the short-buff expiration rule
+---@field enchantDuration? number Full weapon enchant duration in seconds, that sets its warning lead
 ---@field excludeIfSpellKnown? number[] Don't show if player knows any of these spells
 ---@field buffIconID? number Detection-only: any aura whose icon matches counts as the buff (e.g., 136000 for food). Does not affect the displayed icon: a buff that detects by icon still needs icons.textures to show it.
 ---@field icons? IconSpec
