@@ -1153,6 +1153,20 @@ function BR.GetSpellName(spellID)
     return name or nil
 end
 
+---Build a targeted-buff clickMacro. Priority: last target > mouseover > target > the default cast target.
+---@param buffKey string The buff's key, used to look up the last target
+---@return fun(spellID: number): string
+function BR.TargetedClickMacro(buffKey)
+    return function(spellID)
+        local name = BR.GetSpellName(spellID) or ""
+        local lastTarget = BR.TargetMemory and BR.TargetMemory.Get(buffKey)
+        if lastTarget then
+            return "/cast [@" .. lastTarget .. ",help,nodead][@mouseover,help,nodead][@target,help,nodead][] " .. name
+        end
+        return "/cast [@mouseover,help,nodead][@target,help,nodead][] " .. name
+    end
+end
+
 ---Drop the cached misses, so the next BR.GetSpellName reads the API again.
 function BR.ClearSpellNameMisses()
     for spellID, name in pairs(spellNameCache) do

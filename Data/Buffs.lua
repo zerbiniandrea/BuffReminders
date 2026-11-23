@@ -145,6 +145,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field clickMacro? fun(spellID: number?): string
 ---@field casterBuffId? number Check this buff on the caster instead of scanning group
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
+---@field showSolo? boolean Also show with no group. The player is then the only target
 ---@field selfFallback? boolean Any rank from any caster counts. The target is a tank (TANK role or Main Tank mark), else the player. A tank of another class can request it in chat
 ---@field targetHint? string Gray text after the remembered target name in the icon tooltip
 ---@field levelRequired? number A caster in the group must have this level to count
@@ -449,20 +450,7 @@ BR.STANCE_RULES = {
     },
 }
 
----Build a clickMacro function for targeted buffs that remembers the last target (last target re-casting).
----Macro priority: last target > mouseover > current target > no target (self-cast or error).
----@param buffKey string The buff's key, used to look up the last target
----@return fun(spellID: number): string
-local function TargetedClickMacro(buffKey)
-    return function(spellID)
-        local name = BR.GetSpellName(spellID) or ""
-        local lastTarget = BR.TargetMemory and BR.TargetMemory.Get(buffKey)
-        if lastTarget then
-            return "/cast [@" .. lastTarget .. ",help,nodead][@mouseover,help,nodead][@target,help,nodead][] " .. name
-        end
-        return "/cast [@mouseover,help,nodead][@target,help,nodead][] " .. name
-    end
-end
+local TargetedClickMacro = BR.TargetedClickMacro
 
 -- The single source of truth for the default poison order.
 -- BR.profile.roguePoisonPreferences overrides it, with a per-entry enabled flag.

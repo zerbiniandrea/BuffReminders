@@ -1487,6 +1487,15 @@ BR.BUFF_TABLES = {
             clickMacro = TankOrSelfMacro("thorns"),
             infoTooltip = { title = L["Tooltip.TankTarget"], desc = L["Tooltip.ThornsTank.Desc"] },
         },
+        {
+            spellID = 1328548,
+            key = "oathOfLight",
+            showSolo = true,
+            name = L["Buff.OathOfLight"],
+            class = "PALADIN",
+            overlayText = L["Overlay.NoOath"],
+            clickMacro = BR.TargetedClickMacro("oathOfLight"),
+        },
     },
     ---@type SelfBuff[]
     self = {

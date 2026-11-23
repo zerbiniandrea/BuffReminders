@@ -1840,6 +1840,7 @@ end
 ---@param casterBuffId? number Check this buff on the caster instead of scanning the group
 ---@param threshold number Input of Lead.Of
 ---@param floor number Input of Lead.Of
+---@param showSolo? boolean
 ---@return boolean? shouldShow Returns nil if player can't provide this buff
 ---@return number? remainingTime
 ---@return number? lead Lead of the copy that remainingTime reads
@@ -1852,7 +1853,8 @@ local function ShouldShowTargetedBuff(
     buffKey,
     casterBuffId,
     threshold,
-    floor
+    floor,
+    showSolo
 )
     if playerClass ~= requiredClass then
         return nil
@@ -1866,9 +1868,9 @@ local function ShouldShowTargetedBuff(
         return nil
     end
 
-    -- Targeted buffs require an ally to cast on. cachedIsAlone covers both
+    -- Without showSolo, a targeted buff needs an ally. cachedIsAlone covers both
     -- open-world solo (groupSize 0) and scenario solo (groupSize 1, player only).
-    if cachedIsAlone then
+    if cachedIsAlone and not showSolo then
         return nil
     end
 
@@ -3276,7 +3278,8 @@ local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring,
                             buff.key,
                             buff.casterBuffId,
                             targThreshold,
-                            targFloor
+                            targFloor,
+                            buff.showSolo
                         )
                     end
 
