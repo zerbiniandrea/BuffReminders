@@ -1185,7 +1185,7 @@ end
 BR.Display.ShowHoverTooltip = ShowHoverTooltip
 BR.Display.EndHoverTooltip = EndHoverTooltip
 
-local function DrawBuffSpellTooltip(frame, anchor)
+local function DrawBuffSpellTooltip(frame, anchor, addLines)
     local def = frame.buffDef
     if not def then
         return
@@ -1196,7 +1196,8 @@ local function DrawBuffSpellTooltip(frame, anchor)
     end
     GameTooltip:SetOwner(anchor or frame, "ANCHOR_RIGHT")
     GameTooltip:SetSpellByID(spellID)
-    if def.class then
+    -- The provider line helps only when another class gives the buff.
+    if def.class and def.class ~= playerClass then
         local className = (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[def.class]) or def.class
         local r, g, b = 1, 1, 1
         local c = RAID_CLASS_COLORS and RAID_CLASS_COLORS[def.class]
@@ -1205,18 +1206,22 @@ local function DrawBuffSpellTooltip(frame, anchor)
         end
         GameTooltip:AddLine(format(L["BuffTooltip.ProvidedBy"], className), r, g, b)
     end
+    if addLines then
+        addLines(GameTooltip)
+    end
     GameTooltip:Show()
 end
 
 -- Show the spell tooltip for a buff frame, with a class-colored "Provided by"
 -- line. The caller passes the hovered frame as `anchor`, so the tooltip lines up
 -- with the cursor when a click overlay covers the icon.
-local function ShowBuffSpellTooltip(frame, anchor)
+---@param addLines? fun(tooltip: table) Adds lines under the spell before the tooltip shows
+local function ShowBuffSpellTooltip(frame, anchor, addLines)
     if not IsBuffTooltipOn(frame.buffCategory) then
         return
     end
     ShowHoverTooltip(anchor or frame, function()
-        DrawBuffSpellTooltip(frame, anchor)
+        DrawBuffSpellTooltip(frame, anchor, addLines)
     end)
 end
 BR.Display.ShowBuffSpellTooltip = ShowBuffSpellTooltip

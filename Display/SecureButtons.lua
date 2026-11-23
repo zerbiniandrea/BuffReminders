@@ -933,12 +933,14 @@ local function CreateClickOverlay(frame)
         if frame.buffDef and frame.buffDef.subChoices and ShowNextPick(overlay, frame) then
             return
         end
-        if frame.buffDef and (frame.buffCategory == "targeted" or frame.buffDef.castOnOthers) then
-            -- Only the caster class has a meaningful last target.
-            if frame.buffDef.class and frame.buffDef.class ~= playerClass then
-                return
-            end
-            local name, class = BR.TargetMemory.Get(frame.buffDef.key)
+        -- Only the caster class has a meaningful last target.
+        local def = frame.buffDef
+        if
+            def
+            and (frame.buffCategory == "targeted" or def.castOnOthers)
+            and not (def.class and def.class ~= playerClass)
+        then
+            local name, class = BR.TargetMemory.Get(def.key)
             -- A pinned target overrides the automatic memory. The class color is
             -- known only when the pin matches the remembered player. If the pinned
             -- player is not in the group, the click macro does nothing.
@@ -954,8 +956,22 @@ local function CreateClickOverlay(frame)
                     hint = L["Tooltip.PinNotInGroup"]
                 end
             end
-            if name then
-                ShowLastTargetTooltip(overlay, name, class, hint or frame.buffDef.targetHint)
+            hint = hint or def.targetHint
+            -- With spell tooltips on, the target name joins the spell tooltip.
+            if BR.Display.IsBuffTooltipOn(frame.buffCategory) then
+                BR.Display.ShowBuffSpellTooltip(frame, overlay, name and function(tooltip)
+                    local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+                    local text = hint and (name .. " |cff888888" .. hint .. "|r") or name
+                    tooltip:AddLine(" ")
+                    tooltip:AddLine(
+                        L["Tooltip.TargetLine"]:format(text),
+                        c and c.r or 1,
+                        c and c.g or 1,
+                        c and c.b or 1
+                    )
+                end)
+            elseif name then
+                ShowLastTargetTooltip(overlay, name, class, hint)
             end
             return
         end

@@ -605,6 +605,7 @@ english["Options.Soulstone.HideCooldown.Desc"] =
     "When enabled, warlocks won't see the soulstone reminder while the spell is on cooldown. Only applies to warlocks."
 english["Options.Soulstone.PinnedTarget"] = "Always cast on"
 english["Tooltip.PinNotInGroup"] = "(not in group)"
+english["Tooltip.TargetLine"] = "Casts on: %s"
 english["Tooltip.Next"] = "Next:"
 english["Tooltip.ChoiceSpell"] = "· %s"
 english["Tooltip.ChoiceRightClick"] = "Right-click: other blessings"
