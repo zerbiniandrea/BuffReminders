@@ -9,7 +9,7 @@ local BR = ns
 -- handler reads fresh values.
 -- RenderRequested asks for the render that a change needs. urgent = true asks for it now.
 
----@alias CacheId "ammo"|"auraTrackable"|"consumables"|"contentType"|"durability"|"foreignAura"|"healer"|"item"|"loadout"|"offHand"|"pet"|"petActions"|"petHappiness"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"spellUsable"|"stance"|"subgroup"|"tracking"
+---@alias CacheId "ammo"|"auraTrackable"|"consumables"|"contentType"|"durability"|"foreignAura"|"healer"|"item"|"itemCooldown"|"loadout"|"offHand"|"pet"|"petActions"|"petHappiness"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"spellUsable"|"stance"|"subgroup"|"tracking"
 
 ---@class GameContextEventSpec
 ---@field caches? CacheId[] Cache ids to clear, in order
@@ -229,6 +229,7 @@ local EVENT_CACHES = {
             "spellNameMisses",
             "subgroup",
             "spellUsable",
+            "itemCooldown",
             "foreignAura",
         },
         handle = function()
@@ -369,6 +370,16 @@ local EVENT_CACHES = {
         end,
     },
     BAG_UPDATE_DELAYED = { caches = { "item", "repairSource", "consumables", "ammo" } },
+    -- Can fire on each spell cast. An empty cache holds no stale value, so the event
+    -- then requests no render.
+    BAG_UPDATE_COOLDOWN = {
+        handle = function()
+            if BR.BuffState.HasItemCooldownCache() then
+                GameContext.Invalidate("itemCooldown")
+                NotifyChanged(false)
+            end
+        end,
+    },
     NEW_MOUNT_ADDED = { caches = { "repairSource" } },
     PLAYER_MOUNT_DISPLAY_CHANGED = {
         handle = function()

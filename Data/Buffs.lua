@@ -673,6 +673,7 @@ BR.REPAIR_SOURCES = {
 ---@field castSpellID? number           -- Spell ID used for click-to-cast (else spellID)
 ---@field castUnit? string              -- Unit that the click casts on (nil = default targeting)
 ---@field clickSpell? fun(): number?    -- Spell that the click casts, read at click time. nil casts nothing
+---@field clickItem? number             -- Item that the click uses
 ---@field subChoices? SubChoiceRow      -- Choice icons beside the reminder
 ---@field noClickToCast? boolean        -- Suppress the click-to-cast overlay
 ---@field showOnInstanceEntry? boolean  -- Only show briefly on dungeon entry (grouped, non-M+)

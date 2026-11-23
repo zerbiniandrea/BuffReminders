@@ -1317,6 +1317,11 @@ local DRIVE_BY_ROW = {
     end,
 }
 
+local SLEEPING_BAG = {
+    itemID = 211527, -- Cozy Sleeping Bag
+    auraID = 429959, -- Well-Rested
+}
+
 -- Minimap tracking spells, in the order of the fallback pick.
 BR.TRACKING_SPELLS = {
     2383, -- Find Herbs
@@ -1936,6 +1941,31 @@ BR.BUFF_TABLES = {
             end,
             customCheck = function()
                 return BR.Tracking.Pick() ~= nil and not BR.BuffState.IsTrackingActive()
+            end,
+        },
+        {
+            key = "sleepingBag",
+            name = L["Buff.SleepingBag"],
+            icons = { textures = { C_Item.GetItemIconByID(SLEEPING_BAG.itemID) or 134400 } }, -- else a question mark
+            overlayText = L["Overlay.SleepingBag"],
+            infoTooltip = { title = L["Buff.SleepingBag"], desc = L["Tooltip.SleepingBag.Desc"] },
+            clickItem = SLEEPING_BAG.itemID,
+            -- The bag cannot go down in a city or an inn, and the buff gives only experience.
+            customCheck = function(isAuraRestricted)
+                local GameContext = BR.GameContext
+                if isAuraRestricted or GameContext.IsInCombat() or GameContext.IsResting() then
+                    return false
+                end
+                if GameContext.GetPlayerLevel() >= GameContext.GetMaxExpansionLevel() then
+                    return false
+                end
+                if BR.StateHelpers.GetItemCountCached(SLEEPING_BAG.itemID) == 0 then
+                    return false
+                end
+                if C_UnitAuras.GetUnitAuraBySpellID("player", SLEEPING_BAG.auraID) then
+                    return false
+                end
+                return BR.BuffState.IsItemOffCooldown(SLEEPING_BAG.itemID)
             end,
         },
         {

@@ -2293,6 +2293,10 @@ local function ResolveAction(frame, category, db)
         return MacroAction("repair", macro)
     end
 
+    if def and def.clickItem then
+        return ItemAction(def.clickItem, nil, false)
+    end
+
     local castableID
     if frame._br_pet_spell then
         castableID = frame._br_pet_spell

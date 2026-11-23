@@ -4502,6 +4502,41 @@ do
     end
 end
 
+do
+    local GetItemCooldown = C_Item.GetItemCooldown
+    ---@type table<number, number> Item ID -> GetTime() at which the item is ready
+    local cachedItemReadyAt = {}
+
+    ---false while cooldowns are secret, so a reminder fails closed.
+    ---@param itemID number
+    ---@return boolean
+    function BuffState.IsItemOffCooldown(itemID)
+        if CooldownsRestricted() then
+            return false
+        end
+        local readyAt = cachedItemReadyAt[itemID]
+        if readyAt == nil then
+            local ok, start, duration = pcall(GetItemCooldown, itemID)
+            start, duration = ok and Plain(start) or nil, ok and Plain(duration) or nil
+            if not start or not duration then
+                return false
+            end
+            readyAt = duration > 0 and start + duration or 0
+            cachedItemReadyAt[itemID] = readyAt
+        end
+        return readyAt <= GetTime()
+    end
+
+    ---@return boolean
+    function BuffState.HasItemCooldownCache()
+        return next(cachedItemReadyAt) ~= nil
+    end
+
+    function BuffState.InvalidateItemCooldownCache()
+        wipe(cachedItemReadyAt)
+    end
+end
+
 -- ============================================================================
 -- ALLY CACHE PRUNING
 -- ============================================================================
@@ -4610,4 +4645,5 @@ BR.GameContext.RegisterCache("tracking", BuffState.InvalidateTrackingCache)
 BR.GameContext.RegisterCache("petHappiness", BuffState.InvalidatePetHappinessCache)
 BR.GameContext.RegisterCache("stance", BuffState.InvalidateStanceCache)
 BR.GameContext.RegisterCache("spellUsable", BuffState.InvalidateSpellUsableCache)
+BR.GameContext.RegisterCache("itemCooldown", BuffState.InvalidateItemCooldownCache)
 BR.GameContext.RegisterCache("foreignAura", BuffState.InvalidateForeignAuraCache)
