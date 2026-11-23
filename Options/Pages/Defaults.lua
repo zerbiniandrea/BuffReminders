@@ -53,7 +53,7 @@ local function FormatMinutes(minutes)
     return string.format("%.1f", minutes):gsub("%.0$", "") .. " " .. L["Options.Min"]
 end
 
----The share rule at the current settings, with the duration below which a buff counts as short.
+---The share rule at the current settings, with a short and a long example buff.
 ---@param threshold number Minutes
 ---@param share number Percent
 ---@return string
@@ -61,12 +61,21 @@ local function DescribeShare(threshold, share)
     if threshold == 0 then
         return L["Options.ExpirationShare.Off"]
     end
-    return string.format(
-        L["Options.ExpirationShare.Note"],
-        FormatMinutes(threshold * 100 / share),
-        share,
-        FormatMinutes(threshold)
-    )
+    local function Example(minutes)
+        local lead = AuraLead(minutes * 60, threshold * 60, 0, share / 100) / 60
+        return string.format(
+            L["Options.ExpirationShare.Example"],
+            minutes .. " " .. L["Options.Min"],
+            FormatMinutes(lead)
+        )
+    end
+    return string.format(L["Options.ExpirationShare.Note"], share, FormatMinutes(threshold))
+        .. "\n|cff808080"
+        .. string.format(L["Options.ExpirationShare.Formula"], share, FormatMinutes(threshold))
+        .. "|r\n"
+        .. Example(10)
+        .. "  "
+        .. Example(60)
 end
 
 ---The threshold rule, then the warning time of sample buff durations at the current threshold.
