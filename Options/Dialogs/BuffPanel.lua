@@ -1732,6 +1732,16 @@ for _, buff in ipairs(BR.BUFF_TABLES.presence) do
     end
 end
 
+for _, buff in ipairs(BR.BUFF_TABLES.utility) do
+    if buff.subChoices and not SPECIAL_SECTIONS[buff.key] then
+        SPECIAL_SECTIONS[buff.key] = {
+            build = function(layout)
+                AddSubChoicesDropdown(layout, buff, "utility")
+            end,
+        }
+    end
+end
+
 -- The low-stock warning counts charges, so a healthstone without charges has no section.
 for _, buff in ipairs(BR.BUFF_TABLES.consumable) do
     if buff.key == "healthstone" and not buff.itemMaxCharges then

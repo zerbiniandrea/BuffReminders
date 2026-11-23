@@ -9,7 +9,7 @@ local BR = ns
 -- handler reads fresh values.
 -- RenderRequested asks for the render that a change needs. urgent = true asks for it now.
 
----@alias CacheId "ammo"|"auraTrackable"|"consumables"|"contentType"|"durability"|"foreignAura"|"healer"|"item"|"loadout"|"offHand"|"pet"|"petActions"|"petHappiness"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"spellUsable"|"stance"|"subgroup"
+---@alias CacheId "ammo"|"auraTrackable"|"consumables"|"contentType"|"durability"|"foreignAura"|"healer"|"item"|"loadout"|"offHand"|"pet"|"petActions"|"petHappiness"|"repairSource"|"spec"|"spell"|"spellNameMisses"|"spellTextureMisses"|"spellUsable"|"stance"|"subgroup"|"tracking"
 
 ---@class GameContextEventSpec
 ---@field caches? CacheId[] Cache ids to clear, in order
@@ -199,6 +199,13 @@ local PET_HAPPINESS = {
         NotifyChanged(false)
     end,
 }
+---@type GameContextEventSpec
+local TRACKING = {
+    caches = { "tracking" },
+    handle = function()
+        NotifyChanged(false)
+    end,
+}
 
 ---@type table<string, GameContextEventSpec>
 local EVENT_CACHES = {
@@ -206,6 +213,7 @@ local EVENT_CACHES = {
         caches = {
             "contentType",
             "ammo",
+            "tracking",
             "auraTrackable",
             "spell",
             "spec",
@@ -301,6 +309,11 @@ local EVENT_CACHES = {
     PLAYER_ROLES_ASSIGNED = HEALER,
     UNIT_PET = { playerOnly = true, caches = { "pet", "petHappiness" } },
     UNIT_HAPPINESS = PET_HAPPINESS,
+    MINIMAP_UPDATE_TRACKING = TRACKING,
+    -- Death ends the active tracking.
+    PLAYER_DEAD = TRACKING,
+    PLAYER_ALIVE = TRACKING,
+    PLAYER_UNGHOST = TRACKING,
     UPDATE_SHAPESHIFT_FORM = STANCE,
     UPDATE_SHAPESHIFT_FORMS = STANCE,
     PET_STABLE_UPDATE = { caches = { "petActions" } },

@@ -4244,6 +4244,56 @@ do
     end
 end
 
+do
+    local GetNumTrackingTypes = C_Minimap and C_Minimap.GetNumTrackingTypes
+    local GetTrackingInfo = C_Minimap and C_Minimap.GetTrackingInfo
+    local GetTrackingTexture = GetTrackingTexture
+    local trackingActive ---@type boolean? nil = not read
+
+    -- A town type (banker, flight master) is not a spell and can stay on, so only a
+    -- spell type counts. A secret flag counts as active, so the reminder fails closed.
+    ---@return boolean
+    local function ReadTrackingActive()
+        if GetNumTrackingTypes and GetTrackingInfo then
+            local count = Plain(GetNumTrackingTypes())
+            -- An unreadable or empty list (before the minimap loads) is not proof of no tracking.
+            if not count or count == 0 then
+                return true
+            end
+            for i = 1, count do
+                -- Some builds return a table, others return name, texture, active, type, subType, spellID.
+                local info, _, active, trackingType, _, spellID = GetTrackingInfo(i)
+                if type(info) == "table" then
+                    active, trackingType, spellID = info.active, info.type, info.spellID
+                end
+                trackingType = Plain(trackingType)
+                local isSpell = trackingType == "spell" or (trackingType == nil and Plain(spellID) ~= nil)
+                if Plain(active) ~= false and isSpell then
+                    return true
+                end
+            end
+            return false
+        end
+        if GetTrackingTexture then
+            return GetTrackingTexture() ~= nil
+        end
+        return true
+    end
+
+    ---Whether a tracking spell is active (cached). true on a client with no tracking API.
+    ---@return boolean
+    function BuffState.IsTrackingActive()
+        if trackingActive == nil then
+            trackingActive = ReadTrackingActive()
+        end
+        return trackingActive
+    end
+
+    function BuffState.InvalidateTrackingCache()
+        trackingActive = nil
+    end
+end
+
 ---Happiness of the current pet (cached): 1 unhappy, 2 content, 3 happy.
 ---@return number? happiness nil without a pet or on a client without pet happiness
 function BuffState.GetPetHappiness()
@@ -4556,6 +4606,7 @@ BR.GameContext.RegisterCache("repairSource", BuffState.InvalidateRepairSourceCac
 BR.GameContext.RegisterCache("loadout", BuffState.InvalidateLoadoutCache)
 BR.GameContext.RegisterCache("pet", BuffState.InvalidatePetCache)
 BR.GameContext.RegisterCache("ammo", BuffState.InvalidateAmmoCache)
+BR.GameContext.RegisterCache("tracking", BuffState.InvalidateTrackingCache)
 BR.GameContext.RegisterCache("petHappiness", BuffState.InvalidatePetHappinessCache)
 BR.GameContext.RegisterCache("stance", BuffState.InvalidateStanceCache)
 BR.GameContext.RegisterCache("spellUsable", BuffState.InvalidateSpellUsableCache)

@@ -108,6 +108,7 @@ local BR = ns
 ---@field paladinBlessingScope? "group"|"self"
 ---@field blessingSubIcons? "rightclick"|"always"
 ---@field driveBySubIcons? "rightclick"|"always"
+---@field trackingSubIcons? "rightclick"|"always"
 ---@field paladinAuras? table<string, table<string, boolean>> Content row -> chosen aura key. A row with none accepts any aura
 ---@field thornsRequest? boolean A tank of another class sees a Thorns request reminder
 ---@field righteousFuryShow? "tank"|"always"
@@ -1194,12 +1195,12 @@ end
 BR.Display.ShowHoverTooltip = ShowHoverTooltip
 BR.Display.EndHoverTooltip = EndHoverTooltip
 
-local function DrawBuffSpellTooltip(frame, anchor, addLines)
+local function DrawBuffSpellTooltip(frame, anchor, addLines, spellID)
     local def = frame.buffDef
     if not def then
         return
     end
-    local spellID = type(def.spellID) == "table" and def.spellID[1] or def.spellID
+    spellID = spellID or (type(def.spellID) == "table" and def.spellID[1] or def.spellID)
     if not spellID then
         return
     end
@@ -1226,12 +1227,13 @@ end
 -- with the cursor when a click overlay covers the icon.
 ---@param addLines? fun(tooltip: table) Adds lines under the spell before the tooltip shows
 ---@param fallback? fun() Draws a short tooltip while the tooltip key is up
-local function ShowBuffSpellTooltip(frame, anchor, addLines, fallback)
+---@param spellID? number Spell to show. Default: the first spell of the buff
+local function ShowBuffSpellTooltip(frame, anchor, addLines, fallback, spellID)
     if not IsBuffTooltipOn(frame.buffCategory) then
         return
     end
     ShowHoverTooltip(anchor or frame, function()
-        DrawBuffSpellTooltip(frame, anchor, addLines)
+        DrawBuffSpellTooltip(frame, anchor, addLines, spellID)
     end, fallback)
 end
 BR.Display.ShowBuffSpellTooltip = ShowBuffSpellTooltip
