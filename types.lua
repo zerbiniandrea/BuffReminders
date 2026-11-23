@@ -53,7 +53,7 @@
 
 ---@class AnimationGroup
 
----@alias TooltipText {title: string, desc?: string, atlas?: string}
+---@alias TooltipText {title: string, desc?: (string|fun(): string), atlas?: string}
 ---@alias SpellID number|number[]
 ---@alias ClassName "WARRIOR"|"PALADIN"|"HUNTER"|"ROGUE"|"PRIEST"|"DEATHKNIGHT"|"SHAMAN"|"MAGE"|"WARLOCK"|"MONK"|"DRUID"|"DEMONHUNTER"|"EVOKER"
 ---@alias RoleType "TANK"|"HEALER"|"DAMAGER"

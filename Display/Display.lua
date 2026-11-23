@@ -23,6 +23,7 @@ local BR = ns
 ---@field showExpirationGlow boolean
 ---@field showMissingGlow boolean
 ---@field expirationThreshold number
+---@field expirationShare? number Percent of a buff duration
 ---@field preKeyThreshold number
 ---@field glowType number
 ---@field glowColor? number[]
@@ -226,11 +227,21 @@ local BR = ns
 ---@field _br_pet_spec_icon? number        -- Pet spec ability icon texture for hover swap
 ---@field _br_pet_label_key? string        -- Cache key for pet label updates
 ---@field _br_count_scale? number          -- Font scale the count text was last written with
+---@field _br_expiry? ExpiryBar
 ---@field _br_pet_name_text? FontString    -- Pet name label below icon
 ---@field _br_pet_family_text? FontString  -- Pet spec label below name
 ---@field _br_pet_extra_text? FontString   -- Spirit Beast label below spec
 ---@field _cachedItems? table|false         -- Per-cycle cache for GetConsumableActionItems result
 ---@field _sameStatItems? table             -- Reused list for the expiring fan-out (GetSameStatItems)
+
+---@class ExpiryBar
+---@field track table
+---@field fill table
+---@field ticker table Frame that runs the OnUpdate
+---@field expiresAt number GetTime() when the aura ends
+---@field lead number Seconds of the warning window
+---@field layoutKey number Edge and side insets at the last layout
+---@field tick number Seconds between paints
 
 -- Lua stdlib locals (avoid repeated global lookups in hot paths)
 local floor, max, min = math.floor, math.max, math.min
@@ -391,6 +402,7 @@ local eventFrame -- forward declaration; created later in file
 ---@class TestModeData
 ---@field fakeTotal number Total group size for fake counts
 ---@field fakeRemaining number Fake time remaining for expiration glow test
+---@field startedAt number GetTime() when test mode started
 ---@field fakeMissing table<number, number> Fake missing counts per raid buff index
 
 ---@type TestModeData?
@@ -720,6 +732,87 @@ local function SetCountText(frame, text, scale)
     frame._br_count_scale = scale
     ApplyFont(frame.count, GetFrameFontSize(frame, scale))
     frame.count:SetText(text)
+end
+
+-- The bar of an expiring icon: full when the warning window opens, empty when the
+-- aura ends. Only a frame with a shown bar runs its ticker.
+local SetExpiryBar
+do
+    ---@param frame table
+    local function Paint(frame)
+        local bar = frame._br_expiry --[[@as ExpiryBar]]
+        local width, height = frame:GetSize()
+        local edge = max(2, floor(height * 3 / 56 + 0.5))
+        -- The action-button art covers a bevel and rounds the corners of the icon.
+        local bevel = frame._br_masked and floor(height * 4 / 45 + 0.5) or 0
+        local side = edge + bevel
+        local layoutKey = edge * 1000 + side
+        if layoutKey ~= bar.layoutKey then
+            bar.layoutKey = layoutKey
+            bar.track:ClearAllPoints()
+            bar.track:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", side, edge + bevel)
+            bar.track:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -side, edge + bevel)
+            bar.track:SetHeight(edge)
+        end
+        local trackWidth = width - 2 * side
+        -- One pixel of fill per tick, at most two ticks a second.
+        bar.tick = max(0.5, trackWidth > 0 and bar.lead / trackWidth or 0)
+        local fillWidth = trackWidth * min(1, (bar.expiresAt - GetTime()) / bar.lead)
+        if fillWidth >= 1 then
+            bar.fill:SetWidth(fillWidth)
+            bar.fill:Show()
+        else
+            bar.fill:Hide()
+        end
+    end
+
+    ---@param frame table
+    ---@return ExpiryBar
+    local function Create(frame)
+        local colors = BR.Theme.expiry
+        -- Below the count text, which draws on OVERLAY sublevel 0.
+        local track = frame:CreateTexture(nil, "OVERLAY", nil, -2)
+        track:SetColorTexture(colors.track[1], colors.track[2], colors.track[3], colors.track[4])
+        local fill = frame:CreateTexture(nil, "OVERLAY", nil, -1)
+        fill:SetColorTexture(colors.fill[1], colors.fill[2], colors.fill[3], colors.fill[4])
+        fill:SetPoint("TOPLEFT", track, "TOPLEFT")
+        fill:SetPoint("BOTTOMLEFT", track, "BOTTOMLEFT")
+        local ticker = CreateFrame("Frame", nil, frame)
+        ticker:SetAllPoints(frame)
+        local bar = { track = track, fill = fill, ticker = ticker, expiresAt = 0, lead = 1, layoutKey = 0, tick = 0.5 }
+        local elapsedSum = 0
+        ticker:SetScript("OnUpdate", function(_, elapsed)
+            elapsedSum = elapsedSum + elapsed
+            if elapsedSum >= bar.tick then
+                elapsedSum = 0
+                Paint(frame)
+            end
+        end)
+        frame._br_expiry = bar
+        return bar
+    end
+
+    ---Show the bar for an entry in its warning window, else hide it.
+    ---@param frame table
+    ---@param entry? BuffStateEntry
+    SetExpiryBar = function(frame, entry)
+        local bar = frame._br_expiry
+        local expiresAt, lead = entry and entry.expiringAt, entry and entry.expiringLead
+        if not (expiresAt and lead and lead > 0) then
+            if bar then
+                bar.ticker:Hide()
+                bar.track:Hide()
+                bar.fill:Hide()
+            end
+            return
+        end
+        bar = bar or Create(frame)
+        bar.expiresAt = expiresAt
+        bar.lead = lead
+        bar.track:Show()
+        bar.ticker:Show()
+        Paint(frame)
+    end
 end
 
 local FormatRemainingTime = BR.StateHelpers.FormatRemainingTime
@@ -1720,7 +1813,8 @@ local function GenerateTestEntries()
         entry.shouldGlow = false
         entry.countText = nil
         entry.overlayText = nil
-        entry.expiringTime = nil
+        entry.expiringAt = nil
+        entry.expiringLead = nil
         entry.isEating = nil
         entry.petActions = nil
         entry.iconByRole = nil
@@ -1734,6 +1828,9 @@ local function GenerateTestEntries()
         local exGlowEnabled = BR.Config.GetCategorySetting(category, "showExpirationGlow") ~= false
         local missGlowEnabled = BR.Config.GetCategorySetting(category, "showMissingGlow") ~= false
         local threshold = BR.Config.GetCategorySetting(category, "expirationThreshold") or 15
+        -- The sample buff lasts 60 min.
+        local testLead = BR.StateHelpers.AuraLead(3600, threshold * 60) or 0
+        local testRemaining = min(testModeData.fakeRemaining, testLead)
         local expiringShown = false
 
         for i, buff in ipairs(BUFF_TABLES[category]) do
@@ -1758,7 +1855,9 @@ local function GenerateTestEntries()
                 if category == "raid" then
                     if threshold > 0 and not expiringShown then
                         entry.displayType = "expiring"
-                        entry.countText = FormatRemainingTime(testModeData.fakeRemaining)
+                        entry.countText = FormatRemainingTime(testRemaining)
+                        entry.expiringAt = testModeData.startedAt + testRemaining
+                        entry.expiringLead = testLead
                         entry.shouldGlow = exGlowEnabled
                         expiringShown = true
                     else
@@ -1797,7 +1896,9 @@ local function GenerateTestEntries()
                     -- Show first buff as expiring to preview expiration countdown
                     if threshold > 0 and not buff.noExpirationGlow and not expiringShown then
                         entry.displayType = "expiring"
-                        entry.countText = FormatRemainingTime(testModeData.fakeRemaining)
+                        entry.countText = FormatRemainingTime(testRemaining)
+                        entry.expiringAt = testModeData.startedAt + testRemaining
+                        entry.expiringLead = testLead
                         entry.shouldGlow = exGlowEnabled
                         expiringShown = true
                     end
@@ -1867,6 +1968,7 @@ ToggleTestMode = function()
         local data = {
             fakeTotal = random(10, 20),
             fakeRemaining = random(1, threshold) * 60,
+            startedAt = GetTime(),
             fakeMissing = {},
         }
         for i = 1, #RaidBuffs do
@@ -2132,6 +2234,9 @@ local function RenderVisibleEntry(frame, entry)
 
     -- Hide stack count by default; only the consumable-with-items path shows it
     frame.stackCount:Hide()
+
+    local eating = entry.isEating
+    SetExpiryBar(frame, not eating and entry or nil)
 
     -- Eating override: state provides isEating as a snapshot, so the display
     -- never reads a live flag that can change mid-cycle.

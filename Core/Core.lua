@@ -406,6 +406,7 @@ local DefaultSettingKeys = {
     -- Behavior (glow is global-only, lives under defaults)
     showExpirationGlow = "DisplayRefresh",
     expirationThreshold = "DisplayRefresh",
+    expirationShare = "DisplayRefresh",
     preKeyThreshold = "DisplayRefresh",
     glowType = "VisualsRefresh",
     glowColor = "VisualsRefresh",

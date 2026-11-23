@@ -227,10 +227,13 @@ end
 ---Show a tooltip on a widget (title in white, optional description in grey)
 ---@param owner table Frame that owns the tooltip
 ---@param title string Tooltip title
----@param desc? string Optional description line
+---@param desc? string|fun(): string Optional description line. A function runs at each show.
 ---@param anchor? string Anchor point (default "ANCHOR_RIGHT")
 ---@param titled? boolean GameTooltip shows the title in the title color and the description in the text color
 local function ShowTooltip(owner, title, desc, anchor, titled)
+    if type(desc) == "function" then
+        desc = desc()
+    end
     if Theme.ownTooltip and IsOnOptionsSurface(owner) then
         ShowOwnTooltip(owner, title, desc, anchor)
         return
@@ -863,10 +866,10 @@ function Components.Slider(parent, config)
     if config.tooltip then
         local title = config.tooltip.title
         local desc = config.tooltip.desc
-        local fullDesc = desc and (desc .. "\n\n" .. clickHint) or clickHint
         holder:EnableMouse(true)
         local function showTip()
-            ShowTooltip(holder, title, fullDesc, "ANCHOR_TOP")
+            local text = type(desc) == "function" and desc() or desc
+            ShowTooltip(holder, title, text and (text .. "\n\n" .. clickHint) or clickHint, "ANCHOR_TOP")
         end
         local function hideTip()
             HideTooltip()

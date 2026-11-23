@@ -540,6 +540,17 @@ english["Options.UseCustomColor.Desc"] =
     "When enabled, the proc glow is desaturated and recolored.\nThis looks less vibrant than the default proc glow."
 english["Options.ExpirationReminder"] = "Expiration Reminder"
 english["Options.ExpirationWarning"] = "Warn when under"
+english["Options.ExpirationWarning.Note"] = "Short buffs warn earlier, in proportion to their duration. Hover for examples."
+english["Options.ExpirationWarning.Desc"] =
+    "Long buffs warn at this time. Short buffs warn at a share of their duration (see Advanced). Buffs of 5 min or less show only when missing. Custom buffs keep their own time."
+english["Options.ExpirationAdvanced"] = "Advanced"
+english["Options.ExpirationShare"] = "Share of duration"
+english["Options.ExpirationShare.Note"] =
+    "Buffs under %s are short. They warn when %d%% of their duration is left. Longer buffs warn at %s."
+english["Options.ExpirationShare.Off"] = "Expiration warnings are off."
+english["Options.ExpirationPreview.Header"] = "Warning time by buff duration:"
+english["Options.ExpirationPreview.Line"] = "%s: %s"
+english["Options.ExpirationPreview.OrMore"] = "%s or more"
 english["Options.Override.Expiration.Desc"] =
     "Set a warning time for this category. While off, the time from the Defaults page applies."
 english["Options.PreKeyThreshold"] = "Pre-Key Threshold"

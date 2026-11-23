@@ -22,10 +22,12 @@ local LayoutSectionHeader = Helpers.LayoutSectionHeader
 local LayoutSectionNote = Helpers.LayoutSectionNote
 local MakeDefaultsGetter = Helpers.MakeDefaultsGetter
 local MakeDefaultsSetter = Helpers.MakeDefaultsSetter
+local AuraLead = BR.StateHelpers.AuraLead
 
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local SECTION_GAP = BR.Options.Constants.SECTION_GAP
 local COL_PADDING = BR.Options.Constants.COL_PADDING
+local DEPENDENT_INDENT = BR.Options.Constants.DEPENDENT_INDENT
 local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
 
 local tinsert = table.insert
@@ -41,6 +43,59 @@ local function BuildFontOptions()
         end
     end
     return opts
+end
+
+local PREVIEW_MINUTES = { 10, 15, 30, 60, 120 }
+
+---@param minutes number
+---@return string
+local function FormatMinutes(minutes)
+    return string.format("%.1f", minutes):gsub("%.0$", "") .. " " .. L["Options.Min"]
+end
+
+---The share rule at the current settings, with the duration below which a buff counts as short.
+---@param threshold number Minutes
+---@param share number Percent
+---@return string
+local function DescribeShare(threshold, share)
+    if threshold == 0 then
+        return L["Options.ExpirationShare.Off"]
+    end
+    return string.format(
+        L["Options.ExpirationShare.Note"],
+        FormatMinutes(threshold * 100 / share),
+        share,
+        FormatMinutes(threshold)
+    )
+end
+
+---The threshold rule, then the warning time of sample buff durations at the current threshold.
+---@param getThreshold fun(): number Minutes
+---@param getShare fun(): number Percent
+---@return string
+local function DescribeThreshold(getThreshold, getShare)
+    local threshold = getThreshold()
+    local share = getShare() / 100
+    local lines = { L["Options.ExpirationWarning.Desc"] }
+    if threshold == 0 then
+        return lines[1]
+    end
+    tinsert(lines, "")
+    tinsert(lines, L["Options.ExpirationPreview.Header"])
+    for _, minutes in ipairs(PREVIEW_MINUTES) do
+        local lead = AuraLead(minutes * 60, threshold * 60, 0, share) / 60
+        local capped = lead >= threshold
+        local lasts = minutes .. " " .. L["Options.Min"]
+        if capped then
+            lasts = string.format(L["Options.ExpirationPreview.OrMore"], lasts)
+        end
+        local warns = FormatMinutes(lead)
+        tinsert(lines, string.format(L["Options.ExpirationPreview.Line"], lasts, warns))
+        if capped then
+            break
+        end
+    end
+    return table.concat(lines, "\n")
 end
 
 local function Build(content)
@@ -65,17 +120,90 @@ local function Build(content)
         return val == 0 and L["Options.Off"] or (val .. " " .. L["Options.Min"])
     end
 
+    local getThreshold = MakeDefaultsGetter("expirationThreshold", 15)
+    local getShare = MakeDefaultsGetter("expirationShare", 25)
+    local setThreshold = MakeDefaultsSetter("expirationThreshold")
+    local setShare = MakeDefaultsSetter("expirationShare")
+    local shareNote
     local defThresholdHolder = Components.Slider(content, {
         label = L["Options.ExpirationWarning"],
         labelWidth = thresholdLW,
         min = 0,
         max = 45,
-        step = 5,
-        get = MakeDefaultsGetter("expirationThreshold", 15),
+        step = 1,
+        get = getThreshold,
         formatValue = formatMinutes,
-        onChange = MakeDefaultsSetter("expirationThreshold"),
+        tooltip = {
+            title = L["Options.ExpirationWarning"],
+            desc = function()
+                return DescribeThreshold(getThreshold, getShare)
+            end,
+        },
+        onChange = function(val)
+            setThreshold(val)
+            shareNote:SetText(DescribeShare(val, getShare()))
+        end,
     })
     layout:Add(defThresholdHolder, nil, COMPONENT_GAP)
+    LayoutSectionNote(layout, content, L["Options.ExpirationWarning.Note"])
+
+    local advancedOpen = false
+    local advancedToggle = CreateFrame("Button", nil, content)
+    local advancedLabel = advancedToggle:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    advancedLabel:SetPoint("LEFT")
+    local function PaintAdvancedToggle(hover)
+        advancedLabel:SetText((advancedOpen and "- " or "+ ") .. L["Options.ExpirationAdvanced"])
+        advancedLabel:SetTextColor(unpack(hover and BR.Theme.link.hover or BR.Theme.link.linked))
+        advancedToggle:SetSize(advancedLabel:GetStringWidth(), 16)
+    end
+    PaintAdvancedToggle(false)
+    advancedToggle:SetScript("OnEnter", function()
+        PaintAdvancedToggle(true)
+    end)
+    advancedToggle:SetScript("OnLeave", function()
+        PaintAdvancedToggle(false)
+    end)
+    layout:Add(advancedToggle, nil, COMPONENT_GAP)
+
+    local advanced = CreateFrame("Frame", nil, content)
+    advanced:SetSize(content:GetWidth() - COL_PADDING * 2, 1)
+    local advancedLayout = Components.VerticalLayout(advanced, { x = DEPENDENT_INDENT, y = 0 })
+    shareNote = LayoutSectionNote(advancedLayout, advanced, DescribeShare(getThreshold(), getShare()))
+    function shareNote:Refresh()
+        self:SetText(DescribeShare(getThreshold(), getShare()))
+    end
+    tinsert(BR.RefreshableComponents, shareNote)
+    advancedLayout:Add(
+        Components.Slider(advanced, {
+            label = L["Options.ExpirationShare"],
+            labelWidth = thresholdLW,
+            min = 10,
+            max = 50,
+            step = 5,
+            get = getShare,
+            formatValue = function(val)
+                return val .. "%"
+            end,
+            onChange = function(val)
+                setShare(val)
+                shareNote:SetText(DescribeShare(getThreshold(), val))
+            end,
+        }),
+        nil,
+        0
+    )
+    local advancedHeight = math.abs(advancedLayout:GetY())
+    advanced:Hide()
+    layout:AddDynamic(advanced, function()
+        return advancedOpen and advancedHeight or 0
+    end, 0)
+    advancedToggle:SetScript("OnClick", function()
+        advancedOpen = not advancedOpen
+        advanced:SetShown(advancedOpen)
+        PaintAdvancedToggle(true)
+        layout:Reflow()
+        content:SetHeight(math.abs(layout:GetY()) + 20)
+    end)
 
     if BR.INSTANCE_CONTENT.keystones then
         local preKeyThresholdHolder = Components.Slider(content, {

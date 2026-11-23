@@ -360,6 +360,7 @@ local function BuildRetail()
             },
         },
         mover = { body = { 0, 0.7, 0, 0.6 }, edge = CLEAR, text = { 0.4, 1, 0.4, 1 } },
+        expiry = { track = { 0, 0, 0, 0.7 }, fill = { 1, 0.71, 0.18, 1 } },
         cell = {
             edge = BORDER,
             selected = ACCENT,
@@ -687,6 +688,7 @@ local function BuildForever()
             },
         },
         mover = { body = { 0.08, 0.055, 0.03, 0.88 }, edge = { 0.72, 0.54, 0.29, 1 }, text = { 1.0, 0.929, 0.824, 1 } },
+        expiry = { track = { 0, 0, 0, 0.7 }, fill = { 1, 0.71, 0.18, 1 } },
         cell = {
             edge = P.edge,
             selected = P.edgeActive,
