@@ -276,6 +276,10 @@ local GROUP_HINT = L["Tooltip.RightClickGroup"]
 
 ---@param tooltip table
 local function AddGroupHint(tooltip)
+    -- The spell tooltip owns GameTooltip by now, so only the own frame hides.
+    if lastTargetTooltip then
+        lastTargetTooltip:Hide()
+    end
     local n = TARGET_TIP.note
     tooltip:AddLine(GROUP_HINT, n[1], n[2], n[3])
 end
@@ -998,9 +1002,14 @@ local function CreateClickOverlay(frame)
                 end
             end
             hint = hint or def.targetHint
-            -- With spell tooltips on, the target name joins the spell tooltip.
+            -- With spell tooltips on, the target name joins the spell tooltip. While
+            -- the tooltip key is up, the short target tooltip shows alone.
             if BR.Display.IsBuffTooltipOn(frame.buffCategory) then
                 BR.Display.ShowBuffSpellTooltip(frame, overlay, name and function(tooltip)
+                    -- The spell tooltip owns GameTooltip by now, so only the own frame hides.
+                    if lastTargetTooltip then
+                        lastTargetTooltip:Hide()
+                    end
                     local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
                     local text = hint and (name .. " |cff888888" .. hint .. "|r") or name
                     tooltip:AddLine(" ")
@@ -1010,6 +1019,8 @@ local function CreateClickOverlay(frame)
                         c and c.g or 1,
                         c and c.b or 1
                     )
+                end, name and function()
+                    ShowLastTargetTooltip(overlay, name, class, hint)
                 end)
             elseif name then
                 ShowLastTargetTooltip(overlay, name, class, hint)
@@ -1023,12 +1034,14 @@ local function CreateClickOverlay(frame)
         -- The anchor is the overlay: the cursor is over the overlay, not over the
         -- buff frame below it.
         local groupHint = overlay._br_rightClick == "group" and overlay._br_rightSpell ~= overlay._br_action.spellID
-        if BR.Display.IsBuffTooltipOn(frame.buffCategory) then
-            BR.Display.ShowBuffSpellTooltip(frame, overlay, groupHint and AddGroupHint or nil)
-        elseif groupHint then
-            BR.Display.ShowHoverTooltip(overlay, function()
+        local showGroupHint = groupHint
+            and function()
                 ShowLastTargetTooltip(overlay, "", nil, nil, GROUP_HINT)
-            end)
+            end
+        if BR.Display.IsBuffTooltipOn(frame.buffCategory) then
+            BR.Display.ShowBuffSpellTooltip(frame, overlay, groupHint and AddGroupHint or nil, showGroupHint or nil)
+        elseif showGroupHint then
+            showGroupHint()
         end
     end)
     overlay:HookScript("OnLeave", function()
