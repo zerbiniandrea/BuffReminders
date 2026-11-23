@@ -941,9 +941,14 @@ english["BuffPanel.SubChoices.DriveBy"] = "Buff icons"
 english["BuffPanel.SubChoices.DriveBy.Desc"] = "Icons for your other buffs, on your target."
 english["BuffPanel.GroupCast"] = "Cast group version (uses a reagent)"
 english["BuffPanel.GroupCast.Desc"] =
-    "If 2+ group members lack the buff and you have the reagent, a click casts the group version. Otherwise it casts the single-target version."
+    "If enough members of your party lack the buff and are in range, and you have the reagent, a click casts the group version on you. Otherwise it casts the single-target version."
 english["BuffPanel.GroupCast.Blessing.Desc"] =
-    "If 2+ members of one class lack the same blessing, a click casts the Greater version (needs Symbol of Kings). Only when you give that blessing to the whole class."
+    "If enough members of one class lack the same blessing, a click casts the Greater version (needs Symbol of Kings). Only when you give that blessing to the whole class."
+english["BuffPanel.GroupCastMin"] = "Group version at"
+english["BuffPanel.GroupCastMin.Suffix"] = " missing"
+english["BuffPanel.GroupCastMin.Desc"] =
+    "How many members must lack the buff before a click casts the group version: in your party, or in one class for a Greater Blessing. One value for all buffs."
+english["DisabledReason.GroupCast"] = 'Turn on "Cast group version" first.'
 english["BuffPanel.PaladinAura.Hint"] = "Pick one aura per content. The icon shows WRONG AURA if another one is active. An empty row, or an aura you have not learned, accepts any aura."
 english["BuffPanel.ThornsRequest"] = "Tanks can ask for Thorns"
 english["BuffPanel.ThornsRequest.Desc"] =
