@@ -2952,7 +2952,9 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
             and raidVisible
             and scope.show
             and (not requester or (readSources and db.requestBuffInChat == true))
-            and (not buff.requiresKnownSpell or requester or KnowsAnySpell(buff.spellID))
+            and (not buff.requiresKnownSpell or requester or KnowsAnySpell(buff.castSpellID or buff.spellID))
+            -- A caster who did not learn the buff yet cannot cast it.
+            and (buff.class ~= playerClass or requester or KnowsAnySpell(buff.castSpellID or buff.spellID))
             and (not buff.visibilityCondition or buff.visibilityCondition())
         then
             local missing, total, minRemaining, choice, minLead, nextSlack
