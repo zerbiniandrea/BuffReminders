@@ -1417,7 +1417,6 @@ BR.BUFF_TABLES = {
                 local defaults = BR.profile.defaults
                 return defaults ~= nil and defaults.paladinBlessingScope == "self"
             end,
-            infoTooltip = { title = L["Tooltip.PaladinBlessing"], desc = L["Tooltip.PaladinBlessing.Desc"] },
         },
         {
             spellID = { 10938, 10937, 2791, 1245, 1244, 1243, 21564, 21562 },
@@ -1934,7 +1933,6 @@ BR.BUFF_TABLES = {
                 end,
             },
             overlayText = L["Overlay.NoTracking"],
-            infoTooltip = { title = L["Buff.Tracking"], desc = L["Tooltip.Tracking.Desc"] },
             subChoices = TRACKING_ROW,
             clickSpell = function()
                 return BR.Tracking.Pick()

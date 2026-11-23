@@ -325,15 +325,9 @@ english["Tooltip.MayShowExtraIcon.Desc"] =
 english["Tooltip.PaladinDuplicate"] = "Duplicate Check"
 english["Tooltip.PaladinAuraDuplicate.Desc"] =
     "Warns when another paladin already runs the same aura type. Switch to a different aura."
-english["Tooltip.PaladinBlessing"] = "Blessing per Class"
-english["Tooltip.PaladinBlessing.Desc"] =
-    "Each class gets its blessing from your list in Extras. If another paladin already gives it, you give the backup."
 english["Tooltip.DriveBy.Desc"] =
     "Out of combat, shows when your target is a friendly player outside your group who lacks one of your buffs. Click to cast the best rank for them."
-english["Tooltip.Tracking.Desc"] =
-    "Shows when you know Find Herbs or Find Minerals and no tracking is active, for example after you die. Click to cast the last one you used."
-english["Tooltip.SleepingBag.Desc"] =
-    "Shows below max level when you lack Well-Rested and your Cozy Sleeping Bag is ready. Hidden in combat, in cities and in inns. Click to place the bag."
+english["Tooltip.SleepingBag.Desc"] = "Shows only below max level. Hidden in combat, in cities and in inns."
 english["Tooltip.InstanceEntryReminder"] = "Instance Entry Reminder"
 english["Tooltip.InstanceEntryReminder.Desc"] =
     "Briefly shown when entering a dungeon as a reminder to drop a Soulwell. Dismissed after casting or after 30 seconds."
