@@ -136,6 +136,8 @@ english["Overlay.EquipAmmo"] = "EQUIP\nAMMO"
 english["Overlay.DriveBy"] = "BUFF\nTARGET"
 english["Overlay.NoTracking"] = "NO\nTRACK"
 english["Overlay.SleepingBag"] = "SLEEP\nBAG"
+english["Overlay.CampSit"] = "SIT"
+english["Overlay.CampKit"] = "CAMP"
 english["Overlay.NoGrim"] = "NO\nGRIM"
 english["Overlay.BurningRush"] = "RUSH"
 english["Overlay.NoRite"] = "NO\nRITE"
@@ -252,6 +254,7 @@ english["Buff.LowAmmo"] = "Low Ammo"
 english["Buff.DriveByBuffs"] = "Drive-by Buffs"
 english["Buff.Tracking"] = "Gathering Tracking"
 english["Buff.SleepingBag"] = "Cozy Sleeping Bag"
+english["Buff.Camp"] = "Camp Benefits"
 english["Buff.DruidForm"] = "Druid Form"
 english["Buff.GrimoireOfSacrifice"] = "Grimoire of Sacrifice"
 english["Buff.BurningRush"] = "Burning Rush"
@@ -607,6 +610,9 @@ english["Options.Reagent.Threshold.Desc"] =
 english["Options.Reagent.RestedOnly"] = "Only in rested areas"
 english["Options.Reagent.RestedOnly.Desc"] =
     "Warn only in inns and cities, where vendors sell reagents.\n\nIf |cffffcc00Hide while resting|r is on, the warning never shows."
+english["Options.Camp.LightFire"] = "Remind to place a campfire"
+english["Options.Camp.LightFire.Desc"] =
+    "With no campfire near you, the reminder shows CAMP when you carry a Campfire Kit that you can use. Click to place the best kit, then click the ground."
 english["Options.Ammo.Threshold"] = "Hunters (stacks)"
 english["Options.Ammo.Threshold.Desc"] =
     "A hunter is warned below this many stacks (200 each) of equipped ammo."
@@ -627,6 +633,7 @@ english["Tooltip.ChoiceSpell"] = "· %s"
 english["Tooltip.ChoiceRightClick"] = "Right-click: other blessings"
 english["Tooltip.ChoiceRightClick.DriveBy"] = "Right-click: other buffs"
 english["Tooltip.ChoiceRightClick.Tracking"] = "Right-click: other tracking"
+english["Tooltip.ChoiceRightClick.Camp"] = "Right-click: camp features"
 
 -- ============================================================================
 -- OPTIONS: FREE CONSUMABLES
@@ -961,6 +968,9 @@ english["BuffPanel.SubChoices.DriveBy"] = "Buff icons"
 english["BuffPanel.SubChoices.DriveBy.Desc"] = "Icons for your other buffs, on your target."
 english["BuffPanel.SubChoices.Tracking"] = "Tracking icons"
 english["BuffPanel.SubChoices.Tracking.Desc"] = "An icon for your other gathering tracking."
+english["BuffPanel.SubChoices.Camp"] = "Camp feature icons"
+english["BuffPanel.SubChoices.Camp.Desc"] =
+    "Icons for the camp features in your bags. They show while a campfire is near you and the feature cooldown is ready. A feature whose buff you already get from a class buff is last."
 english["BuffPanel.GroupCast"] = "Auto group version (uses a reagent)"
 english["BuffPanel.GroupCast.Desc"] =
     "If enough members of your party lack the buff and are in range, and you have the reagent, a left click casts the group version on you. Otherwise it casts the single-target version."

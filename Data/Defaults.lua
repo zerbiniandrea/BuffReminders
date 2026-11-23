@@ -208,6 +208,7 @@ BR.defaults = {
         repairHideInCombat = true,
         reagentThreshold = 5, -- the reagent reminder shows below this count
         reagentRestedOnly = true,
+        campLightFire = true, -- WoW Forever: the camp reminder also asks for a campfire kit
         ammoThresholdStacks = 1, -- hunters: the ammo reminder shows below this many stacks
         ammoThresholdShots = 20, -- other classes: the ammo reminder shows below this many shots
         groupCastMin = 2, -- group members who lack a buff before the click casts its group version
@@ -273,6 +274,7 @@ BR.defaults = {
         blessingSubIcons = BR.CLIENT == BR.ClientType.Forever and "rightclick" or nil,
         driveBySubIcons = BR.CLIENT == BR.ClientType.Forever and "rightclick" or nil,
         trackingSubIcons = BR.CLIENT == BR.ClientType.Forever and "rightclick" or nil,
+        campSubIcons = BR.CLIENT == BR.ClientType.Forever and "rightclick" or nil,
         -- The paladin aura of each content row (WoW Forever). A row with none accepts any aura.
         paladinAuras = BR.CLIENT == BR.ClientType.Forever and {
             world = {},

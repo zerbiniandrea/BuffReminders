@@ -1148,6 +1148,14 @@ end
 
 local BATTLE_SHOUT = { 25289, 11551, 11550, 11549, 6192, 5242, 6673 }
 
+-- Every rank of a raid buff, the group version included.
+local RAID_BUFF_IDS = {
+    intellect = { 10157, 10156, 1461, 1460, 1459, 23028 },
+    spirit = { 27841, 14819, 14818, 14752, 27681 },
+    versatility = { 9885, 9884, 8907, 5234, 6756, 5232, 1126, 21850, 21849 },
+    stamina = { 10938, 10937, 2791, 1245, 1244, 1243, 21564, 21562 },
+}
+
 -- Rage drains between fights, so the reminder shows only while the shout is castable.
 -- The usable check includes talents that change the rage cost.
 ---@return boolean
@@ -1322,6 +1330,152 @@ local SLEEPING_BAG = {
     auraID = 429959, -- Well-Rested
 }
 
+local CAMP = {
+    benefitsID = 1229741, -- Camp Benefits
+    nearbyID = 1283391, -- Campfire Nearby
+    countdownIDs = { 1229739, 1289723 }, -- Welcoming Campfire, while the player sits or crafts
+    -- Best tier first. Each kit needs a Cooking rank, and all kits share one cooldown.
+    kits = { 279974, 279961, 279981 }, -- Expert, Journeyman, Basic Campfire Kit
+}
+local CAMP_SIT_TEXT = L["Overlay.CampSit"]
+local CAMP_KIT_TEXT = L["Overlay.CampKit"]
+-- The emote token works in every client language. The /sit command is localized.
+local CAMP_SIT_MACRO = '/run DoEmote("SIT")'
+local CAMP_KIT_MACROS = {}
+local CAMP_KIT_ICONS = {}
+for _, itemID in ipairs(CAMP.kits) do
+    CAMP_KIT_MACROS[itemID] = "/use item:" .. itemID
+    CAMP_KIT_ICONS[itemID] = C_Item.GetItemIconByID(itemID)
+end
+
+---@return "sit"|"camp"|nil stage
+---@return number? kitID The kit that the click uses at the camp stage
+local function ComputeCampStage()
+    local GetPlayerAura = C_UnitAuras.GetUnitAuraBySpellID
+    if GetPlayerAura("player", CAMP.benefitsID) then
+        return nil
+    end
+    if GetPlayerAura("player", CAMP.nearbyID) then
+        for _, spellID in ipairs(CAMP.countdownIDs) do
+            if GetPlayerAura("player", spellID) then
+                return nil
+            end
+        end
+        return "sit"
+    end
+    local defaults = BR.profile.defaults
+    if defaults and defaults.campLightFire == false then
+        return nil
+    end
+    -- IsUsableItem also answers false indoors, so a cached answer goes stale on the way out.
+    for _, itemID in ipairs(CAMP.kits) do
+        if BR.StateHelpers.GetItemCountCached(itemID) > 0 and C_Item.IsUsableItem(itemID) then
+            if BR.BuffState.IsItemOffCooldown(itemID) then
+                return "camp", itemID
+            end
+            return nil
+        end
+    end
+    return nil
+end
+
+-- One refresh asks for the stage from several callbacks in the same frame.
+local campStageAt, campStage, campKitID
+---@return "sit"|"camp"|nil stage
+---@return number? kitID
+local function CampStage()
+    local now = GetTime()
+    if campStageAt ~= now then
+        campStageAt = now
+        campStage, campKitID = ComputeCampStage()
+    end
+    return campStage, campKitID
+end
+
+---@class CampFeature
+---@field itemIDs number[] Highest tier first. A higher tier also gives the buff of its tier 1 feature
+---@field conflict? number[] Aura IDs of the class buff that does not stack with the feature buff
+
+-- The placeable features that give a buff to players who sit nearby. A feature needs
+-- a campfire nearby, and all features share one cooldown.
+---@type CampFeature[]
+local CAMP_FEATURES = {
+    -- Alchemy Laboratory, Fermenter, Mana Well
+    { itemIDs = { 279990, 279970, 279956 }, conflict = BLESSING_BY_KEY.wisdom.auraIDs },
+    -- Master Forge, Anvil, Sharpening Wheel. Strength of Earth Totem ranks 5 to 1
+    { itemIDs = { 279955, 279988, 279944 }, conflict = { 25362, 10441, 8163, 8162, 8076 } },
+    -- Arcane Forge, Arcane Salvager, Enchanted Lute
+    { itemIDs = { 279987, 279985, 279976 }, conflict = RAID_BUFF_IDS.versatility },
+    -- Plague Doctor's Laboratory, Toxin Study, First Aid Kit
+    { itemIDs = { 279951, 279940, 279968 }, conflict = RAID_BUFF_IDS.stamina },
+    -- Fishing Hut, Fishing Rack, Fish Bowl
+    { itemIDs = { 279966, 279965, 279967 }, conflict = BLESSING_BY_KEY.kings.auraIDs },
+    -- Seed Hybridizer, Greenhouse, Incense Candle
+    { itemIDs = { 279947, 279964, 279962 }, conflict = RAID_BUFF_IDS.intellect },
+    -- Molten Foundry, Rock Garden, Lodestone
+    { itemIDs = { 279952, 279948, 279960 }, conflict = BLESSING_BY_KEY.might.auraIDs },
+    -- Field Guide, Camp Chair. Moonkin Aura
+    { itemIDs = { 279969, 279979 }, conflict = { 24907 } },
+    -- Loom, Spinning Wheel, Faction Banner (Horde, Alliance)
+    { itemIDs = { 279959, 279943, 279972, 279973 }, conflict = RAID_BUFF_IDS.spirit },
+    -- Sewing Machine, Tanning Rack, Camp Tent
+    { itemIDs = { 279945, 279941, 279978 } },
+}
+---@type table<number, SubChoiceItem>
+local CAMP_FEATURE_CHOICES = {}
+for _, feature in ipairs(CAMP_FEATURES) do
+    for _, itemID in ipairs(feature.itemIDs) do
+        CAMP_FEATURE_CHOICES[itemID] = { itemID = itemID }
+    end
+end
+
+local campChoices = {}
+
+---The carried camp features, while the player can place one. A feature whose buff
+---the player already has from a class buff goes last.
+---@return SubChoiceItem[]
+local function CampFeatureChoices()
+    wipe(campChoices)
+    if CampStage() ~= "sit" then
+        return campChoices
+    end
+    local GetItemCount = BR.StateHelpers.GetItemCountCached
+    local covered = 0
+    for _, feature in ipairs(CAMP_FEATURES) do
+        local last = feature.conflict ~= nil and UnitHasAnyAura("player", feature.conflict)
+        for _, itemID in ipairs(feature.itemIDs) do
+            if GetItemCount(itemID) > 0 then
+                local choice = CAMP_FEATURE_CHOICES[itemID]
+                if last then
+                    covered = covered + 1
+                    tinsert(campChoices, choice)
+                else
+                    tinsert(campChoices, #campChoices - covered + 1, choice)
+                end
+            end
+        end
+    end
+    if campChoices[1] and not BR.BuffState.IsItemOffCooldown(campChoices[1].itemID) then
+        wipe(campChoices)
+    end
+    return campChoices
+end
+
+---@type SubChoiceRow
+local CAMP_ROW = {
+    setting = "campSubIcons",
+    label = L["BuffPanel.SubChoices.Camp"],
+    desc = L["BuffPanel.SubChoices.Camp.Desc"],
+    hint = L["Tooltip.ChoiceRightClick.Camp"],
+    pick = function()
+        if CampStage() == "sit" then
+            return CAMP.benefitsID, "player"
+        end
+        return nil
+    end,
+    others = CampFeatureChoices,
+}
+
 -- Minimap tracking spells, in the order of the fallback pick.
 BR.TRACKING_SPELLS = {
     2383, -- Find Herbs
@@ -1356,7 +1510,7 @@ BR.BUFF_TABLES = {
     ---@type RaidBuff[]
     raid = {
         {
-            spellID = { 10157, 10156, 1461, 1460, 1459, 23028 },
+            spellID = RAID_BUFF_IDS.intellect,
             key = "intellect",
             name = L["Buff.ArcaneIntellect"],
             class = "MAGE",
@@ -1376,7 +1530,7 @@ BR.BUFF_TABLES = {
             visibilityCondition = BattleShoutReady,
         },
         {
-            spellID = { 27841, 14819, 14818, 14752, 27681 },
+            spellID = RAID_BUFF_IDS.spirit,
             key = "spirit",
             name = L["Buff.DivineSpirit"],
             class = "PRIEST",
@@ -1388,7 +1542,7 @@ BR.BUFF_TABLES = {
             requiresKnownSpell = true,
         },
         {
-            spellID = { 9885, 9884, 8907, 5234, 6756, 5232, 1126, 21850, 21849 },
+            spellID = RAID_BUFF_IDS.versatility,
             key = "versatility",
             name = L["Buff.MarkOfTheWild"],
             class = "DRUID",
@@ -1419,7 +1573,7 @@ BR.BUFF_TABLES = {
             end,
         },
         {
-            spellID = { 10938, 10937, 2791, 1245, 1244, 1243, 21564, 21562 },
+            spellID = RAID_BUFF_IDS.stamina,
             key = "stamina",
             name = L["Buff.PowerWordFortitude"],
             class = "PRIEST",
@@ -1976,6 +2130,43 @@ BR.BUFF_TABLES = {
                     return false
                 end
                 return BR.BuffState.IsItemOffCooldown(SLEEPING_BAG.itemID)
+            end,
+        },
+        {
+            key = "camp",
+            name = L["Buff.Camp"],
+            icons = {
+                spells = { CAMP.benefitsID },
+                dynamic = function()
+                    local stage, kitID = CampStage()
+                    -- A nil icon keeps the texture of the previous stage on the frame.
+                    if stage == "camp" and kitID then
+                        local icon = CAMP_KIT_ICONS[kitID] or C_Item.GetItemIconByID(kitID)
+                        CAMP_KIT_ICONS[kitID] = icon
+                        return icon
+                    end
+                    return BR.Icons.GetBuffTexture(CAMP.benefitsID)
+                end,
+            },
+            overlayText = CAMP_SIT_TEXT,
+            overlayTextFn = function()
+                return CampStage() == "camp" and CAMP_KIT_TEXT or CAMP_SIT_TEXT
+            end,
+            subChoices = CAMP_ROW,
+            clickMacroText = function()
+                local stage, kitID = CampStage()
+                if stage == "sit" then
+                    return CAMP_SIT_MACRO
+                end
+                return kitID and CAMP_KIT_MACROS[kitID]
+            end,
+            -- The game blocks both the sit and the kit while the player is mounted.
+            customCheck = function(isAuraRestricted)
+                local GameContext = BR.GameContext
+                if isAuraRestricted or GameContext.IsInCombat() or GameContext.IsResting() or IsMounted() then
+                    return false
+                end
+                return CampStage() ~= nil
             end,
         },
         {

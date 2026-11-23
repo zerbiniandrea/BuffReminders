@@ -456,6 +456,7 @@ local DefaultSettingKeys = {
     repairHideInCombat = "VisibilityRefresh",
     reagentThreshold = "DisplayRefresh",
     reagentRestedOnly = "DisplayRefresh",
+    campLightFire = "DisplayRefresh",
     ammoThresholdStacks = "DisplayRefresh",
     ammoThresholdShots = "DisplayRefresh",
     groupCastMin = false, -- read at click time
@@ -491,6 +492,7 @@ local DefaultSettingKeys = {
     blessingSubIcons = "DisplayRefresh",
     driveBySubIcons = "DisplayRefresh",
     trackingSubIcons = "DisplayRefresh",
+    campSubIcons = "DisplayRefresh",
     thornsRequest = "DisplayRefresh",
     righteousFuryShow = "DisplayRefresh",
     -- Font (global-only, lives under defaults)

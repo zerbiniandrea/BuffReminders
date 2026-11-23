@@ -386,8 +386,13 @@ BR.PET_SPELLS = {
 ---@field label string Drawer label of the setting
 ---@field desc string Drawer tooltip of the setting
 ---@field hint string Hover tooltip line that names the right click
----@field pick fun(def: table): number?, string? Spell and unit of the main click. nil = no cast
----@field others fun(def: table, unit: string, spellID: number): number[][] Rank lists of the other choices for the unit, highest rank first. The list is reused
+---@field pick fun(def: table): number?, string? Spell and unit of the main click. A clickMacroText click ignores them. nil = no cast and no row
+---@field others fun(def: table, unit: string, spellID: number): SubChoice[] The other choices for the unit. The list is reused
+
+---@class SubChoiceItem
+---@field itemID number Item that the choice button uses
+
+---@alias SubChoice number[]|SubChoiceItem A rank list, highest rank first, or an item
 
 ---@class StanceGrid
 ---@field setting string Key of the grid in profile.defaults
@@ -662,6 +667,7 @@ BR.REPAIR_SOURCES = {
 ---@field castUnit? string              -- Unit that the click casts on (nil = default targeting)
 ---@field clickSpell? fun(): number?    -- Spell that the click casts, read at click time. nil casts nothing
 ---@field clickItem? number             -- Item that the click uses
+---@field clickMacroText? fun(): string? -- Macro that the click runs, read at each resolve. nil gives no click
 ---@field subChoices? SubChoiceRow      -- Choice icons beside the reminder
 ---@field noClickToCast? boolean        -- Suppress the click-to-cast overlay
 ---@field showOnInstanceEntry? boolean  -- Only show briefly on dungeon entry (grouped, non-M+)

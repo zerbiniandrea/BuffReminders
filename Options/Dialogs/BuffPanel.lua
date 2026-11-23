@@ -1200,6 +1200,26 @@ local SPECIAL_SECTIONS = {
         end,
     },
 
+    camp = {
+        build = function(layout)
+            AddSpecialCheckbox(layout, {
+                label = L["Options.Camp.LightFire"],
+                get = function()
+                    return BR.Config.Get("defaults.campLightFire") ~= false
+                end,
+                tooltip = { title = L["Options.Camp.LightFire"], desc = L["Options.Camp.LightFire.Desc"] },
+                onChange = function(checked)
+                    BR.Config.Set("defaults.campLightFire", checked)
+                end,
+            })
+            for _, buff in ipairs(BR.BUFF_TABLES.utility) do
+                if buff.key == "camp" and buff.subChoices then
+                    AddSubChoicesDropdown(layout, buff, "utility")
+                end
+            end
+        end,
+    },
+
     lowAmmo = {
         build = function(layout)
             local thresholdHolder = Components.Slider(body, {

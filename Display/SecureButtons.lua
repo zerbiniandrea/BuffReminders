@@ -1509,7 +1509,7 @@ local function UpdateConsumableButtons(frame, actionItems, clickable, startIndex
 end
 
 ---A consumable action button that casts one choice of a subChoices buff on the
----person of the main icon.
+---person of the main icon, or uses the item of an item choice.
 ---@param frame table The buff frame
 ---@return table btn
 local function CreateChoiceButton(frame)
@@ -1531,7 +1531,19 @@ local function CreateChoiceButton(frame)
         frame._br_choiceCastAt = GetTime()
     end)
     btn:SetScript("OnEnter", function(self)
-        if not self._br_ranks or InCombatLockdown() then
+        if InCombatLockdown() then
+            return
+        end
+        local itemID = self.itemID
+        if itemID then
+            BR.Display.ShowHoverTooltip(self, function()
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetItemByID(itemID)
+                GameTooltip:Show()
+            end)
+            return
+        end
+        if not self._br_ranks then
             return
         end
         local pickSpellID, unit = CurrentPick(frame)
@@ -1545,8 +1557,12 @@ local function CreateChoiceButton(frame)
             ShowPickTooltip(self, unit, castID)
         end
     end)
-    btn:SetScript("OnLeave", function()
+    btn:SetScript("OnLeave", function(self)
         HideLastTargetTooltip()
+        BR.Display.EndHoverTooltip(self)
+        if GameTooltip:IsOwned(self) then
+            GameTooltip:Hide()
+        end
         EndHoverSoon(frame)
     end)
     return btn
@@ -1576,9 +1592,11 @@ local function UpdateChoiceRow(frame, active, shown)
         local cs = BR.profile.categorySettings
         local catSettings = cs and cs[frame.buffCategory]
         local showHighlight = not (catSettings and catSettings.clickableHighlight == false)
-        for _, ranks in ipairs(others) do
-            local castID = FitRank(ranks, unit)
-            if castID then
+        for _, choice in ipairs(others) do
+            local itemID = choice.itemID
+            local ranks = not itemID and choice or nil
+            local castID = ranks and FitRank(ranks, unit)
+            if itemID or castID then
                 count = count + 1
                 local btn = buttons[count]
                 if not btn then
@@ -1590,7 +1608,12 @@ local function UpdateChoiceRow(frame, active, shown)
                     btn._br_castID = nil
                 end
                 local action = btn._br_action
-                if not action or action.spellID ~= castID or action.unit ~= unit then
+                if itemID then
+                    if not action or action.itemID ~= itemID then
+                        btn.icon:SetTexture(C_Item.GetItemIconByID(itemID) or 134400)
+                        ApplyAction(btn, ItemAction(itemID, nil, false))
+                    end
+                elseif castID and (not action or action.spellID ~= castID or action.unit ~= unit) then
                     btn.icon:SetTexture(BR.Icons.GetBuffTexture(castID))
                     ApplyAction(btn, SpellAction(castID, unit))
                 end
@@ -2291,6 +2314,11 @@ local function ResolveAction(frame, category, db)
             return nil
         end
         return MacroAction("repair", macro)
+    end
+
+    if def and def.clickMacroText then
+        local macrotext = def.clickMacroText()
+        return macrotext and MacroAction("clickmacrotext", macrotext) or nil
     end
 
     if def and def.clickItem then

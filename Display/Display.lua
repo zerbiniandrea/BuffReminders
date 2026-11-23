@@ -74,6 +74,7 @@ local BR = ns
 ---@field repairHideInCombat? boolean
 ---@field reagentThreshold? number
 ---@field reagentRestedOnly? boolean
+---@field campLightFire? boolean
 ---@field ammoThresholdStacks? number
 ---@field ammoThresholdShots? number
 ---@field groupCastMin? number Members of one party (one class for a blessing) who lack a buff before a group cast
@@ -109,6 +110,7 @@ local BR = ns
 ---@field blessingSubIcons? "rightclick"|"always"
 ---@field driveBySubIcons? "rightclick"|"always"
 ---@field trackingSubIcons? "rightclick"|"always"
+---@field campSubIcons? "rightclick"|"always"
 ---@field paladinAuras? table<string, table<string, boolean>> Content row -> chosen aura key. A row with none accepts any aura
 ---@field thornsRequest? boolean A tank of another class sees a Thorns request reminder
 ---@field righteousFuryShow? "tank"|"always"
@@ -2852,6 +2854,8 @@ UpdateDisplay = function(refreshMode)
             end
             BR.SecureButtons.UpdateActionButtons("pet")
             BR.SecureButtons.UpdateActionButtons("custom")
+            -- An aura can change the action of a utility reminder (the camp stage).
+            BR.SecureButtons.UpdateActionButtons("utility")
         end
     end
 end
