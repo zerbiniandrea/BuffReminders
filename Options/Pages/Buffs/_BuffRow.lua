@@ -229,7 +229,7 @@ local function CreateBuffRow(
     end)
     settingsBtn:SetScript("OnClick", openPanel)
 
-    return y - ITEM_HEIGHT
+    return y - ITEM_HEIGHT, holder
 end
 
 -- Merge per-buff icon lists from every member of a group, deduped, in declared order.
@@ -247,7 +247,31 @@ local function MergeGroupIcons(group)
     return merged
 end
 
-local function RenderBuffArray(parent, x, y, buffArray, rowWidth)
+local function AddSearchTerm(terms, seen, term)
+    if term and term ~= "" and not seen[term] then
+        seen[term] = true
+        terms[#terms + 1] = term
+    end
+end
+
+-- Spell and class names come from the client, so the terms follow the game language.
+local function AddBuffSearchTerms(terms, seen, buff)
+    AddSearchTerm(terms, seen, buff.name)
+    local ids = buff.spellID
+    if type(ids) == "number" then
+        AddSearchTerm(terms, seen, BR.GetSpellName(ids))
+    elseif type(ids) == "table" then
+        for _, id in ipairs(ids) do
+            AddSearchTerm(terms, seen, BR.GetSpellName(id))
+        end
+    end
+    if buff.class then
+        AddSearchTerm(terms, seen, LOCALIZED_CLASS_NAMES_MALE[buff.class])
+    end
+end
+
+---@param rows? { frame: table, text: string }[] Receives each row frame and its lowercase search text
+local function RenderBuffArray(parent, x, y, buffArray, rowWidth, rows)
     -- Bucket grouped buffs so the row factory sees one logical entry per groupId.
     local groupMembers = {}
     for _, buff in ipairs(buffArray) do
@@ -266,6 +290,9 @@ local function RenderBuffArray(parent, x, y, buffArray, rowWidth)
                 local groupInfo = BuffGroups[buff.groupId]
                 local readyCheckOnly = false
                 local freeConsumable = false
+                local displayName = groupInfo and groupInfo.displayName or buff.name
+                local terms, seen = {}, {}
+                AddSearchTerm(terms, seen, displayName)
                 for _, m in ipairs(members) do
                     if m.readyCheckOnly then
                         readyCheckOnly = true
@@ -273,22 +300,28 @@ local function RenderBuffArray(parent, x, y, buffArray, rowWidth)
                     if m.freeConsumable then
                         freeConsumable = true
                     end
+                    AddBuffSearchTerms(terms, seen, m)
                 end
-                y = CreateBuffRow(
+                local holder
+                y, holder = CreateBuffRow(
                     parent,
                     x,
                     y,
                     MergeGroupIcons(members),
                     buff.groupId,
-                    groupInfo and groupInfo.displayName or buff.name,
+                    displayName,
                     buff.infoTooltip,
                     readyCheckOnly,
                     freeConsumable,
                     rowWidth
                 )
+                if rows then
+                    rows[#rows + 1] = { frame = holder, text = table.concat(terms, "\n"):lower() }
+                end
             end
         else
-            y = CreateBuffRow(
+            local holder
+            y, holder = CreateBuffRow(
                 parent,
                 x,
                 y,
@@ -300,6 +333,11 @@ local function RenderBuffArray(parent, x, y, buffArray, rowWidth)
                 buff.freeConsumable,
                 rowWidth
             )
+            if rows then
+                local terms = {}
+                AddBuffSearchTerms(terms, {}, buff)
+                rows[#rows + 1] = { frame = holder, text = table.concat(terms, "\n"):lower() }
+            end
         end
     end
 
