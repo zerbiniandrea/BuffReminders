@@ -1248,6 +1248,10 @@ BR.Display.ShowBuffSpellTooltip = ShowBuffSpellTooltip
 -- click-through so the world beneath (camera drag, unit clicks) is reachable.
 -- Re-called from UpdateVisuals so toggling showBuffTooltips takes effect live.
 local function ApplyBuffFrameMouse(frame, category)
+    -- WireLoadoutFrameClick owns the mouse of a loadout frame.
+    if category == "loadout" then
+        return
+    end
     if IsBuffTooltipOn(category) then
         frame:SetMouseClickEnabled(false)
         frame:SetMouseMotionEnabled(true)
