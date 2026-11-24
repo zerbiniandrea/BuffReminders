@@ -730,6 +730,7 @@ end
 
 local FormatRemainingTime = BR.StateHelpers.FormatRemainingTime
 local FormatCountdownTime = BR.StateHelpers.FormatCountdownTime
+local IsCountdownEntry = BR.StateHelpers.IsCountdownEntry
 
 local GetBuffTexture = BR.Icons.GetBuffTexture
 local GetBuffIcons = BR.Icons.GetBuffIcons
@@ -2929,7 +2930,19 @@ UpdateDisplay = function(refreshMode)
         -- UpdateActionButtons is the only place that wires up their click overlays).
         if not groupOnly and not InCombatLockdown() then
             local displayMode = (BR.profile.defaults or {}).consumableDisplayMode
-            if displayMode == "expanded" then
+            local resolveConsumables = displayMode == "expanded"
+            -- The bag event that starts a meal resolves before the refresh, and the end of a meal fires none.
+            local consumables = visibleByCategory.consumable
+            if not resolveConsumables and consumables then
+                for _, entry in ipairs(consumables) do
+                    local frame = buffFrames[entry.key]
+                    if frame and frame._br_resolvedCountdown ~= IsCountdownEntry(entry) then
+                        resolveConsumables = true
+                        break
+                    end
+                end
+            end
+            if resolveConsumables then
                 BR.SecureButtons.UpdateActionButtons("consumable")
             end
             BR.SecureButtons.UpdateActionButtons("pet")

@@ -4645,6 +4645,12 @@ BR.StateHelpers = {
     FormatRemainingTime = FormatRemainingTime,
     AuraLead = Lead.Of,
     FormatCountdownTime = FormatCountdownTime,
+    ---A countdown entry only reports progress toward a goal, so its click has nothing to do.
+    ---@param entry BuffStateEntry
+    ---@return boolean
+    IsCountdownEntry = function(entry)
+        return entry.isEating == true or entry.countdownExpirationTime ~= nil
+    end,
     IsPlayerEating = IsPlayerEating,
     UpdateEatingState = UpdateEatingState,
     ScanEatingState = ScanEatingState,

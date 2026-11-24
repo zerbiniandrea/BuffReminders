@@ -25,6 +25,7 @@ local GetTime = GetTime
 local IsSpellKnown = C_SpellBook.IsSpellKnown
 local Plain = BR.Secret.Plain
 local BuffTargets = BR.StateHelpers.BuffTargets
+local IsCountdownEntry = BR.StateHelpers.IsCountdownEntry
 local SubIcons = BR.SubIcons
 
 ---@param category string?
@@ -2276,6 +2277,12 @@ end
 local function ResolveAction(frame, category, db)
     local def = frame.buffDef
 
+    -- A click must not spend again the item that started the countdown.
+    local entry = BR.BuffState.entries[frame.key]
+    if entry and IsCountdownEntry(entry) then
+        return nil
+    end
+
     if category == "consumable" then
         local actionItems = GetConsumableActionItems(def)
         if actionItems then
@@ -2406,6 +2413,9 @@ local function UpdateActionButtons(category)
 
     for _, frame in pairs(frames) do
         if frame.buffCategory == category then
+            local entry = BR.BuffState.entries[frame.key]
+            -- Set also where nothing resolves, so the display never asks again for the same state.
+            frame._br_resolvedCountdown = entry ~= nil and IsCountdownEntry(entry)
             local action, actionItems
             if mayOverride then
                 action, actionItems = ResolveAction(frame, category, db)
