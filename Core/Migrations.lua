@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 63
+BR.Migrations.DB_VERSION = 64
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -305,6 +305,14 @@ function BR.Migrations.RunProfile(profile)
                 profileDefaults.rightClickMenu = false
             end
             profileDefaults.rightClickSnooze = nil
+        end,
+        -- [64] The paladin aura of each content row becomes a list with a backup
+        -- (defaults.paladinAuraOrder). No code reads the single choice, so this pass clears it.
+        [64] = function()
+            local profileDefaults = profile.defaults
+            if type(profileDefaults) == "table" then
+                profileDefaults.paladinAuras = nil
+            end
         end,
     }
 

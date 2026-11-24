@@ -329,7 +329,7 @@ english["Tooltip.MayShowExtraIcon.Desc"] =
     "Until you cast this, you might see both this and the Water/Lightning Shield reminder. I can't tell if you want Earth Shield on yourself, or Earth Shield on an ally + Water/Lightning Shield on yourself."
 english["Tooltip.PaladinDuplicate"] = "Duplicate Check"
 english["Tooltip.PaladinAuraDuplicate.Desc"] =
-    "Warns when another paladin already runs the same aura type. Switch to a different aura."
+    "Warns when another paladin already gives you the same aura type. If the content row has a backup aura, the reminder asks for it."
 english["Tooltip.DriveBy.Desc"] =
     "Out of combat, shows when your target is a friendly player outside your group who lacks one of your buffs. Click to cast the best rank for them."
 english["Tooltip.SleepingBag.Desc"] = "Shows only below max level. Hidden in combat, in cities and in inns."
@@ -983,7 +983,15 @@ english["BuffPanel.GroupCastMin.Suffix"] = " missing"
 english["BuffPanel.GroupCastMin.Desc"] =
     "How many members must lack the buff before a click casts the group version: in your party, or in one class for a Greater Blessing. One value for all buffs."
 english["DisabledReason.GroupCast"] = 'Turn on "Auto group version" first.'
-english["BuffPanel.PaladinAura.Hint"] = "Pick one aura per content. The icon shows WRONG AURA if another one is active. An empty row, or an aura you have not learned, accepts any aura."
+english["BuffPanel.PaladinAura.Hint"] =
+    "Main aura per content. If another paladin gives it, you run the backup. An empty row accepts any aura. A resistance aura always counts while it runs."
+english["BuffPanel.PaladinAura.Run"] = "Run"
+english["BuffPanel.PaladinAura.InRun"] = "in Run"
+english["BuffPanel.PaladinAura.MainTip"] = "You run this aura in %s content."
+english["BuffPanel.PaladinAura.NotLearned"] = "Not learned. You run %s instead."
+english["BuffPanel.PaladinAura.None"] = "No aura"
+english["BuffPanel.PaladinAura.None.Desc"] = "Any aura counts."
+english["DisabledReason.AuraDefaults"] = "All content rows use their defaults."
 english["BuffPanel.ThornsRequest"] = "Tanks can ask for Thorns"
 english["BuffPanel.ThornsRequest.Desc"] =
     "If you tank and a druid (level 6+) is in your group, shows when you lack Thorns. A click asks for it in chat. Needs \"Request missing buffs in chat\" on (Chat Requests page)."

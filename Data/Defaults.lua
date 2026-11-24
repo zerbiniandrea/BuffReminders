@@ -274,12 +274,14 @@ BR.defaults = {
         paladinBlessingScope = BR.CLIENT == BR.ClientType.Forever and "group" or nil,
         -- WoW Forever: "all" adds creature tracking to the gathering tracking.
         trackingScope = BR.CLIENT == BR.ClientType.Forever and "gathering" or nil,
-        -- The paladin aura of each content row (WoW Forever). A row with none accepts any aura.
-        paladinAuras = BR.CLIENT == BR.ClientType.Forever and {
-            world = {},
-            dungeon = {},
-            raid = {},
-            pvp = {},
+        -- The paladin auras of each content row (WoW Forever): the main aura, then the
+        -- backup. An empty row accepts any aura. Every slot holds a value, so that AceDB
+        -- cannot fill a slot that the user emptied.
+        paladinAuraOrder = BR.CLIENT == BR.ClientType.Forever and {
+            world = { false, false },
+            dungeon = { false, false },
+            raid = { false, false },
+            pvp = { false, false },
         } or nil,
         -- thornsRequest: absent - nil means off
         righteousFuryShow = BR.CLIENT == BR.ClientType.Forever and "tank" or nil,

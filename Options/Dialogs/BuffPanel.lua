@@ -180,8 +180,7 @@ end
 ---@param setting string
 ---@param hintText string
 ---@param choices ContentGridChoice[]
----@param single? boolean A row holds at most one choice
-local function AddContentGrid(layout, setting, hintText, choices, single)
+local function AddContentGrid(layout, setting, hintText, choices)
     local IsContentChoiceAllowed = BR.StateHelpers.IsContentChoiceAllowed
     local hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hint:SetWidth(bodyW)
@@ -254,19 +253,7 @@ local function AddContentGrid(layout, setting, hintText, choices, single)
             cell.choiceKey = choice.key
             cell:SetScript("OnClick", function()
                 local allowed = IsContentChoiceAllowed(setting, row.key, choice.key)
-                local rowPath = "defaults." .. setting .. "." .. row.key .. "."
-                if single then
-                    -- Every key gets an explicit value, so that a code default cannot
-                    -- add a second choice to the row.
-                    local changes = {}
-                    for _, other in ipairs(choices) do
-                        changes[rowPath .. other.key] = false
-                    end
-                    changes[rowPath .. choice.key] = not allowed
-                    BR.Config.SetMulti(changes)
-                else
-                    BR.Config.Set(rowPath .. choice.key, not allowed)
-                end
+                BR.Config.Set("defaults." .. setting .. "." .. row.key .. "." .. choice.key, not allowed)
                 Components.RefreshAll()
             end)
             cell:SetScript("OnEnter", function(self)
@@ -374,11 +361,11 @@ local function AddStanceGrid(layout, grid)
             icon = C_Spell.GetSpellTexture(spellID),
         }
     end
-    AddContentGrid(layout, grid.setting, grid.hint, choices, grid.single)
+    AddContentGrid(layout, grid.setting, grid.hint, choices)
 end
 
 ---A stored list without unknown keys, repeats and empty slots.
----@param grid ClassChoiceGrid
+---@param grid ChoiceOrderGrid
 ---@param stored any
 ---@return string[]
 local function CleanChoiceOrder(grid, stored)
@@ -386,7 +373,7 @@ local function CleanChoiceOrder(grid, stored)
     if type(stored) ~= "table" then
         return order
     end
-    for i = 1, #grid.choices do
+    for i = 1, grid.slots do
         local key = stored[i]
         local valid, listed = false, false
         for _, choice in ipairs(grid.choices) do
@@ -402,20 +389,20 @@ local function CleanChoiceOrder(grid, stored)
     return order
 end
 
----@param grid ClassChoiceGrid
----@param class string
+---@param grid ChoiceOrderGrid
+---@param rowKey string
 ---@return string[]
-local function ClassChoiceOrder(grid, class)
-    local byClass = BR.Config.Get("defaults." .. grid.setting)
-    return CleanChoiceOrder(grid, type(byClass) == "table" and byClass[class])
+local function RowChoiceOrder(grid, rowKey)
+    local byRow = BR.Config.Get("defaults." .. grid.setting)
+    return CleanChoiceOrder(grid, type(byRow) == "table" and byRow[rowKey])
 end
 
----@param grid ClassChoiceGrid
----@param class string
+---@param grid ChoiceOrderGrid
+---@param rowKey string
 ---@return string[]
-local function DefaultChoiceOrder(grid, class)
-    local byClass = BR.defaults.defaults[grid.setting]
-    return CleanChoiceOrder(grid, type(byClass) == "table" and byClass[class])
+local function DefaultChoiceOrder(grid, rowKey)
+    local byRow = BR.defaults.defaults[grid.setting]
+    return CleanChoiceOrder(grid, type(byRow) == "table" and byRow[rowKey])
 end
 
 ---@param a string[]
@@ -433,32 +420,32 @@ local function SameOrder(a, b)
     return true
 end
 
----Store the list of every class. A slot past the end of a list stores false, so that
+---Store the list of every row. A slot past the end of a list stores false, so that
 ---AceDB cannot fill it from the default.
----@param grid ClassChoiceGrid
----@param orderFor fun(class: string): string[]
-local function WriteClassChoices(grid, orderFor)
+---@param grid ChoiceOrderGrid
+---@param orderFor fun(rowKey: string): string[]
+local function WriteChoiceRows(grid, orderFor)
     local map = {}
-    for _, class in ipairs(grid.classes) do
-        local order = orderFor(class)
+    for _, rowKey in ipairs(grid.rows) do
+        local order = orderFor(rowKey)
         local slots = {}
-        for i = 1, #grid.choices do
+        for i = 1, grid.slots do
             slots[i] = order[i] or false
         end
-        map[class] = slots
+        map[rowKey] = slots
     end
     BR.Config.Set("defaults." .. grid.setting, map)
     -- A chat request macro can name a choice of the class list. Only a rebuild rewrites the macro.
     BR.SecureButtons.UpdateActionButtons("raid")
 end
 
----Write one class list and keep the others.
----@param grid ClassChoiceGrid
----@param class string
+---Write one row list and keep the others.
+---@param grid ChoiceOrderGrid
+---@param rowKey string
 ---@param order string[]
-local function WriteClassOrder(grid, class, order)
-    WriteClassChoices(grid, function(other)
-        return other == class and order or ClassChoiceOrder(grid, other)
+local function WriteRowOrder(grid, rowKey, order)
+    WriteChoiceRows(grid, function(other)
+        return other == rowKey and order or RowChoiceOrder(grid, other)
     end)
     Components.RefreshAll()
 end
@@ -493,12 +480,12 @@ local function SetChoiceSlot(order, slot, key)
     order[slot] = key
 end
 
----True when every class list is empty, so no reminder can fire.
----@param grid ClassChoiceGrid
+---True when every row list is empty, so no reminder can fire.
+---@param grid ChoiceOrderGrid
 ---@return boolean
-local function ClassChoiceGridNeedsSetup(grid)
-    for _, class in ipairs(grid.classes) do
-        if #ClassChoiceOrder(grid, class) > 0 then
+local function ChoiceOrderNeedsSetup(grid)
+    for _, rowKey in ipairs(grid.rows) do
+        if #RowChoiceOrder(grid, rowKey) > 0 then
             return false
         end
     end
@@ -572,10 +559,11 @@ end
 
 ---The picker under a slot: every choice, a separator, then Clear. Escape or a click
 ---outside closes it. The flyout is a child of the body, so a teardown removes it.
----@param grid ClassChoiceGrid
+---@param grid ChoiceOrderGrid
 ---@param isLearned fun(choice: StanceChoice): boolean
----@return table flyout With :Open(anchor, class, slot) and :Close()
-local function CreateChoiceFlyout(grid, isLearned)
+---@param inMainNote string Note of a choice that the main slot holds
+---@return table flyout With :Open(anchor, rowKey, slot) and :Close()
+local function CreateChoiceFlyout(grid, isLearned, inMainNote)
     local flyout = CreateFrame("Frame", nil, body)
     flyout:SetFrameStrata("FULLSCREEN_DIALOG")
     flyout:SetClampedToScreen(true)
@@ -584,8 +572,7 @@ local function CreateChoiceFlyout(grid, isLearned)
     BR.PaintSurface(BR.CreateSurface(flyout), Theme.menu)
     local itemColors = Theme.menuItem
 
-    local roleNotes =
-        { L["BuffPanel.Blessing.InGive"], L["BuffPanel.Blessing.InBackup"], L["BuffPanel.Blessing.InBackup"] }
+    local inBackupNote = L["BuffPanel.Blessing.InBackup"]
     local items = {}
     local function AddItem(choice)
         local item = CreateFrame("Button", nil, flyout)
@@ -632,10 +619,10 @@ local function CreateChoiceFlyout(grid, isLearned)
             BR.SetThemeTextColor(self.label, self.isCurrent and Theme.cell.check or itemColors.text)
         end)
         item:SetScript("OnClick", function(self)
-            local order = ClassChoiceOrder(grid, flyout.class)
+            local order = RowChoiceOrder(grid, flyout.rowKey)
             SetChoiceSlot(order, flyout.slot, self.choice and self.choice.key)
             flyout:Close()
-            WriteClassOrder(grid, flyout.class, order)
+            WriteRowOrder(grid, flyout.rowKey, order)
         end)
         items[#items + 1] = item
         return item
@@ -673,9 +660,9 @@ local function CreateChoiceFlyout(grid, isLearned)
         self:Hide()
     end
 
-    function flyout:Open(anchor, class, slot)
-        self.anchor, self.class, self.slot = anchor, class, slot
-        local order = ClassChoiceOrder(grid, class)
+    function flyout:Open(anchor, rowKey, slot)
+        self.anchor, self.rowKey, self.slot = anchor, rowKey, slot
+        local order = RowChoiceOrder(grid, rowKey)
         local width = 0
         for _, item in ipairs(items) do
             local note
@@ -686,7 +673,7 @@ local function CreateChoiceFlyout(grid, isLearned)
                 item.isCurrent = order[slot] == item.choice.key
                 for i, key in ipairs(order) do
                     if key == item.choice.key and i ~= slot then
-                        note = roleNotes[i]
+                        note = i == 1 and inMainNote or inBackupNote
                     end
                 end
                 note = note or (not learned and L["BuffPanel.Blessing.NotLearnedShort"]) or nil
@@ -730,18 +717,31 @@ local function CreateChoiceFlyout(grid, isLearned)
     return flyout
 end
 
--- One row per class: the main choice, then up to two backups. A backup applies when
+---@class ChoiceOrderSpec
+---@field ownerClass string The class that casts the choices
+---@field rowLabel fun(rowKey: string): string
+---@field rowColor? fun(rowKey: string): table? A color with GetRGB
+---@field selfOnly? fun(): boolean Only the row of ownerClass applies
+---@field hint string
+---@field mainHeader string
+---@field inMainNote string Flyout note of a choice that the main slot holds
+---@field mainTip string Format with the row label
+---@field notLearned string Format with the name of the next learned choice
+---@field none string
+---@field noneDesc string
+---@field defaultsReason string
+
+-- One row per grid row: the main choice, then the backups. A backup applies when
 -- another caster already gives the choice before it.
 ---@param layout table
----@param grid ClassChoiceGrid
----@param hintText string
----@param ownerClass string The class that casts the choices
----@param selfOnly fun(): boolean Only the row of ownerClass applies
-local function AddClassChoiceGrid(layout, grid, hintText, ownerClass, selfOnly)
+---@param grid ChoiceOrderGrid
+---@param spec ChoiceOrderSpec
+local function AddChoiceOrderGrid(layout, grid, spec)
+    local ownerClass = spec.ownerClass
     local hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hint:SetWidth(bodyW)
     hint:SetJustifyH("LEFT")
-    hint:SetText(hintText)
+    hint:SetText(spec.hint)
     layout:AddText(hint, math.max(12, math.ceil(hint:GetStringHeight())), GRID_GAP + 2)
 
     -- The spellbook of another class tells nothing, so there every choice reads as learned.
@@ -759,30 +759,31 @@ local function AddClassChoiceGrid(layout, grid, hintText, ownerClass, selfOnly)
     end
 
     local names = {}
-    for i, class in ipairs(grid.classes) do
-        names[i] = LOCALIZED_CLASS_NAMES_MALE[class] or class
+    for i, rowKey in ipairs(grid.rows) do
+        names[i] = spec.rowLabel(rowKey)
     end
     local labelW = Components.MeasureSharedLabelWidth(names, "GameFontHighlightSmall", 60)
     local mainX = CHOICE_DOT_W + labelW
     local backupX = mainX + CHOICE_MAIN_W + CHOICE_ARROW_W
-    local resetX = backupX + 2 * CHOICE_BACKUP_W + 4
+    local resetX = backupX + (grid.slots - 1) * CHOICE_BACKUP_W + 4
+    local clusterEnds = grid.clusterEnds
 
-    local height = CHOICE_HEADER_H + #grid.classes * CHOICE_ROW_H
-    for _, class in ipairs(grid.classes) do
-        if grid.clusterEnds and grid.clusterEnds[class] then
+    local height = CHOICE_HEADER_H + #grid.rows * CHOICE_ROW_H
+    for _, rowKey in ipairs(grid.rows) do
+        if clusterEnds and clusterEnds[rowKey] then
             height = height + CHOICE_CLUSTER_GAP
         end
     end
     local holder = CreateFrame("Frame", nil, body)
     holder:SetSize(bodyW, height)
-    local flyout = CreateChoiceFlyout(grid, IsLearned)
+    local flyout = CreateChoiceFlyout(grid, IsLearned, spec.inMainNote)
 
     local giveHead = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     giveHead:SetPoint("TOP", holder, "TOPLEFT", mainX + CHOICE_MAIN_W / 2, 0)
-    giveHead:SetText(L["BuffPanel.Blessing.Give"])
+    giveHead:SetText(spec.mainHeader)
     BR.ApplyNoteColor(giveHead)
     local backupHead = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    backupHead:SetPoint("TOP", holder, "TOPLEFT", backupX + CHOICE_BACKUP_W, 0)
+    backupHead:SetPoint("TOP", holder, "TOPLEFT", backupX + (grid.slots - 1) * CHOICE_BACKUP_W / 2, 0)
     backupHead:SetText(L["BuffPanel.Blessing.IfTaken"])
     BR.ApplyNoteColor(backupHead)
 
@@ -825,7 +826,7 @@ local function AddClassChoiceGrid(layout, grid, hintText, ownerClass, selfOnly)
         local key = order[slot.index]
         if not key then
             if slot.index == 1 then
-                BR.ShowTooltip(slot, L["BuffPanel.Blessing.None"], L["BuffPanel.Blessing.None.Desc"], "ANCHOR_TOP")
+                BR.ShowTooltip(slot, spec.none, spec.noneDesc, "ANCHOR_TOP")
             else
                 BR.ShowTooltip(slot, L["BuffPanel.Blessing.AddBackup"], nil, "ANCHOR_TOP")
             end
@@ -841,10 +842,9 @@ local function AddClassChoiceGrid(layout, grid, hintText, ownerClass, selfOnly)
                     nextName = nextTitle
                 end
             end
-            desc = nextName and string.format(L["BuffPanel.Blessing.NotLearned"], nextName)
-                or L["BuffPanel.Blessing.NotLearnedNone"]
+            desc = nextName and string.format(spec.notLearned, nextName) or L["BuffPanel.Blessing.NotLearnedNone"]
         elseif slot.index == 1 then
-            desc = string.format(L["BuffPanel.Blessing.MainTip"], row.className)
+            desc = string.format(spec.mainTip, row.labelText)
         else
             desc = string.format(L["BuffPanel.Blessing.BackupTip"], (ChoiceName(order[slot.index - 1])))
         end
@@ -852,13 +852,13 @@ local function AddClassChoiceGrid(layout, grid, hintText, ownerClass, selfOnly)
     end
 
     local y = -CHOICE_HEADER_H
-    for r, class in ipairs(grid.classes) do
+    for r, rowKey in ipairs(grid.rows) do
         local row = CreateFrame("Frame", nil, holder)
         row:SetPoint("TOPLEFT", 0, y)
         row:SetSize(bodyW, CHOICE_ROW_H)
         row:EnableMouse(true)
-        row.class = class
-        row.className = names[r]
+        row.key = rowKey
+        row.labelText = names[r]
         row:SetScript("OnEnter", UpdateRowHover)
         row:SetScript("OnLeave", UpdateRowHover)
 
@@ -875,7 +875,7 @@ local function AddClassChoiceGrid(layout, grid, hintText, ownerClass, selfOnly)
         row.label:SetJustifyH("LEFT")
         row.label:SetWordWrap(false)
         row.label:SetText(names[r])
-        local color = C_ClassColor.GetClassColor(class)
+        local color = spec.rowColor and spec.rowColor(rowKey)
         if color then
             row.label:SetTextColor(color:GetRGB())
         end
@@ -888,7 +888,8 @@ local function AddClassChoiceGrid(layout, grid, hintText, ownerClass, selfOnly)
         arrow:SetVertexColor(arrowColor[1], arrowColor[2], arrowColor[3], arrowColor[4] or 1)
 
         row.slots = {}
-        for s, size in ipairs(CHOICE_SLOT_SIZES) do
+        for s = 1, grid.slots do
+            local size = CHOICE_SLOT_SIZES[s]
             local slot = CreateFrame("Button", nil, row, "BackdropTemplate")
             slot:SetSize(size, size)
             slot.size = size
@@ -909,7 +910,7 @@ local function AddClassChoiceGrid(layout, grid, hintText, ownerClass, selfOnly)
                 if flyout:IsShown() and flyout.anchor == self then
                     flyout:Close()
                 else
-                    flyout:Open(self, class, s)
+                    flyout:Open(self, rowKey, s)
                 end
             end)
             slot:SetScript("OnEnter", function(self)
@@ -937,7 +938,7 @@ local function AddClassChoiceGrid(layout, grid, hintText, ownerClass, selfOnly)
         row.reset:Hide()
         row.reset:SetScript("OnClick", function()
             BR.HideTooltip()
-            WriteClassOrder(grid, class, DefaultChoiceOrder(grid, class))
+            WriteRowOrder(grid, rowKey, DefaultChoiceOrder(grid, rowKey))
         end)
         row.reset:SetScript("OnEnter", function(self)
             PaintParts(self.glyph, Theme.cell.resetHover)
@@ -951,14 +952,14 @@ local function AddClassChoiceGrid(layout, grid, hintText, ownerClass, selfOnly)
 
         rows[r] = row
         y = y - CHOICE_ROW_H
-        if grid.clusterEnds and grid.clusterEnds[class] then
+        if clusterEnds and clusterEnds[rowKey] then
             y = y - CHOICE_CLUSTER_GAP
         end
     end
 
     local function AnyRowChanged()
-        for _, class in ipairs(grid.classes) do
-            if not SameOrder(ClassChoiceOrder(grid, class), DefaultChoiceOrder(grid, class)) then
+        for _, rowKey in ipairs(grid.rows) do
+            if not SameOrder(RowChoiceOrder(grid, rowKey), DefaultChoiceOrder(grid, rowKey)) then
                 return true
             end
         end
@@ -969,13 +970,13 @@ local function AddClassChoiceGrid(layout, grid, hintText, ownerClass, selfOnly)
     resetRow:SetSize(bodyW, 22)
     local resetAll = CreateButton(resetRow, L["Options.ResetToDefaults"], function()
         flyout:Close()
-        WriteClassChoices(grid, function(class)
-            return DefaultChoiceOrder(grid, class)
+        WriteChoiceRows(grid, function(rowKey)
+            return DefaultChoiceOrder(grid, rowKey)
         end)
         Components.RefreshAll()
     end)
     resetAll:SetPoint("LEFT")
-    resetAll:SetDisabledReason(L["DisabledReason.BlessingDefaults"])
+    resetAll:SetDisabledReason(spec.defaultsReason)
     resetAll:BindEnabled(AnyRowChanged)
     tinsert(bodyHolders, resetAll)
     local selfNote = resetRow:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -985,13 +986,13 @@ local function AddClassChoiceGrid(layout, grid, hintText, ownerClass, selfOnly)
     selfNote:SetText(L["BuffPanel.Blessing.SelfOnlyNote"])
 
     function holder:Refresh()
-        local dimOthers = selfOnly()
+        local dimOthers = spec.selfOnly ~= nil and spec.selfOnly()
         selfNote:SetShown(dimOthers)
         for _, row in ipairs(rows) do
-            local order = ClassChoiceOrder(grid, row.class)
+            local order = RowChoiceOrder(grid, row.key)
             row.order = order
-            row.changed = not SameOrder(order, DefaultChoiceOrder(grid, row.class))
-            row.dimmed = dimOthers and row.class ~= ownerClass
+            row.changed = not SameOrder(order, DefaultChoiceOrder(grid, row.key))
+            row.dimmed = dimOthers and row.key ~= ownerClass
             row:SetAlpha(row.dimmed and CHOICE_DIM_ALPHA or 1)
             row.dot:SetShown(row.changed)
             row.label:SetAlpha(#order == 0 and 0.5 or 1)
@@ -1685,7 +1686,22 @@ for _, buff in ipairs(BR.BUFF_TABLES.raid) do
                 local function IsSelfOnly()
                     return BR.Config.Get("defaults.paladinBlessingScope") == "self"
                 end
-                AddClassChoiceGrid(layout, grid, L["BuffPanel.PaladinBlessing.Hint"], buff.class, IsSelfOnly)
+                AddChoiceOrderGrid(layout, grid, {
+                    ownerClass = buff.class,
+                    rowLabel = function(class)
+                        return LOCALIZED_CLASS_NAMES_MALE[class] or class
+                    end,
+                    rowColor = C_ClassColor.GetClassColor,
+                    selfOnly = IsSelfOnly,
+                    hint = L["BuffPanel.PaladinBlessing.Hint"],
+                    mainHeader = L["BuffPanel.Blessing.Give"],
+                    inMainNote = L["BuffPanel.Blessing.InGive"],
+                    mainTip = L["BuffPanel.Blessing.MainTip"],
+                    notLearned = L["BuffPanel.Blessing.NotLearned"],
+                    none = L["BuffPanel.Blessing.None"],
+                    noneDesc = L["BuffPanel.Blessing.None.Desc"],
+                    defaultsReason = L["DisabledReason.BlessingDefaults"],
+                })
                 AddSpecialCheckbox(layout, {
                     label = L["BuffPanel.BlessSelfOnly"],
                     get = IsSelfOnly,
@@ -1698,7 +1714,7 @@ for _, buff in ipairs(BR.BUFF_TABLES.raid) do
                 groupCast.build(layout)
             end,
             warn = function()
-                return BR.StateHelpers.IsBuffEnabled(buff.key) and ClassChoiceGridNeedsSetup(grid)
+                return BR.StateHelpers.IsBuffEnabled(buff.key) and ChoiceOrderNeedsSetup(grid)
             end,
         }
     elseif buff.groupCast and not SPECIAL_SECTIONS[buff.key] then
@@ -1706,12 +1722,30 @@ for _, buff in ipairs(BR.BUFF_TABLES.raid) do
     end
 end
 
--- A presence grid row with no choice accepts any choice, so the grid never needs setup.
+-- An empty presence row accepts any choice, so the grid never needs setup.
+local CONTENT_ROW_LABELS = {}
+for _, row in ipairs(GRID_ROWS) do
+    CONTENT_ROW_LABELS[row.key] = row.label
+end
 for _, buff in ipairs(BR.BUFF_TABLES.presence) do
-    if buff.choiceGrid then
+    local grid = buff.choiceOrder
+    if grid then
         SPECIAL_SECTIONS[buff.key] = {
             build = function(layout)
-                AddStanceGrid(layout, buff.choiceGrid)
+                AddChoiceOrderGrid(layout, grid, {
+                    ownerClass = buff.class,
+                    rowLabel = function(rowKey)
+                        return CONTENT_ROW_LABELS[rowKey] or rowKey
+                    end,
+                    hint = L["BuffPanel.PaladinAura.Hint"],
+                    mainHeader = L["BuffPanel.PaladinAura.Run"],
+                    inMainNote = L["BuffPanel.PaladinAura.InRun"],
+                    mainTip = L["BuffPanel.PaladinAura.MainTip"],
+                    notLearned = L["BuffPanel.PaladinAura.NotLearned"],
+                    none = L["BuffPanel.PaladinAura.None"],
+                    noneDesc = L["BuffPanel.PaladinAura.None.Desc"],
+                    defaultsReason = L["DisabledReason.AuraDefaults"],
+                })
             end,
         }
     end

@@ -126,7 +126,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
 ---@field castReady? fun(isRestricted: boolean): boolean? For a caster of the class. false hides the missing reminder
 ---@field casterCheck? fun(isRestricted: boolean): string?, boolean? For a player of the class, replaces the group scan. Returns the overlay text (nil = no reminder) and true when a click must cast nothing
----@field choiceGrid? StanceGrid The user picks the buff per content row. A row with no choice accepts any
+---@field choiceOrder? ChoiceOrderGrid The user lists the buff choices per content row. An empty row accepts any
 ---@field clickMacro? fun(spellID: number?): string
 
 ---@class TargetedBuff
@@ -371,14 +371,18 @@ BR.PET_SPELLS = {
 ---@field iconSpellID? number Icon of a choice with no spell
 ---@field groupCast? GroupCastRank[] Group ranks of a buff choice, highest first
 ---@field auraIDs? number[] Every aura ID that counts as the buff choice
+---@field resistance? boolean A paladin resistance aura: it reaches the whole raid and suits one boss
 
----@class ClassChoiceGrid
----@field setting string Key in profile.defaults: class token -> choice keys in priority order, false in an unused slot
----@field choices StanceChoice[] Grid columns. A class list holds at most this many keys
----@field classes string[] Grid rows
----@field clusterEnds? table<string, boolean> Classes that end a cluster of rows. A gap follows each one
----@field forClass fun(class: string): StanceChoice[] Known choices of the class list in priority order. The list is reused
+---@class ChoiceOrderGrid
+---@field setting string Key in profile.defaults: row key -> choice keys in priority order, false in an unused slot
+---@field choices StanceChoice[] The choices that a slot can hold
+---@field rows string[] Row keys in grid order
+---@field slots integer Slots per row: the main choice, then the backups
 ---@field castID fun(choice: StanceChoice): number? Highest known single-target rank of the choice
+---@field clusterEnds? table<string, boolean> Rows that end a cluster. A gap follows each one
+
+---@class ClassChoiceGrid : ChoiceOrderGrid
+---@field forClass fun(class: string): StanceChoice[] Known choices of the class list in priority order. The list is reused
 
 ---@class SubChoiceRow
 ---@field pick fun(def: table): number?, string? Spell and unit of the main click. A clickMacroText click ignores them. nil = no cast and no row
@@ -397,7 +401,6 @@ BR.PET_SPELLS = {
 ---@field setting string Key of the grid in profile.defaults
 ---@field choices StanceChoice[] In grid order. The click prefers the first allowed choice
 ---@field hint string
----@field single? boolean A row holds at most one choice
 
 ---@class StanceRule
 ---@field allowed fun(): table<number, boolean>? Allowed stance spells (BR.NO_STANCE = no stance). nil = no reminder

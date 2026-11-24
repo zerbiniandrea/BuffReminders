@@ -833,7 +833,8 @@ end
 local PALADIN_BLESSING_GRID = {
     setting = "paladinBlessingsByClass",
     choices = PALADIN_BLESSINGS,
-    classes = { "WARRIOR", "ROGUE", "HUNTER", "MAGE", "WARLOCK", "PRIEST", "DRUID", "SHAMAN", "PALADIN" },
+    rows = { "WARRIOR", "ROGUE", "HUNTER", "MAGE", "WARLOCK", "PRIEST", "DRUID", "SHAMAN", "PALADIN" },
+    slots = 3,
     clusterEnds = { ROGUE = true, HUNTER = true },
     forClass = KnownBlessingsForClass,
     castID = function(choice)
@@ -870,45 +871,94 @@ local function RequestedBlessing()
     return choice and choice.spellIDs[1]
 end
 
--- A unit keeps one aura of each type, whoever casts it. A row with no choice accepts any aura.
----@type StanceGrid
+-- A unit keeps one aura of each type, whoever casts it. A resistance aura reaches the
+-- whole raid. The other auras reach only the party.
+---@type ChoiceOrderGrid
 local PALADIN_AURA_GRID = {
-    setting = "paladinAuras",
-    hint = L["BuffPanel.PaladinAura.Hint"],
-    single = true,
+    setting = "paladinAuraOrder",
     choices = {
         { key = "devotion", spellIDs = { 10293, 10292, 1032, 10291, 643, 10290, 465 } },
         { key = "retribution", spellIDs = { 10301, 10300, 10299, 10298, 7294 } },
         { key = "concentration", spellIDs = { 19746 } },
-        { key = "shadowResistance", spellIDs = { 19896, 19895, 19876 } },
-        { key = "frostResistance", spellIDs = { 19898, 19897, 19888 } },
-        { key = "fireResistance", spellIDs = { 19900, 19899, 19891 } },
+        { key = "shadowResistance", spellIDs = { 19896, 19895, 19876 }, resistance = true },
+        { key = "frostResistance", spellIDs = { 19898, 19897, 19888 }, resistance = true },
+        { key = "fireResistance", spellIDs = { 19900, 19899, 19891 }, resistance = true },
         { key = "sanctity", spellIDs = { 20218 } },
     },
+    rows = { "world", "dungeon", "raid", "pvp" },
+    slots = 2,
+    castID = function(choice)
+        return HighestKnownSpell(choice.spellIDs)
+    end,
 }
+local PALADIN_AURA_CHOICES = PALADIN_AURA_GRID.choices
 ---@type table<number, integer>
 local PALADIN_AURA_TYPE = {}
+---@type table<string, integer>
+local PALADIN_AURA_TYPE_BY_KEY = {}
 local ALL_PALADIN_AURA_IDS = {}
-for auraType, choice in ipairs(PALADIN_AURA_GRID.choices) do
+for auraType, choice in ipairs(PALADIN_AURA_CHOICES) do
+    PALADIN_AURA_TYPE_BY_KEY[choice.key] = auraType
     for _, id in ipairs(choice.spellIDs) do
         PALADIN_AURA_TYPE[id] = auraType
         ALL_PALADIN_AURA_IDS[#ALL_PALADIN_AURA_IDS + 1] = id
     end
 end
 
----The aura type of the current content row and its highest known rank. nil when the
----row chooses none or the player does not know the chosen aura.
+local UnitGUID = UnitGUID
+local IsInRaid = IsInRaid
+local IsGUIDInGroup = IsGUIDInGroup
+local UnitTokenFromGUID = UnitTokenFromGUID
+local UnitInSubgroup = UnitInSubgroup
+
+-- The scan reads auras only out of combat. An entry stays while its paladin is out
+-- of range or the player is in combat, so a taken aura does not flip back and forth.
+---@type table<string, integer> GUID of another paladin -> the aura type that the paladin gives the player
+local otherPaladinAuras = {}
+
+---Forget each paladin who left the group. In a raid, a party aura reaches only the
+---subgroup of its caster.
+local function PruneOtherPaladinAuras()
+    local inRaid = IsInRaid()
+    for guid, auraType in pairs(otherPaladinAuras) do
+        local keep = Plain(IsGUIDInGroup(guid)) ~= false
+        if keep and inRaid and not PALADIN_AURA_CHOICES[auraType].resistance then
+            local unit = Plain(UnitTokenFromGUID(guid))
+            keep = not unit or Plain(UnitInSubgroup(unit)) ~= false
+        end
+        if not keep then
+            otherPaladinAuras[guid] = nil
+        end
+    end
+end
+
+---@param auraType integer
+---@return boolean
+local function IsAuraTypeTaken(auraType)
+    for _, other in pairs(otherPaladinAuras) do
+        if other == auraType then
+            return true
+        end
+    end
+    return false
+end
+
+---The aura that the player runs: the first choice of the content row list that the
+---player knows and that no other paladin gives. nil when no choice qualifies.
 ---@return integer? auraType
 ---@return number? castID
-local function ChosenPaladinAura()
-    local row = BR.StateHelpers.GetContentRow()
-    for auraType, choice in ipairs(PALADIN_AURA_GRID.choices) do
-        if BR.StateHelpers.IsContentChoiceAllowed(PALADIN_AURA_GRID.setting, row, choice.key) then
-            local castID = HighestKnownSpell(choice.spellIDs)
-            if castID then
-                return auraType, castID
-            end
-            return nil
+local function WantedPaladinAura()
+    local defaults = BR.profile.defaults
+    local byRow = defaults and defaults.paladinAuraOrder
+    local order = type(byRow) == "table" and byRow[BR.StateHelpers.GetContentRow()]
+    if type(order) ~= "table" then
+        return nil
+    end
+    for i = 1, PALADIN_AURA_GRID.slots do
+        local auraType = PALADIN_AURA_TYPE_BY_KEY[order[i]]
+        local castID = auraType and HighestKnownSpell(PALADIN_AURA_CHOICES[auraType].spellIDs)
+        if castID and not IsAuraTypeTaken(auraType) then
+            return auraType, castID
         end
     end
     return nil
@@ -937,11 +987,16 @@ local function ScanPlayerAuraTypes()
                 ownAuraTypes[auraType] = true
             else
                 foreignAuraTypes[auraType] = true
+                local guid = source and Plain(UnitGUID(source))
+                if guid then
+                    otherPaladinAuras[guid] = auraType
+                end
             end
         end
         i = i + 1
         aura = AuraByIndex("player", i, "HELPFUL")
     end
+    PruneOtherPaladinAuras()
 end
 
 ---@return boolean anyKnown The player knows an aura
@@ -949,7 +1004,7 @@ end
 local function KnownAurasOnStanceBar()
     local bar = BR.BuffState.GetStanceBarSpells()
     local anyKnown, allOnBar = false, true
-    for _, choice in ipairs(PALADIN_AURA_GRID.choices) do
+    for _, choice in ipairs(PALADIN_AURA_CHOICES) do
         if HighestKnownSpell(choice.spellIDs) then
             anyKnown = true
             local onBar = false
@@ -964,7 +1019,8 @@ end
 
 ---Overlay text for the aura reminder of a paladin, or nil when the own aura is fine
 ---or unknown. The stance bar shows the active aura also in combat. Out of combat, an
----own aura instance stands in for an aura with no stance bar slot.
+---own aura instance stands in for an aura with no stance bar slot. A running
+---resistance aura counts as a choice for the current boss.
 ---@param isAuraRestricted boolean
 ---@return string?
 ---@return boolean? noClick
@@ -977,29 +1033,35 @@ local function CheckOwnPaladinAura(isAuraRestricted)
     if not anyKnown then
         return nil
     end
-    local chosenType = ChosenPaladinAura()
     local runType = stanceID and PALADIN_AURA_TYPE[stanceID]
+    local givenByOther = false
     if isAuraRestricted or BR.GameContext.IsInCombat() then
-        if runType then
-            return chosenType and runType ~= chosenType and WRONG_AURA_TEXT or nil
+        if not runType then
+            return allOnBar and NO_AURA_TEXT or nil
         end
-        if not allOnBar then
-            return nil
+    else
+        ScanPlayerAuraTypes()
+        runType = runType or next(ownAuraTypes)
+        if not runType then
+            return NO_AURA_TEXT
         end
-        return NO_AURA_TEXT
+        givenByOther = foreignAuraTypes[runType] == true and not ownAuraTypes[runType]
     end
-    ScanPlayerAuraTypes()
-    runType = runType or next(ownAuraTypes)
-    if not runType then
-        return NO_AURA_TEXT
+    -- The scan marks each aura of another paladin as taken, so no paladin gives the wanted aura.
+    local wantedType = WantedPaladinAura()
+    if runType == wantedType then
+        return nil
     end
-    if chosenType and runType ~= chosenType then
-        return WRONG_AURA_TEXT
-    end
-    if foreignAuraTypes[runType] and not ownAuraTypes[runType] then
+    if givenByOther then
+        if wantedType then
+            return WRONG_AURA_TEXT
+        end
         return DUPLICATE_TEXT, true
     end
-    return nil
+    if not wantedType or PALADIN_AURA_CHOICES[runType].resistance then
+        return nil
+    end
+    return WRONG_AURA_TEXT
 end
 
 ---@class ForeverReagent
@@ -1625,15 +1687,15 @@ BR.BUFF_TABLES = {
             icons = {
                 spells = { 10293 },
                 dynamic = function()
-                    local _, castID = ChosenPaladinAura()
+                    local _, castID = WantedPaladinAura()
                     return castID and BR.Icons.GetBuffTexture(castID)
                 end,
             },
             overlayText = L["Overlay.NoAura"],
             casterCheck = CheckOwnPaladinAura,
-            choiceGrid = PALADIN_AURA_GRID,
+            choiceOrder = PALADIN_AURA_GRID,
             clickMacro = function(spellID)
-                local _, castID = ChosenPaladinAura()
+                local _, castID = WantedPaladinAura()
                 return "/cast " .. (BR.GetSpellName(castID or spellID) or "")
             end,
             infoTooltip = { title = L["Tooltip.PaladinDuplicate"], desc = L["Tooltip.PaladinAuraDuplicate.Desc"] },
