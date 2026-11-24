@@ -305,11 +305,8 @@ L["Display.OpenOptions"] = "打开选项"
 L["Display.SlashCommands"] = "斜杠命令: /br, /br lock, /br unlock, /br test, /br minimap, /br snooze"
 L["Display.MinimapLeftClick"] = "|cFFCFCFCF左键点击|r: 选项"
 L["Display.MinimapRightClick"] = "|cFFCFCFCF右键点击|r: 测试模式"
-L["Display.DismissConsumablesChat"] = "直到下次蓝条加载前，消耗品提醒被暂时隐藏了。"
 L["Display.LoginFirstInstall"] =
     "感谢安装！输入 |cFFFFD100/br unlock|r 来移动增益显示，或者使用 |cFFFFD100/br|r 选项面板底部的按钮。"
-L["Display.LoginSnooze"] =
-    "隐藏消耗品提示现在改为右键操作：右键点击消耗品可暂时隐藏其提示，或输入 |cFFFFD100/br snooze|r。"
 
 -- ============================================================================
 -- OPTIONS: NAVIGATION LABELS

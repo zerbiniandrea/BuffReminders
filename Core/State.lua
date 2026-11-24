@@ -130,10 +130,76 @@ local BuffState = {
 local _, playerClass = UnitClass("player")
 local playerName = GetUnitName("player", true)
 
--- Consumables dismissed state (transient, resets on instance change / reload).
--- "rest": the snooze started in a rest area and also ends when the player leaves it.
----@type boolean|"rest"
-local consumablesDismissed = false
+---@alias SnoozeScope "reminder"|"category"|"all"
+
+---@class SnoozeRecord
+---@field rest? boolean The snooze started in a rest area and ends when the player leaves it
+
+-- A snooze ends at the next loading screen. A reload clears it.
+---@type table<SnoozeScope, table<string, SnoozeRecord>> Id: the reminder key, the category, or "all"
+local snoozes = { reminder = {}, category = {}, all = {} }
+
+do
+    ---@param record SnoozeRecord
+    ---@return boolean
+    local function HasEnded(record)
+        return record.rest == true and not GameContext.IsResting()
+    end
+
+    ---@param which "ended"|"all" "ended": the snoozes whose rest area the player left
+    ---@return number remaining
+    function BuffState.EndSnoozes(which)
+        local remaining = 0
+        for _, records in pairs(snoozes) do
+            for id, record in pairs(records) do
+                if which == "all" or HasEnded(record) then
+                    records[id] = nil
+                else
+                    remaining = remaining + 1
+                end
+            end
+        end
+        return remaining
+    end
+
+    ---@return number count The active snoozes. Changes no state
+    function BuffState.CountSnoozes()
+        local count = 0
+        for _, records in pairs(snoozes) do
+            for _, record in pairs(records) do
+                if not HasEnded(record) then
+                    count = count + 1
+                end
+            end
+        end
+        return count
+    end
+
+    -- The buff data is static, so the group of each key is read once.
+    ---@type table<string, string>?
+    local groupOfKey
+
+    ---A reminder snooze of a grouped buff is stored under its groupId.
+    ---@param entry BuffStateEntry
+    ---@return boolean
+    function BuffState.IsEntrySnoozed(entry)
+        if snoozes.all.all or snoozes.category[entry.category] or snoozes.reminder[entry.key] then
+            return true
+        end
+        if not groupOfKey then
+            groupOfKey = {}
+            for _, buffs in pairs(BR.BUFF_TABLES) do
+                for _, buff in ipairs(buffs) do
+                    if buff.groupId then
+                        groupOfKey[buff.key] = buff.groupId
+                    end
+                end
+            end
+        end
+        local groupId = groupOfKey[entry.key]
+        return groupId ~= nil and snoozes.reminder[groupId] ~= nil
+    end
+end
 
 -- ============================================================================
 -- CACHED VALUES (invalidated by specific events)
@@ -3340,13 +3406,6 @@ local function RefreshConsumables(db, trackingMode, isAuraRestricted, hideExpiri
     local freeVisible = freeMode == "override" and IsFreeConsumableVisible(db) or false
     -- In follow mode, healthstones use consumable category content gates (without ready check)
     local consumableContentVisible = freeMode == "follow" and IsCategoryVisibleForContent("consumable", true) or false
-    -- Dismiss overrides all consumable visibility (transient, resets on instance change)
-    if BuffState.GetConsumablesDismissed() then
-        consumableVisible = false
-        consumableVisibleNoReadyCheck = false
-        freeVisible = false
-        consumableContentVisible = false
-    end
     local freeRcMode = db.defaults and db.defaults.healthstoneVisibility or "readyCheck"
     local competitivePvP = IsInCompetitivePvP()
     for i, buff in ipairs(Consumables) do
@@ -3677,8 +3736,11 @@ function BuffState.Refresh(refreshMode)
     for _, list in pairs(BuffState.visibleByCategory) do
         wipe(list)
     end
+    -- A snooze filters only this list. entry.visible stays true, because a "group"
+    -- refresh does not recompute every entry, and a later pass must show it again.
+    local anySnoozed = BuffState.EndSnoozes("ended") > 0
     for _, entry in pairs(BuffState.entries) do
-        if entry.visible then
+        if entry.visible and not (anySnoozed and BuffState.IsEntrySnoozed(entry)) then
             local cat = entry.category
             if not BuffState.visibleByCategory[cat] then
                 BuffState.visibleByCategory[cat] = {}
@@ -3731,19 +3793,20 @@ function BuffState.IsLegacyInstance()
     return instanceCache.legacyInstance or false
 end
 
----Set whether consumable reminders are dismissed (transient, resets on instance change)
----@param state boolean
-function BuffState.SetConsumablesDismissed(state)
-    consumablesDismissed = state and GameContext.IsResting() and "rest" or state
-end
-
----Get whether consumable reminders are dismissed
----@return boolean
-function BuffState.GetConsumablesDismissed()
-    if consumablesDismissed == "rest" and not GameContext.IsResting() then
-        consumablesDismissed = false
+---Start a snooze. A new snooze replaces the snooze of the same scope and id.
+---@param scope SnoozeScope
+---@param id? string The reminder key or the category. Ignored for "all"
+---@return SnoozeRecord? record nil when a "reminder" or "category" snooze has no id
+function BuffState.Snooze(scope, id)
+    if scope == "all" then
+        id = "all"
+    elseif not id then
+        return nil
     end
-    return consumablesDismissed ~= false
+    ---@type SnoozeRecord
+    local record = { rest = GameContext.IsResting() or nil }
+    snoozes[scope][id] = record
+    return record
 end
 
 ---Raw difficultyID from GetInstanceInfo (cached; invalidated with content type)

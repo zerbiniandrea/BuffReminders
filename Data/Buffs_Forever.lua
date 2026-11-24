@@ -1299,20 +1299,12 @@ end
 
 ---@type SubChoiceRow
 local BLESSING_ROW = {
-    setting = "blessingSubIcons",
-    label = L["BuffPanel.SubChoices"],
-    desc = L["BuffPanel.SubChoices.Desc"],
-    hint = L["Tooltip.ChoiceRightClick"],
     pick = BlessingPick,
     others = OtherBlessings,
 }
 
 ---@type SubChoiceRow
 local DRIVE_BY_ROW = {
-    setting = "driveBySubIcons",
-    label = L["BuffPanel.SubChoices.DriveBy"],
-    desc = L["BuffPanel.SubChoices.DriveBy.Desc"],
-    hint = L["Tooltip.ChoiceRightClick.DriveBy"],
     pick = function()
         local spellID = BR.DriveBy.Pick()
         if spellID then
@@ -1463,10 +1455,6 @@ end
 
 ---@type SubChoiceRow
 local CAMP_ROW = {
-    setting = "campSubIcons",
-    label = L["BuffPanel.SubChoices.Camp"],
-    desc = L["BuffPanel.SubChoices.Camp.Desc"],
-    hint = L["Tooltip.ChoiceRightClick.Camp"],
     pick = function()
         if CampStage() == "sit" then
             return CAMP.benefitsID, "player"
@@ -1510,10 +1498,6 @@ end
 
 ---@type SubChoiceRow
 local TRACKING_ROW = {
-    setting = "trackingSubIcons",
-    label = L["BuffPanel.SubChoices.Tracking"],
-    desc = L["BuffPanel.SubChoices.Tracking.Desc"],
-    hint = L["Tooltip.ChoiceRightClick.Tracking"],
     pick = function()
         local spellID = BR.Tracking.Pick()
         if spellID then

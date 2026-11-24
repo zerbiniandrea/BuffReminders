@@ -157,9 +157,11 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
         if BR.CLIENT_PREVIEW and BR.profile.showLoginMessages ~= false then
             print("|cff00ccffBuffReminders:|r " .. L["Display.LoginClientBeta"]:format(BR.DISCORD_URL))
         end
+        -- Dead key: no notice reads it.
+        glob.snoozeNoticeShown = nil
         if isFirstInstall then
-            -- A fresh install never had the dismiss button. Skip the transition notice.
-            glob.snoozeNoticeShown = true
+            -- A fresh install has no earlier behavior to explain. Skip the change notices.
+            glob.reminderMenuNoticeShown = true
             glob.casterNameNoticeShown = true
             return
         end
@@ -167,10 +169,9 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
             glob.casterNameNoticeShown = true
             print("|cff00ccffBuffReminders:|r " .. L["Display.LoginCasterName"])
         end
-        -- Right-click and /br snooze replace the consumable dismiss button.
-        -- An existing user gets this notice one time only.
-        if BR.profile.showLoginMessages ~= false and not glob.snoozeNoticeShown then
-            glob.snoozeNoticeShown = true
+        -- An existing user learns about the right-click menu one time only.
+        if BR.profile.showLoginMessages ~= false and not glob.reminderMenuNoticeShown then
+            glob.reminderMenuNoticeShown = true
             print("|cff00ccffBuffReminders:|r " .. L["Display.LoginSnooze"])
         end
     end)

@@ -98,25 +98,6 @@ local function Build(ctx, layout)
             end,
         })
         layout:Add(showTooltipsHolder, nil, COMPONENT_GAP)
-
-        local snoozeHolder = Components.Checkbox(parent, {
-            label = L["Options.RightClickSnooze"],
-            get = function()
-                return BR.Config.Get("defaults.rightClickSnooze") ~= false
-            end,
-            enabled = isClickable,
-            disabledReason = L["DisabledReason.ClickToCast"],
-            tooltip = {
-                title = L["Options.RightClickSnooze"],
-                desc = L["Options.RightClickSnooze.Desc"],
-            },
-            onChange = function(checked)
-                BR.Config.Set("defaults.rightClickSnooze", checked)
-            end,
-        })
-        layout:Add(snoozeHolder, nil, COMPONENT_GAP)
-
-        Helpers.LayoutSubsectionNote(layout, parent, L["Options.ClickToCast.SnoozeNote"])
     end
     layout:SetX(baseX)
 

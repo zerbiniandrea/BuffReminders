@@ -177,6 +177,7 @@ read_globals = {
     "GameTooltip",
     "GameTooltip_Hide",
     "HideUIPanel",
+    "MenuUtil",
     "Minimap",
     "PlayerSpellsFrame",
     "PlayerSpellsUtil",

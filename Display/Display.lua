@@ -90,7 +90,8 @@ local BR = ns
 ---@field consumableBadgeOnSubIcons? boolean
 ---@field showConsumableTooltips? boolean
 ---@field tooltipModifier? "SHIFT"|"CTRL"|"ALT" Key that hover tooltips wait for. nil: no key
----@field rightClickSnooze? boolean
+---@field rightClickMenu? boolean false: the right click does the left-click action
+---@field subIconReveal? "hover"|"always"
 ---@field consumableTextScale? number
 ---@field hideConsumableLabels? boolean
 ---@field hideLegacyConsumables? boolean
@@ -107,11 +108,7 @@ local BR = ns
 ---@field druidForms? table<string, table<string, boolean>> Content row -> allowed form keys
 ---@field paladinBlessingsByClass? table<string, (string|false)[]> Class token -> blessing keys in priority order
 ---@field paladinBlessingScope? "group"|"self"
----@field blessingSubIcons? "rightclick"|"always"
----@field driveBySubIcons? "rightclick"|"always"
----@field trackingSubIcons? "rightclick"|"always"
 ---@field trackingScope? "gathering"|"all"
----@field campSubIcons? "rightclick"|"always"
 ---@field paladinAuras? table<string, table<string, boolean>> Content row -> chosen aura key. A row with none accepts any aura
 ---@field thornsRequest? boolean A tank of another class sees a Thorns request reminder
 ---@field righteousFuryShow? "tank"|"always"
@@ -2581,27 +2578,79 @@ local function ApplyPetDisplayMode(frame, entry, frameList)
 end
 
 -- ============================================================================
--- CONSUMABLE SNOOZE
+-- SNOOZE
 -- ============================================================================
 
---- Snooze every consumable reminder until the next loading screen, or until the player leaves
---- the rest area that the snooze started in.
-function BR.SnoozeConsumables()
-    BR.BuffState.SetConsumablesDismissed(true)
-    UpdateDisplay()
-    local message = BR.GameContext.IsResting() and L["Display.DismissConsumablesRestChat"]
-        or L["Display.DismissConsumablesChat"]
-    print("|cff00ccffBuffReminders:|r " .. message)
-end
-
-local function ToggleConsumableSnooze()
-    if not BR.BuffState.GetConsumablesDismissed() then
-        BR.SnoozeConsumables()
+---Snooze reminders and confirm it in chat.
+---@param scope SnoozeScope
+---@param id? string The reminder key or the category. Ignored for "all"
+---@param label string The name of what the snooze hides
+function BR.Snooze(scope, id, label)
+    local record = BR.BuffState.Snooze(scope, id)
+    if not record then
         return
     end
-    BR.BuffState.SetConsumablesDismissed(false)
     UpdateDisplay()
-    print("|cff00ccffBuffReminders:|r " .. L["Display.UnsnoozeConsumablesChat"])
+    local message = record.rest and L["Display.SnoozeChat.Rest"] or L["Display.SnoozeChat.Loading"]
+    print("|cff00ccffBuffReminders:|r " .. format(message, label))
+end
+
+local function ClearSnoozes()
+    BR.BuffState.EndSnoozes("all")
+    UpdateDisplay()
+    print("|cff00ccffBuffReminders:|r " .. L["Display.UnsnoozeChat"])
+end
+
+-- The names that a category snooze shows in the menu and in chat.
+local SNOOZE_CATEGORY_LABELS = {
+    raid = L["Category.RaidBuffs"],
+    presence = L["Category.PresenceBuffs"],
+    targeted = L["Category.TargetedBuffs"],
+    self = L["Category.SelfBuffs"],
+    pet = L["Category.PetReminders"],
+    consumable = L["Category.Consumables"],
+    utility = L["Category.UtilityReminders"],
+    custom = L["Category.CustomBuffs"],
+    loadout = L["Category.LoadoutReminders"],
+}
+
+local function SnoozeCommand()
+    if BR.BuffState.CountSnoozes() > 0 then
+        ClearSnoozes()
+    else
+        BR.Snooze("all", nil, L["Menu.AllReminders"])
+    end
+end
+
+---Open the right-click menu of a reminder. Out of combat only.
+---@param owner table The frame that the menu opens at
+---@param frame table The buff frame, or one of its extra frames
+function BR.Display.OpenReminderMenu(owner, frame)
+    if InCombatLockdown() then
+        return
+    end
+    local host = frame.isExtraFrame and frame.mainFrame or frame
+    local category = host.buffCategory
+    local groupId = host.buffDef and host.buffDef.groupId
+    local group = groupId and BR.BuffGroups[groupId]
+    local key = groupId or host.key
+    local name = group and group.displayName or host.displayName or key
+    local categoryLabel = SNOOZE_CATEGORY_LABELS[category] or category
+    MenuUtil.CreateContextMenu(owner, function(_, root)
+        root:CreateButton(format(L["Menu.Snooze"], name), function()
+            BR.Snooze("reminder", key, name)
+        end)
+        root:CreateButton(format(L["Menu.Snooze"], categoryLabel), function()
+            BR.Snooze("category", category, categoryLabel)
+        end)
+        root:CreateButton(L["Menu.SnoozeAll"], function()
+            BR.Snooze("all", nil, L["Menu.AllReminders"])
+        end)
+        root:CreateDivider()
+        root:CreateButton(L["Menu.Settings"], function()
+            BR.Options.OpenReminderSettings(host.buffDef, category)
+        end)
+    end)
 end
 
 -- Play per-buff sound alert when an icon first appears.
@@ -2911,10 +2960,17 @@ local ReparentBuffFrames
 local function WireLoadoutFrameClick(frame)
     frame:EnableMouse(true)
     frame:SetScript("OnMouseUp", function(self, button)
-        if button ~= "LeftButton" then
+        local db = BR.profile
+        if button == "RightButton" and db.defaults.rightClickMenu ~= false then
+            local cs = db.categorySettings and db.categorySettings.loadout
+            if cs and cs.clickable == true then
+                BR.Display.OpenReminderMenu(self, self)
+            end
             return
         end
-        local db = BR.profile
+        if button ~= "LeftButton" and button ~= "RightButton" then
+            return
+        end
         local rule = db and db.loadoutReminders and db.loadoutReminders[self.key]
         if rule and rule.clickToFix then
             BR.LoadoutActions.ApplyFix(rule)
@@ -3421,10 +3477,12 @@ CallbackRegistry:RegisterCallback("DisplayRefresh", function()
     ResetLayoutSignatures()
     InvalidateSortedCategories()
     UpdateDisplay()
-    -- Refresh consumable action button clickability/visibility after mode changes
+    -- The consumable pass also runs where click to cast is off, to hide the sub-icons
+    -- of a display mode change. A setting can change the right-click mode of any overlay.
     if not InCombatLockdown() then
         BR.SecureButtons.UpdateActionButtons("consumable")
     end
+    BR.SecureButtons.RefreshOverlaySpells()
 end)
 
 -- Visibility toggles (hide-when, show-only-in-group, pet passive)
@@ -3559,7 +3617,7 @@ local function SlashHandler(msg)
         ToggleTestMode()
         BR.Components.RefreshAll()
     elseif cmd == "snooze" then
-        ToggleConsumableSnooze()
+        SnoozeCommand()
     elseif cmd == "lock" then
         SetFrameLocked(true)
         BR.Components.RefreshAll()
@@ -3647,7 +3705,6 @@ end
 local eventHandlers = {}
 
 eventHandlers.PLAYER_ENTERING_WORLD = function()
-    BR.BuffState.SetConsumablesDismissed(false)
     UpdateAuraEventRegistration()
     BR.StateHelpers.ScanEatingState()
     if BR.Loadouts then

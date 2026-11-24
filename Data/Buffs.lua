@@ -381,17 +381,17 @@ BR.PET_SPELLS = {
 ---@field castID fun(choice: StanceChoice): number? Highest known single-target rank of the choice
 
 ---@class SubChoiceRow
----@field setting string Key in profile.defaults: "rightclick" (a right-click opens the row) or "always"
----@field label string Drawer label of the setting
----@field desc string Drawer tooltip of the setting
----@field hint string Hover tooltip line that names the right click
 ---@field pick fun(def: table): number?, string? Spell and unit of the main click. A clickMacroText click ignores them. nil = no cast and no row
 ---@field others fun(def: table, unit: string, spellID: number): SubChoice[] The other choices for the unit. The list is reused
+---@field choiceUnit? fun(def: table): string Target of the choice buttons. nil: the unit of the main click
 
 ---@class SubChoiceItem
 ---@field itemID number Item that the choice button uses
 
----@alias SubChoice number[]|SubChoiceItem A rank list, highest rank first, or an item
+---@class SubChoiceSpell
+---@field spellID number Spell that the choice button casts as is, with no rank fit
+
+---@alias SubChoice number[]|SubChoiceItem|SubChoiceSpell A rank list, highest rank first, an item, or one spell
 
 ---@class StanceGrid
 ---@field setting string Key of the grid in profile.defaults

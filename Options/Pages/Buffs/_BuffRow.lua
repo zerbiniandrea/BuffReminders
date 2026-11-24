@@ -65,6 +65,10 @@ local NOTIFY_DOT_COLOR = { 0.88, 0.42, 0.40 }
 local SOUND_ATLAS = "chatframe-button-icon-voicechat"
 local PIN_TEXTURE = "Interface\\AddOns\\BuffReminders\\Media\\detach.tga"
 
+-- The drawer opener of each row, by setting key.
+---@type table<string, fun()>
+local openersByKey = {}
+
 local function OpenPanel(key, displayName, icons, readyCheckOnly, freeConsumable, anchor)
     BR.Options.Dialogs.BuffPanel.Show({
         key = key,
@@ -134,6 +138,7 @@ local function CreateBuffRow(
     local function openPanel()
         OpenPanel(key, displayName, icons, readyCheckOnly, freeConsumable, settingsBtn)
     end
+    openersByKey[key] = openPanel
 
     settingsBtn:SetFrameLevel(holder:GetFrameLevel() + 5)
     local settingsText = settingsBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -377,3 +382,15 @@ local function RenderBuffArray(parent, x, y, buffArray, rowWidth, rows)
 end
 
 BR.Options.BuffRow.Render = RenderBuffArray
+
+---Open the drawer of a rendered row.
+---@param key string The setting key: the groupId or the buff key
+---@return boolean opened false when no row has the key
+function BR.Options.BuffRow.OpenSettings(key)
+    local open = openersByKey[key]
+    if not open then
+        return false
+    end
+    open()
+    return true
+end

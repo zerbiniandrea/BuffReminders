@@ -241,6 +241,7 @@ local EVENT_CACHES = {
             ComputePvPPrep()
             C_Timer.After(1, OnEnteredWorldSettled)
             SeedGlowingSpells()
+            BR.BuffState.EndSnoozes("all")
         end,
     },
     ZONE_CHANGED_NEW_AREA = {

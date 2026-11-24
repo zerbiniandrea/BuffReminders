@@ -138,43 +138,6 @@ local function AddSpecialCheckbox(layout, opts)
     return holder
 end
 
--- The choice icons work through click to cast of the buff's category.
-local SUB_CHOICE_REASONS = {
-    raid = L["DisabledReason.RaidClickToCast"],
-    utility = L["DisabledReason.UtilityClickToCast"],
-}
-
----@param layout table
----@param buff table A buff definition with subChoices
----@param category string
-local function AddSubChoicesDropdown(layout, buff, category)
-    local row = buff.subChoices
-    local path = "defaults." .. row.setting
-    local drop = Components.Dropdown(body, {
-        label = row.label,
-        labelWidth = DRAWER_LABEL_W + 36,
-        width = DRAWER_FIELD_W - 36,
-        options = {
-            { label = L["BuffPanel.SubChoices.RightClick"], value = "rightclick" },
-            { label = L["BuffPanel.SubChoices.Always"], value = "always" },
-        },
-        get = function()
-            return BR.Config.Get(path, "rightclick")
-        end,
-        enabled = function()
-            local cs = BR.profile.categorySettings
-            return cs ~= nil and cs[category] ~= nil and cs[category].clickable == true
-        end,
-        disabledReason = SUB_CHOICE_REASONS[category],
-        tooltip = { title = row.label, desc = row.desc },
-        onChange = function(val)
-            BR.Config.Set(path, val)
-        end,
-    })
-    tinsert(bodyHolders, drop)
-    layout:Add(drop, 26, COMPONENT_GAP)
-end
-
 local GRID_ROWS = {
     { key = "world", label = L["BuffPanel.WarlockDemon.World"] },
     { key = "dungeon", label = L["BuffPanel.WarlockDemon.Dungeon"], desc = BR.CONTENT_GRID_DUNGEON_DESC },
@@ -1212,11 +1175,6 @@ local SPECIAL_SECTIONS = {
                     BR.Config.Set("defaults.campLightFire", checked)
                 end,
             })
-            for _, buff in ipairs(BR.BUFF_TABLES.utility) do
-                if buff.key == "camp" and buff.subChoices then
-                    AddSubChoicesDropdown(layout, buff, "utility")
-                end
-            end
         end,
     },
 
@@ -1522,11 +1480,6 @@ local SPECIAL_SECTIONS = {
                     BR.Config.Set("defaults.driveByAllowPvP", checked)
                 end,
             })
-            for _, buff in ipairs(BR.BUFF_TABLES.utility) do
-                if buff.key == "driveByBuffs" and buff.subChoices then
-                    AddSubChoicesDropdown(layout, buff, "utility")
-                end
-            end
             local greeting = Components.Dropdown(body, {
                 label = L["BuffPanel.DriveBy.Greeting"],
                 labelWidth = DRAWER_LABEL_W,
@@ -1649,11 +1602,6 @@ local SPECIAL_SECTIONS = {
             })
             tinsert(bodyHolders, scope)
             layout:Add(scope, 26, COMPONENT_GAP)
-            for _, buff in ipairs(BR.BUFF_TABLES.utility) do
-                if buff.key == "tracking" and buff.subChoices then
-                    AddSubChoicesDropdown(layout, buff, "utility")
-                end
-            end
         end,
     },
 
@@ -1683,14 +1631,6 @@ local function MakeGroupCastSection(buff, desc)
     end
     return {
         build = function(layout)
-            -- A buff with a choice row keeps the right click for that row.
-            if not buff.subChoices then
-                local note = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-                note:SetWidth(bodyW)
-                note:SetJustifyH("LEFT")
-                note:SetText(L["BuffPanel.GroupCast.RightClick"])
-                layout:AddText(note, math.max(12, math.ceil(note:GetStringHeight())), COMPONENT_GAP)
-            end
             AddSpecialCheckbox(layout, {
                 label = L["BuffPanel.GroupCast"],
                 get = IsGroupCastOn,
@@ -1756,9 +1696,6 @@ for _, buff in ipairs(BR.BUFF_TABLES.raid) do
                     end,
                 })
                 groupCast.build(layout)
-                if buff.subChoices then
-                    AddSubChoicesDropdown(layout, buff, "raid")
-                end
             end,
             warn = function()
                 return BR.StateHelpers.IsBuffEnabled(buff.key) and ClassChoiceGridNeedsSetup(grid)
@@ -1775,16 +1712,6 @@ for _, buff in ipairs(BR.BUFF_TABLES.presence) do
         SPECIAL_SECTIONS[buff.key] = {
             build = function(layout)
                 AddStanceGrid(layout, buff.choiceGrid)
-            end,
-        }
-    end
-end
-
-for _, buff in ipairs(BR.BUFF_TABLES.utility) do
-    if buff.subChoices and not SPECIAL_SECTIONS[buff.key] then
-        SPECIAL_SECTIONS[buff.key] = {
-            build = function(layout)
-                AddSubChoicesDropdown(layout, buff, "utility")
             end,
         }
     end

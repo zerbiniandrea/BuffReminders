@@ -392,13 +392,13 @@ english["Display.OpenOptions"] = "Open Options"
 english["Display.SlashCommands"] = "Slash commands: /br, /br lock, /br unlock, /br test, /br minimap, /br snooze"
 english["Display.MinimapLeftClick"] = "|cFFCFCFCFLeft click|r: Options"
 english["Display.MinimapRightClick"] = "|cFFCFCFCFRight click|r: Test mode"
-english["Display.DismissConsumablesChat"] = "Consumable reminders hidden until next loading screen."
-english["Display.DismissConsumablesRestChat"] = "Consumable reminders hidden until you leave this rest area."
-english["Display.UnsnoozeConsumablesChat"] = "Consumable reminders shown again."
+english["Display.SnoozeChat.Loading"] = "%s: snoozed until the next loading screen. Type /br snooze to show all reminders again."
+english["Display.SnoozeChat.Rest"] = "%s: snoozed until you leave this rest area. Type /br snooze to show all reminders again."
+english["Display.UnsnoozeChat"] = "Snoozed reminders show again."
 english["Display.LoginFirstInstall"] =
     "Thanks for installing! Type |cFFFFD100/br unlock|r to move the buff display, or use the button at the bottom of the |cFFFFD100/br|r options panel."
 english["Display.LoginSnooze"] =
-    "The consumable dismiss button is now a right-click: right-click a consumable to snooze its reminders, or type |cFFFFD100/br snooze|r."
+    "Right-click a reminder icon to snooze it or to open its settings. Type |cFFFFD100/br snooze|r to snooze all reminders, or to end all snoozes."
 english["Display.LoginCasterName"] =
     "External Buffs can now show who cast each buff. Turn it on in |cFFFFD100/br|r > Categories > External Buffs."
 english["Display.LoginClientBeta"] =
@@ -630,10 +630,6 @@ english["Tooltip.PinNotInGroup"] = "(not in group)"
 english["Tooltip.TargetLine"] = "Casts on: %s"
 english["Tooltip.Next"] = "Next:"
 english["Tooltip.ChoiceSpell"] = "· %s"
-english["Tooltip.ChoiceRightClick"] = "Right-click: other blessings"
-english["Tooltip.ChoiceRightClick.DriveBy"] = "Right-click: other buffs"
-english["Tooltip.ChoiceRightClick.Tracking"] = "Right-click: other tracking"
-english["Tooltip.ChoiceRightClick.Camp"] = "Right-click: camp features"
 
 -- ============================================================================
 -- OPTIONS: FREE CONSUMABLES
@@ -703,13 +699,18 @@ english["Options.Direction.Desc"] =
 english["Options.ClickToCast"] = "Click to cast"
 english["Options.ClickToCast.DescFull"] =
     "Make buff icons clickable to cast the corresponding spell (out of combat only). Only works for spells your character can cast."
-english["Options.RightClickSnooze"] = "Right-click to snooze"
-english["Options.RightClickSnooze.Desc"] =
-    "Right-click a consumable icon to snooze its reminders. If this option is off, right-click uses the consumable, like left-click."
-english["Options.ClickToCast.SnoozeNote"] =
-    "A snooze hides the consumable reminders until the next loading screen. A snooze in a city or an inn also ends when you leave it. Type |cFFFFD100/br snooze|r to start or end a snooze."
 english["Options.HoverHighlight"] = "Hover highlight"
 english["Options.HoverHighlight.Desc"] = "Show a subtle highlight when hovering over clickable buff icons."
+english["Options.RightClickMenu"] = "Right-click: snooze and settings menu"
+english["Options.RightClickMenu.Desc"] =
+    "Right-click a reminder icon that takes clicks to open a menu. The menu snoozes the reminder, its category, or all reminders, and opens the settings of the reminder. The menu works out of combat only. If this option is off, right-click does the same as left-click."
+english["Options.SubIconReveal"] = "Show alternatives"
+english["Options.SubIconReveal.Desc"] =
+    "Some reminders show small icons for the alternatives: other blessings, other buffs, other tracking, camp features, and the group or single version of a raid buff. Click an icon to use that alternative. The icons need \"Click to cast\" on in the category of the reminder (Categories tab)."
+english["Options.SubIconReveal.Hover"] = "On hover"
+english["Options.SubIconReveal.Always"] = "Always"
+english["Options.Snooze.Note"] =
+    "A snooze lasts until the next loading screen, or until you leave the city or inn where it started. Type |cFFFFD100/br snooze|r to snooze all reminders, and again to show them."
 english["Options.RequestBuffInChat"] = "Request missing buffs in chat"
 english["Options.RequestBuffInChat.Tooltip"] = "Click a missing buff your class can't cast to ask your group for it."
 english["ChatRequests.PageNote"] = "Click a missing buff your class can't cast to ask for it in chat."
@@ -758,8 +759,11 @@ english["Options.TooltipModifier.None"] = "None"
 english["Options.TooltipModifier.Shift"] = "Shift"
 english["Options.TooltipModifier.Ctrl"] = "Ctrl"
 english["Options.TooltipModifier.Alt"] = "Alt"
-english["Tooltip.RightClickSnooze"] = "Right-click: snooze consumable reminders"
-english["Tooltip.RightClickGroup"] = "Right-click: group version"
+english["Tooltip.RightClickMenu"] = "Right-click: snooze or settings"
+english["Menu.Snooze"] = "Snooze %s"
+english["Menu.SnoozeAll"] = "Snooze all reminders"
+english["Menu.AllReminders"] = "All reminders"
+english["Menu.Settings"] = "Settings..."
 english["Options.PetPassiveCombat"] = "Pet passive only in combat"
 english["Options.PetPassiveCombat.Desc"] =
     "Only show the passive pet reminder while in combat. When disabled, the reminder is always shown."
@@ -964,22 +968,11 @@ english["DisabledReason.BlessingDefaults"] = "All classes use their defaults."
 english["BuffPanel.BlessSelfOnly"] = "Only bless myself"
 english["BuffPanel.BlessSelfOnly.Desc"] =
     "Check and bless only yourself."
-english["BuffPanel.SubChoices"] = "Blessing icons"
-english["BuffPanel.SubChoices.RightClick"] = "On right-click"
-english["BuffPanel.SubChoices.Always"] = "Always"
-english["BuffPanel.SubChoices.Desc"] = "Icons for your other blessings, on the same person."
-english["BuffPanel.SubChoices.DriveBy"] = "Buff icons"
-english["BuffPanel.SubChoices.DriveBy.Desc"] = "Icons for your other buffs, on your target."
-english["BuffPanel.SubChoices.Tracking"] = "Tracking icons"
-english["BuffPanel.SubChoices.Tracking.Desc"] = "An icon for your other tracking."
 english["BuffPanel.Tracking.Scope"] = "Track"
 english["BuffPanel.Tracking.Scope.Desc"] =
     "The tracking that the reminder offers. Only one tracking can be active. If any tracking is active, the reminder hides."
 english["BuffPanel.Tracking.Scope.Gathering"] = "Gathering only"
 english["BuffPanel.Tracking.Scope.All"] = "All tracking"
-english["BuffPanel.SubChoices.Camp"] = "Camp feature icons"
-english["BuffPanel.SubChoices.Camp.Desc"] =
-    "Icons for the camp features in your bags. They show while a campfire is near you and the feature cooldown is ready. A feature whose buff you already get from a class buff is last."
 english["BuffPanel.GroupCast"] = "Auto group version (uses a reagent)"
 english["BuffPanel.GroupCast.Desc"] =
     "If enough members of your party lack the buff and are in range, and you have the reagent, a left click casts the group version on you. Otherwise it casts the single-target version."
@@ -990,7 +983,6 @@ english["BuffPanel.GroupCastMin.Suffix"] = " missing"
 english["BuffPanel.GroupCastMin.Desc"] =
     "How many members must lack the buff before a click casts the group version: in your party, or in one class for a Greater Blessing. One value for all buffs."
 english["DisabledReason.GroupCast"] = 'Turn on "Auto group version" first.'
-english["BuffPanel.GroupCast.RightClick"] = "Right-click the icon: the group version, if you have the reagent."
 english["BuffPanel.PaladinAura.Hint"] = "Pick one aura per content. The icon shows WRONG AURA if another one is active. An empty row, or an aura you have not learned, accepts any aura."
 english["BuffPanel.ThornsRequest"] = "Tanks can ask for Thorns"
 english["BuffPanel.ThornsRequest.Desc"] =
@@ -1415,7 +1407,6 @@ english["DisabledReason.ShowWithoutItems"] = 'Turn on "Show when not in bags" fi
 english["DisabledReason.PetLabelsOff"] = 'Pick a position for "Pet labels" first.'
 english["DisabledReason.OverrideRow"] = 'Tick "Override" on this row first.'
 english["DisabledReason.RaidClickToCast"] = 'Needs "Click to cast" on (Categories > Raid tab).'
-english["DisabledReason.UtilityClickToCast"] = 'Needs "Click to cast" on (Categories > Utility tab).'
 
 -- Direction labels
 english["Direction.Left"] = "Left"

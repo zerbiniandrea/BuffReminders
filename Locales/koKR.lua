@@ -312,11 +312,8 @@ L["Display.OpenOptions"] = "옵션 열기"
 L["Display.SlashCommands"] = "슬래시 명령어: /br, /br lock, /br unlock, /br test, /br minimap, /br snooze"
 L["Display.MinimapLeftClick"] = "|cFFCFCFCF왼쪽 클릭|r: 옵션"
 L["Display.MinimapRightClick"] = "|cFFCFCFCF오른쪽 클릭|r: 테스트 모드"
-L["Display.DismissConsumablesChat"] = "소모품 알림이 다음 로딩 화면까지 숨겨집니다."
 L["Display.LoginFirstInstall"] =
     "설치해 주셔서 감사합니다! |cFFFFD100/br unlock|r을 입력하여 버프 표시를 이동하거나, |cFFFFD100/br|r 옵션 패널 하단의 버튼을 사용하세요."
-L["Display.LoginSnooze"] =
-    "우클릭으로 소모품 알림 해제: 소모품에 우클릭이나 |cFFFFD100/br snooze|r를 입력하면 리마인더를 이번 세션에서만 해제할 수 있습니다."
 L["Display.LoginCasterName"] =
     "외부 버프는 이제 버프마다 시전자를 표시할 수 있습니다. |cFFFFD100/br|r > 카테고리 > 외부 버프에서 켜세요."
 
@@ -577,9 +574,6 @@ L["Options.Direction.Desc"] =
 L["Options.ClickToCast"] = "클릭으로 시전"
 L["Options.ClickToCast.DescFull"] =
     "버프 아이콘을 클릭해 해당 주문을 시전할 수 있습니다.(비전투 시에만) 내 캐릭터가 시전 가능한 주문에만 작동합니다."
-L["Options.RightClickSnooze"] = "우클릭으로 알림 일시 중지"
-L["Options.RightClickSnooze.Desc"] =
-    "소모품 아이콘을 우클릭하면 알림을 일시 중지합니다. 이 옵션을 끄면 우클릭으로도 소모품을 사용합니다."
 L["Options.HoverHighlight"] = "마우스오버 강조"
 L["Options.HoverHighlight.Desc"] = "클릭 가능한 버프 아이콘에 마우스를 올리면 희미한 강조 효과가 표시됩니다."
 L["Options.RequestBuffInChat"] = "없는 버프를 채팅으로 요청"

@@ -472,6 +472,47 @@ local function Build(content)
     AddGlowRow(L["Options.ExpiringGlow"], L["Options.ExpiringGlow.Desc"], "showExpirationGlow", "expiring")
     AddGlowRow(L["Options.MissingGlow"], L["Options.MissingGlow.Desc"], "showMissingGlow", "missing")
 
+    -- ========================================================================
+    -- INTERACTION
+    -- ========================================================================
+    -- Global only: no category overrides these keys.
+    LayoutSectionHeader(layout, content, L["Options.Interaction"])
+
+    local menuHolder = Components.Checkbox(content, {
+        label = L["Options.RightClickMenu"],
+        tooltip = { title = L["Options.RightClickMenu"], desc = L["Options.RightClickMenu.Desc"] },
+        get = MakeDefaultsGetter("rightClickMenu", true),
+        onChange = MakeDefaultsSetter("rightClickMenu"),
+    })
+    layout:Add(menuHolder, nil, COMPONENT_GAP)
+
+    -- Only some buffs have a choice row, so a client with none hides the dropdown. A
+    -- raid buff with a group version gets a row for the other version.
+    local hasChoiceRows = false
+    for _, buffs in pairs(BR.BUFF_TABLES) do
+        for _, buff in ipairs(buffs) do
+            hasChoiceRows = hasChoiceRows or buff.subChoices ~= nil or (buff.groupCast ~= nil and buff.castOnMissing)
+        end
+    end
+    if hasChoiceRows then
+        local interactionLW = Components.MeasureSharedLabelWidth({ L["Options.SubIconReveal"] })
+        local revealHolder = Components.Dropdown(content, {
+            label = L["Options.SubIconReveal"],
+            labelWidth = interactionLW,
+            tooltip = { title = L["Options.SubIconReveal"], desc = L["Options.SubIconReveal.Desc"] },
+            options = {
+                { label = L["Options.SubIconReveal.Hover"], value = "hover" },
+                { label = L["Options.SubIconReveal.Always"], value = "always" },
+            },
+            width = TEXT_DD_W,
+            get = MakeDefaultsGetter("subIconReveal", "hover"),
+            onChange = MakeDefaultsSetter("subIconReveal"),
+        })
+        layout:Add(revealHolder, nil, COMPONENT_GAP)
+    end
+
+    Helpers.LayoutSubsectionNote(layout, content, L["Options.Snooze.Note"])
+
     content:SetHeight(math.abs(layout:GetY()) + 20)
 end
 

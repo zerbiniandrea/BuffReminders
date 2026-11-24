@@ -313,11 +313,8 @@ L["Display.OpenOptions"] = "打開選項"
 L["Display.SlashCommands"] = "使用指令:  /br, /br lock, /br unlock, /br test, /br minimap, /br snooze"
 L["Display.MinimapLeftClick"] = "|cFFCFCFCF左鍵點擊|r: 選項"
 L["Display.MinimapRightClick"] = "|cFFCFCFCF右鍵點擊|r: 測試模式"
-L["Display.DismissConsumablesChat"] = "在下一次登入前消耗品提示將隱藏。"
 L["Display.LoginFirstInstall"] =
     "感謝安裝！輸入 |cFFFFD100/br unlock|r 來移動增益顯示，或者使用 |cFFFFD100/br|r 選項面板底部的按鈕。"
-L["Display.LoginSnooze"] =
-    "消耗品關閉按鈕現在是右鍵點擊: 右鍵點選消耗品可暫停其提醒，或輸入 |cFFFFD100/br snooze|r。"
 L["Display.LoginCasterName"] =
     "外部增益效果現在可以顯示每個增益效果的施放者。在 |cFFFFD100/br|r > 類別 > 外部增益啟用此功能。"
 
@@ -579,9 +576,6 @@ L["Options.Direction.Desc"] =
 L["Options.ClickToCast"] = "點擊施法"
 L["Options.ClickToCast.DescFull"] =
     "你可以點擊增益圖示來施放對應的法術（僅限非戰鬥狀態）。只對你的角色可施放的法術有效。"
-L["Options.RightClickSnooze"] = "右鍵單擊以暫停"
-L["Options.RightClickSnooze.Desc"] =
-    "右鍵點選消耗品圖示可暫停其提醒。如果關閉此選項，右鍵單擊會使用消耗品，就像左鍵單擊一樣。"
 L["Options.HoverHighlight"] = "懸停高亮"
 L["Options.HoverHighlight.Desc"] = "將鼠標懸停在可點擊的增益圖示上時，顯示微弱的高亮效果。"
 L["Options.RequestBuffInChat"] = "在聊天中請求缺失的增益"

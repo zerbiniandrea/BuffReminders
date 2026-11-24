@@ -911,6 +911,10 @@ local function CreateOptionsPanel()
 
     panel.ActivatePage = ActivatePage
     BR.Options.ActivatePage = ActivatePage
+    ---@param text string
+    BR.Options.SetSearch = function(text)
+        searchEdit:SetText(text)
+    end
 
     return panel
 end
@@ -944,6 +948,35 @@ local function ToggleOptions()
     end
 end
 
+---Open the settings of one reminder: its drawer on the All Buffs page, or the
+---editor of a custom or a loadout reminder.
+---@param def table The buff definition, the custom buff, or the loadout rule
+---@param category CategoryName
+local function OpenReminderSettings(def, category)
+    ShowOptions()
+    local refresh = BR.Components.RefreshAll
+    if category == "custom" then
+        BR.Options.ActivatePage("custom")
+        BR.Options.Dialogs.CustomBuff.Show(def.key, refresh)
+        return
+    end
+    if category == "loadout" then
+        local dialog = BR.Options.Dialogs.LoadoutReminder
+        if dialog then
+            BR.Options.ActivatePage("loadout")
+            dialog.Show(def.key, refresh)
+        end
+        return
+    end
+    local group = def.groupId and BR.BuffGroups[def.groupId]
+    BR.Options.SetSearch(group and group.displayName or def.name)
+    -- The drawer anchors to the row, which the filter places on the next layout pass.
+    C_Timer.After(0, function()
+        BR.Options.BuffRow.OpenSettings(def.groupId or def.key)
+    end)
+end
+
 BR.Options.Toggle = ToggleOptions
+BR.Options.OpenReminderSettings = OpenReminderSettings
 BR.Options.Show = ShowOptions
 BR.Options.Hide = HideOptions

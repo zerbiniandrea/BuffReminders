@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 62
+BR.Migrations.DB_VERSION = 63
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -286,6 +286,25 @@ function BR.Migrations.RunProfile(profile)
                 profileDefaults.paladinBlessings = nil
                 profileDefaults.paladinBlessingPriority = nil
             end
+        end,
+        -- [63] The four choice-row keys become defaults.subIconReveal: one "always"
+        -- keeps every row on screen. defaults.rightClickSnooze = false becomes
+        -- defaults.rightClickMenu = false.
+        [63] = function()
+            local profileDefaults = profile.defaults
+            if type(profileDefaults) ~= "table" then
+                return
+            end
+            for _, key in ipairs({ "blessingSubIcons", "driveBySubIcons", "trackingSubIcons", "campSubIcons" }) do
+                if profileDefaults[key] == "always" then
+                    profileDefaults.subIconReveal = "always"
+                end
+                profileDefaults[key] = nil
+            end
+            if profileDefaults.rightClickSnooze == false then
+                profileDefaults.rightClickMenu = false
+            end
+            profileDefaults.rightClickSnooze = nil
         end,
     }
 
