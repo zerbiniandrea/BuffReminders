@@ -123,7 +123,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field groupOnly? boolean Only show when in a group (hide when solo)
 ---@field suppressedByEntry? string Hide when this entry key is already visible (e.g., self buff covers it)
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
----@field customCheck? fun(isRestricted?: boolean): boolean?
+---@field castReady? fun(isRestricted: boolean): boolean? For a caster of the class. false hides the missing reminder
 ---@field casterCheck? fun(isRestricted: boolean): string?, boolean? For a player of the class, replaces the group scan. Returns the overlay text (nil = no reminder) and true when a click must cast nothing
 ---@field choiceGrid? StanceGrid The user picks the buff per content row. A row with no choice accepts any
 ---@field clickMacro? fun(spellID: number?): string
@@ -173,7 +173,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field excludeSpellID? number
 ---@field icons? IconSpec
 ---@field infoTooltip? TooltipText
----@field customCheck? fun(isRestricted?: boolean): boolean?
+---@field customCheck? fun(isRestricted: boolean): boolean? Replaces the aura check. true = reminder needed, false = satisfied, nil = does not apply
 ---@field getPetActions? fun(): PetAction[]?  -- Override pet actions (e.g., wrong pet -> Felguard only)
 ---@field petSacrifice? PetSacrifice The player can sacrifice the pet for a buff
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
@@ -670,7 +670,7 @@ BR.REPAIR_SOURCES = {
 ---@field noClickToCast? boolean        -- Suppress the click-to-cast overlay
 ---@field showOnInstanceEntry? boolean  -- Only show briefly on dungeon entry (grouped, non-M+)
 ---@field visibilityCondition? fun(): boolean?
----@field customCheck? fun(isRestricted?: boolean): boolean?
+---@field customCheck? fun(isRestricted: boolean): boolean? true shows the reminder
 ---@field addedIn? string Version cohort for the what's-new dot
 
 ---@class BuffTables
@@ -798,7 +798,7 @@ BR.BUFF_TABLES = {
             readyCheckOnly = true,
             castOnOthers = true,
             noExpirationGlow = true,
-            customCheck = function()
+            castReady = function()
                 if playerClass ~= "WARLOCK" then
                     return nil
                 end

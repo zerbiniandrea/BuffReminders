@@ -1981,8 +1981,9 @@ end
 ---Check if player should cast their self buff or weapon imbue (returns true if missing)
 ---@param buff SelfBuff|CustomBuff
 ---@param skipSpellKnownCheck? boolean Skip the "player knows spell" check (for custom buffs)
+---@param isRestricted? boolean Passed to customCheck
 ---@return boolean? Returns nil if player can't/shouldn't use this buff
-local function ShouldShowSelfBuff(buff, skipSpellKnownCheck)
+local function ShouldShowSelfBuff(buff, skipSpellKnownCheck, isRestricted)
     local spellID = buff.spellID --[[@as SpellID]]
     local requiredClass, requireSpecId = buff.class, buff.requireSpecId
     local enchantID, requiresSpell, excludeSpell = buff.enchantID, buff.requiresSpellID, buff.excludeSpellID
@@ -2004,7 +2005,7 @@ local function ShouldShowSelfBuff(buff, skipSpellKnownCheck)
     end
 
     if customCheck then
-        return customCheck()
+        return customCheck(isRestricted == true)
     end
 
     -- For buffs with multiple spellIDs (like shields), check if the player knows ANY of them
@@ -3039,7 +3040,7 @@ local function RefreshSelf(isAuraRestricted, hideExpiring)
                         BR.Icons.ApplyDynamicIcon(entry, buff)
                     end
                 else
-                    local shouldShow = ShouldShowSelfBuff(buff)
+                    local shouldShow = ShouldShowSelfBuff(buff, false, isAuraRestricted)
                     -- showWhenPresent inverts the logic (e.g., Burning Rush: show when active)
                     local wantPresent = buff.showWhenPresent
                     local show = (wantPresent and shouldShow == false) or (not wantPresent and shouldShow)
@@ -3210,15 +3211,8 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring,
                                 presFloor
                             )
                         end
-                        -- customCheck gates display (e.g., soulstone CD tracking for warlocks)
-                        local customOk = true
-                        if not hasBuff and buff.customCheck then
-                            local result = buff.customCheck(isAuraRestricted)
-                            if result == false then
-                                customOk = false
-                            end
-                        end
-                        if not hasBuff and customOk then
+                        local canCast = hasBuff or not buff.castReady or buff.castReady(isAuraRestricted) ~= false
+                        if not hasBuff and canCast then
                             SetEntryText(entry, buff.overlayText, presMissGlow)
                         elseif
                             not buff.noExpirationGlow
@@ -3322,9 +3316,10 @@ local function RefreshPet(isAuraRestricted)
             IsBuffEnabled(settingKey)
             and petVisible
             and not (buff.key == "petPassive" and petPassiveHidden)
+            and (not buff.visibilityCondition or buff.visibilityCondition())
             and not (buff.petSacrifice and IsPetSacrificed(buff.petSacrifice, isAuraRestricted))
         then
-            local shouldShow = ShouldShowSelfBuff(buff)
+            local shouldShow = ShouldShowSelfBuff(buff, false, isAuraRestricted)
             if shouldShow then
                 SetEntryText(entry, buff.overlayText, petMissGlow)
                 BR.Icons.ApplyDynamicIcon(entry, buff)
