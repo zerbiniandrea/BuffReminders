@@ -643,21 +643,14 @@ L["Options.ConsumableTextScale"] = "基礎大小"
 L["Options.ConsumableTextScale.Title"] = "基礎文字大小"
 L["Options.ConsumableTextScale.Desc"] =
     "堆疊計數、屬性標籤和標誌的字體大小，以圖示大小的百分比表示。三者中的每一個都可以覆蓋下面的。"
-L["Options.ConsumableBadgeOnSubIcons"] = "在子圖示上顯示品質標記"
-L["Options.ConsumableBadgeOnSubIcons.Title"] = "品質標記在子圖示上"
-L["Options.ConsumableBadgeOnSubIcons.Desc"] =
-    '在每個子圖示顯示食物品質字母 (例如 "澎"為澎湃，"普"為普通的)，而非只在主圖示。'
 L["Options.ItemDisplay"] = "物品顯示"
 L["Options.ItemDisplay.IconOnly"] = "僅圖示"
 L["Options.ItemDisplay.IconOnlyDesc"] = "顯示數量最多的物品"
-L["Options.ItemDisplay.SubIcons"] = "子圖示"
-L["Options.ItemDisplay.SubIconsDesc"] = "在每個圖示下方顯示較小的物品變體圖示"
 L["Options.ItemDisplay.Expanded"] = "展開"
 L["Options.ItemDisplay.ExpandedDesc"] = "將每個物品變體顯示為全尺寸圖示"
 L["Options.ItemDisplay.Mode"] = "消耗品物品顯示"
 L["Options.ItemDisplay.Mode.Desc"] =
     "設置具有多個變體的消耗品物品（例如各種精鍊類型）的顯示方式。"
-L["Options.SubIconSide"] = "方向"
 L["Options.SubIconSide.Bottom"] = "底部"
 L["Options.SubIconSide.Top"] = "頂部"
 L["Options.SubIconSide.Left"] = "左側"

@@ -487,30 +487,36 @@ local function Build(content)
     })
     layout:Add(menuHolder, nil, COMPONENT_GAP)
 
-    -- Only some buffs have a choice row, so a client with none hides the dropdown. A
-    -- raid buff with a group version gets a row for the other version.
-    local hasChoiceRows = false
-    for _, buffs in pairs(BR.BUFF_TABLES) do
-        for _, buff in ipairs(buffs) do
-            hasChoiceRows = hasChoiceRows or buff.subChoices ~= nil or (buff.groupCast ~= nil and buff.castOnMissing)
-        end
-    end
-    if hasChoiceRows then
-        local interactionLW = Components.MeasureSharedLabelWidth({ L["Options.SubIconReveal"] })
-        local revealHolder = Components.Dropdown(content, {
-            label = L["Options.SubIconReveal"],
-            labelWidth = interactionLW,
-            tooltip = { title = L["Options.SubIconReveal"], desc = L["Options.SubIconReveal.Desc"] },
-            options = {
-                { label = L["Options.SubIconReveal.Hover"], value = "hover" },
-                { label = L["Options.SubIconReveal.Always"], value = "always" },
-            },
-            width = TEXT_DD_W,
-            get = MakeDefaultsGetter("subIconReveal", "hover"),
-            onChange = MakeDefaultsSetter("subIconReveal"),
-        })
-        layout:Add(revealHolder, nil, COMPONENT_GAP)
-    end
+    local interactionLW = Components.MeasureSharedLabelWidth({ L["Options.SubIconReveal"], L["Options.SubIconSide"] })
+    local revealHolder = Components.Dropdown(content, {
+        label = L["Options.SubIconReveal"],
+        labelWidth = interactionLW,
+        tooltip = { title = L["Options.SubIconReveal"], desc = L["Options.SubIconReveal.Desc"] },
+        options = {
+            { label = L["Options.SubIconReveal.Hover"], value = "hover" },
+            { label = L["Options.SubIconReveal.Always"], value = "always" },
+        },
+        width = TEXT_DD_W,
+        get = MakeDefaultsGetter("subIconReveal", "hover"),
+        onChange = MakeDefaultsSetter("subIconReveal"),
+    })
+    layout:Add(revealHolder, nil, COMPONENT_GAP)
+
+    local sideHolder = Components.Dropdown(content, {
+        label = L["Options.SubIconSide"],
+        labelWidth = interactionLW,
+        tooltip = { title = L["Options.SubIconSide"], desc = L["Options.SubIconSide.Desc"] },
+        options = {
+            { label = L["Options.SubIconSide.Bottom"], value = "BOTTOM" },
+            { label = L["Options.SubIconSide.Top"], value = "TOP" },
+            { label = L["Options.SubIconSide.Left"], value = "LEFT" },
+            { label = L["Options.SubIconSide.Right"], value = "RIGHT" },
+        },
+        width = TEXT_DD_W,
+        get = MakeDefaultsGetter("subIconSide", "BOTTOM"),
+        onChange = MakeDefaultsSetter("subIconSide"),
+    })
+    layout:Add(sideHolder, nil, COMPONENT_GAP)
 
     Helpers.LayoutSubsectionNote(layout, content, L["Options.Snooze.Note"])
 

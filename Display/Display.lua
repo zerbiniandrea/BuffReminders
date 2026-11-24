@@ -92,6 +92,7 @@ local BR = ns
 ---@field tooltipModifier? "SHIFT"|"CTRL"|"ALT" Key that hover tooltips wait for. nil: no key
 ---@field rightClickMenu? boolean false: the right click does the left-click action
 ---@field subIconReveal? "hover"|"always"
+---@field subIconSide? "TOP"|"BOTTOM"|"LEFT"|"RIGHT"
 ---@field consumableTextScale? number
 ---@field hideConsumableLabels? boolean
 ---@field hideLegacyConsumables? boolean
@@ -171,7 +172,6 @@ local BR = ns
 ---@field split? boolean
 ---@field clickable? boolean
 ---@field clickableHighlight? boolean
----@field subIconSide? string
 ---@field showOnlyOnReadyCheck? boolean
 ---@field showBuffTooltips? boolean Spell tooltip on hover (raid, presence, targeted, self)
 ---@field priority? number
@@ -226,6 +226,7 @@ local BR = ns
 ---@field mainFrame? BuffFrame
 ---@field _br_pet_spell? string             -- Localized spell name for pet click-to-cast
 ---@field _br_item? table                   -- Consumable item an expanded extra frame shows
+---@field _br_subIcon? boolean             -- A test-mode sub-icon, not a layout frame
 ---@field _br_pet_spec_icon? number        -- Pet spec ability icon texture for hover swap
 ---@field _br_pet_label_key? string        -- Cache key for pet label updates
 ---@field _br_count_scale? number          -- Font scale the count text was last written with
@@ -587,7 +588,6 @@ local function BuildCategorySettings(category)
         or defaultCatSettings.position
         or { point = "CENTER", x = 0, y = 0 }
     result.split = catSettings and catSettings.split or false
-    result.subIconSide = (catSettings and catSettings.subIconSide) or defaultCatSettings.subIconSide
 
     local useCustomAppearance = catSettings and catSettings.useCustomAppearance
     if useCustomAppearance then
@@ -1699,7 +1699,7 @@ local function PositionDetachedIcon(key, frame)
     local totalFrames = 1
     if frame.extraFrames then
         for _, extra in ipairs(frame.extraFrames) do
-            if extra:IsShown() then
+            if extra:IsShown() and not extra._br_subIcon then
                 totalFrames = totalFrames + 1
             end
         end
@@ -1720,7 +1720,7 @@ local function PositionDetachedIcon(key, frame)
         frame:SetPoint("LEFT", container, "LEFT", 0, 0)
         local offset = iconWidth + spacing
         for _, extra in ipairs(frame.extraFrames) do
-            if extra:IsShown() then
+            if extra:IsShown() and not extra._br_subIcon then
                 extra:SetSize(iconWidth, iconSize)
                 extra:ClearAllPoints()
                 extra:SetPoint("LEFT", container, "LEFT", offset, 0)
@@ -2346,7 +2346,7 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
     -- only the other qualities of the stat it refreshes; food being eaten keeps one icon.
     local expiring = entry.displayType == "expiring"
     if (entry.displayType ~= "text" and not expiring) or entry.isEating then
-        BR.SecureButtons.UpdateConsumableButtons(frame, nil)
+        BR.SecureButtons.SetItemRow(frame, nil)
         return
     end
     if not BUFF_KEY_TO_CATEGORY[frame.key] or not frame:IsShown() then
@@ -2362,21 +2362,15 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
     if displayMode == "sub_icons" then
         if testMode and items and #items > 1 then
             -- Test mode: render visual-only sub-icon frames (no secure buttons)
-            local effectiveCat = GetEffectiveCategory(frame)
-            local catSettings = GetCategorySettings(effectiveCat)
-            local consumableSettings = GetCategorySettings("consumable")
+            local catSettings = GetCategorySettings(GetEffectiveCategory(frame))
             local iconSize = catSettings.iconSize or 64
-            local size = max(18, floor(iconSize * 0.45))
-            local btnSpacing = max(2, floor(size * 0.2))
-            local subIconSide = consumableSettings.subIconSide or "BOTTOM"
-            local subIconOffset = -6
-            local itemCount = #items - 1
-            local isSideways = subIconSide == "LEFT" or subIconSide == "RIGHT"
-
+            local size, spacing = BR.SubIcons.Metrics(iconSize)
+            local side = (BR.profile.defaults or {}).subIconSide or "BOTTOM"
+            local width, height = frame:GetWidth(), frame:GetHeight()
             local cFontSize = BR.SecureButtons.ComputeConsumableFontSize(iconSize, "stackCount")
             for i = 2, #items do
-                local idx = i - 2
                 local extra = GetOrCreateExtraFrame(frame, i - 1)
+                extra._br_subIcon = true
                 extra:SetParent(frame)
                 extra:SetSize(size, size)
                 extra.icon:SetTexture(items[i].icon)
@@ -2388,46 +2382,18 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
                 SetExpirationGlow(extra, false)
                 extra:SetFrameLevel(frame:GetFrameLevel() + 4)
 
+                local x, y = BR.SubIcons.Position(i - 2, #items - 1, side, 0, 0, width, height, size, spacing)
                 extra:ClearAllPoints()
-                if isSideways then
-                    local maxPerCol = max(1, floor((iconSize + btnSpacing) / (size + btnSpacing)))
-                    local row = idx % maxPerCol
-                    local col = floor(idx / maxPerCol)
-                    local thisColCount = min(maxPerCol, itemCount - col * maxPerCol)
-                    local thisColHeight = thisColCount * size + (thisColCount - 1) * btnSpacing
-                    local startY = (iconSize - thisColHeight) / 2
-                    local yOff = -(startY + row * (size + btnSpacing))
-                    if subIconSide == "LEFT" then
-                        extra:SetPoint("TOPRIGHT", frame, "TOPLEFT", subIconOffset - col * (size + btnSpacing), yOff)
-                    else
-                        extra:SetPoint("TOPLEFT", frame, "TOPRIGHT", -subIconOffset + col * (size + btnSpacing), yOff)
-                    end
-                else
-                    local maxPerRow = max(1, floor((iconSize + btnSpacing) / (size + btnSpacing)))
-                    local col = idx % maxPerRow
-                    local row = floor(idx / maxPerRow)
-                    local thisRowCount = min(maxPerRow, itemCount - row * maxPerRow)
-                    local thisRowWidth = thisRowCount * size + (thisRowCount - 1) * btnSpacing
-                    local startX = (iconSize - thisRowWidth) / 2
-                    local xOff = startX + col * (size + btnSpacing)
-                    if subIconSide == "TOP" then
-                        extra:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", xOff, -subIconOffset + row * (size + btnSpacing))
-                    else
-                        extra:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", xOff, subIconOffset - row * (size + btnSpacing))
-                    end
-                end
-
+                extra:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", x, y)
                 extra:Show()
             end
         elseif not testMode then
-            local cs = BR.profile.categorySettings and BR.profile.categorySettings.consumable
-            local clickable = cs and cs.clickable == true
-            -- Skip first item (already shown as main icon)
-            BR.SecureButtons.UpdateConsumableButtons(frame, items, clickable, 2)
+            -- The main icon shows the first item.
+            BR.SecureButtons.SetItemRow(frame, items, 2)
         end
     else
         -- Not sub_icons: hide any leftover sub-icon buttons
-        BR.SecureButtons.UpdateConsumableButtons(frame, nil)
+        BR.SecureButtons.SetItemRow(frame, nil)
         if displayMode == "expanded" and items and #items > 1 then
             local cachedGlow = entry.category
                     and GetCachedGlowSettings(
@@ -2439,6 +2405,7 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
             local stackFontSize = BR.SecureButtons.ComputeConsumableFontSize(expandedSize, "stackCount")
             for i = 2, #items do
                 local extra = GetOrCreateExtraFrame(frame, i - 1)
+                extra._br_subIcon = nil
                 extra._br_item = items[i] -- The click overlay uses the item this frame shows.
                 extra:SetParent(parentFrame)
                 extra:SetSize(expandedSize, frame:GetHeight())
@@ -2839,13 +2806,16 @@ UpdateDisplay = function(refreshMode)
                             if IsIconDetached(entry.key) then
                                 wipe(reusableDetachedSink)
                                 ApplyConsumableDisplayMode(frame, entry, reusableDetachedSink, frame:GetParent())
+                                if shown then
+                                    PositionDetachedIcon(entry.key, frame)
+                                end
                             else
                                 ApplyConsumableDisplayMode(frame, entry, frames, frame:GetParent())
                             end
                         elseif category == "pet" then
                             if IsIconDetached(entry.key) then
-                                -- Extras were not shown yet on the first positioning
-                                -- pass; re-run it so the container fits them.
+                                -- The first positioning pass sees the extras of the last render.
+                                -- A second pass fits the container to the current ones.
                                 ApplyPetDisplayMode(frame, entry, nil)
                                 if shown then
                                     PositionDetachedIcon(entry.key, frame)
@@ -2878,6 +2848,9 @@ UpdateDisplay = function(refreshMode)
                             if IsIconDetached(entry.key) then
                                 wipe(reusableDetachedSink)
                                 ApplyConsumableDisplayMode(frame, entry, reusableDetachedSink, frame:GetParent())
+                                if shown then
+                                    PositionDetachedIcon(entry.key, frame)
+                                end
                             else
                                 ApplyConsumableDisplayMode(frame, entry, reusableMainBuffs, frame:GetParent())
                             end

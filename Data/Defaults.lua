@@ -225,6 +225,7 @@ BR.defaults = {
         showConsumableTooltips = false,
         rightClickMenu = true,
         subIconReveal = "hover",
+        subIconSide = "BOTTOM",
         hideLegacyConsumables = true,
         preferReusableRunes = false,
         placeAtPlayer = true,
@@ -461,7 +462,6 @@ BR.defaults = {
             split = false,
             clickable = true,
             clickableHighlight = true,
-            subIconSide = "BOTTOM",
             priority = 6,
         },
         utility = {

@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 65
+BR.Migrations.DB_VERSION = 66
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -175,7 +175,8 @@ end
 ---MIN_DB_VERSION resets to empty. A profile above DB_VERSION comes from a newer build
 ---and stays untouched.
 ---@param profile table Raw profile table
-function BR.Migrations.RunProfile(profile)
+---@param isImport? boolean The profile comes from an import string
+function BR.Migrations.RunProfile(profile, isImport)
     local version = tonumber(profile.dbVersion) or 0
     if version > BR.Migrations.DB_VERSION then
         return
@@ -319,6 +320,40 @@ function BR.Migrations.RunProfile(profile)
         [65] = function()
             profile.levelingExpiring = nil
         end,
+        -- [66] Consumable sub-icons follow defaults.subIconReveal. A local retail profile
+        -- keeps them always on screen, as before. WoW Forever and an import start on the
+        -- default. The sub-icon side becomes the global defaults.subIconSide.
+        [66] = function()
+            local profileDefaults = type(profile.defaults) == "table" and profile.defaults or nil
+            local mode = profileDefaults and profileDefaults.consumableDisplayMode
+            local reveal = profileDefaults and profileDefaults.subIconReveal
+            if
+                BR.CLIENT == BR.ClientType.Retail
+                and not isImport
+                and reveal == nil
+                and (mode == nil or mode == "sub_icons")
+            then
+                profileDefaults = profileDefaults or {}
+                profile.defaults = profileDefaults
+                profileDefaults.subIconReveal = "always"
+            end
+            local categorySettings = profile.categorySettings
+            if type(categorySettings) ~= "table" then
+                return
+            end
+            local consumable = categorySettings.consumable
+            local side = type(consumable) == "table" and consumable.subIconSide or nil
+            if side ~= nil then
+                profileDefaults = profileDefaults or {}
+                profile.defaults = profileDefaults
+                profileDefaults.subIconSide = side
+            end
+            for _, catSettings in pairs(categorySettings) do
+                if type(catSettings) == "table" then
+                    catSettings.subIconSide = nil
+                end
+            end
+        end,
     }
 
     for step = version + 1, BR.Migrations.DB_VERSION do
@@ -347,7 +382,7 @@ function BR.Migrations.RunImport(data, exportVersion)
     else
         data.dbVersion = math.floor(exportVersion)
     end
-    BR.Migrations.RunProfile(data)
+    BR.Migrations.RunProfile(data, true)
 end
 
 local function CopyTable(source)

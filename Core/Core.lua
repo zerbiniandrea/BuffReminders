@@ -334,7 +334,6 @@ local CategorySettingKeys = {
     expirationThreshold = "DisplayRefresh",
     spacing = "LayoutRefresh",
     layoutDirection = "LayoutRefresh",
-    subIconSide = "LayoutRefresh",
     anchorFrame = "LayoutRefresh",
     anchorPoint = "LayoutRefresh",
     -- Layout
@@ -477,6 +476,7 @@ local DefaultSettingKeys = {
     tooltipModifier = false, -- Read at hover time
     rightClickMenu = "DisplayRefresh", -- Re-wires the type2 attribute of the click overlays
     subIconReveal = "DisplayRefresh",
+    subIconSide = "LayoutRefresh",
     hideLegacyConsumables = "DisplayRefresh",
     preferReusableRunes = "DisplayRefresh",
     placeAtPlayer = "DisplayRefresh",

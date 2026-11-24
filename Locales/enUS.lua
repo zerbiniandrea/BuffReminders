@@ -706,7 +706,7 @@ english["Options.RightClickMenu.Desc"] =
     "Right-click a reminder icon that takes clicks to open a menu. The menu snoozes the reminder, its category, or all reminders, and opens the settings of the reminder. The menu works out of combat only. If this option is off, right-click does the same as left-click."
 english["Options.SubIconReveal"] = "Show alternatives"
 english["Options.SubIconReveal.Desc"] =
-    "Some reminders show small icons for the alternatives: other blessings, other buffs, other tracking, camp features, and the group or single version of a raid buff. Click an icon to use that alternative. The icons need \"Click to cast\" on in the category of the reminder (Categories tab)."
+    "Some reminders show small icons for the alternatives. Examples: the other consumables in your bags, other blessings, other tracking, camp features, and the group or single version of a raid buff. With \"On hover\", the icons show while the cursor is on the reminder icon. Click an icon to use that alternative. A click needs \"Click to cast\" on in the category of the reminder (Categories tab). If \"Click to cast\" is off, the consumable icons show your items but do not take clicks, and the other alternatives do not show."
 english["Options.SubIconReveal.Hover"] = "On hover"
 english["Options.SubIconReveal.Always"] = "Always"
 english["Options.Snooze.Note"] =
@@ -794,21 +794,23 @@ english["Options.ConsumableTextScale"] = "Base size"
 english["Options.ConsumableTextScale.Title"] = "Base text size"
 english["Options.ConsumableTextScale.Desc"] =
     "Font size for stack counts, stat labels and badges, as a percentage of icon size. Each of the three can override it below."
-english["Options.ConsumableBadgeOnSubIcons"] = "Show quality badge on sub-icons"
-english["Options.ConsumableBadgeOnSubIcons.Title"] = "Quality badge on sub-icons"
+english["Options.ConsumableBadgeOnSubIcons"] = "Show quality badge on alternatives"
+english["Options.ConsumableBadgeOnSubIcons.Title"] = "Quality badge on alternatives"
 english["Options.ConsumableBadgeOnSubIcons.Desc"] =
-    'Show the food quality letter (e.g. "H" for Hearty, "F" for Fleeting) on each sub-icon, not just the main icon.'
+    'Show the food quality letter (e.g. "H" for Hearty, "F" for Fleeting) on each alternative icon, not only on the main icon.'
 english["Options.ItemDisplay"] = "Item display"
 english["Options.ItemDisplay.IconOnly"] = "Icon only"
 english["Options.ItemDisplay.IconOnlyDesc"] = "Shows the item with the highest count"
-english["Options.ItemDisplay.SubIcons"] = "Sub-icons"
-english["Options.ItemDisplay.SubIconsDesc"] = "Small clickable item variants below each icon"
+english["Options.ItemDisplay.SubIcons"] = "Alternative icons"
+english["Options.ItemDisplay.SubIconsDesc"] =
+    "The other items show as small icons next to the main icon. \"Show alternatives\" on the Defaults page sets when they show."
 english["Options.ItemDisplay.Expanded"] = "Expanded"
 english["Options.ItemDisplay.ExpandedDesc"] = "Each item variant as a full-sized icon"
 english["Options.ItemDisplay.Mode"] = "Consumable item display"
 english["Options.ItemDisplay.Mode.Desc"] =
     "How consumable items with multiple variants (e.g. different flask types) are displayed."
-english["Options.SubIconSide"] = "Side"
+english["Options.SubIconSide"] = "Alternatives side"
+english["Options.SubIconSide.Desc"] = "Select the side of the reminder icon where the alternative icons show."
 english["Options.SubIconSide.Bottom"] = "Bottom"
 english["Options.SubIconSide.Top"] = "Top"
 english["Options.SubIconSide.Left"] = "Left"

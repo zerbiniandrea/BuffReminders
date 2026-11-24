@@ -77,6 +77,7 @@ Display\Fonts.lua
 Display\Display.lua
 Core\ImportExport.lua
 Display\Movers.lua
+Display\SubIcons.lua
 Display\SecureButtons.lua
 Display\AuraTracker.lua
 Display\AuraSounds.lua

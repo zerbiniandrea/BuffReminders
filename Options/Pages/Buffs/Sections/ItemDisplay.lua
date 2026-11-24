@@ -16,21 +16,18 @@ local TEXCOORD_INSET = BR.TEXCOORD_INSET
 
 local Helpers = BR.Options.Helpers
 local LayoutSectionHeader = Helpers.LayoutSectionHeader
-local MakeCategoryGetter = Helpers.MakeCategoryGetter
-local MakeCategorySetter = Helpers.MakeCategorySetter
 
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local DEPENDENT_INDENT = BR.Options.Constants.DEPENDENT_INDENT
 
 local function Build(ctx, layout)
-    local category = ctx.category
     local parent = ctx.content
 
     LayoutSectionHeader(layout, parent, L["Options.ItemDisplay"])
     layout:Space(COMPONENT_GAP)
 
     local updateDisplayModePreview
-    local updateSubIconSideVisibility
+    local updateBadgeVisibility
     local displayModeHolder = Components.Dropdown(parent, {
         label = L["Options.ItemDisplay"],
         get = function()
@@ -62,8 +59,8 @@ local function Build(ctx, layout)
             if updateDisplayModePreview then
                 updateDisplayModePreview(val)
             end
-            if updateSubIconSideVisibility then
-                updateSubIconSideVisibility(val)
+            if updateBadgeVisibility then
+                updateBadgeVisibility(val)
             end
             -- The badge-on-sub-icons toggle is enabled only in sub_icons mode,
             -- so its gate must re-evaluate.
@@ -195,23 +192,8 @@ local function Build(ctx, layout)
     end
     table.insert(BR.RefreshableComponents, previewHolder)
 
-    local subIconSideHolder = Components.Dropdown(parent, {
-        label = L["Options.SubIconSide"],
-        labelWidth = 30,
-        width = 85,
-        get = MakeCategoryGetter(category, "subIconSide", "BOTTOM"),
-        options = {
-            { value = "BOTTOM", label = L["Options.SubIconSide.Bottom"] },
-            { value = "TOP", label = L["Options.SubIconSide.Top"] },
-            { value = "LEFT", label = L["Options.SubIconSide.Left"] },
-            { value = "RIGHT", label = L["Options.SubIconSide.Right"] },
-        },
-        onChange = MakeCategorySetter(category, "subIconSide"),
-    })
-    subIconSideHolder:SetPoint("TOPLEFT", previewHolder, "TOPRIGHT", 12, 0)
-
-    -- Only the Sub-icons mode draws sub-icons, so both of its options share the
-    -- mode row and hide in the other modes.
+    -- Only the Sub-icons mode draws sub-icons, so its option shares the mode row
+    -- and hides in the other modes.
     local badgeOnSubIconsHolder = Components.Checkbox(parent, {
         label = L["Options.ConsumableBadgeOnSubIcons"],
         get = function()
@@ -225,17 +207,17 @@ local function Build(ctx, layout)
             BR.Config.Set("defaults.consumableBadgeOnSubIcons", checked)
         end,
     })
-    badgeOnSubIconsHolder:SetPoint("LEFT", subIconSideHolder, "RIGHT", 12, 0)
+    -- Level with the mode dropdown: the preview is taller than the row.
+    badgeOnSubIconsHolder:SetPoint("LEFT", previewHolder, "TOPRIGHT", 12, -displayModeHolder:GetHeight() / 2)
 
-    updateSubIconSideVisibility = function(mode)
+    updateBadgeVisibility = function(mode)
         local subIcons = mode == "sub_icons"
-        subIconSideHolder:SetShown(subIcons)
         badgeOnSubIconsHolder:SetShown(subIcons and BR.CONSUMABLE_FEATURES.itemLabels)
     end
-    updateSubIconSideVisibility(BR.Config.Get("defaults.consumableDisplayMode"))
+    updateBadgeVisibility(BR.Config.Get("defaults.consumableDisplayMode"))
     table.insert(BR.RefreshableComponents, {
         Refresh = function()
-            updateSubIconSideVisibility(BR.Config.Get("defaults.consumableDisplayMode"))
+            updateBadgeVisibility(BR.Config.Get("defaults.consumableDisplayMode"))
         end,
     })
 end

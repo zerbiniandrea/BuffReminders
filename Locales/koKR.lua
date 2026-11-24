@@ -642,21 +642,14 @@ L["Options.ConsumableTextScale"] = "기본 크기"
 L["Options.ConsumableTextScale.Title"] = "기본 텍스트 크기"
 L["Options.ConsumableTextScale.Desc"] =
     "아이콘 크기 비율에 따른 개수, 능력치 라벨, 등급의 글꼴 크기입니다. 아래에서 3개 항목을 각자 설정할 수 있습니다."
-L["Options.ConsumableBadgeOnSubIcons"] = "하위 아이콘에 등급 표시"
-L["Options.ConsumableBadgeOnSubIcons.Title"] = "하위 아이콘 등급 표시"
-L["Options.ConsumableBadgeOnSubIcons.Desc"] =
-    '주 아이콘을 제외하고 각 하위 아이콘에 음식 품질 글자를 표시합니다. (예시: 든든한에 "든", 덧없는에 "덧")'
 L["Options.ItemDisplay"] = "아이템 표시"
 L["Options.ItemDisplay.IconOnly"] = "아이콘만 표시"
 L["Options.ItemDisplay.IconOnlyDesc"] = "수량이 가장 많은 아이템 표시"
-L["Options.ItemDisplay.SubIcons"] = "하위 아이콘"
-L["Options.ItemDisplay.SubIconsDesc"] = "각 아이콘 아래에 클릭되는 다른 등급의 작은 아이템을 표시합니다"
 L["Options.ItemDisplay.Expanded"] = "확장"
 L["Options.ItemDisplay.ExpandedDesc"] = "다른 등급 아이템 아이콘을 원래 크기로 확장합니다"
 L["Options.ItemDisplay.Mode"] = "소모품 아이템 표시"
 L["Options.ItemDisplay.Mode.Desc"] =
     "복수의 등급이 있는 소모품 아이템(예: 다양한 영약 등급)의 표시 방식을 설정합니다."
-L["Options.SubIconSide"] = "방향"
 L["Options.SubIconSide.Bottom"] = "아래"
 L["Options.SubIconSide.Top"] = "위"
 L["Options.SubIconSide.Left"] = "왼쪽"

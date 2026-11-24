@@ -556,9 +556,6 @@ L["Options.PetLabels.SizePct"] = "尺寸占比 %"
 -- ============================================================================
 -- OPTIONS: CONSUMABLE DISPLAY
 -- ============================================================================
-L["Options.ConsumableBadgeOnSubIcons"] = "在子图标上显示品质标签"
-L["Options.ConsumableBadgeOnSubIcons.Title"] = "子图标品质标签"
-L["Options.ConsumableBadgeOnSubIcons.Desc"] = "在每个子图标上也显示食物品质字母（例如“丰”代表丰盛，“飞”代表飞逝），而不仅在主图标上显示。"
 L["Options.ConsumableBadgeOnSubIcons.Disabled"] = "仅在“子图标”显示模式下可用。"
 L["Options.HideConsumableLabels"] = "隐藏属性标签"
 L["Options.HideConsumableLabels.Title"] = "隐藏消耗品属性标签"
@@ -567,14 +564,11 @@ L["Options.HideConsumableLabels.Desc"] =
 L["Options.ItemDisplay"] = "物品显示"
 L["Options.ItemDisplay.IconOnly"] = "仅图标"
 L["Options.ItemDisplay.IconOnlyDesc"] = "显示数量最多的物品"
-L["Options.ItemDisplay.SubIcons"] = "子图标"
-L["Options.ItemDisplay.SubIconsDesc"] = "在每个图标下方显示较小的物品变体图标"
 L["Options.ItemDisplay.Expanded"] = "展开"
 L["Options.ItemDisplay.ExpandedDesc"] = "将每个物品变体显示为全尺寸图标"
 L["Options.ItemDisplay.Mode"] = "消耗品物品显示"
 L["Options.ItemDisplay.Mode.Desc"] =
     "设置具有多个变体的消耗品物品（例如各种合剂类型）的显示方式。"
-L["Options.SubIconSide"] = "方向"
 L["Options.SubIconSide.Bottom"] = "底部"
 L["Options.SubIconSide.Top"] = "顶部"
 L["Options.SubIconSide.Left"] = "左侧"

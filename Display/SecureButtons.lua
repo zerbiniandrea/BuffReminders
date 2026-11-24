@@ -11,7 +11,7 @@ local L = BR.L
 -- ============================================================================
 
 -- Lua stdlib locals (avoid repeated global lookups in hot paths)
-local floor, max, min = math.floor, math.max, math.min
+local floor, max = math.floor, math.max
 local tsort = table.sort
 local wipe = wipe
 
@@ -25,6 +25,15 @@ local GetTime = GetTime
 local IsSpellKnown = C_SpellBook.IsSpellKnown
 local Plain = BR.Secret.Plain
 local BuffTargets = BR.StateHelpers.BuffTargets
+local SubIcons = BR.SubIcons
+
+---@param category string?
+---@return boolean
+local function IsCategoryClickable(category)
+    local cs = category and BR.profile.categorySettings
+    local catSettings = cs and cs[category]
+    return catSettings ~= nil and catSettings.clickable == true
+end
 
 -- ============================================================================
 -- SPELL HELPERS
@@ -448,7 +457,7 @@ local function StoreAction(button, action)
 end
 
 ---@return "hover"|"always"
-local function ChoiceRowMode()
+local function RowRevealMode()
     local defaults = BR.profile.defaults
     return defaults and defaults.subIconReveal == "always" and "always" or "hover"
 end
@@ -541,6 +550,13 @@ local function RowOf(def)
         return GROUP_VARIANT_ROW
     end
     return nil
+end
+
+---A choice only casts, so a choice row needs click-to-cast.
+---@param frame table The buff frame
+---@return boolean
+local function HasRow(frame)
+    return frame._br_rowItems ~= nil or (RowOf(frame.buffDef) ~= nil and IsCategoryClickable(frame.buffCategory))
 end
 
 ---Wire an action onto a secure button. UpdateActionButtons resolves every frame on
@@ -694,8 +710,8 @@ end
 
 local NEXT_LEAD = L["Tooltip.Next"]
 
--- Frames whose choice row is open.
-local openChoiceRows = setmetatable({}, { __mode = "k" })
+-- Frames whose row is open in "hover" mode.
+local openRows = setmetatable({}, { __mode = "k" })
 
 ---The rank that the level of the unit accepts, else the highest known rank.
 ---@param ranks number[] Highest rank first
@@ -819,27 +835,24 @@ local function ShowNextPick(overlay, frame)
     return true
 end
 
-local FADE_IN_DURATION = 0.12
-local FADE_OUT_DURATION = 0.2
-
 ---@param frame table The buff frame
-local function FinishCloseChoiceRow(frame)
+local function FinishCloseRow(frame)
     if frame.buffText then
         frame.buffText:SetAlpha(1)
     end
     BR.SecureButtons.ScheduleSecureSync()
 end
 
----Close the choice row. The secure sync does not run in combat, so the "BUFF!"
----text comes back here.
+---Close the row. The secure sync does not run in combat, so the "BUFF!" text
+---comes back here.
 ---@param frame table The buff frame
 ---@param instant? boolean Skip the fade-out
-local function CloseChoiceRow(frame, instant)
-    openChoiceRows[frame] = nil
+local function CloseRow(frame, instant)
+    openRows[frame] = nil
     local fading = false
-    if not instant and not InCombatLockdown() and ChoiceRowMode() == "hover" then
+    if not instant and not InCombatLockdown() and RowRevealMode() == "hover" then
         for _, btn in ipairs(frame.actionButtons or {}) do
-            if btn._br_fadeOut and btn:IsVisible() then
+            if btn:IsVisible() then
                 btn._br_fadeIn:Stop()
                 -- A fading button must not cast.
                 btn:EnableMouse(false)
@@ -849,51 +862,64 @@ local function CloseChoiceRow(frame, instant)
         end
     end
     if not fading then
-        FinishCloseChoiceRow(frame)
+        FinishCloseRow(frame)
         return
     end
-    C_Timer.After(FADE_OUT_DURATION, function()
-        if not openChoiceRows[frame] then
-            FinishCloseChoiceRow(frame)
+    C_Timer.After(SubIcons.FADE_OUT_DURATION, function()
+        if not openRows[frame] then
+            FinishCloseRow(frame)
         end
     end)
 end
+
+local HOVER_GRACE = 0.3
 
 ---Forget the pick and close the row when the cursor leaves both the icon and its
 ---row. The delay covers the gap between them.
 ---@param frame table The buff frame
 local function EndHoverSoon(frame)
-    C_Timer.After(0.3, function()
+    C_Timer.After(HOVER_GRACE, function()
+        -- IsMouseOver ignores the mouse state, so it also covers an icon with no overlay.
+        if frame:IsVisible() and frame:IsMouseOver() then
+            return
+        end
         local overlay = frame.clickOverlay
         if overlay and overlay:IsVisible() and overlay:IsMouseOver() then
             return
         end
         for _, btn in ipairs(frame.actionButtons or {}) do
             if btn:IsVisible() and btn:IsMouseOver() then
+                -- A button with the mouse off gets no OnLeave to end the hover.
+                if not btn:IsMouseEnabled() then
+                    EndHoverSoon(frame)
+                end
                 return
             end
         end
         frame._br_pickUnit = nil
         -- An "always" row never closes, and a close shows the "BUFF!" text for one frame.
-        if ChoiceRowMode() == "hover" then
-            CloseChoiceRow(frame)
+        if RowRevealMode() == "hover" then
+            CloseRow(frame)
         end
     end)
 end
 
----In "hover" mode, show the choice row while the cursor is on the icon or the row.
+---In "hover" mode, show the row while the cursor is on the icon or the row.
 ---@param frame table The buff frame
-local function OpenChoiceRow(frame)
-    if InCombatLockdown() or ChoiceRowMode() ~= "hover" or openChoiceRows[frame] then
+local function OpenRow(frame)
+    if InCombatLockdown() or RowRevealMode() ~= "hover" or openRows[frame] then
         return
     end
-    openChoiceRows[frame] = true
-    -- A row that fades out keeps its buttons shown: stop the fade. The sync takes the mouse back.
+    openRows[frame] = true
+    -- The fill gives the mouse back to the buttons that a fade-out took it from.
+    if frame._br_rowItems then
+        frame._br_rowDirty = true
+    end
+    -- A faded button can stay on its driver until the sync parks it: undo the fade.
+    -- The sync takes the mouse back.
     for _, btn in ipairs(frame.actionButtons or {}) do
-        if btn._br_fadeOut and btn._br_fadeOut:IsPlaying() then
-            btn._br_fadeOut:Stop()
-            btn:SetAlpha(1)
-        end
+        btn._br_fadeOut:Stop()
+        btn:SetAlpha(btn._br_alpha)
     end
     BR.SecureButtons.ScheduleSecureSync()
 end
@@ -1049,10 +1075,15 @@ local function CreateClickOverlay(frame)
     overlay.highlight:SetColorTexture(1, 1, 1, 0.2)
     overlay:HookScript("OnEnter", StyleOverlayHighlight)
     overlay:HookScript("OnEnter", function()
-        if RowOf(frame.buffDef) then
-            OpenChoiceRow(frame)
+        if HasRow(frame) then
+            OpenRow(frame)
         end
-        if frame.buffDef and frame.buffDef.subChoices and ShowNextPick(overlay, frame) then
+        if
+            frame.buffDef
+            and frame.buffDef.subChoices
+            and IsCategoryClickable(frame.buffCategory)
+            and ShowNextPick(overlay, frame)
+        then
             return
         end
         -- An overlay with no left action has no tooltip of its own to carry the menu hint.
@@ -1127,7 +1158,7 @@ local function CreateClickOverlay(frame)
         end)
     end)
     overlay:HookScript("OnLeave", function()
-        if RowOf(frame.buffDef) then
+        if HasRow(frame) then
             EndHoverSoon(frame)
         end
         HideLastTargetTooltip()
@@ -1193,22 +1224,6 @@ end
 -- CONSUMABLE ACTION BUTTONS
 -- ============================================================================
 
-local ACTION_ICON_SCALE = 0.45
-local ACTION_ICON_MIN = 18
-local ACTION_ICON_OFFSET = -6
-
--- A choice row can lie over a neighbor icon. One strata up, no overlay takes its mouse.
-local STRATA_ABOVE = {
-    BACKGROUND = "LOW",
-    LOW = "MEDIUM",
-    MEDIUM = "HIGH",
-    HIGH = "DIALOG",
-    DIALOG = "FULLSCREEN",
-    FULLSCREEN = "FULLSCREEN_DIALOG",
-    FULLSCREEN_DIALOG = "TOOLTIP",
-    TOOLTIP = "TOOLTIP",
-}
-
 local BADGE_COLORS = {
     [L["Badge.Hearty"]] = { r = 0.4, g = 0.7, b = 1 },
     [L["Badge.Fleeting"]] = { r = 0.4, g = 0.7, b = 1 },
@@ -1222,22 +1237,9 @@ local function ComputeConsumableFontSize(mainIconSize, item)
     return max(6, floor(mainIconSize * BR.TextPositions.GetSizePercent(item) / 100))
 end
 
----Parented to UIParent with NO anchor to a buff frame: an anchor taints it.
----SyncSecureButtons positions it.
 ---@return table btn The created button
 local function CreateActionButton()
-    local btn = CreateFrame("Button", nil, UIParent, "SecureActionButtonTemplate")
-    btn:RegisterForClicks("AnyDown", "AnyUp")
-    btn:Hide()
-    -- Starts hidden. SyncSecureButtons swaps in the combat driver after it positions
-    -- the button.
-    RegisterStateDriver(btn, "visibility", "hide")
-    btn:SetScript("OnShow", function(self)
-        local bf = self._br_buff_frame
-        if not bf or not bf:IsVisible() then
-            self:Hide()
-        end
-    end)
+    local btn = SubIcons.CreateButton()
     -- The refresh runs shortly after the click so the consumed buff disappears fast.
     btn:SetScript("PostClick", function(self, button, down)
         if HandleMenuClick(self, button, down, self._br_buff_frame) then
@@ -1252,23 +1254,11 @@ local function CreateActionButton()
             end
         end)
     end)
-
-    btn.icon = btn:CreateTexture(nil, "ARTWORK")
-    btn.icon:SetAllPoints()
-    btn.icon:SetTexCoord(BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET, BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET)
-
-    btn.count = btn:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-    btn.count:SetPoint("BOTTOMRIGHT", -1, 1)
-
-    btn.highlight = btn:CreateTexture(nil, "HIGHLIGHT")
-    btn.highlight:SetAllPoints()
-    btn.highlight:SetTexCoord(BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET, BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET)
-    btn.highlight:SetColorTexture(1, 1, 1, 0.2)
-
     btn:SetScript("OnEnter", ShowConsumableTooltip)
     btn:SetScript("OnLeave", function(self)
         BR.Display.EndHoverTooltip(self)
         GameTooltip:Hide()
+        EndHoverSoon(self._br_buff_frame)
     end)
 
     return btn
@@ -1528,59 +1518,128 @@ local function GetConsumableActionItems(buff)
     return items and #items > 0 and items or nil
 end
 
----Create or update the item icons for a consumable buff frame. SyncSecureButtons
----positions them.
+---Set the item row of a consumable buff frame to actionItems[startIndex..]. If no
+---item is at or after startIndex, the row clears. SyncSecureButtons builds and
+---positions the buttons.
 ---@param frame table The buff frame
 ---@param actionItems table[]|false|nil Array of { itemID, count, icon }
----@param clickable boolean? True when the buttons accept mouse input
 ---@param startIndex? number First index in actionItems to show (default 1)
-local function UpdateConsumableButtons(frame, actionItems, clickable, startIndex)
-    if InCombatLockdown() then
-        return
-    end
+local function SetItemRow(frame, actionItems, startIndex)
     startIndex = startIndex or 1
-    if not actionItems or #actionItems < startIndex then
-        if frame.actionButtons then
-            for _, btn in ipairs(frame.actionButtons) do
-                btn._br_visible = false
-                btn:Hide()
-            end
-        end
+    if actionItems and #actionItems >= startIndex then
+        frame._br_rowItems = actionItems
+        frame._br_rowStart = startIndex
+        frame._br_rowDirty = true
+        RegisterSecureHost(frame)
         return
     end
-
+    frame._br_rowItems = nil
+    openRows[frame] = nil
     if not frame.actionButtons then
-        frame.actionButtons = {}
-        RegisterSecureHost(frame)
+        return
     end
+    local inCombat = InCombatLockdown()
+    for _, btn in ipairs(frame.actionButtons) do
+        -- A plain field: the next sync parks the button.
+        btn._br_visible = false
+        if not inCombat then
+            btn:Hide()
+        end
+    end
+end
 
-    local btnIndex = 0
-    for i = startIndex, #actionItems do
-        btnIndex = btnIndex + 1
-        local item = actionItems[i]
-        local btn = frame.actionButtons[btnIndex]
+---Fill the item row buttons from the items that SetItemRow stored. Out of combat only.
+---@param frame table The buff frame
+local function FillItemRow(frame)
+    local items = frame._br_rowItems
+    local buttons = frame.actionButtons
+    if not buttons then
+        buttons = {}
+        frame.actionButtons = buttons
+    end
+    local cs = BR.profile.categorySettings
+    local catSettings = cs and cs[frame.buffCategory]
+    local clickable = catSettings and catSettings.clickable == true or false
+    local showHighlight = clickable and catSettings.clickableHighlight ~= false
+    frame._br_rowDirty = nil
+    local count = 0
+    for i = frame._br_rowStart, #items do
+        count = count + 1
+        local item = items[i]
+        local btn = buttons[count]
         if not btn then
             btn = CreateActionButton()
             btn._br_buff_frame = frame
-            frame.actionButtons[btnIndex] = btn
+            buttons[count] = btn
         end
 
         btn.icon:SetTexture(item.icon or 134400)
         ApplyAction(btn, ConsumableItemAction(item, frame))
 
-        btn:EnableMouse(clickable == true)
-        btn._br_visible = true
+        btn:EnableMouse(clickable)
+        btn.highlight:SetShown(showHighlight)
         btn._br_count = item.count
         btn._br_permanent = item.permanent
         btn._br_qualityAtlas = item.qualityAtlas
         btn._br_badge = item.badge
         btn._br_needs_sync = true
     end
-
-    for i = btnIndex + 1, #frame.actionButtons do
-        frame.actionButtons[i]._br_visible = false
-        frame.actionButtons[i]:Hide()
+    frame._br_rowCount = count
+    for i = count + 1, #buttons do
+        buttons[i]._br_visible = false
+        buttons[i]:Hide()
     end
+end
+
+---Fill the item row if its items or settings changed, then show or hide it. Out of combat only.
+---@param frame table The buff frame
+---@param shown boolean The row is open
+local function ShowItemRow(frame, shown)
+    if frame._br_rowDirty then
+        FillItemRow(frame)
+    end
+    local count = shown and frame._br_rowCount or 0
+    for i, btn in ipairs(frame.actionButtons) do
+        btn._br_visible = i <= count
+    end
+end
+
+---A click-through hover area over an icon whose item row has no overlay to open it.
+---@param frame table The buff frame
+---@param on boolean
+local function SetHoverCatcher(frame, on)
+    local catcher = frame._br_hoverCatcher
+    if not on then
+        if catcher then
+            catcher:Hide()
+        end
+        return
+    end
+    if not catcher then
+        catcher = CreateFrame("Frame", nil, frame)
+        catcher:SetAllPoints()
+        -- The catcher covers the icon, so it passes the hover on to the icon scripts.
+        catcher:SetScript("OnEnter", function()
+            OpenRow(frame)
+            local onEnter = frame:GetScript("OnEnter")
+            if onEnter then
+                onEnter(frame)
+            end
+        end)
+        catcher:SetScript("OnLeave", function()
+            EndHoverSoon(frame)
+            local onLeave = frame:GetScript("OnLeave")
+            if onLeave then
+                onLeave(frame)
+            end
+        end)
+        -- After the scripts, because an OnEnter script turns the whole mouse on.
+        -- Motion only, so a click reaches the world.
+        catcher:SetMouseClickEnabled(false)
+        catcher:SetMouseMotionEnabled(true)
+        frame._br_hoverCatcher = catcher
+    end
+    catcher:Show()
 end
 
 ---The target of the choice buttons of a frame.
@@ -1611,21 +1670,6 @@ local function CreateChoiceButton(frame)
     local btn = CreateActionButton()
     btn._br_buff_frame = frame
     btn._br_choice = true
-    -- Alpha animations only: a moving secure button can miss the click.
-    local fadeIn = btn:CreateAnimationGroup()
-    local alphaIn = fadeIn:CreateAnimation("Alpha")
-    alphaIn:SetFromAlpha(0)
-    alphaIn:SetToAlpha(1)
-    alphaIn:SetDuration(FADE_IN_DURATION)
-    btn._br_fadeIn = fadeIn
-    -- The final alpha holds until the sync hides the button.
-    local fadeOut = btn:CreateAnimationGroup()
-    fadeOut:SetToFinalAlpha(true)
-    local alphaOut = fadeOut:CreateAnimation("Alpha")
-    alphaOut:SetFromAlpha(1)
-    alphaOut:SetToAlpha(0)
-    alphaOut:SetDuration(FADE_OUT_DURATION)
-    btn._br_fadeOut = fadeOut
     btn:SetScript("PreClick", function(self, button)
         if
             InCombatLockdown()
@@ -1750,22 +1794,14 @@ local function UpdateChoiceRow(frame, active, shown)
     end
 end
 
--- A choice row closes on combat start.
-local hasChoiceRows = false
-for _, buffs in pairs(BR.BUFF_TABLES) do
-    for _, buff in ipairs(buffs) do
-        hasChoiceRows = hasChoiceRows or RowOf(buff) ~= nil
+-- An open row closes on combat start.
+local rowEvents = CreateFrame("Frame")
+BR.Client.RegisterEvent(rowEvents, "PLAYER_REGEN_DISABLED")
+rowEvents:SetScript("OnEvent", function()
+    for frame in pairs(openRows) do
+        CloseRow(frame, true)
     end
-end
-if hasChoiceRows then
-    local choiceEvents = CreateFrame("Frame")
-    BR.Client.RegisterEvent(choiceEvents, "PLAYER_REGEN_DISABLED")
-    choiceEvents:SetScript("OnEvent", function()
-        for frame in pairs(openChoiceRows) do
-            CloseChoiceRow(frame, true)
-        end
-    end)
-end
+end)
 
 -- ============================================================================
 -- SECURE FRAME SYNC
@@ -1790,15 +1826,13 @@ local function HideSecureFramesForCatKey(catKey)
         local effectiveCat = GetEffectiveCategory(frame)
         local groupId = frame.buffDef and frame.buffDef.groupId
         if effectiveCat == catKey or frame.key == catKey or groupId == catKey then
+            openRows[frame] = nil
+            if frame._br_hoverCatcher then
+                frame._br_hoverCatcher:Hide()
+            end
             if frame.actionButtons then
                 for _, btn in ipairs(frame.actionButtons) do
-                    if btn._br_driver_active then
-                        RegisterStateDriver(btn, "visibility", "hide")
-                        btn._br_driver_active = false
-                        btn._br_x = nil
-                    else
-                        btn:Hide()
-                    end
+                    SubIcons.Park(btn)
                 end
             end
             if frame.clickOverlay then
@@ -1830,15 +1864,13 @@ local function HideAllSecureFrames()
             frame.clickOverlay:Hide()
             frame.clickOverlay._br_left = nil
         end
+        openRows[frame] = nil
+        if frame._br_hoverCatcher then
+            frame._br_hoverCatcher:Hide()
+        end
         if frame.actionButtons then
             for _, btn in ipairs(frame.actionButtons) do
-                if btn._br_driver_active then
-                    RegisterStateDriver(btn, "visibility", "hide")
-                    btn._br_driver_active = false
-                    btn._br_x = nil
-                else
-                    btn:Hide()
-                end
+                SubIcons.Park(btn)
             end
         end
         if frame.extraFrames then
@@ -1851,6 +1883,45 @@ local function HideAllSecureFrames()
             end
         end
     end
+end
+
+---Place a click overlay over its host and show it, or hide it. On a shown overlay,
+---the caller sets the mouse.
+---@param overlay table SecureActionButton overlay
+---@param host table The frame that the overlay covers
+---@param active boolean The overlay takes clicks
+---@return boolean placed The overlay shows over the host
+local function SyncOverlay(overlay, host, active)
+    if not active or not host:IsVisible() then
+        overlay:EnableMouse(false)
+        overlay:Hide()
+        overlay._br_left = nil
+        return false
+    end
+    local left, bottom, width, height = host:GetRect()
+    if not left then
+        return false
+    end
+    if
+        overlay._br_left ~= left
+        or overlay._br_bottom ~= bottom
+        or overlay._br_width ~= width
+        or overlay._br_height ~= height
+    then
+        overlay:ClearAllPoints()
+        overlay:SetSize(width, height)
+        overlay:SetFrameStrata(host:GetFrameStrata())
+        overlay:SetFrameLevel(host:GetFrameLevel() + 5)
+        overlay:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, bottom)
+        overlay._br_left = left
+        overlay._br_bottom = bottom
+        overlay._br_width = width
+        overlay._br_height = height
+    end
+    if not overlay:IsShown() then
+        overlay:Show()
+    end
+    return true
 end
 
 -- Secure buttons are placed in screen coordinates, never anchored, so they cannot
@@ -1871,10 +1942,7 @@ local function SyncSecureButtons()
         -- Sync click overlay
         local overlay = frame.clickOverlay
         if overlay then
-            local cs = frame.buffCategory
-                and BR.profile.categorySettings
-                and BR.profile.categorySettings[frame.buffCategory]
-            local clickable = cs and cs.clickable == true
+            local clickable = IsCategoryClickable(frame.buffCategory)
             -- Click to cast governs casting. A chat request answers its own toggle
             -- on the Chat Requests page, and a custom buff its own click action, so
             -- both stay clickable where the category turned click-to-cast off.
@@ -1882,61 +1950,33 @@ local function SyncSecureButtons()
                 clickable = overlay._br_chatRequestKey ~= nil
                     or (frame.buffCategory == "custom" and HasCustomClickAction(frame.buffDef))
             end
-            if frame:IsVisible() then
-                if not clickable or not overlay._br_has_action then
-                    overlay:EnableMouse(false)
-                    overlay:Hide()
-                    overlay._br_left = nil
-                else
-                    local left, bottom, width, height = frame:GetRect()
-                    if left then
-                        if
-                            overlay._br_left ~= left
-                            or overlay._br_bottom ~= bottom
-                            or overlay._br_width ~= width
-                            or overlay._br_height ~= height
-                        then
-                            overlay:ClearAllPoints()
-                            overlay:SetSize(width, height)
-                            overlay:SetFrameStrata(frame:GetFrameStrata())
-                            overlay:SetFrameLevel(frame:GetFrameLevel() + 5)
-                            overlay:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, bottom)
-                            overlay._br_left = left
-                            overlay._br_bottom = bottom
-                            overlay._br_width = width
-                            overlay._br_height = height
-                        end
-                        -- The cooldown timer clears the timestamp when it expires.
-                        -- The next sync run then re-enables the mouse.
-                        local cdEnabled = BR.profile.chatRequestCooldown ~= false
-                        local cdUntil = cdEnabled and overlay._br_chatRequestCooldownUntil
-                        if cdUntil and cdUntil > GetTime() then
-                            overlay:EnableMouse(false)
-                        else
-                            overlay:EnableMouse(true)
-                        end
-                        if not overlay:IsShown() then
-                            overlay:Show()
-                        end
-                    end
-                end
-            else
-                overlay:Hide()
-                overlay:EnableMouse(false)
-                overlay._br_left = nil
+            if SyncOverlay(overlay, frame, clickable and overlay._br_has_action == true) then
+                -- The cooldown timer clears the timestamp when it expires.
+                -- The next sync run then re-enables the mouse.
+                local cdEnabled = BR.profile.chatRequestCooldown ~= false
+                local cdUntil = cdEnabled and overlay._br_chatRequestCooldownUntil
+                overlay:EnableMouse(not (cdUntil and cdUntil > GetTime()))
             end
         end
-        local def = frame.buffDef
-        if overlay and RowOf(def) then
+        local itemRow = frame._br_rowItems ~= nil
+        local overlayShown = overlay ~= nil and overlay:IsShown()
+        if itemRow or (overlay and RowOf(frame.buffDef)) then
             if not frame:IsVisible() then
-                openChoiceRows[frame] = nil
+                openRows[frame] = nil
             end
-            local active = overlay:IsShown()
-            UpdateChoiceRow(frame, active, active and (openChoiceRows[frame] or ChoiceRowMode() == "always"))
-            if not frame._br_rowHasChoices then
-                openChoiceRows[frame] = nil
+            local revealed = openRows[frame] or RowRevealMode() == "always"
+            if itemRow then
+                ShowItemRow(frame, revealed)
+            else
+                -- A choice only casts, so a row opens only with click-to-cast on.
+                local active = overlayShown and IsCategoryClickable(frame.buffCategory)
+                UpdateChoiceRow(frame, active, active and revealed)
+                if not frame._br_rowHasChoices then
+                    openRows[frame] = nil
+                end
             end
         end
+        SetHoverCatcher(frame, itemRow and not overlayShown and RowRevealMode() == "hover")
         -- Sync action buttons (consumable item row or choice row)
         if frame.actionButtons then
             if frame:IsVisible() then
@@ -1944,9 +1984,8 @@ local function SyncSecureButtons()
                 if left then
                     local effectiveCat = GetEffectiveCategory(frame)
                     local catSettings = GetCategorySettings(effectiveCat)
-                    local size = max(ACTION_ICON_MIN, floor((catSettings.iconSize or 64) * ACTION_ICON_SCALE))
-                    local btnSpacing = max(2, floor(size * 0.2))
-                    local subIconSide = GetCategorySettings(frame.buffCategory).subIconSide or "BOTTOM"
+                    local size, btnSpacing = SubIcons.Metrics(catSettings.iconSize or 64)
+                    local subIconSide = (BR.profile.defaults or {}).subIconSide or "BOTTOM"
                     local visibleCount = 0
                     for _, btn in ipairs(frame.actionButtons) do
                         if btn._br_visible then
@@ -1958,38 +1997,23 @@ local function SyncSecureButtons()
                         local stackFontSize = ComputeConsumableFontSize(baseIconSize, "stackCount")
                         local badgeFontSize = ComputeConsumableFontSize(baseIconSize, "badge")
                         local showSubIconBadge = BR.Config.Get("defaults.consumableBadgeOnSubIcons") == true
+                        -- The buttons already inherit the UIParent alpha.
+                        local uiAlpha = UIParent:GetEffectiveAlpha()
+                        local hostAlpha = uiAlpha > 0 and frame:GetEffectiveAlpha() / uiAlpha or 1
                         local idx = 0
                         for _, btn in ipairs(frame.actionButtons) do
                             if btn._br_visible then
-                                local btnX, btnY
-                                local isSideways = subIconSide == "LEFT" or subIconSide == "RIGHT"
-                                if isSideways then
-                                    local maxPerCol = max(1, floor((height + btnSpacing) / (size + btnSpacing)))
-                                    local row = idx % maxPerCol
-                                    local col = floor(idx / maxPerCol)
-                                    local thisColCount = min(maxPerCol, visibleCount - col * maxPerCol)
-                                    local thisColHeight = thisColCount * size + (thisColCount - 1) * btnSpacing
-                                    local thisColStartY = bottom + (height - thisColHeight) / 2
-                                    if subIconSide == "LEFT" then
-                                        btnX = left + ACTION_ICON_OFFSET - size - col * (size + btnSpacing)
-                                    else
-                                        btnX = left + width - ACTION_ICON_OFFSET + col * (size + btnSpacing)
-                                    end
-                                    btnY = thisColStartY + row * (size + btnSpacing)
-                                else
-                                    local maxPerRow = max(1, floor((width + btnSpacing) / (size + btnSpacing)))
-                                    local col = idx % maxPerRow
-                                    local row = floor(idx / maxPerRow)
-                                    local thisRowCount = min(maxPerRow, visibleCount - row * maxPerRow)
-                                    local thisRowWidth = thisRowCount * size + (thisRowCount - 1) * btnSpacing
-                                    local thisRowStartX = left + (width - thisRowWidth) / 2
-                                    btnX = thisRowStartX + col * (size + btnSpacing)
-                                    if subIconSide == "TOP" then
-                                        btnY = bottom + height - ACTION_ICON_OFFSET + row * (size + btnSpacing)
-                                    else
-                                        btnY = bottom + ACTION_ICON_OFFSET - size - row * (size + btnSpacing)
-                                    end
-                                end
+                                local btnX, btnY = SubIcons.Position(
+                                    idx,
+                                    visibleCount,
+                                    subIconSide,
+                                    left,
+                                    bottom,
+                                    width,
+                                    height,
+                                    size,
+                                    btnSpacing
+                                )
                                 -- The size and outline stamps let the dirty check see
                                 -- a font setting change. A face change needs no stamp:
                                 -- linked fontstrings follow the shared font object.
@@ -2004,7 +2028,7 @@ local function SyncSecureButtons()
                                     btn:ClearAllPoints()
                                     btn:SetSize(size, size)
                                     local strata = frame:GetFrameStrata()
-                                    btn:SetFrameStrata(btn._br_choice and STRATA_ABOVE[strata] or strata)
+                                    btn:SetFrameStrata(btn._br_choice and SubIcons.STRATA_ABOVE[strata] or strata)
                                     btn:SetFrameLevel(frame:GetFrameLevel() + 4)
                                     btn:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", btnX, btnY)
                                     btn._br_x = btnX
@@ -2069,14 +2093,10 @@ local function SyncSecureButtons()
                                         btn._br_cooldown:Clear()
                                     end
                                 end
+                                SubIcons.SetAlpha(btn, hostAlpha)
                                 -- A new button starts on the "hide" driver.
-                                if not btn._br_driver_active then
-                                    RegisterStateDriver(btn, "visibility", "[combat] hide; show")
-                                    btn._br_driver_active = true
-                                    btn:SetAlpha(1)
-                                    if btn._br_fadeIn and ChoiceRowMode() == "hover" then
-                                        btn._br_fadeIn:Play()
-                                    end
+                                if SubIcons.Activate(btn) and RowRevealMode() == "hover" then
+                                    btn._br_fadeIn:Play()
                                 end
                                 if not btn:IsShown() then
                                     btn:Show()
@@ -2087,68 +2107,25 @@ local function SyncSecureButtons()
                     end
                     for _, btn in ipairs(frame.actionButtons) do
                         if not btn._br_visible and btn._br_driver_active then
-                            RegisterStateDriver(btn, "visibility", "hide")
-                            btn._br_driver_active = false
-                            btn._br_x = nil
+                            SubIcons.Park(btn)
                         end
                     end
                 end
             else
                 for _, btn in ipairs(frame.actionButtons) do
-                    if btn._br_driver_active then
-                        RegisterStateDriver(btn, "visibility", "hide")
-                        btn._br_driver_active = false
-                        btn._br_x = nil
-                    else
-                        btn:Hide()
-                    end
+                    SubIcons.Park(btn)
                 end
             end
         end
-        -- Sync extra frame click overlays (expanded consumable display mode)
+        -- Extra frame click overlays (expanded consumables, pet actions)
         if frame.extraFrames then
+            local clickable = IsCategoryClickable(frame.buffCategory)
             for _, extra in ipairs(frame.extraFrames) do
                 local extraOverlay = extra.clickOverlay
-                if extraOverlay then
-                    if extra:IsVisible() then
-                        local extraCs = frame.buffCategory
-                            and BR.profile.categorySettings
-                            and BR.profile.categorySettings[frame.buffCategory]
-                        local extraClickable = extraCs and extraCs.clickable == true
-                        if not extraClickable then
-                            extraOverlay:EnableMouse(false)
-                            extraOverlay:Hide()
-                            extraOverlay._br_left = nil
-                        else
-                            local eLeft, eBottom, eWidth, eHeight = extra:GetRect()
-                            if eLeft then
-                                if
-                                    extraOverlay._br_left ~= eLeft
-                                    or extraOverlay._br_bottom ~= eBottom
-                                    or extraOverlay._br_width ~= eWidth
-                                    or extraOverlay._br_height ~= eHeight
-                                then
-                                    extraOverlay:ClearAllPoints()
-                                    extraOverlay:SetSize(eWidth, eHeight)
-                                    extraOverlay:SetFrameStrata(extra:GetFrameStrata())
-                                    extraOverlay:SetFrameLevel(extra:GetFrameLevel() + 5)
-                                    extraOverlay:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", eLeft, eBottom)
-                                    extraOverlay._br_left = eLeft
-                                    extraOverlay._br_bottom = eBottom
-                                    extraOverlay._br_width = eWidth
-                                    extraOverlay._br_height = eHeight
-                                end
-                                extraOverlay:EnableMouse(true)
-                                if not extraOverlay:IsShown() then
-                                    extraOverlay:Show()
-                                end
-                            end
-                        end
-                    else
-                        extraOverlay:Hide()
-                        extraOverlay:EnableMouse(false)
-                        extraOverlay._br_left = nil
-                    end
+                if
+                    extraOverlay and SyncOverlay(extraOverlay, extra, clickable and extraOverlay._br_has_action == true)
+                then
+                    extraOverlay:EnableMouse(true)
                 end
             end
         end
@@ -2248,19 +2225,14 @@ end
 
 ---@param frame table The buff frame
 ---@param actionItems table[]? Cached consumable items
----@param showHighlight boolean Category-level highlight setting
----@param frameHighlight boolean Per-frame highlight (same as showHighlight for consumables)
+---@param frameHighlight boolean Per-frame highlight
 ---@param db table The profile database
-local function UpdateConsumableSubElements(frame, actionItems, showHighlight, frameHighlight, db)
+local function UpdateConsumableSubElements(frame, actionItems, frameHighlight, db)
     local displayMode = (db.defaults or {}).consumableDisplayMode or "sub_icons"
 
-    if displayMode == "sub_icons" and frame.actionButtons then
-        for _, btn in ipairs(frame.actionButtons) do
-            btn:EnableMouse(true)
-            if btn.highlight then
-                btn.highlight:SetShown(showHighlight)
-            end
-        end
+    -- The sync applies the click settings to the item row.
+    if frame._br_rowItems then
+        frame._br_rowDirty = true
     end
 
     if displayMode == "expanded" and frame.extraFrames and actionItems then
@@ -2319,25 +2291,14 @@ local function UpdateExtraFrameOverlays(frame, frameHighlight, db)
 end
 
 ---@param frame table The buff frame
----@param db table The profile database
-local function DisableFrameAndChildren(frame, db)
+local function DisableFrameAndChildren(frame)
     if frame.clickOverlay then
         DisableOverlay(frame.clickOverlay)
     end
-    -- Sub-icons stay on screen in sub_icons mode. Only the mouse goes off.
+    -- An item row stays on screen with the mouse off. A choice row closes with its overlay.
     if frame.actionButtons then
-        local displayMode = (db.defaults or {}).consumableDisplayMode or "sub_icons"
         for _, btn in ipairs(frame.actionButtons) do
             btn:EnableMouse(false)
-            if displayMode ~= "sub_icons" then
-                if btn._br_driver_active then
-                    RegisterStateDriver(btn, "visibility", "hide")
-                    btn._br_driver_active = false
-                    btn._br_x = nil
-                else
-                    btn:Hide()
-                end
-            end
         end
     end
     if frame.extraFrames then
@@ -2514,7 +2475,7 @@ local function UpdateActionButtons(category)
             end
 
             if not frameEnabled then
-                DisableFrameAndChildren(frame, db)
+                DisableFrameAndChildren(frame)
             else
                 if action then
                     if not frame.clickOverlay then
@@ -2534,7 +2495,7 @@ local function UpdateActionButtons(category)
                 end
 
                 if category == "consumable" then
-                    UpdateConsumableSubElements(frame, actionItems, showHighlight, frameHighlight, db)
+                    UpdateConsumableSubElements(frame, actionItems, frameHighlight, db)
                 else
                     UpdateExtraFrameOverlays(frame, frameHighlight, db)
                 end
@@ -2578,7 +2539,7 @@ BR.SecureButtons = {
     RefreshOverlaySpells = RefreshOverlaySpells,
     RefreshChatRequestMacros = RefreshChatRequestMacros,
     GetConsumableActionItems = GetConsumableActionItems,
-    UpdateConsumableButtons = UpdateConsumableButtons,
+    SetItemRow = SetItemRow,
     InvalidateConsumableCache = InvalidateConsumableCache,
     HideAllSecureFrames = HideAllSecureFrames,
     HideSecureFramesForCatKey = HideSecureFramesForCatKey,
