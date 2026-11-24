@@ -31,6 +31,8 @@ jobs:
             # A stable release lists every change since the previous stable tag.
             BASELINE=$(git tag --sort=-v:refname | grep -vE 'alpha|beta|rc' | grep -vFx "$TAG" | head -1)
           fi
+          # cliff.toml reads BASELINE for the compare link.
+          export BASELINE
           RANGE="${BASELINE:+${BASELINE}..}HEAD"
           echo "Tag=$TAG  Baseline=${BASELINE:-<none>}  Range=$RANGE"
           curl -sSL https://github.com/orhun/git-cliff/releases/download/v2.10.1/git-cliff-2.10.1-x86_64-unknown-linux-gnu.tar.gz \
@@ -65,8 +67,13 @@ jobs:
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
           CHANGELOG=$(gh release view "$TAG" --json body -q '.body' | sed 's/\r//g')
-          CHANGELOG_ESCAPED=$(echo "$CHANGELOG" | jq -Rs .)
+          URL="https://github.com/zerbiniandrea/BuffReminders/releases/tag/$TAG"
+          # Discord rejects an embed description over 4096 characters. A longer
+          # changelog is cut at a line break and links to the full release.
+          PAYLOAD=$(jq -n --arg tag "$TAG" --arg body "$CHANGELOG" --arg url "$URL" '
+            (if ($body | length) > 4096
+              then ($body[0:3900] | split("\n") | .[:-1] | join("\n")) + "\n\n[Read the full changelog](" + $url + ")"
+              else $body end) as $desc
+            | {embeds: [{title: "BuffReminders \($tag) Released", description: $desc, color: 5814783, url: $url}]}')
 
-          curl -H "Content-Type: application/json" \
-            -d "{\"embeds\": [{\"title\": \"BuffReminders $TAG Released\", \"description\": $CHANGELOG_ESCAPED, \"color\": 5814783, \"url\": \"https://github.com/zerbiniandrea/BuffReminders/releases/tag/$TAG\"}]}" \
-            "$DISCORD_WEBHOOK"
+          curl -fsS -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK"

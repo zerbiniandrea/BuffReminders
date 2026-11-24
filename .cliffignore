@@ -1,0 +1,7 @@
+# Commits to leave out of the changelog, one full SHA per line.
+# Fixes the new group-mate tracking feature, which no stable release has.
+bd25ef430cc37540fbe8ec5891042544517c1e3b
+# Covered by the reminder search entry, which also balances the columns.
+c08930b2e4c1338b9c5a9459ff06d1bd0962367d
+# The expiring-while-leveling option, removed again before a stable release.
+5a7daf2d75e96fb48003d797de9368a184c277d2

@@ -21,3 +21,4 @@ ignore:
   - CONTRIBUTING.md
   - types.lua
   - cliff.toml
+  - .cliffignore

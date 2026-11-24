@@ -1,41 +1,86 @@
-# git-cliff config — generates release notes from Conventional Commits.
+# git-cliff config: generates release notes from Conventional Commits.
 #
-# feat/fix/perf get their own sections; i18n collapses to a single Localization
-# line; everything else lands in a catch-all Other Changes section. Leading
-# gitmoji are stripped from each line; only the commit subject is shown (bodies
-# are ignored). A conventional-commit scope, when present, renders as a bold
-# "Scope: " lead-in (e.g. feat(soulstone) -> "**Soulstone:** ..."); scopeless
-# subjects render bare. Sections are ordered via HTML-comment sort keys that the
-# template strips before rendering. Within a section, scoped commits come first
-# clustered and alphabetized by scope (so same-scope entries read together),
-# then the scopeless ones; both keep commit (date) order as the tiebreaker.
+# feat/fix/perf get their own sections. i18n collapses to one Localization line, and
+# all other types collapse to one Other Changes line. Leading gitmoji are stripped,
+# and only the subject renders (no bodies).
 #
-# The pre-release folding and the release ranges live in .github/workflows/release.yml
-# (--ignore-tags + an explicit range), NOT here. A stable release shows every
-# meaningful change since the last stable tag. A pre-release shows the changes
-# since the previous tag. Each section is labeled with its own tag.
+# Inside a section, entries for both clients come first. A scope "retail/<area>" or
+# "forever/<area>" (or the bare client name) goes into a block for that client.
+# A scope with one entry renders inline ("**Area:** ..."); a scope with more entries
+# renders as a heading with nested entries. Scopeless entries come last.
+#
+# An annotated tag message renders as an intro above the sections. The workflow sets
+# BASELINE (the previous tag of the range) for the compare link. The pre-release
+# folding and the ranges live in .github/workflows/release.yml. .cliffignore lists
+# the SHAs of commits to leave out.
 
 [changelog]
-header = "# BuffReminders\n\n"
+header = "# BuffReminders\n"
 body = """
+{%- macro entries(commits, client, indent) -%}
+{%- set_global prev = "" -%}
+{%- for commit in commits | filter(attribute="scope") | sort(attribute="scope") -%}
+{%- if commit.scope and commit.scope != client -%}
+{%- if client != "" -%}{%- set area = commit.scope | trim_start_matches(pat=client ~ "/") -%}{%- else -%}{%- set area = commit.scope -%}{%- endif -%}
+{%- set count = commits | filter(attribute="scope", value=commit.scope) | length -%}
+{%- if count == 1 %}
+{{ indent }}- **{{ area | upper_first }}:** {{ commit.message }}
+{%- else -%}
+{%- if commit.scope != prev %}
+{{ indent }}- **{{ area | upper_first }}:**
+{%- set_global prev = commit.scope -%}
+{%- endif %}
+{{ indent }}  - {{ commit.message | upper_first }}
+{%- endif -%}
+{%- endif -%}
+{%- endfor -%}
+{%- for commit in commits -%}
+{%- if not commit.scope or commit.scope == client %}
+{{ indent }}- {{ commit.message | upper_first }}
+{%- endif -%}
+{%- endfor -%}
+{%- endmacro entries -%}
+
 ## [{{ version }}](https://github.com/zerbiniandrea/BuffReminders/tree/{{ version }}){% if timestamp %} ({{ timestamp | date(format="%Y-%m-%d") }}){% endif %}
-{% if previous.version %}[Full Changelog](https://github.com/zerbiniandrea/BuffReminders/compare/{{ previous.version }}...{{ version }}) {% endif %}[Previous Releases](https://github.com/zerbiniandrea/BuffReminders/releases)
+{% set baseline = get_env(name="BASELINE", default="") -%}
+{% if baseline != "" %}[Full Changelog](https://github.com/zerbiniandrea/BuffReminders/compare/{{ baseline }}...{{ version }}) {% endif %}[Previous Releases](https://github.com/zerbiniandrea/BuffReminders/releases)
+{% if message %}
+{{ message | trim }}
+{% endif -%}
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group | split(pat="-->") | last }}
-{% if group is containing("Localization") %}
-{%- set_global langs = "" %}
-{%- for commit in commits %}
-{%- if commit.scope and commit.scope not in langs %}{% set_global langs = langs ~ commit.scope ~ ", " %}{% endif %}
+{% if group is containing("Localization") -%}
+{%- set_global langs = "" -%}
+{%- for commit in commits -%}
+{%- if commit.scope and commit.scope not in langs %}{% set_global langs = langs ~ commit.scope ~ ", " %}{% endif -%}
 {%- endfor %}
 - Updated translations{% if langs != "" %}: {{ langs | trim_end_matches(pat=", ") }}{% endif %}
-{%- else %}{% for commit in commits | filter(attribute="scope") | sort(attribute="scope") %}
-- **{{ commit.scope | upper_first }}:** {{ commit.message }}
-{%- endfor %}{% for commit in commits %}{% if not commit.scope %}
-- {{ commit.message | upper_first }}
-{%- endif %}{% endfor %}{% endif %}
-{% endfor %}\n
+{% elif group is containing("Other Changes") %}
+- {{ commits | length }} internal change{% if commits | length > 1 %}s{% endif %} (code cleanup, build and docs). The full changelog lists each one.
+{% else -%}
+{%- set_global shared = [] -%}
+{%- set_global retail = [] -%}
+{%- set_global forever = [] -%}
+{%- for commit in commits -%}
+{%- set head = commit.scope | default(value="") | split(pat="/") | first -%}
+{%- if head == "retail" -%}{%- set_global retail = retail | concat(with=commit) -%}
+{%- elif head == "forever" -%}{%- set_global forever = forever | concat(with=commit) -%}
+{%- else -%}{%- set_global shared = shared | concat(with=commit) -%}
+{%- endif -%}
+{%- endfor -%}
+{{ self::entries(commits=shared, client="", indent="") }}
+{%- if retail | length > 0 %}
+- **Retail:**
+{{- self::entries(commits=retail, client="retail", indent="  ") }}
+{%- endif -%}
+{%- if forever | length > 0 %}
+- **WoW Forever:**
+{{- self::entries(commits=forever, client="forever", indent="  ") }}
+{%- endif %}
+{% endif -%}
+{% endfor %}
 """
-trim = true
+trim = false
 
 [git]
 conventional_commits = true
@@ -53,6 +98,10 @@ commit_preprocessors = [
 # never render. The final catch-all routes everything else to Other Changes.
 commit_parsers = [
   { footer = "^(?i)changelog: ?skip", skip = true },
+  # v7.0.0: WoW Forever commits from before the client scope rule. Delete after the release.
+  { sha = "9b5f14848c3d638aa401da9cac5760fc55e5e365", scope = "forever/mage armor", group = "<!-- 0 -->New Features ✨" },
+  { sha = "b99d4355ea78b0bcc7152b8dcb20201927d5dfa7", scope = "forever/sleeping bag", group = "<!-- 0 -->New Features ✨" },
+  { sha = "efdd3ee020c372e921f47629703000facdecd7f4", scope = "forever/tracking", group = "<!-- 0 -->New Features ✨" },
   { message = "^feat", group = "<!-- 0 -->New Features ✨" },
   { message = "^fix", group = "<!-- 1 -->Bug Fixes 🐛" },
   { message = "^perf", group = "<!-- 2 -->Performance ⚡️" },
