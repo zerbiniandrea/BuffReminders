@@ -332,7 +332,7 @@ english["Tooltip.PaladinAuraDuplicate.Desc"] =
     "Warns when another paladin already gives you the same aura type. If the content row has a backup aura, the reminder asks for it."
 english["Tooltip.DriveBy.Desc"] =
     "Out of combat, shows when your target is a friendly player outside your group who lacks one of your buffs. Click to cast the best rank for them."
-english["Tooltip.SleepingBag.Desc"] = "Shows only below max level. Hidden in combat, in cities and in inns."
+english["Tooltip.SleepingBag.Desc"] = "Shows only below max level. Hidden in combat, in cities and in inns. While you rest in the bag, the icon counts down to 3 stacks of Well-Rested."
 english["Tooltip.InstanceEntryReminder"] = "Instance Entry Reminder"
 english["Tooltip.InstanceEntryReminder.Desc"] =
     "Briefly shown when entering a dungeon as a reminder to drop a Soulwell. Dismissed after casting or after 30 seconds."

@@ -9,6 +9,7 @@ end
 local L = BR.L
 
 local floor = math.floor
+local max = math.max
 local AuraByIndex = BR.Secret.AuraByIndex
 local AuraField = BR.Secret.AuraField
 local Plain = BR.Secret.Plain
@@ -1404,7 +1405,46 @@ local DRIVE_BY_ROW = {
 local SLEEPING_BAG = {
     itemID = 211527, -- Cozy Sleeping Bag
     auraID = 429959, -- Well-Rested
+    restingID = 1331671, -- Resting, while the player lies in the bag
+    maxStacks = 3,
+    stackSeconds = 60,
 }
+
+-- The Resting aura has no duration, so the rest starts when the addon first sees it.
+local restInstanceID, restStartedAt
+
+---GetTime()-based moment of the full Well-Rested stack, while the player rests in the bag.
+---@return number? endsAt nil when the player is not in the bag or has all the stacks
+---@return number? sweepSeconds
+---@return string? stacksText
+local function SleepingBagRestEnd()
+    local GetPlayerAura = C_UnitAuras.GetUnitAuraBySpellID
+    local resting = GetPlayerAura("player", SLEEPING_BAG.restingID)
+    if not resting then
+        restInstanceID = nil
+        return nil
+    end
+    if resting.auraInstanceID ~= restInstanceID then
+        restInstanceID = resting.auraInstanceID
+        restStartedAt = GetTime()
+    end
+    local lastStackAt = restStartedAt
+    local stacks = 0
+    local rested = GetPlayerAura("player", SLEEPING_BAG.auraID)
+    if rested then
+        stacks = max(rested.applications or 0, 1)
+        -- Each stack refreshes the duration, so the aura start is the time of the last stack.
+        if rested.duration and rested.duration > 0 then
+            lastStackAt = max(lastStackAt, rested.expirationTime - rested.duration)
+        end
+    end
+    if stacks >= SLEEPING_BAG.maxStacks then
+        return nil
+    end
+    local fullSeconds = SLEEPING_BAG.maxStacks * SLEEPING_BAG.stackSeconds
+    local endsAt = lastStackAt + (SLEEPING_BAG.maxStacks - stacks) * SLEEPING_BAG.stackSeconds
+    return endsAt, fullSeconds, stacks .. "/" .. SLEEPING_BAG.maxStacks
+end
 
 local CAMP = {
     benefitsID = 1229741, -- Camp Benefits
@@ -2215,13 +2255,21 @@ BR.BUFF_TABLES = {
             overlayText = L["Overlay.SleepingBag"],
             infoTooltip = { title = L["Buff.SleepingBag"], desc = L["Tooltip.SleepingBag.Desc"] },
             clickItem = SLEEPING_BAG.itemID,
+            countdown = SleepingBagRestEnd,
             -- The bag cannot go down in a city or an inn, and the buff gives only experience.
             customCheck = function(isAuraRestricted)
                 local GameContext = BR.GameContext
-                if isAuraRestricted or GameContext.IsInCombat() or GameContext.IsResting() then
+                if isAuraRestricted or GameContext.IsInCombat() then
                     return false
                 end
                 if GameContext.GetPlayerLevel() >= GameContext.GetMaxExpansionLevel() then
+                    return false
+                end
+                -- The bag itself makes the player rest, so this check comes before the rest check.
+                if SleepingBagRestEnd() then
+                    return true
+                end
+                if GameContext.IsResting() then
                     return false
                 end
                 if BR.StateHelpers.GetItemCountCached(SLEEPING_BAG.itemID) == 0 then

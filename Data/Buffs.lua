@@ -675,6 +675,7 @@ BR.REPAIR_SOURCES = {
 ---@field showOnInstanceEntry? boolean  -- Only show briefly on dungeon entry (grouped, non-M+)
 ---@field visibilityCondition? fun(): boolean?
 ---@field customCheck? fun(isRestricted: boolean): boolean? true shows the reminder
+---@field countdown? fun(): number?, number?, string? -- End of a countdown that replaces the label, sweep length, progress text
 ---@field addedIn? string Version cohort for the what's-new dot
 
 ---@class BuffTables

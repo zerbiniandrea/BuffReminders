@@ -234,6 +234,8 @@ local BR = ns
 ---@field _br_pet_extra_text? FontString   -- Spirit Beast label below spec
 ---@field _cachedItems? table|false         -- Per-cycle cache for GetConsumableActionItems result
 ---@field _sameStatItems? table             -- Reused list for the expiring fan-out (GetSameStatItems)
+---@field countdownSweep? table           -- Cooldown frame
+---@field countdownTextHost? table        -- Carrier that keeps the texts above countdownSweep
 
 -- Lua stdlib locals (avoid repeated global lookups in hot paths)
 local floor, max, min = math.floor, math.max, math.min
@@ -684,7 +686,7 @@ end
 ---@param entry BuffStateEntry
 ---@return boolean
 local function IsCountdownText(entry)
-    return entry.isEating or entry.displayType == "expiring"
+    return entry.isEating or entry.countdownExpirationTime ~= nil or entry.displayType == "expiring"
 end
 
 ---Calculate font size from explicit textSize
@@ -726,7 +728,7 @@ local function SetCountText(frame, text, scale)
 end
 
 local FormatRemainingTime = BR.StateHelpers.FormatRemainingTime
-local FormatEatingTime = BR.StateHelpers.FormatEatingTime
+local FormatCountdownTime = BR.StateHelpers.FormatCountdownTime
 
 local GetBuffTexture = BR.Icons.GetBuffTexture
 local GetBuffIcons = BR.Icons.GetBuffIcons
@@ -1738,6 +1740,9 @@ local function GenerateTestEntries()
         entry.countText = nil
         entry.overlayText = nil
         entry.isEating = nil
+        entry.countdownExpirationTime = nil
+        entry.countdownDuration = nil
+        entry.progressText = nil
         entry.petActions = nil
         entry.iconByRole = nil
         entry.dynamicIcon = nil
@@ -2024,6 +2029,41 @@ local function ApplyItemCooldown(frame, item)
     frame.itemCooldown:SetCooldown(start, duration)
 end
 
+---Sweep that fills toward the end of a countdown. A nil duration clears it.
+---@param frame BuffFrame
+---@param expTime? number
+---@param duration? number
+local function ApplyCountdownSweep(frame, expTime, duration)
+    local sweep = frame.countdownSweep
+    if not (expTime and duration) then
+        if sweep then
+            sweep:Clear()
+        end
+        return
+    end
+    if not sweep then
+        sweep = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
+        sweep:SetAllPoints()
+        sweep:SetDrawBling(false)
+        sweep:SetHideCountdownNumbers(true)
+        sweep.noCooldownCount = true
+        sweep:EnableMouse(false)
+        -- The sweep is a child frame, so it draws over every region of the icon.
+        -- The texts go on a carrier above it.
+        local textHost = CreateFrame("Frame", nil, frame)
+        textHost:SetAllPoints()
+        textHost:EnableMouse(false)
+        ---@diagnostic disable-next-line: undefined-field
+        frame.count:SetParent(textHost)
+        ---@diagnostic disable-next-line: undefined-field
+        frame.stackCount:SetParent(textHost)
+        frame.countdownSweep = sweep
+        frame.countdownTextHost = textHost
+    end
+    frame.countdownTextHost:SetFrameLevel(sweep:GetFrameLevel() + 2)
+    sweep:SetCooldown(expTime - duration, duration)
+end
+
 ---Clear consumable overlays from a frame.
 ---@param frame table
 local function ClearConsumableOverlays(frame)
@@ -2152,48 +2192,55 @@ local function RenderVisibleEntry(frame, entry)
     -- Hide stack count by default; only the consumable-with-items path shows it
     frame.stackCount:Hide()
 
-    -- Eating override: state provides isEating as a snapshot, so the display
+    -- State provides these fields as a snapshot, so the display
     -- never reads a live flag that can change mid-cycle.
-    if entry.isEating then
+    if entry.isEating or entry.countdownExpirationTime then
         SetIconDesaturated(frame.icon, false)
-        frame.icon:SetTexture(EATING_ICON)
-        frame._br_eating_icon = true
-        if entry.eatingExpirationTime then
-            -- Seed initial text, then hand off to per-frame OnUpdate for smooth countdown
-            local remaining = entry.eatingExpirationTime - GetTime()
-            if remaining > 0 then
-                SetCountText(frame, FormatEatingTime(remaining), COUNT_TEXT_SCALE)
-                frame.count:Show()
-            else
-                frame.count:Hide()
-            end
-            if not frame._br_eating_onupdate then
-                local expTime = entry.eatingExpirationTime
+        if entry.isEating then
+            frame.icon:SetTexture(EATING_ICON)
+            frame._br_eating_icon = true
+        end
+        local expTime = entry.countdownExpirationTime
+        frame._br_countdown_exp = expTime
+        local remaining = expTime and expTime - GetTime() or 0
+        if remaining > 0 then
+            SetCountText(frame, FormatCountdownTime(remaining), COUNT_TEXT_SCALE)
+            frame.count:Show()
+            -- The handler reads the end from the frame, so a later render can move it.
+            if not frame._br_countdown_onupdate then
                 frame:SetScript("OnUpdate", function()
-                    local rem = expTime - GetTime()
+                    local rem = (frame._br_countdown_exp or 0) - GetTime()
                     if rem > 0 then
-                        frame.count:SetText(FormatEatingTime(rem))
+                        frame.count:SetText(FormatCountdownTime(rem))
                     else
                         frame.count:Hide()
                         frame:SetScript("OnUpdate", nil)
-                        frame._br_eating_onupdate = nil
+                        frame._br_countdown_onupdate = nil
                     end
                 end)
-                frame._br_eating_onupdate = true
+                frame._br_countdown_onupdate = true
             end
         else
             frame.count:Hide()
         end
+        if entry.progressText then
+            ApplyFont(frame.stackCount, BR.SecureButtons.ComputeConsumableFontSize(frame:GetWidth(), "stackCount"))
+            frame.stackCount:SetText(entry.progressText)
+            frame.stackCount:Show()
+        end
+        ApplyCountdownSweep(frame, expTime, entry.countdownDuration)
         frame:Show()
         SetExpirationGlow(frame, false)
         return true
-    elseif frame._br_eating_icon then
-        -- Transition from eating -> not eating: restore the correct consumable icon
+    end
+    ApplyCountdownSweep(frame, nil)
+    if frame._br_countdown_onupdate then
+        frame:SetScript("OnUpdate", nil)
+        frame._br_countdown_onupdate = nil
+    end
+    frame._br_countdown_exp = nil
+    if frame._br_eating_icon then
         frame._br_eating_icon = nil
-        if frame._br_eating_onupdate then
-            frame:SetScript("OnUpdate", nil)
-            frame._br_eating_onupdate = nil
-        end
         ResolveConsumableFrame(frame)
     end
 

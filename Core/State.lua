@@ -24,7 +24,9 @@ local BR = ns
 ---@field iconByRole table<RoleType,number>? -- Role-based icon override
 ---@field rebuffWarning boolean?             -- Consumable rebuff pulsing border?
 ---@field isEating boolean?                 -- Food entry: player is currently eating
----@field eatingExpirationTime number?      -- GetTime()-based expiration of eating aura
+---@field countdownExpirationTime number?   -- GetTime()-based end of a live countdown
+---@field countdownDuration number?         -- Length of the progress sweep that ends with the countdown
+---@field progressText string?              -- Progress toward the goal of the countdown, e.g. "1/3"
 ---@field petActions PetActionList?           -- Expanded pet summon actions
 ---@field dynamicIcon number|string|nil      -- Dynamic icon texture override (e.g. next poison to cast)
 ---@field glowKindOverride "expiring"|"missing"|nil -- Override glow kind (e.g. healthstone low stock uses expiring glow)
@@ -1180,10 +1182,10 @@ local function FormatRemainingTime(seconds)
     end
 end
 
----Format remaining time for eating countdown (always shows real value, e.g., "5m" or "23s")
+---Format the remaining time of a live countdown (always shows the real value, e.g., "5m" or "23s")
 ---@param seconds number
 ---@return string
-local function FormatEatingTime(seconds)
+local function FormatCountdownTime(seconds)
     local mins = ceil(seconds / 60)
     if mins > 1 then
         return format(FMT_MINUTES, mins)
@@ -3174,6 +3176,9 @@ local function RefreshUtility(db, trackingMode, isAuraRestricted)
             and (not buff.customCheck or buff.customCheck(isAuraRestricted))
         then
             SetEntryText(entry, buff.overlayTextFn and buff.overlayTextFn() or buff.overlayText, utilityMissGlow)
+            if buff.countdown then
+                entry.countdownExpirationTime, entry.countdownDuration, entry.progressText = buff.countdown()
+            end
             BR.Icons.ApplyDynamicIcon(entry, buff)
         end
     end
@@ -3501,7 +3506,7 @@ local function RefreshConsumables(db, trackingMode, isAuraRestricted, hideExpiri
                         if entry.visible and buff.key == "food" then
                             entry.isEating = IsPlayerEating()
                             if entry.isEating then
-                                entry.eatingExpirationTime = GetEatingExpirationTime()
+                                entry.countdownExpirationTime = GetEatingExpirationTime()
                             end
                         end
                     end
@@ -3651,7 +3656,9 @@ function BuffState.Refresh(refreshMode)
             entry.overlayText = nil
             entry.rebuffWarning = nil -- legacy field, still cleared for safety
             entry.isEating = nil
-            entry.eatingExpirationTime = nil
+            entry.countdownExpirationTime = nil
+            entry.countdownDuration = nil
+            entry.progressText = nil
             entry.petActions = nil
             entry.dynamicIcon = nil
             entry.glowKindOverride = nil
@@ -4646,7 +4653,7 @@ BR.StateHelpers = {
     GetPlayerSpecId = GetPlayerSpecId,
     FormatRemainingTime = FormatRemainingTime,
     AuraLead = Lead.Of,
-    FormatEatingTime = FormatEatingTime,
+    FormatCountdownTime = FormatCountdownTime,
     IsPlayerEating = IsPlayerEating,
     UpdateEatingState = UpdateEatingState,
     ScanEatingState = ScanEatingState,
