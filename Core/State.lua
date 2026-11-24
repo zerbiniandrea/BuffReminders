@@ -991,6 +991,8 @@ Lead.share = 0.25
 
 ---Seconds before the end of an aura when its warning starts: a share of its full
 ---duration, at most the threshold. An aura of 5 min or less shows only when missing.
+---The share rounds down to whole minutes (at least 1), so the first timer label
+---that the icon shows matches the lead.
 ---An unknown duration (nil, 0, or secret) uses the threshold.
 ---@param duration? number
 ---@param threshold number Seconds
@@ -1005,7 +1007,10 @@ function Lead.Of(duration, threshold, floor, share)
     if duration <= 300 then
         return nil
     end
-    local lead = duration * (share or Lead.share)
+    local lead = math.floor(duration * (share or Lead.share) / 60) * 60
+    if lead < 60 then
+        lead = 60
+    end
     if lead > threshold then
         lead = threshold
     end
