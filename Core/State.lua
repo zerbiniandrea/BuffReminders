@@ -3840,7 +3840,9 @@ function BuffState.GetHideAllReason(db)
     if db.showOnlyInGroup and BuffState.IsAlone() then
         return "solo"
     end
-    if db.hideWhileResting and GameContext.IsResting() then
+    -- A sleeping bag makes the player rest, but its countdown must stay visible.
+    -- BR.IsRestingInBag is nil on retail.
+    if db.hideWhileResting and GameContext.IsResting() and not (BR.IsRestingInBag and BR.IsRestingInBag()) then
         return "resting"
     end
     if db.hideInCombat and GameContext.IsInCombat() then

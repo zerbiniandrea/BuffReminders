@@ -1410,6 +1410,12 @@ local SLEEPING_BAG = {
     stackSeconds = 60,
 }
 
+---@return boolean
+local function IsRestingInBag()
+    return C_UnitAuras.GetUnitAuraBySpellID("player", SLEEPING_BAG.restingID) ~= nil
+end
+BR.IsRestingInBag = IsRestingInBag
+
 -- The Resting aura has no duration, so the rest starts when the addon first sees it.
 local restInstanceID, restStartedAt
 
