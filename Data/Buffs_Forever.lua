@@ -1567,9 +1567,9 @@ BR.BUFF_TABLES = {
             levelRequired = 4, -- Blessing of Might rank 1
             chatRequestable = true,
             chatRequestSpell = RequestedBlessing,
-            selfScope = function()
+            target = function()
                 local defaults = BR.profile.defaults
-                return defaults ~= nil and defaults.paladinBlessingScope == "self"
+                return defaults ~= nil and defaults.paladinBlessingScope == "self" and "self" or "group"
             end,
         },
         {

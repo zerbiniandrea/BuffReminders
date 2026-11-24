@@ -2943,7 +2943,7 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
             HasCasterForBuff(buff.class, buff.levelRequired, buff.reach)
         )
         local requester = buff.chatRequestSpell ~= nil and playerClass ~= buff.class
-        local playerOnly = requester or scope.playerOnly or (buff.selfScope ~= nil and buff.selfScope())
+        local playerOnly = requester or scope.playerOnly
 
         if
             not (bronzeHiddenInCombat and buff.key == "bronze")

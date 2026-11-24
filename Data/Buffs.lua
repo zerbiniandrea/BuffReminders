@@ -96,7 +96,6 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field visibilityCondition? fun(): boolean Return false to hide the buff
 ---@field classChoices? ClassChoiceGrid Each member wants a choice of their class list. The click casts the choice of the largest class set
 ---@field target? BuffTarget|fun(): BuffTarget A function reads a user setting. Default "group"
----@field selfScope? fun(): boolean Return true to check and cast the buff on the player only
 ---@field subChoices? SubChoiceRow Choice icons beside the reminder
 ---@field infoTooltip? TooltipText
 
