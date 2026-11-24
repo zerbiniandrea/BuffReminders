@@ -191,9 +191,8 @@ local nativeOwner
 ---@param hint? string Gray text shown after the name, such as "(not in group)"
 ---@param lead? string Gray text shown before the name
 ---@param above? boolean Place the tooltip above the anchor
----@param note? string Gray second line
 ---@param spellID? number Spell shown after the name
-local function ShowLastTargetTooltip(anchor, name, class, hint, lead, above, note, spellID)
+local function ShowLastTargetTooltip(anchor, name, class, hint, lead, above, spellID)
     local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
     local spellName = spellID and BR.GetSpellName(spellID)
     if TARGET_TIP.native then
@@ -210,9 +209,6 @@ local function ShowLastTargetTooltip(anchor, name, class, hint, lead, above, not
         -- The line color paints the lead, the separator and the hint.
         local n = TARGET_TIP.note
         GameTooltip:AddLine(line, n[1], n[2], n[3])
-        if note then
-            GameTooltip:AddLine(note, n[1], n[2], n[3])
-        end
         GameTooltip:Show()
         nativeOwner = anchor
         return
@@ -232,10 +228,7 @@ local function ShowLastTargetTooltip(anchor, name, class, hint, lead, above, not
         tip:SetBackdropColor(bg[1], bg[2], bg[3], bg[4] or 1)
         tip:SetBackdropBorderColor(edge[1], edge[2], edge[3], edge[4] or 1)
         tip.name = tip:CreateFontString(nil, "OVERLAY")
-        tip.note = tip:CreateFontString(nil, "OVERLAY")
-        tip.note:SetPoint("BOTTOM", 0, 8)
-        local n = TARGET_TIP.note
-        tip.note:SetTextColor(n[1], n[2], n[3])
+        tip.name:SetPoint("CENTER", 0, 0)
         lastTargetTooltip = tip
     end
     local tip = lastTargetTooltip
@@ -249,19 +242,7 @@ local function ShowLastTargetTooltip(anchor, name, class, hint, lead, above, not
     tip.name:SetText(lead and ("|cff888888" .. lead .. "|r " .. text) or text)
     tip.name:SetTextColor(r, g, b)
     local textWidth, textHeight = BR.DisplayFonts.GetStringSize(tip.name)
-    tip.name:ClearAllPoints()
-    if note then
-        BR.DisplayFonts.Apply(tip.note, 11)
-        tip.note:SetText(note)
-        tip.note:Show()
-        local noteWidth, noteHeight = BR.DisplayFonts.GetStringSize(tip.note)
-        tip.name:SetPoint("TOP", 0, -8)
-        tip:SetSize(max(textWidth, noteWidth) + 24, textHeight + noteHeight + 19)
-    else
-        tip.note:Hide()
-        tip.name:SetPoint("CENTER", 0, 0)
-        tip:SetSize(textWidth + 24, textHeight + 16)
-    end
+    tip:SetSize(textWidth + 24, textHeight + 16)
     tip:ClearAllPoints()
     if above then
         tip:SetPoint("BOTTOM", anchor, "TOP", 0, 4)
@@ -281,23 +262,6 @@ local function HideLastTargetTooltip()
     nativeOwner = nil
 end
 
-local MENU_HINT = L["Tooltip.RightClickMenu"]
-
----@param button table
----@return string? hint The menu hint while the right click of the button opens the menu
-local function MenuHint(button)
-    return button._br_rightClick == "menu" and MENU_HINT or nil
-end
-
----@param tooltip table
----@param button table
-local function AddMenuHint(tooltip, button)
-    if button._br_rightClick == "menu" then
-        local n = TARGET_TIP.note
-        tooltip:AddLine(MENU_HINT, n[1], n[2], n[3])
-    end
-end
-
 ---@param owner table A consumable button
 local function ShowConsumableTooltip(owner)
     local defaults = BR.profile.defaults
@@ -307,7 +271,6 @@ local function ShowConsumableTooltip(owner)
     BR.Display.ShowHoverTooltip(owner, function()
         GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
         GameTooltip:SetItemByID(owner.itemID)
-        AddMenuHint(GameTooltip, owner)
         GameTooltip:Show()
     end)
 end
@@ -791,11 +754,10 @@ end
 ---@param unit string
 ---@param spellID number
 ---@param lead? string
----@param note? string
-local function ShowPickTooltip(anchor, unit, spellID, lead, note)
+local function ShowPickTooltip(anchor, unit, spellID, lead)
     local _, class = UnitClass(unit)
     local name = Plain(UnitName(unit)) or unit
-    ShowLastTargetTooltip(anchor, name, Plain(class), nil, lead, true, note, spellID)
+    ShowLastTargetTooltip(anchor, name, Plain(class), nil, lead, true, spellID)
 end
 
 ---@param frame table The buff frame
@@ -825,13 +787,11 @@ local function ShowNextPick(overlay, frame)
     RememberPick(frame, spellID, unit)
     BR.SecureButtons.ScheduleSecureSync()
     if unit ~= "player" then
-        ShowPickTooltip(overlay, unit, spellID, NEXT_LEAD, MenuHint(overlay))
+        ShowPickTooltip(overlay, unit, spellID, NEXT_LEAD)
         return true
     end
     -- A self pick names no person, so only the spell tooltip shows it.
-    BR.Display.ShowBuffSpellTooltip(frame, overlay, function(tooltip)
-        AddMenuHint(tooltip, overlay)
-    end, nil, spellID)
+    BR.Display.ShowBuffSpellTooltip(frame, overlay, nil, nil, spellID)
     return true
 end
 
@@ -1086,12 +1046,8 @@ local function CreateClickOverlay(frame)
         then
             return
         end
-        -- An overlay with no left action has no tooltip of its own to carry the menu hint.
+        -- An overlay with no left action exists only for the right-click menu.
         if overlay._br_action_type == "" and not BR.Display.IsBuffTooltipOn(frame.buffCategory) then
-            local hint = MenuHint(overlay)
-            if hint then
-                ShowLastTargetTooltip(overlay, "", nil, nil, hint)
-            end
             return
         end
         -- Only the caster class has a meaningful last target.
@@ -1138,12 +1094,11 @@ local function CreateClickOverlay(frame)
                             c and c.b or 1
                         )
                     end
-                    AddMenuHint(tooltip, overlay)
                 end, name and function()
-                    ShowLastTargetTooltip(overlay, name, class, hint, nil, nil, MenuHint(overlay))
+                    ShowLastTargetTooltip(overlay, name, class, hint)
                 end)
             elseif name then
-                ShowLastTargetTooltip(overlay, name, class, hint, nil, nil, MenuHint(overlay))
+                ShowLastTargetTooltip(overlay, name, class, hint)
             end
             return
         end
@@ -1153,9 +1108,7 @@ local function CreateClickOverlay(frame)
         end
         -- The anchor is the overlay: the cursor is over the overlay, not over the
         -- buff frame below it.
-        BR.Display.ShowBuffSpellTooltip(frame, overlay, function(tooltip)
-            AddMenuHint(tooltip, overlay)
-        end)
+        BR.Display.ShowBuffSpellTooltip(frame, overlay)
     end)
     overlay:HookScript("OnLeave", function()
         if HasRow(frame) then
@@ -1694,7 +1647,6 @@ local function CreateChoiceButton(frame)
             BR.Display.ShowHoverTooltip(self, function()
                 GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                 GameTooltip:SetItemByID(itemID)
-                AddMenuHint(GameTooltip, self)
                 GameTooltip:Show()
             end)
             return
@@ -1711,7 +1663,7 @@ local function CreateChoiceButton(frame)
         local unit = ChoiceUnit(frame)
         local castID = unit and ChoiceCast(self, unit)
         if unit and castID then
-            ShowPickTooltip(self, unit, castID, nil, MenuHint(self))
+            ShowPickTooltip(self, unit, castID)
         end
     end)
     btn:SetScript("OnLeave", function(self)
