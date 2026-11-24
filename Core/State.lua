@@ -3509,7 +3509,7 @@ end
 
 -- User-defined buffs. They take the same path as self and pet buffs.
 local function RefreshCustom(isAuraRestricted, hideExpiring)
-    local _, customMissGlow = GetCategoryGlowSettings("custom")
+    local customExGlow, customMissGlow = GetCategoryGlowSettings("custom")
     for i, buff in ipairs(CustomBuffs) do
         local entry = GetOrCreateEntry(buff.key, "custom", i)
 
@@ -3584,7 +3584,7 @@ local function RefreshCustom(isAuraRestricted, hideExpiring)
                 if duration and duration > 0 and duration <= lead then
                     lead = nil
                 end
-                TrySetEntryExpiring(entry, remaining, lead, true)
+                TrySetEntryExpiring(entry, remaining, lead, customExGlow)
             end
         end
     end
