@@ -110,6 +110,7 @@ local BR = ns
 ---@field blessingSubIcons? "rightclick"|"always"
 ---@field driveBySubIcons? "rightclick"|"always"
 ---@field trackingSubIcons? "rightclick"|"always"
+---@field trackingScope? "gathering"|"all"
 ---@field campSubIcons? "rightclick"|"always"
 ---@field paladinAuras? table<string, table<string, boolean>> Content row -> chosen aura key. A row with none accepts any aura
 ---@field thornsRequest? boolean A tank of another class sees a Thorns request reminder

@@ -1629,6 +1629,34 @@ local SPECIAL_SECTIONS = {
         end,
     },
 
+    tracking = {
+        build = function(layout)
+            local scope = Components.Dropdown(body, {
+                label = L["BuffPanel.Tracking.Scope"],
+                labelWidth = DRAWER_LABEL_W,
+                width = DRAWER_FIELD_W,
+                options = {
+                    { label = L["BuffPanel.Tracking.Scope.Gathering"], value = "gathering" },
+                    { label = L["BuffPanel.Tracking.Scope.All"], value = "all" },
+                },
+                get = function()
+                    return BR.Config.Get("defaults.trackingScope", "gathering")
+                end,
+                tooltip = { title = L["BuffPanel.Tracking.Scope"], desc = L["BuffPanel.Tracking.Scope.Desc"] },
+                onChange = function(val)
+                    BR.Config.Set("defaults.trackingScope", val)
+                end,
+            })
+            tinsert(bodyHolders, scope)
+            layout:Add(scope, 26, COMPONENT_GAP)
+            for _, buff in ipairs(BR.BUFF_TABLES.utility) do
+                if buff.key == "tracking" and buff.subChoices then
+                    AddSubChoicesDropdown(layout, buff, "utility")
+                end
+            end
+        end,
+    },
+
     dkRunes = {
         editor = "Runeforge",
     },

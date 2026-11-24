@@ -1476,11 +1476,37 @@ local CAMP_ROW = {
     others = CampFeatureChoices,
 }
 
--- Minimap tracking spells, in the order of the fallback pick.
+---@alias TrackingKind "gathering"|"creature"
+
+---@class TrackingSpell
+---@field spellID number
+---@field kind TrackingKind
+---@field form? number Stance spell that the cast needs. The game ends the tracking when the form ends
+
+-- Minimap tracking spells, in the order of the fallback pick. The game allows one active tracking.
+---@type TrackingSpell[]
 BR.TRACKING_SPELLS = {
-    2383, -- Find Herbs
-    2580, -- Find Minerals
+    { spellID = 2383, kind = "gathering" }, -- Find Herbs
+    { spellID = 2580, kind = "gathering" }, -- Find Minerals
+    { spellID = 2481, kind = "gathering" }, -- Find Treasure
+    { spellID = 1494, kind = "creature" }, -- Track Beasts
+    { spellID = 19883, kind = "creature" }, -- Track Humanoids
+    { spellID = 19884, kind = "creature" }, -- Track Undead
+    { spellID = 19878, kind = "creature" }, -- Track Demons
+    { spellID = 19880, kind = "creature" }, -- Track Elementals
+    { spellID = 19882, kind = "creature" }, -- Track Giants
+    { spellID = 19879, kind = "creature" }, -- Track Dragonkin
+    { spellID = 19885, kind = "creature" }, -- Track Hidden
+    { spellID = 5225, kind = "creature", form = 768 }, -- Track Humanoids (Druid), Cat Form
+    { spellID = 5502, kind = "creature" }, -- Sense Undead
+    { spellID = 5500, kind = "creature" }, -- Sense Demons
 }
+
+---@type number[]
+local TRACKING_SPELL_IDS = {}
+for i, spell in ipairs(BR.TRACKING_SPELLS) do
+    TRACKING_SPELL_IDS[i] = spell.spellID
+end
 
 ---@type SubChoiceRow
 local TRACKING_ROW = {
@@ -2088,7 +2114,7 @@ BR.BUFF_TABLES = {
         {
             key = "tracking",
             name = L["Buff.Tracking"],
-            spellID = BR.TRACKING_SPELLS,
+            spellID = TRACKING_SPELL_IDS,
             icons = {
                 spells = { 2383, 2580, 1494 },
                 dynamic = function()

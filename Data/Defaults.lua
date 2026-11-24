@@ -275,6 +275,8 @@ BR.defaults = {
         blessingSubIcons = BR.CLIENT == BR.ClientType.Forever and "rightclick" or nil,
         driveBySubIcons = BR.CLIENT == BR.ClientType.Forever and "rightclick" or nil,
         trackingSubIcons = BR.CLIENT == BR.ClientType.Forever and "rightclick" or nil,
+        -- WoW Forever: "all" adds creature tracking to the gathering tracking.
+        trackingScope = BR.CLIENT == BR.ClientType.Forever and "gathering" or nil,
         campSubIcons = BR.CLIENT == BR.ClientType.Forever and "rightclick" or nil,
         -- The paladin aura of each content row (WoW Forever). A row with none accepts any aura.
         paladinAuras = BR.CLIENT == BR.ClientType.Forever and {

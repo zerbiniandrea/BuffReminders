@@ -492,6 +492,7 @@ local DefaultSettingKeys = {
     blessingSubIcons = "DisplayRefresh",
     driveBySubIcons = "DisplayRefresh",
     trackingSubIcons = "DisplayRefresh",
+    trackingScope = "DisplayRefresh",
     campSubIcons = "DisplayRefresh",
     thornsRequest = "DisplayRefresh",
     righteousFuryShow = "DisplayRefresh",
