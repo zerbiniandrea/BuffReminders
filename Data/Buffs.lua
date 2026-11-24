@@ -112,7 +112,6 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field levelRequired? number
 ---@field overlayText string
 ---@field groupId? string
----@field excludeSpellID? number
 ---@field icons? IconSpec
 ---@field infoTooltip? TooltipText
 ---@field noExpirationGlow? boolean
@@ -178,7 +177,6 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field getPetActions? fun(): PetAction[]?  -- Override pet actions (e.g., wrong pet -> Felguard only)
 ---@field petSacrifice? PetSacrifice The player can sacrifice the pet for a buff
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
----@field showOnInstanceEntry? boolean Only show when entering an instance (not M+), skip normal buff checks
 ---@field showWhenPresent? boolean Show when buff IS active (inverts normal "show when missing" logic)
 ---@field noClickToCast? boolean Suppress click-to-cast overlay (e.g., CastSpellByID can't toggle this spell)
 ---@field noExpirationGlow? boolean Show only the missing state, never the expiring state (permanent enchants, short buffs)
@@ -906,7 +904,6 @@ BR.BUFF_TABLES = {
             class = "EVOKER",
             overlayText = L["Overlay.NoScales"],
             requireSpecId = 1473, -- Augmentation
-            requiresSpellID = 360827,
             clickMacro = TargetedClickMacro("blisteringScales"),
         },
         {
@@ -946,7 +943,6 @@ BR.BUFF_TABLES = {
             class = "EVOKER",
             overlayText = L["Overlay.NoTimeless"],
             requireSpecId = 1473, -- Augmentation
-            requiresSpellID = 412710,
             clickMacro = TargetedClickMacro("timelessness"),
         },
         {

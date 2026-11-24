@@ -3025,74 +3025,60 @@ local function RefreshSelf(isAuraRestricted, hideExpiring)
         local entry = GetOrCreateEntry(buff.key, "self", i)
         local settingKey = buff.groupId or buff.key
 
-        if buff.showOnInstanceEntry then
-            -- Self buff shown only briefly on zone-in - no normal buff checks.
-            -- customCheck makes an API call, so it runs after every other gate.
-            if
-                GameContext.IsInDungeonEntry()
-                and selfVisible
-                and (not buff.class or buff.class == playerClass)
-                and IsBuffEnabled(settingKey)
-                and (not buff.customCheck or buff.customCheck(isAuraRestricted))
-            then
-                SetEntryText(entry, buff.overlayText, selfMissGlow)
-            end
-        else
-            if
-                selfVisible
-                and IsBuffEnabled(settingKey)
-                and (not buff.visibilityCondition or buff.visibilityCondition())
-            then
-                local trackable = IsAuraTrackable(buff)
-                local useGlowDet = isAuraRestricted and not trackable and buff.glowDetectable
-                if not isAuraRestricted or trackable or useGlowDet then
-                    if useGlowDet then
-                        if IsAnySpellGlowing(buff) then
-                            SetEntryText(entry, buff.overlayText, selfMissGlow)
-                            BR.Icons.ApplyDynamicIcon(entry, buff)
+        if
+            selfVisible
+            and IsBuffEnabled(settingKey)
+            and (not buff.visibilityCondition or buff.visibilityCondition())
+        then
+            local trackable = IsAuraTrackable(buff)
+            local useGlowDet = isAuraRestricted and not trackable and buff.glowDetectable
+            if not isAuraRestricted or trackable or useGlowDet then
+                if useGlowDet then
+                    if IsAnySpellGlowing(buff) then
+                        SetEntryText(entry, buff.overlayText, selfMissGlow)
+                        BR.Icons.ApplyDynamicIcon(entry, buff)
+                    end
+                else
+                    local shouldShow = ShouldShowSelfBuff(buff)
+                    -- showWhenPresent inverts the logic (e.g., Burning Rush: show when active)
+                    local wantPresent = buff.showWhenPresent
+                    local show = (wantPresent and shouldShow == false) or (not wantPresent and shouldShow)
+                    if show then
+                        SetEntryText(entry, buff.overlayText, selfMissGlow)
+                        BR.Icons.ApplyDynamicIcon(entry, buff)
+                    elseif
+                        shouldShow == false
+                        and not wantPresent
+                        and not buff.noExpirationGlow
+                        and not hideExpiring
+                    then
+                        -- Buff present: check whether it expires soon.
+                        -- Weapon imbues (paladin rites, shaman imbues) time
+                        -- out on the enchant, not an aura.
+                        local remaining, expiringCastID, duration
+                        if buff.enchantID then
+                            remaining = GetWeaponEnchantRemaining(buff.enchantID)
+                            duration = buff.enchantDuration
+                        elseif buff.getExpirationInfo then
+                            remaining, expiringCastID = buff.getExpirationInfo()
+                            duration = buff.enchantDuration
+                        elseif buff.buffIdOverride or buff.spellID then
+                            _, remaining, _, duration =
+                                UnitHasBuff("player", (buff.buffIdOverride or buff.spellID) --[[@as SpellID]])
                         end
-                    else
-                        local shouldShow = ShouldShowSelfBuff(buff)
-                        -- showWhenPresent inverts the logic (e.g., Burning Rush: show when active)
-                        local wantPresent = buff.showWhenPresent
-                        local show = (wantPresent and shouldShow == false) or (not wantPresent and shouldShow)
-                        if show then
-                            SetEntryText(entry, buff.overlayText, selfMissGlow)
-                            BR.Icons.ApplyDynamicIcon(entry, buff)
-                        elseif
-                            shouldShow == false
-                            and not wantPresent
-                            and not buff.noExpirationGlow
-                            and not hideExpiring
+                        if
+                            TrySetEntryExpiring(
+                                entry,
+                                remaining,
+                                Lead.Of(duration, selfThreshold, selfFloor),
+                                selfExGlow
+                            )
                         then
-                            -- Buff present: check whether it expires soon.
-                            -- Weapon imbues (paladin rites, shaman imbues) time
-                            -- out on the enchant, not an aura.
-                            local remaining, expiringCastID, duration
-                            if buff.enchantID then
-                                remaining = GetWeaponEnchantRemaining(buff.enchantID)
-                                duration = buff.enchantDuration
-                            elseif buff.getExpirationInfo then
-                                remaining, expiringCastID = buff.getExpirationInfo()
-                                duration = buff.enchantDuration
-                            elseif buff.buffIdOverride or buff.spellID then
-                                _, remaining, _, duration =
-                                    UnitHasBuff("player", (buff.buffIdOverride or buff.spellID) --[[@as SpellID]])
-                            end
-                            if
-                                TrySetEntryExpiring(
-                                    entry,
-                                    remaining,
-                                    Lead.Of(duration, selfThreshold, selfFloor),
-                                    selfExGlow
-                                )
-                            then
-                                if expiringCastID then
-                                    entry.dynamicIcon = BR.Icons.GetBuffTexture(expiringCastID)
-                                elseif buff.enchantID then
-                                    -- The icon shows the imbue that the click casts.
-                                    BR.Icons.ApplyDynamicIcon(entry, buff)
-                                end
+                            if expiringCastID then
+                                entry.dynamicIcon = BR.Icons.GetBuffTexture(expiringCastID)
+                            elseif buff.enchantID then
+                                -- The icon shows the imbue that the click casts.
+                                BR.Icons.ApplyDynamicIcon(entry, buff)
                             end
                         end
                     end
