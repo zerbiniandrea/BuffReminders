@@ -229,6 +229,7 @@ local BR = ns
 ---@field _br_pet_spec_icon? number        -- Pet spec ability icon texture for hover swap
 ---@field _br_pet_label_key? string        -- Cache key for pet label updates
 ---@field _br_count_scale? number          -- Font scale the count text was last written with
+---@field _br_textInsetRatio? number      -- Share of the icon size that keeps inside text off the frame art
 ---@field _br_pet_name_text? FontString    -- Pet name label below icon
 ---@field _br_pet_family_text? FontString  -- Pet spec label below name
 ---@field _br_pet_extra_text? FontString   -- Spirit Beast label below spec
@@ -791,6 +792,8 @@ local BLIZZARD_ICON_ART = {
     maskAtlas = "UI-HUD-ActionBar-IconFrame-Mask",
     frameWidthRatio = 46 / 45,
     maskRatio = 91 / 64,
+    -- Inset of the count on a 45 px action button.
+    textInsetRatio = 5 / 45,
 }
 -- A missing mask atlas would hide the icon, so the style needs both atlases.
 BLIZZARD_ICON_ART.available = BR.HasThemeAtlas(BLIZZARD_ICON_ART.frameAtlas)
@@ -1062,12 +1065,14 @@ local function SetBlizzardIconArt(frame, shown, iconWidth, iconHeight)
             SizeBlizzardIconArt(frame, iconWidth, iconHeight)
         end
         frame.iconFrameArt:Show()
+        frame._br_textInsetRatio = BLIZZARD_ICON_ART.textInsetRatio
         if not frame._br_masked then
             frame.icon:AddMaskTexture(frame.iconMask)
             frame._br_masked = true
         end
     else
         frame.iconFrameArt:Hide()
+        frame._br_textInsetRatio = nil
         if frame._br_masked then
             frame.icon:RemoveMaskTexture(frame.iconMask)
             frame._br_masked = false
@@ -3396,6 +3401,8 @@ local function UpdateVisuals()
         local size = catSettings.iconSize or 64
         local width = GetEffectiveWidth(catSettings.iconWidth, size)
         frame:SetSize(width, size)
+        -- Before the text anchors: the icon style sets their inset.
+        UpdateIconStyling(frame, catSettings)
         -- Re-apply at the scale the current text was written with, not a guess:
         -- a frame showing a "NO X" label must not be resized to count scale.
         ApplyFont(frame.count, GetFrameFontSize(frame, frame._br_count_scale or COUNT_TEXT_SCALE))
@@ -3457,7 +3464,6 @@ local function UpdateVisuals()
             local lz, lx, ly = BR.TextPositions.Get("buffReminder")
             BR.TextPositions.Apply(frame.subLabel, frame, lz, lx, ly)
         end
-        UpdateIconStyling(frame, catSettings)
 
         -- Re-apply mouse state so toggling Show Buff Tooltips (raid/presence)
         -- switches between hover-enabled and fully click-through without /reload.

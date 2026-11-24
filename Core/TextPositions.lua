@@ -22,15 +22,15 @@ BR.TextPositions = {}
 -- off the icon edge. The user offset adds to that nudge.
 local ZONES = {
     -- INSIDE: anchored to a point of the icon itself (inset by a few pixels)
-    INSIDE_TL = { point = "TOPLEFT", relPoint = "TOPLEFT", dx = 2, dy = -2 },
-    INSIDE_T = { point = "TOP", relPoint = "TOP", dx = 0, dy = -2 },
-    INSIDE_TR = { point = "TOPRIGHT", relPoint = "TOPRIGHT", dx = -2, dy = -2 },
-    INSIDE_L = { point = "LEFT", relPoint = "LEFT", dx = 2, dy = 0 },
+    INSIDE_TL = { point = "TOPLEFT", relPoint = "TOPLEFT", dx = 2, dy = -2, inside = true },
+    INSIDE_T = { point = "TOP", relPoint = "TOP", dx = 0, dy = -2, inside = true },
+    INSIDE_TR = { point = "TOPRIGHT", relPoint = "TOPRIGHT", dx = -2, dy = -2, inside = true },
+    INSIDE_L = { point = "LEFT", relPoint = "LEFT", dx = 2, dy = 0, inside = true },
     INSIDE_C = { point = "CENTER", relPoint = "CENTER", dx = 0, dy = 0 },
-    INSIDE_R = { point = "RIGHT", relPoint = "RIGHT", dx = -2, dy = 0 },
-    INSIDE_BL = { point = "BOTTOMLEFT", relPoint = "BOTTOMLEFT", dx = 2, dy = 2 },
-    INSIDE_B = { point = "BOTTOM", relPoint = "BOTTOM", dx = 0, dy = 2 },
-    INSIDE_BR = { point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", dx = -2, dy = 2 },
+    INSIDE_R = { point = "RIGHT", relPoint = "RIGHT", dx = -2, dy = 0, inside = true },
+    INSIDE_BL = { point = "BOTTOMLEFT", relPoint = "BOTTOMLEFT", dx = 2, dy = 2, inside = true },
+    INSIDE_B = { point = "BOTTOM", relPoint = "BOTTOM", dx = 0, dy = 2, inside = true },
+    INSIDE_BR = { point = "BOTTOMRIGHT", relPoint = "BOTTOMRIGHT", dx = -2, dy = 2, inside = true },
     -- ABOVE: text's bottom edge anchored to icon's top
     ABOVE_L = { point = "BOTTOMLEFT", relPoint = "TOPLEFT", dx = 0, dy = 4 },
     ABOVE_C = { point = "BOTTOM", relPoint = "TOP", dx = 0, dy = 4 },
@@ -186,6 +186,18 @@ end
 ---@param offsetY number?
 function BR.TextPositions.Apply(region, frame, zone, offsetX, offsetY)
     local z = ZONES[zone] or ZONES.INSIDE_C
+    local dx, dy = z.dx, z.dy
+    -- Frame art covers the icon edge, so an inside nudge scales with the icon.
+    local ratio = z.inside and frame._br_textInsetRatio
+    if ratio then
+        local width, height = frame:GetSize()
+        if dx ~= 0 then
+            dx = (dx > 0 and 1 or -1) * math.max(math.abs(dx), math.floor(width * ratio + 0.5))
+        end
+        if dy ~= 0 then
+            dy = (dy > 0 and 1 or -1) * math.max(math.abs(dy), math.floor(height * ratio + 0.5))
+        end
+    end
     region:ClearAllPoints()
-    region:SetPoint(z.point, frame, z.relPoint, z.dx + (offsetX or 0), z.dy + (offsetY or 0))
+    region:SetPoint(z.point, frame, z.relPoint, dx + (offsetX or 0), dy + (offsetY or 0))
 end
