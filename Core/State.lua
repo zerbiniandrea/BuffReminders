@@ -1854,35 +1854,20 @@ local function IsPlayerBuffActive(spellID, role, threshold, floor)
     return found, minRemaining, targetEntry, minLead, nextSlack
 end
 
----Check if player should cast their targeted buff (returns true if a beneficiary needs it)
----@param spellIDs SpellID
----@param requiredClass ClassName
----@param beneficiaryRole? RoleType
----@param requireSpecId? number
----@param buffKey? string Used for last target cache
----@param casterBuffId? number Check this buff on the caster instead of scanning the group
+---Reminder state of an "ally" or "allyOrSelf" buff: one copy of the player's cast on any member.
+---@param buff TargetedBuff
 ---@param threshold number Input of Lead.Of
 ---@param floor number Input of Lead.Of
----@param showSolo? boolean
 ---@return boolean? shouldShow Returns nil if player can't provide this buff
 ---@return number? remainingTime
 ---@return number? lead Lead of the copy that remainingTime reads
 ---@return number? nextSlack Seconds until the next copy enters its window
-local function ShouldShowTargetedBuff(
-    spellIDs,
-    requiredClass,
-    beneficiaryRole,
-    requireSpecId,
-    buffKey,
-    casterBuffId,
-    threshold,
-    floor,
-    showSolo
-)
-    if playerClass ~= requiredClass then
+local function AllyTargetState(buff, threshold, floor)
+    local spellIDs, buffKey, casterBuffId = buff.spellID, buff.key, buff.casterBuffId
+    if playerClass ~= buff.class then
         return nil
     end
-    if requireSpecId and GetPlayerSpecId() ~= requireSpecId then
+    if buff.requireSpecId and GetPlayerSpecId() ~= buff.requireSpecId then
         return nil
     end
 
@@ -1891,21 +1876,14 @@ local function ShouldShowTargetedBuff(
         return nil
     end
 
-    -- Without showSolo, a targeted buff needs an ally. cachedIsAlone covers both
-    -- open-world solo (groupSize 0) and scenario solo (groupSize 1, player only).
-    if cachedIsAlone and not showSolo then
-        return nil
-    end
-
     if casterBuffId then
-        -- Shortcut: check if the caster has this buff on themselves (combat-safe spell ID)
         local hasBuff, remaining, _, duration = UnitHasBuff("player", casterBuffId)
         -- Scan the group for the original buff and record only on a hit. The
         -- target-side spell can be unqueryable (off the aura whitelist in restricted
         -- contexts like M+, or the target is phased / out of range), so a miss is
         -- ambiguous and must NOT forget the memory. Roster pruning handles
         -- departures, and a retarget overwrites on the next successful scan.
-        if buffKey and not GameContext.IsInCombat() and hasBuff then
+        if not GameContext.IsInCombat() and hasBuff then
             for _, data in ipairs(currentValidUnits) do
                 if not Plain(UnitIsUnit(data.unit, "player")) then
                     local targetHas = UnitHasBuff(data.unit, spellIDs)
@@ -1921,13 +1899,11 @@ local function ShouldShowTargetedBuff(
     end
 
     local isActive, remaining, targetEntry, lead, nextSlack =
-        IsPlayerBuffActive(spellID, beneficiaryRole, threshold, floor)
+        IsPlayerBuffActive(spellID, buff.beneficiaryRole, threshold, floor)
 
     -- Update target memory (records even in combat: this path only runs for
     -- whitelist-safe queries, gated by IsAuraTrackable at the call site)
-    if buffKey then
-        TargetMemory.Observe(buffKey, isActive, targetEntry and targetEntry.name, targetEntry and targetEntry.class)
-    end
+    TargetMemory.Observe(buffKey, isActive, targetEntry and targetEntry.name, targetEntry and targetEntry.class)
 
     return not isActive, remaining, lead, nextSlack
 end
@@ -1938,7 +1914,7 @@ local function IsUnitTank(data)
     return GetUnitRole(data) == "TANK" or IsMainTank(data.unit)
 end
 
----Reminder state of a selfFallback targeted buff. The caster checks the first tank who
+---Reminder state of a "tankOrSelf" buff. The caster checks the first tank who
 ---lacks the buff, else the player when the group has no tank. A tank of another class
 ---checks themselves, if a caster who can cast the buff is in the group.
 ---@param buff TargetedBuff
@@ -1949,7 +1925,7 @@ end
 ---@return number? remainingTime
 ---@return number? lead Lead of the copy that remainingTime reads
 ---@return number? nextSlack Seconds until the next tank copy enters its window
-local function ShouldShowRoleTargetedBuff(buff, playerOnly, threshold, floor)
+local function TankOrSelfState(buff, playerOnly, threshold, floor)
     local spellIDs = buff.spellID
     if playerClass ~= buff.class then
         if
@@ -3252,18 +3228,19 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring,
     end
 end
 
--- Buffs the player must keep on other units. self_only mode tracks only buffs
--- on the player, so it hides this category, except the player check of a selfFallback buff.
+-- Buffs the player keeps on units that the player picks.
 local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring, expiringClass)
     local targetedVisible = IsCategoryVisibleForContent("targeted")
-    local selfOnly = trackingMode == "self_only"
+    -- Targeted buffs sit on other units, so personal mode keeps the group scope.
+    local scopeMode = trackingMode == "personal" and "all" or trackingMode
     local targExGlow, targMissGlow, targThreshold, targFloor = GetCategoryGlowSettings("targeted")
     for i, buff in ipairs(TargetedBuffs) do
         local entry = GetOrCreateEntry(buff.key, "targeted", i)
         local settingKey = GetBuffSettingKey(buff)
+        local target = BuffTargets.Resolve(buff, "targeted")
+        local scope = GetTrackingScope(scopeMode, buff.class, target, true)
 
-        local selfTargeted = buff.selfFallback or (buff.showSolo and cachedIsAlone)
-        if targetedVisible and (not selfOnly or selfTargeted) and IsBuffEnabled(settingKey) then
+        if targetedVisible and scope.show and IsBuffEnabled(settingKey) then
             local trackable = IsAuraTrackable(buff)
             local useGlowDet = isAuraRestricted and not trackable and buff.glowDetectable
             if (not isAuraRestricted or trackable or useGlowDet) and PassesPreChecks(buff, nil, db, trackingMode) then
@@ -3273,21 +3250,11 @@ local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring,
                     end
                 else
                     local shouldShow, remaining, lead, nextSlack
-                    if buff.selfFallback then
+                    if target == "tankOrSelf" then
                         shouldShow, remaining, lead, nextSlack =
-                            ShouldShowRoleTargetedBuff(buff, selfOnly, targThreshold, targFloor)
+                            TankOrSelfState(buff, scope.playerOnly, targThreshold, targFloor)
                     else
-                        shouldShow, remaining, lead, nextSlack = ShouldShowTargetedBuff(
-                            buff.spellID,
-                            buff.class,
-                            buff.beneficiaryRole,
-                            buff.requireSpecId,
-                            buff.key,
-                            buff.casterBuffId,
-                            targThreshold,
-                            targFloor,
-                            buff.showSolo
-                        )
+                        shouldShow, remaining, lead, nextSlack = AllyTargetState(buff, targThreshold, targFloor)
                     end
 
                     if shouldShow then
