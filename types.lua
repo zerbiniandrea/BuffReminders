@@ -59,6 +59,17 @@
 ---@alias RoleType "TANK"|"HEALER"|"DAMAGER"
 -- What one cast of the buff covers: the caster's party, or the whole raid.
 ---@alias BuffReach "party"|"raid"
+-- Who receives the buff. The category gives the default.
+--   group: every member who benefits needs a copy (raid default)
+--   anyone: one copy on any member covers the group (presence default)
+--   self: only the player
+--   ally: one unit that the caster picks. Needs a group (targeted default). "Just on me" modes hide it
+--   allyOrSelf: one unit that the caster picks, the player included. Also shown solo
+--   tankOrSelf: each tank (TANK role or Main Tank mark), one cast at a time. With no tank, the player
+---@alias BuffTarget "group"|"anyone"|"self"|"ally"|"allyOrSelf"|"tankOrSelf"
+-- Which copies satisfy the caster: any caster's copy, or only the player's own.
+-- A viewer of another class always counts any copy. The category gives the default.
+---@alias BuffCopies "any"|"own"
 ---@alias SpecID number
 ---@alias BuffBeneficiaries table<string, table<ClassName, boolean>>
 ---@alias SpecBeneficiaries table<string, table<SpecID, boolean>>

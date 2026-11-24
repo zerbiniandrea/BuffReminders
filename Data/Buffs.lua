@@ -95,6 +95,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field chatRequestSpell? fun(): number? The spell that a player of another class asks for. That player checks only their own aura, out of combat. The chat request names the spell
 ---@field visibilityCondition? fun(): boolean Return false to hide the buff
 ---@field classChoices? ClassChoiceGrid Each member wants a choice of their class list. The click casts the choice of the largest class set
+---@field target? BuffTarget|fun(): BuffTarget A function reads a user setting. Default "group"
 ---@field selfScope? fun(): boolean Return true to check and cast the buff on the player only
 ---@field subChoices? SubChoiceRow Choice icons beside the reminder
 ---@field infoTooltip? TooltipText
@@ -117,6 +118,8 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field noExpirationGlow? boolean
 ---@field readyCheckOnly? boolean Only show during ready checks
 ---@field showOnInstanceEntry? boolean Also show when entering an instance (not M+)
+---@field target? BuffTarget Default "anyone"
+---@field copies? BuffCopies Default "any"
 ---@field castOnOthers? boolean Buff exists on the target, not the caster (e.g., Soulstone)
 ---@field pinnedTarget? fun(): string? User-assigned hard target name, nil when unset (e.g., Soulstone pin)
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
@@ -144,6 +147,8 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field clickMacro? fun(spellID: number?): string
 ---@field casterBuffId? number Check this buff on the caster instead of scanning group
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
+---@field target? BuffTarget Default "ally"
+---@field copies? BuffCopies Default "own"
 ---@field showSolo? boolean Also show with no group. The player is then the only target
 ---@field selfFallback? boolean Any rank from any caster counts. The target is a tank (TANK role or Main Tank mark), else the player. A tank of another class can request it in chat
 ---@field targetHint? string Gray text after the remembered target name in the icon tooltip
@@ -797,6 +802,8 @@ BR.BUFF_TABLES = {
             chatRequestable = true,
             readyCheckOnly = true,
             castOnOthers = true,
+            target = "ally",
+            copies = "own",
             noExpirationGlow = true,
             castReady = function()
                 if playerClass ~= "WARLOCK" then

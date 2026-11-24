@@ -1631,6 +1631,8 @@ BR.BUFF_TABLES = {
             overlayText = L["Overlay.NoThorns"],
             levelRequired = 6, -- Thorns rank 1
             selfFallback = true,
+            target = "tankOrSelf",
+            copies = "any",
             targetHint = L["Tooltip.TankHint"],
             chatRequestable = true,
             -- A tank of another class sees the request only when the user turns it on.
@@ -1645,6 +1647,7 @@ BR.BUFF_TABLES = {
             spellID = 1328548,
             key = "oathOfLight",
             showSolo = true,
+            target = "allyOrSelf",
             name = L["Buff.OathOfLight"],
             class = "PALADIN",
             overlayText = L["Overlay.NoOath"],
