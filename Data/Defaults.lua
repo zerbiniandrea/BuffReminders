@@ -91,9 +91,10 @@ BR.defaults = {
     buffTrackingMode = "all",
     -- Per-context tracking overrides: each is a tracking mode, or "default" for
     -- no override. When several apply at once, the most restrictive mode wins.
-    outsideInstancesMode = "self_only",
+    -- Forever players level in open-world groups, so buffs on group mates matter there.
+    outsideInstancesMode = BR.CLIENT == BR.ClientType.Forever and "my_buffs" or "self_only",
     combatMode = "default",
-    levelingMode = "my_buffs",
+    levelingMode = BR.CLIENT == BR.ClientType.Forever and "default" or "my_buffs",
     levelingExpiring = BR.CLIENT == BR.ClientType.Forever and "own" or "all",
     hideAllInVehicle = false,
     hideWhileMounted = false,
