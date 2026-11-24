@@ -119,7 +119,6 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field showOnInstanceEntry? boolean Also show when entering an instance (not M+)
 ---@field target? BuffTarget Default "anyone"
 ---@field copies? BuffCopies Default "any"
----@field castOnOthers? boolean Buff exists on the target, not the caster (e.g., Soulstone)
 ---@field pinnedTarget? fun(): string? User-assigned hard target name, nil when unset (e.g., Soulstone pin)
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
 ---@field groupOnly? boolean Only show when in a group (hide when solo)
@@ -148,8 +147,6 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
 ---@field target? BuffTarget Default "ally"
 ---@field copies? BuffCopies Default "own"
----@field showSolo? boolean Also show with no group. The player is then the only target
----@field selfFallback? boolean Any rank from any caster counts. The target is a tank (TANK role or Main Tank mark), else the player. A tank of another class can request it in chat
 ---@field targetHint? string Gray text after the remembered target name in the icon tooltip
 ---@field levelRequired? number A caster in the group must have this level to count
 ---@field noExpirationGlow? boolean
@@ -800,7 +797,6 @@ BR.BUFF_TABLES = {
             overlayText = L["Overlay.NoSoulstone"],
             chatRequestable = true,
             readyCheckOnly = true,
-            castOnOthers = true,
             target = "ally",
             copies = "own",
             noExpirationGlow = true,

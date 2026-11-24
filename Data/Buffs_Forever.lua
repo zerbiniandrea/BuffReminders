@@ -1630,7 +1630,6 @@ BR.BUFF_TABLES = {
             class = "DRUID",
             overlayText = L["Overlay.NoThorns"],
             levelRequired = 6, -- Thorns rank 1
-            selfFallback = true,
             target = "tankOrSelf",
             copies = "any",
             targetHint = L["Tooltip.TankHint"],
@@ -1646,7 +1645,6 @@ BR.BUFF_TABLES = {
         {
             spellID = 1328548,
             key = "oathOfLight",
-            showSolo = true,
             target = "allyOrSelf",
             name = L["Buff.OathOfLight"],
             class = "PALADIN",
