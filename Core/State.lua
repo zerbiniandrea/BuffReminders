@@ -1545,71 +1545,94 @@ local function GetEffectiveTrackingMode(db)
     return mode
 end
 
+-- Target and copies rules. One table, so that State.lua stays below the 200-local limit.
+local BuffTargets = {
+    ---@type table<string, BuffTarget>
+    DEFAULT_TARGET = { raid = "group", presence = "anyone", targeted = "ally" },
+    ---@type table<string, BuffCopies>
+    DEFAULT_COPIES = { raid = "any", presence = "any", targeted = "own" },
+}
+
+---@param buff table
+---@param category "raid"|"presence"|"targeted"
+---@return BuffTarget
+function BuffTargets.Resolve(buff, category)
+    local target = buff.target
+    if type(target) == "function" then
+        target = target()
+    end
+    return target or BuffTargets.DEFAULT_TARGET[category]
+end
+
+---@param buff table
+---@param category "raid"|"presence"|"targeted"
+---@return BuffCopies
+function BuffTargets.Copies(buff, category)
+    return buff.copies or BuffTargets.DEFAULT_COPIES[category]
+end
+
+---Whether each cast goes on one unit that the caster picks, so target memory applies.
+---@param target BuffTarget
+---@return boolean
+function BuffTargets.PicksUnit(target)
+    return target == "ally" or target == "allyOrSelf" or target == "tankOrSelf"
+end
+
+---Whether the player is a valid receiver of the buff. "Just on me" modes show only these buffs.
+---@param target BuffTarget
+---@return boolean
+function BuffTargets.IncludesPlayer(target)
+    if target == "ally" then
+        return false
+    end
+    if target == "allyOrSelf" then
+        return cachedIsAlone
+    end
+    return true
+end
+
 ---Determine visibility and scan scope for a buff based on tracking mode.
----Raid buffs go on everyone, so "scan group" means showing coverage numbers.
----Presence buffs live on the caster, so "scan group" means finding if anyone has the aura.
+---"group" buffs go on everyone, so "scan group" means showing coverage numbers.
+---"anyone" buffs need one copy, so "scan group" means finding if anyone has the aura.
 ---@param trackingMode string
 ---@param buffClass ClassName
----@param category "raid"|"presence"
+---@param target BuffTarget
 ---@param hasCaster boolean
----@param castOnOthers? boolean Buff exists on the target, not the caster (e.g., Soulstone)
 ---@return { show: boolean, playerOnly: boolean }
-local function GetTrackingScope(trackingMode, buffClass, category, hasCaster, castOnOthers)
+local function GetTrackingScope(trackingMode, buffClass, target, hasCaster)
     if not hasCaster then
         return SCOPE_HIDDEN
     end
     if ModeHidesOtherClasses(trackingMode) and buffClass ~= playerClass then
         return SCOPE_HIDDEN
     end
+    if target == "ally" and cachedIsAlone then
+        return SCOPE_HIDDEN
+    end
+    if target == "self" then
+        return SCOPE_PLAYER_ONLY
+    end
 
     if trackingMode == "self_only" then
-        -- Only the player's own class buffs, on the player. A castOnOthers buff
-        -- (e.g. Soulstone) lives on the target, not on the player.
-        if category == "presence" and castOnOthers then
-            return SCOPE_HIDDEN
-        end
-        return SCOPE_PLAYER_ONLY
+        return BuffTargets.IncludesPlayer(target) and SCOPE_PLAYER_ONLY or SCOPE_HIDDEN
     elseif trackingMode == "personal" then
-        -- Presence buffs from other classes exist only on the caster, not on the
-        -- player. In personal mode, a castOnOthers buff (Soulstone) belongs to
-        -- another player.
-        if category == "presence" and (buffClass ~= playerClass or castOnOthers) then
+        -- An "anyone" buff of another class sits on its caster, never on the player.
+        if target == "anyone" and buffClass ~= playerClass then
             return SCOPE_HIDDEN
         end
-        return SCOPE_PLAYER_ONLY
+        return BuffTargets.IncludesPlayer(target) and SCOPE_PLAYER_ONLY or SCOPE_HIDDEN
     elseif trackingMode == "smart" then
         local isMyClass = buffClass == playerClass
-        -- Raid: scan the group when the player is the caster (show coverage),
-        -- otherwise check the player only.
-        -- Presence: check the player only when the player is the caster, scan the
-        -- group to find other casters.
-        --   castOnOthers: always scan the group (the buff is on the target).
-        if category == "raid" then
-            if isMyClass then
-                return SCOPE_GROUP
-            else
-                return SCOPE_PLAYER_ONLY
-            end
-        else
-            if isMyClass and not castOnOthers then
-                return SCOPE_PLAYER_ONLY
-            else
-                return SCOPE_GROUP
-            end
-        end
-    elseif trackingMode == "my_buffs" then
-        -- Raid: scan the group to show coverage numbers.
-        -- Presence: check the player's own aura only.
-        --   castOnOthers: scan the group (the buff is on another unit).
-        if category == "presence" and not castOnOthers then
+        if target == "group" then
+            return isMyClass and SCOPE_GROUP or SCOPE_PLAYER_ONLY
+        elseif target == "anyone" and isMyClass then
             return SCOPE_PLAYER_ONLY
-        else
-            return SCOPE_GROUP
         end
-    else
-        -- "all" mode: always scan the full group
         return SCOPE_GROUP
+    elseif trackingMode == "my_buffs" then
+        return target == "anyone" and SCOPE_PLAYER_ONLY or SCOPE_GROUP
     end
+    return SCOPE_GROUP
 end
 
 -- ============================================================================
@@ -1703,7 +1726,7 @@ end
 ---Uses currentValidUnits cache built at start of refresh cycle
 ---@param spellIDs SpellID
 ---@param playerOnly? boolean Only check the player, not the group
----@param playerCastOnly? boolean Count only auras cast by the player (e.g. castOnOthers for the caster class)
+---@param playerCastOnly? boolean Count only auras cast by the player (copies = "own" for the caster class)
 ---@param partyOnly? boolean In a raid, look only in the player's subgroup
 ---@param threshold number Input of Lead.Of
 ---@param floor number Input of Lead.Of
@@ -2940,7 +2963,7 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, exp
         local scope = GetTrackingScope(
             trackingMode,
             buff.class,
-            "raid",
+            BuffTargets.Resolve(buff, "raid"),
             HasCasterForBuff(buff.class, buff.levelRequired, buff.reach)
         )
         local requester = buff.chatRequestSpell ~= nil and playerClass ~= buff.class
@@ -3127,12 +3150,12 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring,
             suppressed = suppressor and suppressor.visible
         end
         if not suppressed then
+            local target = BuffTargets.Resolve(buff, "presence")
             local scope = GetTrackingScope(
                 trackingMode,
                 buff.class,
-                "presence",
-                HasCasterForBuff(buff.class, buff.levelRequired, buff.reach),
-                buff.castOnOthers
+                target,
+                HasCasterForBuff(buff.class, buff.levelRequired, buff.reach)
             )
             local dungeonEntryOk = buff.showOnInstanceEntry and GameContext.IsInDungeonEntry()
             local readyCheckOk = not buff.readyCheckOnly or GameContext.IsInReadyCheck()
@@ -3154,16 +3177,17 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring,
                 and (readyCheckOk or dungeonEntryOk)
                 and scope.show
                 and (not buff.groupOnly or #currentValidUnits > 1) -- solo = 1 entry (player only)
-            -- castOnOthers target memory (e.g. Soulstone) updates on every refresh
+            -- Target memory of a one-unit buff (e.g. Soulstone) updates on every refresh
             -- the aura API allows, independent of reminder visibility: Soulstone's
             -- display is ready-check-gated, but the click macro needs current memory
             -- at all times. The display branch below reuses this scan result, so the
             -- buff is never scanned twice in one refresh.
-            local isOwnCaster = buff.castOnOthers and buff.class == playerClass
+            local isOwnCaster = BuffTargets.Copies(buff, "presence") == "own" and buff.class == playerClass
             local hasBuff, minRemaining, targetEntry, minLead, nextSlack
             local scanned = false
             if
                 isOwnCaster
+                and BuffTargets.PicksUnit(target)
                 and not GameContext.IsInCombat()
                 and #currentValidUnits > 1
                 and IsBuffEnabled(buff.key)
@@ -3197,7 +3221,7 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring,
                             SetEntryText(entry, buff.overlayText, presMissGlow)
                         end
                     else
-                        -- castOnOthers: for the caster class, count only the player's
+                        -- copies = "own": for the caster class, count only the player's
                         -- own cast. That resolves the right target and keeps another
                         -- caster's coverage from hiding the icon.
                         if not scanned then
@@ -4532,10 +4556,6 @@ end
 -- unresolved name can evict a member the class/role fallback still needs.
 
 do
-    local GetUnitName = GetUnitName
-    local IsInRaid = IsInRaid
-    local GetNumGroupMembers = GetNumGroupMembers
-
     local rosterFrame = CreateFrame("Frame")
     BR.Client.RegisterEvent(rosterFrame, "GROUP_ROSTER_UPDATE")
     rosterFrame:SetScript("OnEvent", function()
