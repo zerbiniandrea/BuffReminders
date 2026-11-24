@@ -847,8 +847,6 @@ L["Options.BuffTracking.MyBuffs"] = "내 버프만, 모든 사람에게"
 L["Options.BuffTracking.MyBuffs.Desc"] =
     "내 직업이 걸 수 있는 버프만 표시하되, 그룹 전체 적용 여부는 추적합니다."
 L["Options.BuffTracking.OnlyMine"] = "모든 버프, 나한테만"
-L["Options.BuffTracking.OnlyMine.Desc"] =
-    "모든 버프 유형을 표시하지만 나한테 있는지만을 확인합니다. 그룹은 세지 않습니다."
 L["Options.BuffTracking.SelfOnly"] = "내 버프만, 나한테만"
 L["Options.BuffTracking.SelfOnly.Desc"] =
     "내 직업이 걸 수 있는 버프만 표시하고 나한테 있는지만 확인합니다. 그룹 및 다른 사람에게 건 버프 수는 세지 않습니다."

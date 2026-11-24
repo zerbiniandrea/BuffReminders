@@ -853,8 +853,6 @@ L["Options.BuffTracking.MyBuffs"] = "僅我的增益，所有玩家"
 L["Options.BuffTracking.MyBuffs.Desc"] =
     "僅顯示你的職業能提供的增益，但會追蹤整個隊伍的套用情況。"
 L["Options.BuffTracking.OnlyMine"] = "所有增益，僅我需要的"
-L["Options.BuffTracking.OnlyMine.Desc"] =
-    "顯示所有類型的增益，但僅檢查自身是否擁有。不顯示團體數量統計。"
 L["Options.BuffTracking.SelfOnly"] = "只有我的增益，只在我身上"
 L["Options.BuffTracking.SelfOnly.Desc"] =
     "只顯示你的職業可以提供的增益，並且僅檢查自身是否擁有。沒有團體數量統計，也沒有你對其他人施加的增益。"

@@ -1081,7 +1081,7 @@ english["Options.BuffTracking.MyBuffs.Desc"] =
     "Only show buffs your class can provide. Still tracks full group coverage."
 english["Options.BuffTracking.OnlyMine"] = "All buffs, just on me"
 english["Options.BuffTracking.OnlyMine.Desc"] =
-    "Show all buff types, but only check whether you personally have them. No group counts."
+    "Show all buff types, but only check whether you personally have them. No group counts. Buffs you cast on others, such as Beacon of Light, still show."
 english["Options.BuffTracking.SelfOnly"] = "Only my buffs, just on me"
 english["Options.BuffTracking.SelfOnly.Desc"] =
     "Only show buffs your class can provide, and only check whether you personally have them. No group counts, no buffs you cast on others."
