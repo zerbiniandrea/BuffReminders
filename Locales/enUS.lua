@@ -975,7 +975,7 @@ english["BuffPanel.Tracking.Scope.Gathering"] = "Gathering only"
 english["BuffPanel.Tracking.Scope.All"] = "All tracking"
 english["BuffPanel.GroupCast"] = "Auto group version (uses a reagent)"
 english["BuffPanel.GroupCast.Desc"] =
-    "If enough members of your party lack the buff and are in range, and you have the reagent, a left click casts the group version on you. Otherwise it casts the single-target version."
+    "If enough members of your party lack the buff and are in range, and you have the reagent, a left click casts the group version on you. Otherwise it casts the single-target version. Hover the icon to pick the other version for one cast."
 english["BuffPanel.GroupCast.Blessing.Desc"] =
     "If enough members of one class lack the same blessing, a click casts the Greater version (needs Symbol of Kings). Only when you give that blessing to the whole class."
 english["BuffPanel.GroupCastMin"] = "Group version at"
