@@ -3258,7 +3258,8 @@ local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring,
         local entry = GetOrCreateEntry(buff.key, "targeted", i)
         local settingKey = GetBuffSettingKey(buff)
 
-        if targetedVisible and (not selfOnly or buff.selfFallback) and IsBuffEnabled(settingKey) then
+        local selfTargeted = buff.selfFallback or (buff.showSolo and cachedIsAlone)
+        if targetedVisible and (not selfOnly or selfTargeted) and IsBuffEnabled(settingKey) then
             local trackable = IsAuraTrackable(buff)
             local useGlowDet = isAuraRestricted and not trackable and buff.glowDetectable
             if (not isAuraRestricted or trackable or useGlowDet) and PassesPreChecks(buff, nil, db, trackingMode) then
