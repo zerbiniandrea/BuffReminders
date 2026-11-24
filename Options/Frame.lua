@@ -9,6 +9,7 @@ local BR = ns
 -- content.
 --
 -- Each page is registered as BR.Options.Pages.<id> = { title, Build = fn(content), showMasqueBanner = bool }.
+-- The header search box filters the SEARCH_PAGE_ID page through its Search(text) function.
 
 local max, min = math.max, math.min
 
@@ -369,6 +370,100 @@ end
 -- PANEL BUILDER
 -- ============================================================================
 
+local SEARCH_PAGE_ID = "allBuffs"
+local SEARCH_WIDTH = 200
+local SEARCH_HEIGHT = 20
+local SEARCH_GLYPH_SIZE = 12
+local SEARCH_CLEAR_SIZE = 16
+-- Left text inset of the search box: the glyph, plus the gap to the text.
+local SEARCH_TEXT_LEFT = 22
+local SEARCH_GLYPH_TEXTURE = "Interface\\AddOns\\BuffReminders\\Media\\search.tga"
+local SEARCH_CLEAR_TEXTURE = "Interface\\AddOns\\BuffReminders\\Media\\clear.tga"
+
+local function PaintGlyph(tex, color)
+    tex:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
+end
+
+---@return table holder
+---@return table editBox
+---@return fun(text: string, matches: integer, searching: boolean) update Syncs the placeholder, clear button and count
+local function CreateSearchBar(parent)
+    local tokens = Theme.search
+    local holder = Components.TextInput(parent, { labelWidth = 0, width = SEARCH_WIDTH })
+    holder:SetHeight(SEARCH_HEIGHT)
+    local editBox = holder.editBox
+    local box = editBox:GetParent()
+    box:SetHeight(SEARCH_HEIGHT)
+
+    local glyph = box:CreateTexture(nil, "OVERLAY")
+    glyph:SetTexture(SEARCH_GLYPH_TEXTURE)
+    glyph:SetSize(SEARCH_GLYPH_SIZE, SEARCH_GLYPH_SIZE)
+    glyph:SetPoint("LEFT", editBox, "LEFT", (SEARCH_TEXT_LEFT - SEARCH_GLYPH_SIZE) / 2 - 1, 0)
+
+    -- The text inset and the placeholder share one left edge, so the text does not move on the first key.
+    local placeholder = box:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    placeholder:SetPoint("LEFT", editBox, "LEFT", SEARCH_TEXT_LEFT, 0)
+    SetTextColor(placeholder, Theme.editBox.defaultText)
+    placeholder:SetText(L["Options.SearchReminders"])
+
+    local clear = CreateFrame("Button", nil, box)
+    clear:SetSize(SEARCH_CLEAR_SIZE, SEARCH_CLEAR_SIZE)
+    clear:SetPoint("RIGHT", box, "RIGHT", -3, 0)
+    clear:SetFrameLevel(editBox:GetFrameLevel() + 2)
+    local clearTex = clear:CreateTexture(nil, "ARTWORK")
+    clearTex:SetTexture(SEARCH_CLEAR_TEXTURE)
+    clearTex:SetSize(8, 8)
+    clearTex:SetPoint("CENTER")
+    PaintGlyph(clearTex, tokens.clear)
+    clear:SetScript("OnEnter", function()
+        PaintGlyph(clearTex, tokens.clearHover)
+    end)
+    clear:SetScript("OnLeave", function()
+        PaintGlyph(clearTex, tokens.clear)
+    end)
+    clear:SetScript("OnClick", function()
+        editBox:SetText("")
+        editBox:SetFocus()
+    end)
+    clear:Hide()
+
+    local count = box:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    BR.ApplyNoteColor(count)
+    count:SetPoint("RIGHT", clear, "LEFT", -2, 0)
+
+    local function PaintSearchGlyph()
+        local active = editBox:HasFocus() or editBox:GetText() ~= ""
+        PaintGlyph(glyph, active and tokens.glyphActive or tokens.glyph)
+    end
+    editBox:HookScript("OnEditFocusGained", PaintSearchGlyph)
+    editBox:HookScript("OnEditFocusLost", PaintSearchGlyph)
+    editBox:HookScript("OnEscapePressed", function(self)
+        self:SetText("")
+    end)
+    editBox:HookScript("OnEnter", function(self)
+        BR.ShowTooltip(self, L["Options.SearchReminders"], L["Options.SearchReminders.Desc"], "ANCHOR_BOTTOM")
+    end)
+    editBox:HookScript("OnLeave", function()
+        BR.HideTooltip()
+    end)
+
+    local function Update(text, matches, searching)
+        local hasText = text ~= ""
+        placeholder:SetShown(not hasText)
+        clear:SetShown(hasText)
+        count:SetShown(searching)
+        count:SetFormattedText(L["Options.SearchCount"], matches)
+        local right = 4
+        if hasText then
+            right = right + SEARCH_CLEAR_SIZE + (searching and count:GetStringWidth() + 4 or 0)
+        end
+        editBox:SetTextInsets(SEARCH_TEXT_LEFT, right, 0, 0)
+        PaintSearchGlyph()
+    end
+    Update("", 0, false)
+    return holder, editBox, Update
+end
+
 local function CreateOptionsPanel()
     local panel = CreatePanel("BuffRemindersOptions", PANEL_WIDTH, PANEL_HEIGHT, {
         escClose = true,
@@ -454,10 +549,11 @@ local function CreateOptionsPanel()
     -- ====================================================================
     local MIN_PCT, MAX_PCT = PANEL_ZOOM.MIN, PANEL_ZOOM.MAX
 
-    local closeBtn = BR.Options.Helpers.AddCloseButton(panel)
+    BR.Options.Helpers.AddCloseButton(panel)
 
     local scaleHolder = CreateFrame("Frame", nil, panel)
-    scaleHolder:SetPoint("RIGHT", closeBtn, "LEFT", -8, 0)
+    -- The controls center on the header band, as the title does. The close button keeps the corner.
+    scaleHolder:SetPoint("RIGHT", panel, "TOPRIGHT", C.DIALOG_CLOSE_INSET - C.DIALOG_CLOSE_SIZE - 8, -HEADER_HEIGHT / 2)
     scaleHolder:SetSize(60, 16)
 
     local scaleDown = scaleHolder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -517,6 +613,9 @@ local function CreateOptionsPanel()
     end)
 
     UpdateScaleText()
+
+    local searchHolder, searchEdit, UpdateSearchBar = CreateSearchBar(panel)
+    searchHolder:SetPoint("RIGHT", scaleHolder, "LEFT", -16, 0)
 
     panel:SetScale(BR.PanelScale())
 
@@ -619,6 +718,10 @@ local function CreateOptionsPanel()
             return
         end
         activePageId = pageId
+        -- The search filters one page, so a kept query would hide rows on the next visit with no visible reason.
+        if pageId ~= SEARCH_PAGE_ID and searchEdit:GetText() ~= "" then
+            searchEdit:SetText("")
+        end
         for id, scrollFrame in pairs(pageContainers) do
             if id == pageId then
                 BuildPageIfNeeded(id)
@@ -785,6 +888,22 @@ local function CreateOptionsPanel()
     -- Snapshot the unacknowledged what's-new entries before the first page
     -- builds. The row dots and the sidebar bubble-up read that snapshot.
     BR.Options.WhatsNew.Refresh()
+
+    -- A query typed on another page opens the search page first.
+    searchEdit:HookScript("OnTextChanged", function(self)
+        local text = self:GetText()
+        if text ~= "" and activePageId ~= SEARCH_PAGE_ID and BR.Options.Pages[SEARCH_PAGE_ID] then
+            ActivatePage(SEARCH_PAGE_ID)
+        end
+        local matches, searching = 0, false
+        if pageBuilt[SEARCH_PAGE_ID] then
+            matches, searching = BR.Options.Pages[SEARCH_PAGE_ID].Search(text)
+        end
+        UpdateSearchBar(text, matches, searching)
+    end)
+    panel:HookScript("OnHide", function()
+        searchEdit:SetText("")
+    end)
 
     if firstPageId then
         ActivatePage(firstPageId)

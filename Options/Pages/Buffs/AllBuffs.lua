@@ -19,6 +19,7 @@ local BUFF_TABLES = BR.BUFF_TABLES
 
 local COL_PADDING = BR.Options.Constants.COL_PADDING
 local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
+local ITEM_HEIGHT = BR.Options.Constants.ITEM_HEIGHT
 
 -- Vertical gap between header text and the description below it. The gap must
 -- keep the header descenders (g/p/y) clear of the note's caps.
@@ -32,10 +33,8 @@ local NOTE_TO_ROWS_GAP = 16
 local ROW_INDENT = 6
 -- Vertical gap between the last row of one section and the next header.
 local INTER_SECTION_GAP = 10
-local SEARCH_TO_SECTIONS_GAP = 14
-local SEARCH_DIM_ALPHA = 0.25
--- Space kept above the first match after a scroll, so its section header stays in view.
-local SEARCH_SCROLL_MARGIN = 40
+-- While a search hides the notes, rows follow the header directly. The gap keeps the header descenders clear.
+local HEADER_TO_ROWS_GAP = 20
 
 local SECTIONS = {
     {
@@ -75,32 +74,34 @@ local SECTIONS = {
     },
 }
 
-local function CreateSectionWithNote(parent, x, y, headerText, noteText)
+---@class AllBuffsSection
+---@field header table
+---@field note table
+---@field title string Lowercase section title
+---@field rows BuffRowSearch[]
+---@field visibleRows table[] Row frames that the current query keeps, in list order
+
+local function CreateSection(parent, headerText, noteText)
     local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    header:SetPoint("TOPLEFT", x, y)
     header:SetText(BR.TITLE_COLOR_CODE .. headerText .. "|r")
 
     local note = parent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     BR.ApplyNoteColor(note)
-    note:SetPoint("TOPLEFT", x, y - HEADER_TO_NOTE_GAP)
     note:SetText(noteText)
 
-    return y - HEADER_TO_NOTE_GAP - NOTE_TO_ROWS_GAP, header, note
+    return header, note
+end
+
+local function HeaderToRows(searching)
+    return searching and HEADER_TO_ROWS_GAP or HEADER_TO_NOTE_GAP + NOTE_TO_ROWS_GAP
 end
 
 -- Tries every split that keeps list order in each column and the first section on the left.
 -- Picks the split with the shortest tallest column. A greedy fill leaves the last section unbalanced.
-local function AssignColumns()
-    local Measure = BR.Options.BuffRow.Measure
-    local sections, heights = {}, {}
-    for _, section in ipairs(SECTIONS) do
-        if BR.IsCategoryAvailable(section.category) then
-            sections[#sections + 1] = section
-            heights[#heights + 1] = HEADER_TO_NOTE_GAP + NOTE_TO_ROWS_GAP + Measure(BUFF_TABLES[section.category] or {})
-        end
-    end
-
-    local n = #sections
+---@param heights number[]
+---@return integer[] columns Column (1 or 2) of each entry in heights
+local function AssignColumns(heights)
+    local n = #heights
     local bestMask, bestMax, bestDiff = 0, math.huge, math.huge
     for mask = 0, 2 ^ math.max(n - 1, 0) - 1 do
         local h, count = { 0, 0 }, { 0, 0 }
@@ -120,137 +121,153 @@ local function AssignColumns()
         end
     end
 
-    local columns = { {}, {} }
+    local columns = {}
     for i = 1, n do
         local col = 1
         if i > 1 then
             col = bestMask % 2 + 1
             bestMask = math.floor(bestMask / 2)
         end
-        columns[col][#columns[col] + 1] = sections[i]
+        columns[i] = col
     end
-    return columns[1], columns[2]
+    return columns
 end
 
-local function RenderColumn(parent, x, y, sections, colWidth, rendered)
-    local Render = BR.Options.BuffRow.Render
-    local rowsX = x + ROW_INDENT
-    -- Rows start ROW_INDENT in from the column's left edge; span the rest of
-    -- the column so the "Settings" link lands on the column's right edge.
-    local rowWidth = colWidth - ROW_INDENT
-    for i, section in ipairs(sections) do
-        local title = L[section.titleKey]
-        local header, note
-        y, header, note = CreateSectionWithNote(parent, x, y, title, L[section.noteKey])
-        local rows = {}
-        y = Render(parent, rowsX, y, BUFF_TABLES[section.category] or {}, rowWidth, rows)
-        rendered[#rendered + 1] = { header = header, note = note, title = title:lower(), rows = rows }
-        if i < #sections then
+-- A section title match keeps the whole section. A row kept by a term other than its name shows that term.
+---@param rendered AllBuffsSection[]
+---@return AllBuffsSection[] shown Sections that keep at least one row
+---@return integer matches Number of kept rows
+---@return boolean searching
+local function FilterSections(rendered, query)
+    query = query:lower():match("^%s*(.-)%s*$")
+    local searching = query ~= ""
+    local shown, matches = {}, 0
+    for _, section in ipairs(rendered) do
+        local titleHit = not searching or section.title:find(query, 1, true) ~= nil
+        local visibleRows = {}
+        for _, row in ipairs(section.rows) do
+            local hit, hint = titleHit, nil
+            if not titleHit then
+                for i, term in ipairs(row.lowerTerms) do
+                    if term:find(query, 1, true) then
+                        hit = true
+                        hint = i > 1 and row.terms[i] or nil
+                        break
+                    end
+                end
+            end
+            row.frame:SetShown(hit)
+            row.frame:SetMatchHint(hint)
+            if hit then
+                visibleRows[#visibleRows + 1] = row.frame
+            end
+        end
+        section.visibleRows = visibleRows
+        local keep = #visibleRows > 0
+        section.header:SetShown(keep)
+        section.note:SetShown(keep and not searching)
+        if keep then
+            shown[#shown + 1] = section
+            matches = matches + #visibleRows
+        end
+    end
+    return shown, matches, searching
+end
+
+---@param shown AllBuffsSection[]
+---@param xs number[] Left edge of each column
+---@return number height Height of the tallest column
+local function PlaceSections(shown, xs, searching)
+    local headerToRows = HeaderToRows(searching)
+    local heights = {}
+    for i, section in ipairs(shown) do
+        heights[i] = headerToRows + #section.visibleRows * ITEM_HEIGHT
+    end
+    local columns = AssignColumns(heights)
+    local ys = { PAGE_TOP_PADDING, PAGE_TOP_PADDING }
+    for i, section in ipairs(shown) do
+        local col = columns[i]
+        local x, y = xs[col], ys[col]
+        if y ~= PAGE_TOP_PADDING then
             y = y - INTER_SECTION_GAP
         end
-    end
-    return y
-end
-
--- A section title match keeps the whole section lit. Returns the lit frames, or nil for an empty query.
-local function ApplySearch(rendered, query)
-    query = query:lower():match("^%s*(.-)%s*$")
-    local matches = query ~= "" and {} or nil
-    for _, section in ipairs(rendered) do
-        local titleHit = query == "" or section.title:find(query, 1, true) ~= nil
-        local anyHit = titleHit
-        for _, row in ipairs(section.rows) do
-            local hit = titleHit or row.text:find(query, 1, true) ~= nil
-            row.frame:SetAlpha(hit and 1 or SEARCH_DIM_ALPHA)
-            if hit and matches then
-                matches[#matches + 1] = row.frame
-            end
-            anyHit = anyHit or hit
+        section.header:ClearAllPoints()
+        section.header:SetPoint("TOPLEFT", x, y)
+        section.note:ClearAllPoints()
+        section.note:SetPoint("TOPLEFT", x, y - HEADER_TO_NOTE_GAP)
+        y = y - headerToRows
+        for _, frame in ipairs(section.visibleRows) do
+            frame:ClearAllPoints()
+            frame:SetPoint("TOPLEFT", x + ROW_INDENT, y)
+            y = y - ITEM_HEIGHT
         end
-        local alpha = anyHit and 1 or SEARCH_DIM_ALPHA
-        section.header:SetAlpha(alpha)
-        section.note:SetAlpha(alpha)
-        if titleHit and matches then
-            matches[#matches + 1] = section.header
-        end
+        ys[col] = y
     end
-    return matches
+    return math.max(-ys[1], -ys[2])
 end
 
--- Scrolls only when no match is in view, so the list does not jump while the user types.
-local function ScrollToMatches(scrollFrame, content, matches)
-    if not matches or #matches == 0 then
-        return
-    end
-    local contentTop = content:GetTop()
-    if not contentTop then
-        return
-    end
-    local scroll = scrollFrame:GetVerticalScroll() or 0
-    local viewHeight = scrollFrame:GetHeight()
-    local first = math.huge
-    for _, frame in ipairs(matches) do
-        local top = frame:GetTop()
-        if top then
-            local offset = contentTop - top
-            if offset >= scroll and offset + frame:GetHeight() <= scroll + viewHeight then
-                return
-            end
-            first = math.min(first, offset)
-        end
-    end
-    if first == math.huge then
-        return
-    end
-    local range = scrollFrame:GetVerticalScrollRange() or 0
-    scrollFrame:SetVerticalScroll(math.max(0, math.min(range, first - SEARCH_SCROLL_MARGIN)))
-end
-
-local function CreateSearchBox(content, scrollFrame, x, y, width, rendered)
-    local holder = BR.Components.TextInput(content, { labelWidth = 0, width = width })
-    holder:SetPoint("TOPLEFT", x - 5, y)
-    local editBox = holder.editBox
-
-    local placeholder = editBox:GetParent():CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    placeholder:SetPoint("LEFT", 6, 0)
-    placeholder:SetText(L["BuffRow.SearchPlaceholder"])
-
-    editBox:HookScript("OnTextChanged", function(self)
-        local text = self:GetText()
-        placeholder:SetShown(text == "")
-        ScrollToMatches(scrollFrame, content, ApplySearch(rendered, text))
-    end)
-    editBox:HookScript("OnEscapePressed", function(self)
-        self:SetText("")
-    end)
-    -- The page builds once, so a kept query would dim rows on the next visit with no visible reason.
-    content:HookScript("OnHide", function()
-        editBox:SetText("")
-    end)
-    return y - holder:GetHeight() - SEARCH_TO_SECTIONS_GAP
-end
+---@type fun(text: string): integer, boolean
+local applyQuery
 
 local function Build(content, scrollFrame)
     local contentWidth = scrollFrame:GetContentWidth()
     local colWidth = math.floor((contentWidth - COL_PADDING * 3) / 2)
-    local leftX = COL_PADDING
-    local rightX = COL_PADDING + colWidth + COL_PADDING
+    local xs = { COL_PADDING, COL_PADDING + colWidth + COL_PADDING }
 
+    -- Rows start ROW_INDENT in from the column's left edge; span the rest of
+    -- the column so the "Settings" link lands on the column's right edge.
+    local rowWidth = colWidth - ROW_INDENT
+    local Render = BR.Options.BuffRow.Render
+    ---@type AllBuffsSection[]
     local rendered = {}
-    -- PAGE_TOP_PADDING is the standard page top margin, so the search box sits
-    -- at the same Y as the first element on every other page.
-    local startY = CreateSearchBox(content, scrollFrame, leftX, PAGE_TOP_PADDING, colWidth, rendered)
+    for _, section in ipairs(SECTIONS) do
+        if BR.IsCategoryAvailable(section.category) then
+            local title = L[section.titleKey]
+            local header, note = CreateSection(content, title, L[section.noteKey])
+            local rows = {}
+            Render(content, 0, 0, BUFF_TABLES[section.category] or {}, rowWidth, rows)
+            rendered[#rendered + 1] =
+                { header = header, note = note, title = title:lower(), rows = rows, visibleRows = {} }
+        end
+    end
 
-    local leftSections, rightSections = AssignColumns()
-    local leftEndY = RenderColumn(content, leftX, startY, leftSections, colWidth, rendered)
-    local rightEndY = RenderColumn(content, rightX, startY, rightSections, colWidth, rendered)
+    local emptyText = content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    BR.ApplyNoteColor(emptyText)
+    emptyText:SetPoint("TOPLEFT", xs[1], PAGE_TOP_PADDING)
+    emptyText:SetText(L["Options.SearchEmpty"])
 
-    content:SetHeight(math.max(math.abs(leftEndY), math.abs(rightEndY)) + 16)
+    -- The scroll position before a search comes back when the search clears.
+    local savedScroll
+    applyQuery = function(text)
+        local shown, matches, searching = FilterSections(rendered, text)
+        content:SetHeight(PlaceSections(shown, xs, searching) + 16)
+        emptyText:SetShown(#shown == 0)
+        if searching then
+            savedScroll = savedScroll or scrollFrame:GetVerticalScroll()
+            scrollFrame:SetVerticalScroll(0)
+        elseif savedScroll then
+            local restore = savedScroll
+            savedScroll = nil
+            -- The scroll range follows the new content height only after the next layout pass.
+            C_Timer.After(0, function()
+                scrollFrame:SetVerticalScroll(math.min(restore, scrollFrame:GetVerticalScrollRange() or 0))
+            end)
+        end
+        return matches, searching
+    end
+    applyQuery("")
 end
 
 BR.Options.Pages.allBuffs = {
     title = L["Page.Reminders"],
     Build = Build,
+    ---Filters the page. The options panel calls it from the header search box, only after Build.
+    ---@param text string
+    ---@return integer matches
+    ---@return boolean searching
+    Search = function(text)
+        return applyQuery(text)
+    end,
 }
 
 -- Every buff with an `addedIn` cohort is a what's-new source. This is a provider,

@@ -55,6 +55,8 @@ local GLYPH_TO_LINK_GAP = 7
 -- never overlap the buff name, regardless of how glyph visibility changes later.
 -- Three slots: new-buff dot, detached pin, sound.
 local GLYPH_RESERVE = 3 * (GLYPH_SIZE + GLYPH_GAP)
+local MATCH_HINT_GAP = 6
+local MATCH_HINT_PREFIX = "\194\183 "
 
 -- The bundled dot and pin textures are white. The vertex color sets the hue.
 local NOTIFY_DOT_TEXTURE = "Interface\\AddOns\\BuffReminders\\Media\\dot.tga"
@@ -219,6 +221,22 @@ local function CreateBuffRow(
         holder.label:SetJustifyH("LEFT")
     end
 
+    local matchHint = holder:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    BR.ApplyNoteColor(matchHint)
+    matchHint:SetPoint("LEFT", holder.infoIcon or holder.label, "RIGHT", MATCH_HINT_GAP, 0)
+    matchHint:SetPoint("RIGHT", settingsBtn, "LEFT", -(GLYPH_RESERVE + LINK_GAP), 0)
+    matchHint:SetJustifyH("LEFT")
+    matchHint:SetWordWrap(false)
+    matchHint:Hide()
+    ---Shows the search term that kept the row, when the row name does not show it.
+    ---@param term? string
+    function holder:SetMatchHint(term)
+        if term then
+            matchHint:SetText(MATCH_HINT_PREFIX .. term)
+        end
+        matchHint:SetShown(term ~= nil)
+    end
+
     settingsBtn:SetScript("OnEnter", function(self)
         settingsText:SetTextColor(unpack(self.hoverColor or LINK_HOVER))
         BR.ShowTooltip(self, displayName, L["BuffRow.SettingsLink.Tooltip"], "ANCHOR_RIGHT", true)
@@ -270,7 +288,21 @@ local function AddBuffSearchTerms(terms, seen, buff)
     end
 end
 
----@param rows? { frame: table, text: string }[] Receives each row frame and its lowercase search text
+---@class BuffRowSearch
+---@field frame table Row holder, with SetMatchHint
+---@field terms string[] The row name first, then spell and class names
+---@field lowerTerms string[]
+
+---@return BuffRowSearch
+local function SearchRow(holder, terms)
+    local lowerTerms = {}
+    for i, term in ipairs(terms) do
+        lowerTerms[i] = term:lower()
+    end
+    return { frame = holder, terms = terms, lowerTerms = lowerTerms }
+end
+
+---@param rows? BuffRowSearch[] Receives each row frame and its search terms
 local function RenderBuffArray(parent, x, y, buffArray, rowWidth, rows)
     -- Bucket grouped buffs so the row factory sees one logical entry per groupId.
     local groupMembers = {}
@@ -316,7 +348,7 @@ local function RenderBuffArray(parent, x, y, buffArray, rowWidth, rows)
                     rowWidth
                 )
                 if rows then
-                    rows[#rows + 1] = { frame = holder, text = table.concat(terms, "\n"):lower() }
+                    rows[#rows + 1] = SearchRow(holder, terms)
                 end
             end
         else
@@ -336,7 +368,7 @@ local function RenderBuffArray(parent, x, y, buffArray, rowWidth, rows)
             if rows then
                 local terms = {}
                 AddBuffSearchTerms(terms, {}, buff)
-                rows[#rows + 1] = { frame = holder, text = table.concat(terms, "\n"):lower() }
+                rows[#rows + 1] = SearchRow(holder, terms)
             end
         end
     end
@@ -344,22 +376,4 @@ local function RenderBuffArray(parent, x, y, buffArray, rowWidth, rows)
     return y
 end
 
----Height that RenderBuffArray uses for the same array.
----@param buffArray table[]
----@return number
-local function MeasureBuffArray(buffArray)
-    local rows = 0
-    local seenGroups = {}
-    for _, buff in ipairs(buffArray) do
-        if not buff.groupId then
-            rows = rows + 1
-        elseif not seenGroups[buff.groupId] then
-            seenGroups[buff.groupId] = true
-            rows = rows + 1
-        end
-    end
-    return rows * ITEM_HEIGHT
-end
-
 BR.Options.BuffRow.Render = RenderBuffArray
-BR.Options.BuffRow.Measure = MeasureBuffArray

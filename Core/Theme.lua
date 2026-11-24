@@ -376,6 +376,7 @@ local function BuildRetail()
             unlearned = { 0.8, 0.2, 0.2, 1 },
             separator = Grey(0.25),
         },
+        search = { glyph = TEXT_DISABLED, glyphActive = ACCENT, clear = TEXT_DISABLED, clearHover = ACCENT },
     }
     return theme
 end
@@ -703,6 +704,7 @@ local function BuildForever()
             unlearned = { 0.769, 0.318, 0.243, 0.9 },
             separator = P.edgeDisabled,
         },
+        search = { glyph = P.textDisabled, glyphActive = P.accent, clear = P.textDisabled, clearHover = P.accent },
     }
     return theme
 end

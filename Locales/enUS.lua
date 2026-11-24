@@ -894,7 +894,11 @@ english["BuffRow.Glyph.Detached.Desc"] =
     "This icon is placed freely on screen. Manage it in the buff's Settings or on the Layout page."
 english["BuffRow.Glyph.New"] = "New buff"
 english["BuffRow.Glyph.New.Desc"] = "Added in the latest update."
-english["BuffRow.SearchPlaceholder"] = "Search by reminder, spell, or class"
+english["Options.SearchReminders"] = "Search reminders"
+english["Options.SearchReminders.Desc"] = "Find a reminder by its name, a spell name, or a class name."
+-- %d is the number of matching reminders
+english["Options.SearchCount"] = "%d found"
+english["Options.SearchEmpty"] = "No reminder matches this search."
 -- %s is the option name
 english["BuffPanel.EditOption"] = "Edit %s"
 english["BuffPanel.Show"] = "Show"
