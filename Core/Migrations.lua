@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 64
+BR.Migrations.DB_VERSION = 65
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -313,6 +313,11 @@ function BR.Migrations.RunProfile(profile)
             if type(profileDefaults) == "table" then
                 profileDefaults.paladinAuras = nil
             end
+        end,
+        -- [65] The expiring state below max level follows the duration share, so the
+        -- levelingExpiring choice has no reader. This pass clears it.
+        [65] = function()
+            profile.levelingExpiring = nil
         end,
     }
 

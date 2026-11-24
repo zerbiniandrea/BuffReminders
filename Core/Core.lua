@@ -301,7 +301,6 @@ local RootSettings = {
     outsideInstancesMode = "DisplayRefresh",
     combatMode = "DisplayRefresh",
     levelingMode = "DisplayRefresh",
-    levelingExpiring = "DisplayRefresh",
     showMissingCountOnly = "DisplayRefresh",
     -- Visibility toggles (routed through Config.Set -> VisibilityRefresh)
     hideInCombat = "VisibilityRefresh",

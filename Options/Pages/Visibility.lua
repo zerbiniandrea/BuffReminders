@@ -209,7 +209,6 @@ local function BuildTrackingOverridesSection(content, layout)
         L["Options.BuffTracking.Override.OutsideInstances"],
         L["Options.BuffTracking.Override.Combat"],
         L["Options.BuffTracking.Override.Leveling"],
-        L["Options.LevelingExpiring"],
     })
 
     local function OverrideDropdown(cfg)
@@ -217,7 +216,7 @@ local function BuildTrackingOverridesSection(content, layout)
             label = cfg.label,
             labelWidth = overrideLW,
             width = 220,
-            options = cfg.options or OverrideOptions(),
+            options = OverrideOptions(),
             tooltip = cfg.tooltip,
             get = function()
                 return BR.Config.Get(cfg.path)
@@ -266,36 +265,6 @@ local function BuildTrackingOverridesSection(content, layout)
             return BR.profile.hideWhileLeveling ~= true
         end,
         disabledReason = L["DisabledReason.LevelingOverride"],
-    })
-
-    OverrideDropdown({
-        label = L["Options.LevelingExpiring"],
-        path = "levelingExpiring",
-        options = {
-            {
-                value = "own",
-                label = L["Options.LevelingExpiring.Own"],
-                desc = L["Options.LevelingExpiring.Own.Desc"],
-            },
-            {
-                value = "all",
-                label = L["Options.LevelingExpiring.All"],
-                desc = L["Options.LevelingExpiring.All.Desc"],
-            },
-            {
-                value = "off",
-                label = L["Options.LevelingExpiring.Off"],
-                desc = L["Options.LevelingExpiring.Off.Desc"],
-            },
-        },
-        tooltip = {
-            title = L["Options.LevelingExpiring"],
-            desc = L["Options.LevelingExpiring.Desc"],
-        },
-        enabled = function()
-            return BR.profile.hideWhileLeveling ~= true
-        end,
-        disabledReason = L["DisabledReason.LevelingExpiring"],
     })
 end
 

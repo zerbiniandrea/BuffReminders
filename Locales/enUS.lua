@@ -1115,16 +1115,6 @@ english["Options.BuffTracking.Override.Combat.Desc"] =
 english["Options.BuffTracking.Override.Leveling"] = "While leveling"
 english["Options.BuffTracking.Override.Leveling.Desc"] =
     "Tracking mode to use below max level. Once you reach max level, the mode selected above is used."
-english["Options.LevelingExpiring"] = "Expiring while leveling"
-english["Options.LevelingExpiring.Desc"] =
-    "Below max level, choose which buffs warn before they expire. Missing buffs always show. Custom buffs keep their own threshold."
-english["Options.LevelingExpiring.Own"] = "Your spells only"
-english["Options.LevelingExpiring.Own.Desc"] =
-    "Only your own class buffs warn. Everything else shows only when missing or low."
-english["Options.LevelingExpiring.All"] = "All buffs"
-english["Options.LevelingExpiring.All.Desc"] = "Every buff warns, as at max level."
-english["Options.LevelingExpiring.Off"] = "Off (missing only)"
-english["Options.LevelingExpiring.Off.Desc"] = "Buffs show only when missing or low on stock."
 
 -- ============================================================================
 -- OPTIONS: PROFILES TAB
@@ -1409,8 +1399,6 @@ english["DisabledReason.OverrideSection"] = 'Turn on "Override" at the top of th
 english["DisabledReason.CombatOverride"] =
     '"In combat" hiding is enabled above, so nothing shows in combat and this override would have no effect.\nUncheck it to use a combat tracking override.'
 english["DisabledReason.LevelingOverride"] =
-    '"Leveling" is checked under Hide when above, so nothing shows while leveling. Uncheck it to use this.'
-english["DisabledReason.LevelingExpiring"] =
     '"Leveling" is checked under Hide when above, so nothing shows while leveling. Uncheck it to use this.'
 english["DisabledReason.ExpiringInCombat"] =
     '"In combat" hiding is enabled, so everything is already hidden during combat.'

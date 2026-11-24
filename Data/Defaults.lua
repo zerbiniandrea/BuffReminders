@@ -49,7 +49,6 @@ local BR = ns
 ---@field outsideInstancesMode BuffTrackingMode|"default"
 ---@field combatMode BuffTrackingMode|"default"
 ---@field levelingMode BuffTrackingMode|"default"
----@field levelingExpiring "own"|"all"|"off" Which buffs show the expiring state below max level
 ---@field hideAllInVehicle boolean
 ---@field hideWhileMounted boolean
 ---@field hideInLegacyInstances boolean
@@ -95,7 +94,6 @@ BR.defaults = {
     outsideInstancesMode = BR.CLIENT == BR.ClientType.Forever and "my_buffs" or "self_only",
     combatMode = "default",
     levelingMode = BR.CLIENT == BR.ClientType.Forever and "default" or "my_buffs",
-    levelingExpiring = BR.CLIENT == BR.ClientType.Forever and "own" or "all",
     hideAllInVehicle = false,
     hideWhileMounted = false,
     hideInLegacyInstances = true,
