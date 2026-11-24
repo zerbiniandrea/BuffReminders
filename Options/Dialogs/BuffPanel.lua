@@ -1313,6 +1313,29 @@ local SPECIAL_SECTIONS = {
         end,
     },
 
+    mageArmor = {
+        build = function(layout)
+            local drop = Components.Dropdown(body, {
+                label = L["BuffPanel.MageArmor"],
+                labelWidth = DRAWER_LABEL_W,
+                width = DRAWER_FIELD_W,
+                options = {
+                    { label = L["BuffPanel.MageArmor.Mage"], value = "mage" },
+                    { label = L["BuffPanel.MageArmor.Ice"], value = "ice" },
+                },
+                get = function()
+                    return BR.Config.Get("defaults.mageArmorPreference", "mage")
+                end,
+                tooltip = { title = L["BuffPanel.MageArmor"], desc = L["BuffPanel.MageArmor.Desc"] },
+                onChange = function(val)
+                    BR.Config.Set("defaults.mageArmorPreference", val)
+                end,
+            })
+            tinsert(bodyHolders, drop)
+            layout:Add(drop, 26, COMPONENT_GAP)
+        end,
+    },
+
     thorns = {
         build = function(layout)
             AddSpecialCheckbox(layout, {

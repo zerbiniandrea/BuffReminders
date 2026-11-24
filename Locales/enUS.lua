@@ -1000,6 +1000,11 @@ english["BuffPanel.RighteousFuryShow.Tank"] = "When tanking"
 english["BuffPanel.RighteousFuryShow.Always"] = "Always"
 english["BuffPanel.RighteousFuryShow.Desc"] =
     "When tanking: only with the Tank role or a Main Tank mark. Always: solo and in any group."
+english["BuffPanel.MageArmor"] = "Cast"
+english["BuffPanel.MageArmor.Mage"] = "Mage Armor"
+english["BuffPanel.MageArmor.Ice"] = "Frost/Ice Armor"
+english["BuffPanel.MageArmor.Desc"] =
+    "The armor that the icon shows and a click casts. Any armor satisfies the reminder. If you do not know this armor yet, the other armor is used."
 english["BuffPanel.Sound"] = "Sound"
 english["BuffPanel.Sound.None"] = "None"
 english["BuffPanel.Detached"] = "Own frame (detached)"

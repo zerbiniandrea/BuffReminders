@@ -721,6 +721,28 @@ local function RighteousFuryWanted()
     return (defaults ~= nil and defaults.righteousFuryShow == "always") or BR.StateHelpers.IsPlayerTank()
 end
 
+-- Ice Armor is the higher rank line of Frost Armor, so both are one choice. Highest rank first.
+local ICE_ARMOR_IDS = { 10220, 10219, 7320, 7302, 7301, 7300, 168 }
+local MAGE_ARMOR_IDS = { 22783, 22782, 6117 }
+local ALL_MAGE_ARMOR_IDS = {}
+for _, list in ipairs({ ICE_ARMOR_IDS, MAGE_ARMOR_IDS }) do
+    for _, id in ipairs(list) do
+        ALL_MAGE_ARMOR_IDS[#ALL_MAGE_ARMOR_IDS + 1] = id
+    end
+end
+
+---Highest known rank of the preferred armor, else of the other armor.
+---@return number?
+local function PreferredMageArmor()
+    local defaults = BR.profile.defaults
+    local preferIce = defaults ~= nil and defaults.mageArmorPreference == "ice"
+    local first, second = MAGE_ARMOR_IDS, ICE_ARMOR_IDS
+    if preferIce then
+        first, second = ICE_ARMOR_IDS, MAGE_ARMOR_IDS
+    end
+    return HighestKnownSpell(first) or HighestKnownSpell(second)
+end
+
 -- State remembers the tank that a role buff goes on. With no tank, the buff goes on the player.
 ---@param buffKey string
 ---@return fun(spellID: number?): string
@@ -1777,23 +1799,21 @@ BR.BUFF_TABLES = {
             end,
         },
         {
-            spellID = {
-                10220, -- Ice Armor
-                10219,
-                7320,
-                7302,
-                7301, -- Frost Armor
-                7300,
-                168,
-                22783, -- Mage Armor
-                22782,
-                6117,
-            },
+            spellID = ALL_MAGE_ARMOR_IDS,
             key = "mageArmor",
-            icons = { spells = { 10220 } },
+            icons = {
+                spells = { 10220 },
+                dynamic = function()
+                    local castID = PreferredMageArmor()
+                    return castID and BR.Icons.GetBuffTexture(castID)
+                end,
+            },
             name = L["Buff.MageArmor"],
             class = "MAGE",
             overlayText = L["Overlay.NoArmor"],
+            clickMacro = function(spellID)
+                return "/cast " .. (BR.GetSpellName(PreferredMageArmor() or spellID) or "")
+            end,
         },
         {
             spellID = {

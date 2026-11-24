@@ -285,6 +285,7 @@ BR.defaults = {
         } or nil,
         -- thornsRequest: absent - nil means off
         righteousFuryShow = BR.CLIENT == BR.ClientType.Forever and "tank" or nil,
+        mageArmorPreference = BR.CLIENT == BR.ClientType.Forever and "mage" or nil,
         -- Per-text-item size override, as a percentage of the icon size. An
         -- absent key follows consumableTextScale.
         textSizes = {},
