@@ -1340,50 +1340,6 @@ for _, itemID in ipairs(CAMP.kits) do
     CAMP_KIT_ICONS[itemID] = C_Item.GetItemIconByID(itemID)
 end
 
----@return "sit"|"camp"|nil stage
----@return number? kitID The kit that the click uses at the camp stage
-local function ComputeCampStage()
-    local GetPlayerAura = C_UnitAuras.GetUnitAuraBySpellID
-    if GetPlayerAura("player", CAMP.benefitsID) then
-        return nil
-    end
-    if GetPlayerAura("player", CAMP.nearbyID) then
-        for _, spellID in ipairs(CAMP.countdownIDs) do
-            if GetPlayerAura("player", spellID) then
-                return nil
-            end
-        end
-        return "sit"
-    end
-    local defaults = BR.profile.defaults
-    if defaults and defaults.campLightFire == false then
-        return nil
-    end
-    -- IsUsableItem also answers false indoors, so a cached answer goes stale on the way out.
-    for _, itemID in ipairs(CAMP.kits) do
-        if BR.StateHelpers.GetItemCountCached(itemID) > 0 and C_Item.IsUsableItem(itemID) then
-            if BR.BuffState.IsItemOffCooldown(itemID) then
-                return "camp", itemID
-            end
-            return nil
-        end
-    end
-    return nil
-end
-
--- One refresh asks for the stage from several callbacks in the same frame.
-local campStageAt, campStage, campKitID
----@return "sit"|"camp"|nil stage
----@return number? kitID
-local function CampStage()
-    local now = GetTime()
-    if campStageAt ~= now then
-        campStageAt = now
-        campStage, campKitID = ComputeCampStage()
-    end
-    return campStage, campKitID
-end
-
 ---@class CampFeature
 ---@field itemIDs number[] Highest tier first. A higher tier also gives the buff of its tier 1 feature
 ---@field conflict? number[] Aura IDs of the class buff that does not stack with the feature buff
@@ -1419,6 +1375,58 @@ for _, feature in ipairs(CAMP_FEATURES) do
     for _, itemID in ipairs(feature.itemIDs) do
         CAMP_FEATURE_CHOICES[itemID] = { itemID = itemID }
     end
+end
+
+---@return "sit"|"camp"|nil stage
+---@return number? kitID The kit that the click uses at the camp stage
+local function ComputeCampStage()
+    local GetPlayerAura = C_UnitAuras.GetUnitAuraBySpellID
+    if GetPlayerAura("player", CAMP.benefitsID) then
+        return nil
+    end
+    if GetPlayerAura("player", CAMP.nearbyID) then
+        for _, spellID in ipairs(CAMP.countdownIDs) do
+            if GetPlayerAura("player", spellID) then
+                return nil
+            end
+        end
+        return "sit"
+    end
+    local defaults = BR.profile.defaults
+    if defaults and defaults.campLightFire == false then
+        return nil
+    end
+    -- IsUsableItem also answers false indoors, so a cached answer goes stale on the way out.
+    local kitID
+    for _, itemID in ipairs(CAMP.kits) do
+        if BR.StateHelpers.GetItemCountCached(itemID) > 0 and C_Item.IsUsableItem(itemID) then
+            kitID = itemID
+            break
+        end
+    end
+    if not kitID or not BR.BuffState.IsItemOffCooldown(kitID) then
+        return nil
+    end
+    -- A campfire alone gives no benefit: the benefits come from the features placed near it.
+    for itemID in pairs(CAMP_FEATURE_CHOICES) do
+        if BR.StateHelpers.GetItemCountCached(itemID) > 0 then
+            return "camp", kitID
+        end
+    end
+    return nil
+end
+
+-- One refresh asks for the stage from several callbacks in the same frame.
+local campStageAt, campStage, campKitID
+---@return "sit"|"camp"|nil stage
+---@return number? kitID
+local function CampStage()
+    local now = GetTime()
+    if campStageAt ~= now then
+        campStageAt = now
+        campStage, campKitID = ComputeCampStage()
+    end
+    return campStage, campKitID
 end
 
 local campChoices = {}

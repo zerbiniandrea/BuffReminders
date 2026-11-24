@@ -612,7 +612,7 @@ english["Options.Reagent.RestedOnly.Desc"] =
     "Warn only in inns and cities, where vendors sell reagents.\n\nIf |cffffcc00Hide while resting|r is on, the warning never shows."
 english["Options.Camp.LightFire"] = "Remind to place a campfire"
 english["Options.Camp.LightFire.Desc"] =
-    "With no campfire near you, the reminder shows CAMP when you carry a Campfire Kit that you can use. Click to place the best kit, then click the ground."
+    "With no campfire near you, the reminder shows CAMP when you carry a Campfire Kit that you can use and at least one camp feature. Click to place the best kit, then click the ground."
 english["Options.Ammo.Threshold"] = "Hunters (stacks)"
 english["Options.Ammo.Threshold.Desc"] =
     "A hunter is warned below this many stacks (200 each) of equipped ammo."
