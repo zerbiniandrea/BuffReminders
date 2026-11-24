@@ -24,6 +24,7 @@ local ChatRequest = BR.ChatRequest
 local GetTime = GetTime
 local IsSpellKnown = C_SpellBook.IsSpellKnown
 local Plain = BR.Secret.Plain
+local BuffTargets = BR.StateHelpers.BuffTargets
 
 -- ============================================================================
 -- SPELL HELPERS
@@ -1000,7 +1001,8 @@ local function CreateClickOverlay(frame)
         local def = frame.buffDef
         if
             def
-            and (frame.buffCategory == "targeted" or def.castOnOthers)
+            and BuffTargets.DEFAULT_TARGET[frame.buffCategory]
+            and BuffTargets.PicksUnit(BuffTargets.Resolve(def, frame.buffCategory))
             and not (def.class and def.class ~= playerClass)
         then
             local name, class = BR.TargetMemory.Get(def.key)

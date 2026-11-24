@@ -4598,6 +4598,7 @@ BR.StateHelpers = {
     GetItemCountCached = GetItemCountCached,
     IsPlayerTank = IsPlayerTank,
     AsSpellList = AsSpellList,
+    BuffTargets = BuffTargets,
 }
 
 BR.BuffState = BuffState
