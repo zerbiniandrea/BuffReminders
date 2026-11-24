@@ -476,7 +476,8 @@ local function Build(content)
     -- INTERACTION
     -- ========================================================================
     -- Global only: no category overrides these keys.
-    LayoutSectionHeader(layout, content, L["Options.Interaction"])
+    local interactionHeader = LayoutSectionHeader(layout, content, L["Options.Interaction"])
+    BR.Options.WhatsNew.AttachDot(interactionHeader, "defaults.interaction")
 
     local menuHolder = Components.Checkbox(content, {
         label = L["Options.RightClickMenu"],
@@ -521,3 +522,5 @@ BR.Options.Pages.defaults = {
     showMasqueBanner = true,
     Build = Build,
 }
+
+BR.Options.WhatsNew.Register({ cohort = "7.0.0", pageId = "defaults", key = "defaults.interaction" })
