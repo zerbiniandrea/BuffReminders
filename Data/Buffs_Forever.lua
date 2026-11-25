@@ -1419,8 +1419,9 @@ BR.IsRestingInBag = IsRestingInBag
 -- The Resting aura has no duration, so the rest starts when the addon first sees it.
 local restInstanceID, restStartedAt
 
----GetTime()-based moment of the full Well-Rested stack, while the player rests in the bag.
----@return number? endsAt nil when the player is not in the bag or has all the stacks
+---GetTime()-based moment of the next Well-Rested gain while the player rests in the bag:
+---the full stack, or at full stacks the duration refresh.
+---@return number? endsAt nil when the player is not in the bag
 ---@return number? sweepSeconds
 ---@return string? stacksText
 local function SleepingBagRestEnd()
@@ -1444,12 +1445,28 @@ local function SleepingBagRestEnd()
             lastStackAt = max(lastStackAt, rested.expirationTime - rested.duration)
         end
     end
+    local stacksText = stacks .. "/" .. SLEEPING_BAG.maxStacks
     if stacks >= SLEEPING_BAG.maxStacks then
-        return nil
+        return lastStackAt + SLEEPING_BAG.stackSeconds, SLEEPING_BAG.stackSeconds, stacksText
     end
     local fullSeconds = SLEEPING_BAG.maxStacks * SLEEPING_BAG.stackSeconds
     local endsAt = lastStackAt + (SLEEPING_BAG.maxStacks - stacks) * SLEEPING_BAG.stackSeconds
-    return endsAt, fullSeconds, stacks .. "/" .. SLEEPING_BAG.maxStacks
+    return endsAt, fullSeconds, stacksText
+end
+
+-- The bag cannot go down in a city or an inn, and the buff gives only experience.
+---@param isAuraRestricted boolean
+---@return boolean
+local function CanPlaceSleepingBag(isAuraRestricted)
+    local GameContext = BR.GameContext
+    if isAuraRestricted or GameContext.IsInCombat() or GameContext.IsResting() then
+        return false
+    end
+    if GameContext.GetPlayerLevel() >= GameContext.GetMaxExpansionLevel() then
+        return false
+    end
+    return BR.StateHelpers.GetItemCountCached(SLEEPING_BAG.itemID) > 0
+        and BR.BuffState.IsItemOffCooldown(SLEEPING_BAG.itemID)
 end
 
 local CAMP = {
@@ -1507,13 +1524,11 @@ for _, feature in ipairs(CAMP_FEATURES) do
     end
 end
 
+---The next step toward Camp Benefits, also while the buff is present, so that the step renews it.
 ---@return "sit"|"camp"|nil stage
 ---@return number? kitID The kit that the click uses at the camp stage
 local function ComputeCampStage()
     local GetPlayerAura = C_UnitAuras.GetUnitAuraBySpellID
-    if GetPlayerAura("player", CAMP.benefitsID) then
-        return nil
-    end
     if GetPlayerAura("player", CAMP.nearbyID) then
         for _, spellID in ipairs(CAMP.countdownIDs) do
             if GetPlayerAura("player", spellID) then
@@ -1557,6 +1572,17 @@ local function CampStage()
         campStage, campKitID = ComputeCampStage()
     end
     return campStage, campKitID
+end
+
+-- The game blocks both the sit and the kit while the player is mounted.
+---@param isAuraRestricted boolean
+---@return boolean
+local function CanRenewCamp(isAuraRestricted)
+    local GameContext = BR.GameContext
+    if isAuraRestricted or GameContext.IsInCombat() or GameContext.IsResting() or IsMounted() then
+        return false
+    end
+    return CampStage() ~= nil
 end
 
 local campChoices = {}
@@ -2262,7 +2288,6 @@ BR.BUFF_TABLES = {
             infoTooltip = { title = L["Buff.SleepingBag"], desc = L["Tooltip.SleepingBag.Desc"] },
             clickItem = SLEEPING_BAG.itemID,
             countdown = SleepingBagRestEnd,
-            -- The bag cannot go down in a city or an inn, and the buff gives only experience.
             customCheck = function(isAuraRestricted)
                 local GameContext = BR.GameContext
                 if isAuraRestricted or GameContext.IsInCombat() then
@@ -2275,17 +2300,11 @@ BR.BUFF_TABLES = {
                 if SleepingBagRestEnd() then
                     return true
                 end
-                if GameContext.IsResting() then
-                    return false
-                end
-                if BR.StateHelpers.GetItemCountCached(SLEEPING_BAG.itemID) == 0 then
-                    return false
-                end
-                if C_UnitAuras.GetUnitAuraBySpellID("player", SLEEPING_BAG.auraID) then
-                    return false
-                end
-                return BR.BuffState.IsItemOffCooldown(SLEEPING_BAG.itemID)
+                return CanPlaceSleepingBag(isAuraRestricted)
+                    and not C_UnitAuras.GetUnitAuraBySpellID("player", SLEEPING_BAG.auraID)
             end,
+            renewAuraID = SLEEPING_BAG.auraID,
+            canRenew = CanPlaceSleepingBag,
         },
         {
             key = "camp",
@@ -2315,14 +2334,12 @@ BR.BUFF_TABLES = {
                 end
                 return kitID and CAMP_KIT_MACROS[kitID]
             end,
-            -- The game blocks both the sit and the kit while the player is mounted.
             customCheck = function(isAuraRestricted)
-                local GameContext = BR.GameContext
-                if isAuraRestricted or GameContext.IsInCombat() or GameContext.IsResting() or IsMounted() then
-                    return false
-                end
-                return CampStage() ~= nil
+                return CanRenewCamp(isAuraRestricted)
+                    and not C_UnitAuras.GetUnitAuraBySpellID("player", CAMP.benefitsID)
             end,
+            renewAuraID = CAMP.benefitsID,
+            canRenew = CanRenewCamp,
         },
         {
             key = "lowAmmo",

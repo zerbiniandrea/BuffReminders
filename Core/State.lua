@@ -3161,11 +3161,12 @@ local function RefreshSelf(isAuraRestricted, hideExpiring)
     end
 end
 
--- Chores (drop a table, repair gear), not auras: class-gated and driven by
--- customCheck. A showOnInstanceEntry chore surfaces only briefly on zone-in.
-local function RefreshUtility(db, trackingMode, isAuraRestricted)
+-- Chores (drop a table, repair gear): class-gated and driven by customCheck. A chore
+-- with renewAuraID also warns before its aura ends. A showOnInstanceEntry chore
+-- surfaces only briefly on zone-in.
+local function RefreshUtility(db, trackingMode, isAuraRestricted, hideExpiring)
     local utilityVisible = IsCategoryVisibleForContent("utility")
-    local _, utilityMissGlow = GetCategoryGlowSettings("utility")
+    local utilityExGlow, utilityMissGlow, utilityThreshold, utilityFloor = GetCategoryGlowSettings("utility")
     local repairHiddenInCombat = GameContext.IsInCombat() and db.defaults and db.defaults.repairHideInCombat ~= false
     for i, buff in ipairs(UtilityBuffs) do
         local entry = GetOrCreateEntry(buff.key, "utility", i)
@@ -3178,13 +3179,20 @@ local function RefreshUtility(db, trackingMode, isAuraRestricted)
             and (not buff.class or buff.class == playerClass)
             and IsBuffEnabled(settingKey)
             and PassesPreChecks(buff, nil, db, trackingMode)
-            and (not buff.customCheck or buff.customCheck(isAuraRestricted))
         then
-            SetEntryText(entry, buff.overlayTextFn and buff.overlayTextFn() or buff.overlayText, utilityMissGlow)
-            if buff.countdown then
-                entry.countdownExpirationTime, entry.countdownDuration, entry.progressText = buff.countdown()
+            if not buff.customCheck or buff.customCheck(isAuraRestricted) then
+                SetEntryText(entry, buff.overlayTextFn and buff.overlayTextFn() or buff.overlayText, utilityMissGlow)
+                if buff.countdown then
+                    entry.countdownExpirationTime, entry.countdownDuration, entry.progressText = buff.countdown()
+                end
+                BR.Icons.ApplyDynamicIcon(entry, buff)
+            elseif buff.renewAuraID and not hideExpiring and (not buff.canRenew or buff.canRenew(isAuraRestricted)) then
+                local _, remaining, _, duration = UnitHasBuff("player", buff.renewAuraID)
+                local lead = Lead.Of(duration, utilityThreshold, utilityFloor)
+                if TrySetEntryExpiring(entry, remaining, lead, utilityExGlow) then
+                    BR.Icons.ApplyDynamicIcon(entry, buff)
+                end
             end
-            BR.Icons.ApplyDynamicIcon(entry, buff)
         end
     end
 end
@@ -3713,7 +3721,7 @@ function BuffState.Refresh(refreshMode)
         -- Self buffs run before presence so suppressedByEntry can read self entries.
         RefreshSelf(isAuraRestricted, hideExpiring)
         -- Chores never depend on group state, so a group refresh skips them.
-        RefreshUtility(db, trackingMode, isAuraRestricted)
+        RefreshUtility(db, trackingMode, isAuraRestricted, hideExpiring)
     end
     RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring)
     RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring)

@@ -676,6 +676,8 @@ BR.REPAIR_SOURCES = {
 ---@field visibilityCondition? fun(): boolean?
 ---@field customCheck? fun(isRestricted: boolean): boolean? true shows the reminder
 ---@field countdown? fun(): number?, number?, string? -- End of a countdown that replaces the label, sweep length, progress text
+---@field renewAuraID? number Aura that the chore gives. While customCheck is false, the reminder warns before the aura ends
+---@field canRenew? fun(isRestricted: boolean): boolean Gates the warning on whether the player can do the chore now
 ---@field addedIn? string Version cohort for the what's-new dot
 
 ---@class BuffTables

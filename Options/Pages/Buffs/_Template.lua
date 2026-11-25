@@ -25,6 +25,24 @@ local BR = ns
 
 local Components = BR.Components
 
+-- A pet is present or missing. A utility chore expires only if it gives a timed aura.
+---@param category CategoryName
+---@return boolean
+local function HasExpiration(category)
+    if category == "pet" then
+        return false
+    end
+    if category ~= "utility" then
+        return true
+    end
+    for _, buff in ipairs(BR.BUFF_TABLES.utility) do
+        if buff.renewAuraID then
+            return true
+        end
+    end
+    return false
+end
+
 local COL_PADDING = BR.Options.Constants.COL_PADDING
 local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING
 
@@ -74,9 +92,7 @@ function Template.Build(content, scrollFrame, category, opts)
     -- per-entry config live on their own sidebar pages and dialogs.
     if not userAuthored then
         Sections.Visibility(ctx, layout)
-        -- Pet and utility reminders have no expiration. A pet is present or
-        -- missing, and a utility item is a chore, not an aura.
-        if category ~= "pet" and category ~= "utility" then
+        if HasExpiration(category) then
             Sections.Timing(ctx, layout)
         end
         if category == "consumable" then
