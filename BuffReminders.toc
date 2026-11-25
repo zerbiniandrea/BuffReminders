@@ -69,6 +69,7 @@ Core\TalentLoadoutEx.lua
 Core\Loadouts.lua
 Core\LoadoutActions.lua
 Core\State.lua
+Core\State\Stances.lua
 Core\DriveBy.lua
 Core\Tracking.lua
 UI\Components.lua
