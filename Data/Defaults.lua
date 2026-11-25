@@ -166,7 +166,7 @@ BR.defaults = {
         -- Appearance
         iconSize = 64,
         -- iconWidth: nil = same as iconSize (square). Set explicitly for non-square icons.
-        textSize = 20,
+        textSize = BR.CLIENT == BR.ClientType.Forever and 17 or 20,
         textOutline = "OUTLINE",
         slugOutline = true,
         iconAlpha = 1,
