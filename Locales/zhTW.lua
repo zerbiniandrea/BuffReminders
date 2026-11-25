@@ -808,9 +808,9 @@ L["Options.PreferReusableRunes"] = "偏好可重複使用的增強符文"
 L["Options.PreferReusableRunes.Title"] = "偏好可重複使用的增強符文"
 L["Options.PreferReusableRunes.Desc"] =
     "如果您有可重複使用的增強符文，僅顯示該符文。如果沒有，顯示其他符文。"
-L["Options.FeastAtPlayer"] = "將大餐放在腳下"
-L["Options.FeastAtPlayer.Desc"] =
-    "點擊大餐圖示將大餐放置在您的位置。如果此選項關閉，您必須選擇地面上的一個點。"
+L["Options.PlaceAtPlayer"] = "放置盛宴和大鍋在腳下"
+L["Options.PlaceAtPlayer.Desc"] =
+    "點擊盛宴或大鍋圖示將放置在您的位置。如果此選項關閉，您必須選擇地面上的一個點。"
 
 -- ============================================================================
 -- OPTIONS: DK RUNEFORGE PREFERENCES
