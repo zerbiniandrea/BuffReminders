@@ -38,7 +38,7 @@ local function GetRuneIcons()
         return cachedRuneIcons
     end
     cachedRuneIcons = {}
-    for _, rune in ipairs(BR.DK_RUNEFORGES) do
+    for _, rune in ipairs(BR.BuffData.dkRuneforges) do
         local texture = C_Spell.GetSpellTexture(rune.spellID)
         cachedRuneIcons[rune.enchantID] = texture and { texture } or nil
     end
@@ -76,11 +76,11 @@ local function BuildInline(parent, opts)
     local x, y, width = opts.x, opts.y, opts.width
     local register = opts.registerHolder or function(_) end
     local runeIcons = GetRuneIcons()
-    local numRunes = #BR.DK_RUNEFORGES
+    local numRunes = #BR.BuffData.dkRuneforges
 
     local function CreateRuneCheckboxes(content, specId, slot, cx, startY, maxLabelWidth)
         local cy = startY
-        for _, rune in ipairs(BR.DK_RUNEFORGES) do
+        for _, rune in ipairs(BR.BuffData.dkRuneforges) do
             local enchantID = rune.enchantID
             local holder = Components.Checkbox(content, {
                 label = BR.GetSpellName(rune.spellID) or rune.key,

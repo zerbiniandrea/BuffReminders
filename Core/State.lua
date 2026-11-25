@@ -64,8 +64,8 @@ local FMT_LESS_THAN_ONE = BR.L["Overlay.LessThanOneMinute"]
 local FMT_SECONDS = BR.L["Overlay.SecondsFormat"]
 
 -- Buff tables from Buffs.lua (via BR namespace)
-local BUFF_TABLES = BR.BUFF_TABLES
-local REPAIR_SOURCES = BR.REPAIR_SOURCES
+local BUFF_TABLES = BR.BuffData.buffTables
+local REPAIR_SOURCES = BR.BuffData.repairSources
 local BuffBeneficiaries = BR.BuffBeneficiaries
 local SpecBeneficiaries = BR.SpecBeneficiaries
 
@@ -190,7 +190,7 @@ do
         end
         if not groupOfKey then
             groupOfKey = {}
-            for _, buffs in pairs(BR.BUFF_TABLES) do
+            for _, buffs in pairs(BR.BuffData.buffTables) do
                 for _, buff in ipairs(buffs) do
                     if buff.groupId then
                         groupOfKey[buff.key] = buff.groupId
@@ -224,7 +224,7 @@ end
 local instanceCache = {}
 local GetDifficultyIDCached -- forward declaration (defined next to GetCurrentContentType)
 
-local CONTENT_DIFFICULTY_TABLES = BR.INSTANCE_CONTENT.difficultyIDs
+local CONTENT_DIFFICULTY_TABLES = BR.BuffData.instanceContent.difficultyIDs
 
 -- Maps content type to the DB key holding its difficulty sub-filter. A content type
 -- without a sub-row on this client ignores a saved filter, because no control can clear it.
@@ -235,7 +235,7 @@ for contentType, diffDbKey in pairs({
     raid = "raidDifficulty",
     pvp = "pvpType",
 }) do
-    if BR.INSTANCE_CONTENT.difficulties[contentType] then
+    if BR.BuffData.instanceContent.difficulties[contentType] then
         CONTENT_DIFF_DB_KEYS[contentType] = diffDbKey
     end
 end
@@ -299,7 +299,7 @@ local GetPetHappiness = C_PetInfo and C_PetInfo.GetPetHappiness
 
 -- Warrior stance and druid form rules of the client: the allowed stances and the
 -- stance that the click casts.
-local STANCE_RULES = BR.STANCE_RULES
+local STANCE_RULES = BR.BuffData.stanceRules
 local NO_STANCE = BR.NO_STANCE
 
 -- Priest shadow forms. Shadowform is the only stance shadow priests can take;
@@ -2194,7 +2194,7 @@ local function IsFreeConsumable(buff)
     if buff.freeConsumable then
         return true
     end
-    local items = buff.consumableCategory and BR.CONSUMABLE_ITEMS[buff.consumableCategory]
+    local items = buff.consumableCategory and BR.ConsumableData.items[buff.consumableCategory]
     if items then
         for itemID, entry in pairs(items) do
             if type(entry) == "table" and entry.permanent and HasItemByMode(itemID) then
@@ -3861,8 +3861,7 @@ function BuffState.GetHideAllReason(db)
         return "solo"
     end
     -- A sleeping bag makes the player rest, but its countdown must stay visible.
-    -- BR.IsRestingInBag is nil on retail.
-    if db.hideWhileResting and GameContext.IsResting() and not (BR.IsRestingInBag and BR.IsRestingInBag()) then
+    if db.hideWhileResting and GameContext.IsResting() and not BR.BuffData.isRestingInBag() then
         return "resting"
     end
     if db.hideInCombat and GameContext.IsInCombat() then

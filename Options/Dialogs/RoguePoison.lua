@@ -5,7 +5,7 @@ local BR = ns
 -- ============================================================================
 -- ROGUE POISON EDITOR (inline section)
 -- ============================================================================
--- One reorderable column of poison checkboxes per BR.POISON_COLUMNS entry. The
+-- One reorderable column of poison checkboxes per BR.BuffData.poisonColumns entry. The
 -- top row is the highest priority.
 --
 -- BuildInline(parent, opts) draws the editor into `parent` at (opts.x, opts.y)
@@ -38,11 +38,11 @@ local function EnsureRoguePoisonPrefs()
         db.roguePoisonPreferences = {}
     end
     local prefs = db.roguePoisonPreferences
-    for _, column in ipairs(BR.POISON_COLUMNS) do
+    for _, column in ipairs(BR.BuffData.poisonColumns) do
         local cat = column.key
         if not prefs[cat] or #prefs[cat] == 0 then
             prefs[cat] = {}
-            for _, seed in ipairs(BR.DEFAULT_POISON_PREFERENCES[cat]) do
+            for _, seed in ipairs(BR.BuffData.poisonDefaults[cat]) do
                 tinsert(prefs[cat], { spellID = seed.spellID, enabled = seed.enabled })
             end
         end
@@ -94,7 +94,7 @@ end
 local function BuildInline(parent, opts)
     local x, y, width = opts.x, opts.y, opts.width
     local register = opts.registerHolder or function(_) end
-    local columns = BR.POISON_COLUMNS
+    local columns = BR.BuffData.poisonColumns
     local colWidth = width / #columns
     local colX, rows = {}, {}
     for i, column in ipairs(columns) do
@@ -223,7 +223,7 @@ local function BuildInline(parent, opts)
     local function ResetToDefaults()
         for _, column in ipairs(columns) do
             local category = column.key
-            local catDefaults = BR.DEFAULT_POISON_PREFERENCES[category]
+            local catDefaults = BR.BuffData.poisonDefaults[category]
             local defaultIndex = {}
             for i, e in ipairs(catDefaults) do
                 defaultIndex[e.spellID] = i

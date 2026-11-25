@@ -8,7 +8,7 @@ end
 
 -- Food items list every food of every level that gives a food buff.
 ---@type table<string, table<number, ConsumableItemInfo|boolean>>
-BR.CONSUMABLE_ITEMS = {
+local ITEMS = {
     food = {
         [724] = true, -- Goretusk Liver Pie
         [733] = true, -- Westfall Stew
@@ -169,6 +169,19 @@ BR.CONSUMABLE_ITEMS = {
 }
 
 -- Petrification is a short stun shield, not the flask that the player runs.
-BR.UNREMEMBERED_FLASK_ITEMS = {
+local UNREMEMBERED_FLASKS = {
     [13506] = true, -- Flask of Petrification
+}
+
+---@type ConsumableData
+BR.ConsumableData = {
+    items = ITEMS,
+    unrememberedFlasks = UNREMEMBERED_FLASKS,
+    previewTextures = {
+        flask = { 134842, 134877, 134821 }, -- Titans, Distilled Wisdom, Supreme Power
+        food = { 132804, 134020 }, -- Nightfin Soup, Smoked Desert Dumplings
+        oil = 134727, -- Brilliant Wizard Oil
+    },
+    -- Forever items have no crafted quality, stat labels, Delve food or legacy tier.
+    features = { itemLabels = false, delveFood = false, legacyItems = false },
 }

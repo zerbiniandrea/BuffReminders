@@ -15,7 +15,7 @@ local BR = ns
 
 local L = BR.L
 
-local BUFF_TABLES = BR.BUFF_TABLES
+local BUFF_TABLES = BR.BuffData.buffTables
 
 local COL_PADDING = BR.Options.Constants.COL_PADDING
 local PAGE_TOP_PADDING = BR.Options.Constants.PAGE_TOP_PADDING

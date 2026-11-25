@@ -40,7 +40,7 @@ end
 ---@param itemID number
 ---@return boolean
 local function IsUnrememberedItem(itemID)
-    return BR.UNREMEMBERED_FLASK_ITEMS and BR.UNREMEMBERED_FLASK_ITEMS[itemID] or false
+    return BR.ConsumableData.unrememberedFlasks[itemID] or false
 end
 
 local unrememberedSpellIDs = nil
@@ -51,7 +51,7 @@ local unrememberedSpellIDs = nil
 local function IsUnrememberedSpell(spellID)
     if not unrememberedSpellIDs then
         unrememberedSpellIDs = {}
-        for itemID in pairs(BR.UNREMEMBERED_FLASK_ITEMS or {}) do
+        for itemID in pairs(BR.ConsumableData.unrememberedFlasks) do
             local ok, _, sid = pcall(GetItemSpell, itemID)
             if ok and sid then
                 unrememberedSpellIDs[sid] = true

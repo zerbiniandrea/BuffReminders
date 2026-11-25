@@ -7,7 +7,7 @@ local L = BR.L
 -- CHAT REQUEST (definition + resolution)
 -- ============================================================================
 -- Single source of truth for "request this buff in chat". A buff is requestable
--- only when its definition in BR.BUFF_TABLES carries `chatRequestable = true`.
+-- only when its definition in BR.BuffData.buffTables carries `chatRequestable = true`.
 
 local ChatRequest = {}
 
@@ -23,7 +23,7 @@ local categorySet
 ---@type table<string, table>
 local defsByKey
 
--- BR.BUFF_TABLES is static after load (custom buffs are not scanned), so one
+-- BR.BuffData.buffTables is static after load (custom buffs are not scanned), so one
 -- build is safe to cache for the session.
 local function build()
     buffsByCategory = {}
@@ -31,7 +31,7 @@ local function build()
     categorySet = {}
     defsByKey = {}
     for _, cat in ipairs(CATEGORY_ORDER) do
-        local tbl = BR.BUFF_TABLES[cat]
+        local tbl = BR.BuffData.buffTables[cat]
         if tbl then
             for _, def in ipairs(tbl) do
                 if def.chatRequestable then

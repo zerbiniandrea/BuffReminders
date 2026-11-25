@@ -232,7 +232,7 @@ local function GetDetachedDisplayName(key)
     if group and group.displayName then
         return group.displayName
     end
-    for _, buffs in pairs(BR.BUFF_TABLES) do
+    for _, buffs in pairs(BR.BuffData.buffTables) do
         for _, buff in ipairs(buffs) do
             if (buff.groupId or buff.key) == key then
                 return buff.name or key

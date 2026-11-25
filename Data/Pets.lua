@@ -28,7 +28,7 @@ local IsSpellKnown = C_SpellBook.IsSpellKnown
 ---@class PetActionList : PetAction[]
 ---@field genericIndex? number  -- Preferred index for generic (collapsed) display mode
 
-local PET_SPELLS = BR.PET_SPELLS
+local PET_SPELLS = BR.BuffData.petSpells
 
 local CALL_PET_SPELLS = PET_SPELLS.callPet
 

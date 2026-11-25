@@ -57,7 +57,7 @@ local function GetCastableSpellID(spellIDs)
     return nil
 end
 
-local FEL_DOMINATION_ID = BR.PET_SPELLS.felDomination
+local FEL_DOMINATION_ID = BR.BuffData.petSpells.felDomination
 
 -- Spell names never change once the client resolves them. An unresolved name at
 -- login is not cached, so the next display cycle retries it.
@@ -1293,7 +1293,7 @@ local function RefreshConsumableCache()
     end
 
     local specId = BR.StateHelpers and BR.StateHelpers.GetPlayerSpecId()
-    local itemSets = BR.CONSUMABLE_ITEMS or {}
+    local itemSets = BR.ConsumableData.items
     local defs = BR.profile and BR.profile.defaults or {}
     local hideLegacy = defs.hideLegacyConsumables ~= false
     local preferReusableRunes = defs.preferReusableRunes == true

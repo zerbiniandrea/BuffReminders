@@ -346,7 +346,7 @@ end
 -- fire. GetSpecialState colors the All Buffs row link orange for it.
 local function PoisonNeedsSetup()
     local prefs = BR.profile.roguePoisonPreferences
-    for _, column in ipairs(BR.POISON_COLUMNS) do
+    for _, column in ipairs(BR.BuffData.poisonColumns) do
         local list = prefs and prefs[column.key]
         for _, entry in ipairs(list or {}) do
             if entry.enabled and entry.spellID then
@@ -358,8 +358,8 @@ local function PoisonNeedsSetup()
 end
 
 -- Stance grids of the client. A client with spec-based stance rules has none.
-local WARRIOR_STANCE_GRID = BR.STANCE_RULES.WARRIOR.grid
-local DRUID_FORM_GRID = BR.STANCE_RULES.DRUID.grid
+local WARRIOR_STANCE_GRID = BR.BuffData.stanceRules.WARRIOR.grid
+local DRUID_FORM_GRID = BR.BuffData.stanceRules.DRUID.grid
 
 ---True when no row of the stance grid allows a choice, so no reminder can fire.
 ---@param grid StanceGrid
@@ -1725,7 +1725,7 @@ end
 -- Buffs with group ranks get the group cast section. Their definitions belong to
 -- the active client, so the sections build at load time from its buff table.
 -- A classChoices buff keeps its group ranks on each choice.
-for _, buff in ipairs(BR.BUFF_TABLES.raid) do
+for _, buff in ipairs(BR.BuffData.buffTables.raid) do
     local grid = buff.classChoices
     if grid then
         local groupCast = MakeGroupCastSection(buff, L["BuffPanel.GroupCast.Blessing.Desc"])
@@ -1775,7 +1775,7 @@ local CONTENT_ROW_LABELS = {}
 for _, row in ipairs(GRID_ROWS) do
     CONTENT_ROW_LABELS[row.key] = row.label
 end
-for _, buff in ipairs(BR.BUFF_TABLES.presence) do
+for _, buff in ipairs(BR.BuffData.buffTables.presence) do
     local grid = buff.choiceOrder
     if grid then
         SPECIAL_SECTIONS[buff.key] = {
@@ -1800,7 +1800,7 @@ for _, buff in ipairs(BR.BUFF_TABLES.presence) do
 end
 
 -- The low-stock warning counts charges, so a healthstone without charges has no section.
-for _, buff in ipairs(BR.BUFF_TABLES.consumable) do
+for _, buff in ipairs(BR.BuffData.buffTables.consumable) do
     if buff.key == "healthstone" and not buff.itemMaxCharges then
         SPECIAL_SECTIONS.healthstone = nil
     end

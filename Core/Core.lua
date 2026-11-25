@@ -99,7 +99,7 @@ function BR.ByClient(values)
     return value
 end
 
--- Stance key for "no stance" (stance bar form 0) in the allowed-stances sets of BR.STANCE_RULES.
+-- Stance key for "no stance" (stance bar form 0) in the allowed-stances sets of BR.BuffData.stanceRules.
 BR.NO_STANCE = 0
 
 BR.SHADOWFORM_SPELL_ID = BR.ByClient({ retail = 232698, forever = 15473 })
@@ -547,11 +547,11 @@ local ContentGridKeys = {
 BR.CATEGORY_ORDER = { "raid", "presence", "targeted", "self", "pet", "consumable", "utility", "custom", "loadout" }
 
 -- Virtual categories: user-defined entries that live in db.customBuffs /
--- db.loadoutReminders rather than BR.BUFF_TABLES. Consumers that walk only the
+-- db.loadoutReminders rather than BR.BuffData.buffTables. Consumers that walk only the
 -- built-in buff tables (chat requests, static-buff iteration) skip these.
 BR.VIRTUAL_CATEGORIES = { custom = true, loadout = true }
 
--- Built-in (non-virtual) categories that have entries in BR.BUFF_TABLES, in
+-- Built-in (non-virtual) categories that have entries in BR.BuffData.buffTables, in
 -- display order. Derived from BR.CATEGORY_ORDER minus the virtual categories so
 -- there is still exactly one ordered list to maintain.
 BR.STATIC_CATEGORIES = {}
@@ -572,7 +572,7 @@ function BR.IsCategoryAvailable(category)
     if category == "loadout" then
         return BR.Loadouts ~= nil
     end
-    local buffs = BR.BUFF_TABLES and BR.BUFF_TABLES[category]
+    local buffs = BR.BuffData and BR.BuffData.buffTables[category]
     return buffs ~= nil and buffs[1] ~= nil
 end
 

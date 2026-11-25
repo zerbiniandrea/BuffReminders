@@ -35,7 +35,7 @@ local function HasExpiration(category)
     if category ~= "utility" then
         return true
     end
-    for _, buff in ipairs(BR.BUFF_TABLES.utility) do
+    for _, buff in ipairs(BR.BuffData.buffTables.utility) do
         if buff.renewAuraID then
             return true
         end

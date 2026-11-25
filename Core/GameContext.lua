@@ -541,7 +541,7 @@ end
 ---Wipe the glow registry and fill it from the buff tables and the active profile.
 function GameContext.RebuildGlowRegistry()
     wipe(glowSpellToBuff)
-    local buffTables = BR.BUFF_TABLES
+    local buffTables = BR.BuffData.buffTables
     -- A loadout rule checks a talent, not an aura, so it never joins.
     for category, buffs in pairs(buffTables) do
         if category ~= "custom" and category ~= "loadout" then

@@ -276,7 +276,7 @@ local masqueGroup = Masque and Masque:Group("BuffReminders")
 -- Global API table for external addon integration
 BuffReminders = {}
 
-local BUFF_TABLES = BR.BUFF_TABLES
+local BUFF_TABLES = BR.BuffData.buffTables
 
 local RaidBuffs = BUFF_TABLES.raid
 local SelfBuffs = BUFF_TABLES.self

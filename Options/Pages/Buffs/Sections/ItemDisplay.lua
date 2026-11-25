@@ -75,7 +75,7 @@ local function Build(ctx, layout)
     local P_GAP = 3
     local P_STEP = P_ICON + P_GAP + P_BORDER * 2
     local P_SUB_STEP = P_SUB + P_BORDER * 2
-    local previewTextures = BR.CONSUMABLE_PREVIEW_TEXTURES
+    local previewTextures = BR.ConsumableData.previewTextures
     local TEX_FLASK = previewTextures.flask
     local TEX_FOOD = previewTextures.food
     local TEX_OIL = previewTextures.oil
@@ -212,7 +212,7 @@ local function Build(ctx, layout)
 
     updateBadgeVisibility = function(mode)
         local subIcons = mode == "sub_icons"
-        badgeOnSubIconsHolder:SetShown(subIcons and BR.CONSUMABLE_FEATURES.itemLabels)
+        badgeOnSubIconsHolder:SetShown(subIcons and BR.ConsumableData.features.itemLabels)
     end
     updateBadgeVisibility(BR.Config.Get("defaults.consumableDisplayMode"))
     table.insert(BR.RefreshableComponents, {
@@ -303,7 +303,7 @@ local function BuildOverlays(ctx, layout)
         })
     end
 
-    if BR.CONSUMABLE_FEATURES.itemLabels then
+    if BR.ConsumableData.features.itemLabels then
         -- "Off" on the stat label row is the stored hideConsumableLabels flag.
         TextItemRow("statLabel", L["Options.TextPositions.StatLabel"], {
             get = function()
@@ -363,7 +363,7 @@ local function BuildFilters(ctx, layout)
     layout:Add(readyCheckOnlyHolder, nil, COMPONENT_GAP)
     layout:SetX(layout:GetX() - DEPENDENT_INDENT)
 
-    if BR.CONSUMABLE_FEATURES.delveFood then
+    if BR.ConsumableData.features.delveFood then
         local delveFoodOnlyHolder = Components.Checkbox(parent, {
             label = L["Options.DelveFoodOnly"],
             get = function()
@@ -380,7 +380,7 @@ local function BuildFilters(ctx, layout)
         layout:Add(delveFoodOnlyHolder, nil, COMPONENT_GAP)
     end
 
-    if BR.CONSUMABLE_FEATURES.legacyItems then
+    if BR.ConsumableData.features.legacyItems then
         local hideLegacyHolder = Components.Checkbox(parent, {
             label = L["Options.HideLegacyConsumables"],
             get = function()

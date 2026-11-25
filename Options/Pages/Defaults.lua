@@ -214,7 +214,7 @@ local function Build(content)
         content:SetHeight(math.abs(layout:GetY()) + 20)
     end)
 
-    if BR.INSTANCE_CONTENT.keystones then
+    if BR.BuffData.instanceContent.keystones then
         local preKeyThresholdHolder = Components.Slider(content, {
             label = L["Options.PreKeyThreshold"],
             labelWidth = thresholdLW,

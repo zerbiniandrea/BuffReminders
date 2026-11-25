@@ -137,7 +137,7 @@ end
 ---Pre-fill the icon cache for every static buff. The caller must wait until spell data
 ---settles.
 local function PreFillIconCaches()
-    for _, buffArray in pairs(BR.BUFF_TABLES) do
+    for _, buffArray in pairs(BR.BuffData.buffTables) do
         for _, buff in ipairs(buffArray) do
             GetBuffIcons(buff)
         end

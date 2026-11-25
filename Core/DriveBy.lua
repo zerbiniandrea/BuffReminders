@@ -43,7 +43,7 @@ local OFFER_PRIORITY = { stamina = 1, spirit = 2 }
 local candidates = {}
 local scanIndex = {}
 for _, category in ipairs({ "raid", "self" }) do
-    for _, buff in ipairs(BR.BUFF_TABLES[category]) do
+    for _, buff in ipairs(BR.BuffData.buffTables[category]) do
         if buff.class == playerClass and HasRankLevels(buff.spellID) then
             candidates[#candidates + 1] = buff
             scanIndex[buff] = #candidates

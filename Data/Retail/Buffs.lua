@@ -61,8 +61,6 @@ local DK_RUNEFORGES = {
     { enchantID = 6245, spellID = 327082, key = "apocalypse" },
 }
 
-BR.DK_RUNEFORGES = DK_RUNEFORGES
-
 -- ============================================================================
 -- TYPE DEFINITIONS
 -- ============================================================================
@@ -211,7 +209,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field infoTooltip? TooltipText
 ---@field visibilityCondition? fun(): boolean Custom function that gates visibility (return false to hide)
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
----@field consumableCategory? string Category key in BR.CONSUMABLE_ITEMS for bag scanning (only set when items exist)
+---@field consumableCategory? string Category key in BR.ConsumableData.items for bag scanning (only set when items exist)
 ---@field freeConsumable? boolean Bypass content gates (always show when enabled)
 ---@field showOnInstanceEntry? boolean Only show briefly when entering an instance
 ---@field disabledInCompetitivePvP? boolean Unusable in arenas and rated BGs
@@ -244,7 +242,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 
 ---User-defined loadout reminder: shows when the player's setup does not match the
 ---rule's expectation for the current content. Stored in BR.profile.loadoutReminders
----and mirrored into BR.BUFF_TABLES.loadout at runtime.
+---and mirrored into BR.BuffData.buffTables.loadout at runtime.
 ---@class LoadoutRule
 ---@field key string
 ---@field name string
@@ -278,16 +276,6 @@ local function IsNotEarthen()
     return BR.playerRace ~= "EarthenDwarf"
 end
 
--- Sample icons for the consumable item display preview in the options.
-BR.CONSUMABLE_PREVIEW_TEXTURES = {
-    flask = { 7548898, 7548899, 7548900 },
-    food = { 4672193, 1045939 },
-    oil = 7548987,
-}
-
--- Consumable options that only apply to this client's item data.
-BR.CONSUMABLE_FEATURES = { itemLabels = true, delveFood = true, legacyItems = true }
-
 ---@class InstanceContent
 ---@field contentTypes string[] Segments of the content visibility bar, in bar order
 ---@field difficulties table<string, string[]> Sub-toggle keys per content type, in bar order. No entry = no sub-row
@@ -297,7 +285,7 @@ BR.CONSUMABLE_FEATURES = { itemLabels = true, delveFood = true, legacyItems = tr
 ---@field keystones boolean Dungeons can run as Mythic Keystones
 
 ---@type InstanceContent
-BR.INSTANCE_CONTENT = {
+local INSTANCE_CONTENT = {
     contentTypes = { "openWorld", "housing", "scenario", "dungeon", "raid", "pvp" },
     difficulties = {
         scenario = { "delves", "others" },
@@ -336,7 +324,7 @@ BR.INSTANCE_CONTENT = {
 ---@field felDomination number
 
 ---@type PetSpells
-BR.PET_SPELLS = {
+local PET_SPELLS = {
     callPet = { 883, 83242, 83243, 83244, 83245 },
     stableSlots = true,
     demonFlyout = 10,
@@ -414,7 +402,7 @@ for specId, formID in pairs(DRUID_EXPECTED_FORMS) do
 end
 
 ---@type table<string, StanceRule>
-BR.STANCE_RULES = {
+local STANCE_RULES = {
     WARRIOR = {
         allowed = function()
             return WARRIOR_EXPECTED_STANCES[BR.StateHelpers.GetPlayerSpecId()]
@@ -444,7 +432,7 @@ local TargetedClickMacro = BR.TargetedClickMacro
 
 -- The single source of truth for the default poison order.
 -- BR.profile.roguePoisonPreferences overrides it, with a per-entry enabled flag.
-BR.DEFAULT_POISON_PREFERENCES = {
+local DEFAULT_POISON_PREFERENCES = {
     lethal = {
         { spellID = 381664, enabled = true }, -- Amplifying
         { spellID = 2823, enabled = true }, -- Deadly
@@ -463,7 +451,7 @@ BR.DEFAULT_POISON_PREFERENCES = {
 ---@field label string
 
 ---@type PoisonColumn[]
-BR.POISON_COLUMNS = {
+local POISON_COLUMNS = {
     { key = "lethal", label = L["Options.PoisonLethal"] },
     { key = "nonLethal", label = L["Options.PoisonNonLethal"] },
 }
@@ -496,7 +484,7 @@ local function GetEnabledPoisons(category)
     local prefs = BR.profile and BR.profile.roguePoisonPreferences
     local list = prefs and prefs[category]
     if not list or #list == 0 then
-        list = BR.DEFAULT_POISON_PREFERENCES[category]
+        list = DEFAULT_POISON_PREFERENCES[category]
     end
     local count = 0
     for _, entry in ipairs(list) do
@@ -623,7 +611,7 @@ end
 -- sell, so it is deliberately absent. Items repair on the spot and are the path
 -- where mounting is blocked. Legacy engineering items can lose their use effect
 -- across expansions, so State.lua gates them on usability, not just ownership.
-BR.REPAIR_SOURCES = {
+local REPAIR_SOURCES = {
     mounts = {
         122708, -- Grand Expedition Yak (Cousin Slowhands)
         264058, -- Mighty Caravan Brutosaur (Merchant Maku)
@@ -675,7 +663,7 @@ BR.REPAIR_SOURCES = {
 ---@field utility UtilityBuff[]
 
 ---@type BuffTables
-BR.BUFF_TABLES = {
+local BUFF_TABLES = {
     ---@type RaidBuff[]
     raid = {
         {
@@ -1634,4 +1622,19 @@ BR.BUFF_TABLES = {
             end,
         },
     },
+}
+
+---@type BuffData
+BR.BuffData = {
+    buffTables = BUFF_TABLES,
+    dkRuneforges = DK_RUNEFORGES,
+    instanceContent = INSTANCE_CONTENT,
+    petSpells = PET_SPELLS,
+    stanceRules = STANCE_RULES,
+    poisonDefaults = DEFAULT_POISON_PREFERENCES,
+    poisonColumns = POISON_COLUMNS,
+    repairSources = REPAIR_SOURCES,
+    isRestingInBag = function()
+        return false
+    end,
 }

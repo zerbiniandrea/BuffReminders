@@ -25,25 +25,10 @@ local AMMO_EQUIP_TEXT = L["Overlay.EquipAmmo"]
 
 local _, playerClass = UnitClass("player")
 
--- Each export mirrors a retail export that shared code reads.
-
----@type DKRuneforge[]
-BR.DK_RUNEFORGES = {}
-
--- Sample icons for the consumable item display preview in the options.
-BR.CONSUMABLE_PREVIEW_TEXTURES = {
-    flask = { 134842, 134877, 134821 }, -- Titans, Distilled Wisdom, Supreme Power
-    food = { 132804, 134020 }, -- Nightfin Soup, Smoked Desert Dumplings
-    oil = 134727, -- Brilliant Wizard Oil
-}
-
--- Forever items have no crafted quality, stat labels, Delve food or legacy tier.
-BR.CONSUMABLE_FEATURES = { itemLabels = false, delveFood = false, legacyItems = false }
-
 -- Forever has no housing, scenarios or arenas, and all its dungeons have one difficulty.
 -- The raid map holds the raid difficultyIDs that Forever raids use.
 ---@type InstanceContent
-BR.INSTANCE_CONTENT = {
+local INSTANCE_CONTENT = {
     contentTypes = { "openWorld", "dungeon", "raid", "pvp" },
     difficulties = {
         raid = { "raid40", "raid20" },
@@ -66,7 +51,7 @@ BR.INSTANCE_CONTENT = {
 }
 
 -- One poison column per hand. Each entry is the rank 1 spell of a poison type.
-BR.DEFAULT_POISON_PREFERENCES = {
+local DEFAULT_POISON_PREFERENCES = {
     mainHand = {
         { spellID = 8679, enabled = true }, -- Instant
         { spellID = 2823, enabled = true }, -- Deadly
@@ -84,18 +69,13 @@ BR.DEFAULT_POISON_PREFERENCES = {
 }
 
 ---@type PoisonColumn[]
-BR.POISON_COLUMNS = {
+local POISON_COLUMNS = {
     { key = "mainHand", label = L["Options.PoisonMainHand"] },
     { key = "offHand", label = L["Options.PoisonOffHand"] },
 }
 
-BR.REPAIR_SOURCES = {
-    mounts = {},
-    items = {},
-}
-
 ---@type PetSpells
-BR.PET_SPELLS = {
+local PET_SPELLS = {
     callPet = { 883 },
     demonSummons = { 688, 697, 712, 691 }, -- Imp, Voidwalker, Succubus, Felhunter
     demonChoices = { "imp", "voidwalker", "succubus", "felhunter" },
@@ -205,7 +185,7 @@ local function FindPetFood()
     local _, familyID = UnitCreatureFamily("pet")
     familyID = Plain(familyID)
     local diet = type(familyID) == "number" and PET_DIETS[familyID] or nil
-    local buffFood = BR.CONSUMABLE_ITEMS.food
+    local buffFood = BR.ConsumableData.items.food
     local bestID, bestLevel = nil, -1
     for bag = 0, NUM_BAG_SLOTS or 4 do
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
@@ -402,7 +382,7 @@ local function PoisonList(column)
     local prefs = BR.profile.roguePoisonPreferences
     local list = prefs and prefs[column]
     if not list or #list == 0 then
-        list = BR.DEFAULT_POISON_PREFERENCES[column]
+        list = DEFAULT_POISON_PREFERENCES[column]
     end
     return list
 end
@@ -560,7 +540,7 @@ local function GridStanceRule(grid)
 end
 
 ---@type table<string, StanceRule>
-BR.STANCE_RULES = {
+local STANCE_RULES = {
     WARRIOR = GridStanceRule(WARRIOR_STANCE_GRID),
     DRUID = GridStanceRule(DRUID_FORM_GRID),
 }
@@ -1272,7 +1252,6 @@ local SLEEPING_BAG = {
 local function IsRestingInBag()
     return C_UnitAuras.GetUnitAuraBySpellID("player", SLEEPING_BAG.restingID) ~= nil
 end
-BR.IsRestingInBag = IsRestingInBag
 
 -- The Resting aura has no duration, so the rest starts when the addon first sees it.
 local restInstanceID, restStartedAt
@@ -1538,7 +1517,7 @@ local TRACKING_ROW = {
 -- A single-target raid buff sets castOnMissing, so that the click casts on a member
 -- who lacks the buff. groupCast lists its group ranks, highest first.
 ---@type BuffTables
-BR.BUFF_TABLES = {
+local BUFF_TABLES = {
     ---@type RaidBuff[]
     raid = {
         {
@@ -2328,5 +2307,18 @@ BR.BUFF_TABLES = {
 
 -- The happiness reminder exists only on a client with pet happiness.
 if C_PetInfo and C_PetInfo.GetPetHappiness then
-    table.insert(BR.BUFF_TABLES.pet, 1, PET_HAPPINESS)
+    table.insert(BUFF_TABLES.pet, 1, PET_HAPPINESS)
 end
+
+---@type BuffData
+BR.BuffData = {
+    buffTables = BUFF_TABLES,
+    dkRuneforges = {},
+    instanceContent = INSTANCE_CONTENT,
+    petSpells = PET_SPELLS,
+    stanceRules = STANCE_RULES,
+    poisonDefaults = DEFAULT_POISON_PREFERENCES,
+    poisonColumns = POISON_COLUMNS,
+    repairSources = { mounts = {}, items = {} },
+    isRestingInBag = IsRestingInBag,
+}

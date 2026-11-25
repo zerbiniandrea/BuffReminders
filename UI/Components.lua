@@ -2104,7 +2104,7 @@ end
 ---@field diffDbKey? string
 ---@field diffDefs? ToggleDef[]
 
--- Every content segment and sub-toggle of both clients. BR.INSTANCE_CONTENT picks the
+-- Every content segment and sub-toggle of both clients. BR.BuffData.instanceContent picks the
 -- ones that this client renders.
 ---@type table<string, ToggleDef>
 local CONTENT_DEFS = {
@@ -2159,7 +2159,7 @@ Components.ContentToggleCatalog = { content = CONTENT_DEFS, difficulties = DIFFI
 ---@type ToggleDef[]
 local CONTENT_TOGGLE_DEFS = {}
 do
-    local instanceContent = BR.INSTANCE_CONTENT
+    local instanceContent = BR.BuffData.instanceContent
     local titles = instanceContent.titles or {}
     for _, key in ipairs(instanceContent.contentTypes) do
         local def = CONTENT_DEFS[key]

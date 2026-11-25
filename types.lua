@@ -88,3 +88,41 @@
 ---@field scenarioDifficulty? table<string, boolean>
 ---@field dungeonDifficulty? table<string, boolean>
 ---@field raidDifficulty? table<string, boolean>
+
+-- Each client exports the same typed table from its file of the same name in Data/Retail and
+-- Data/Forever. A field must not accept nil: LuaLS skips the missing-field check on a nil-able field.
+
+---@class PoisonPreference
+---@field spellID number
+---@field enabled boolean
+
+---@class RepairSources
+---@field mounts number[] Mounts that summon a repair vendor, in preference order
+---@field items number[] Items that repair on the spot, in preference order
+
+---@class BuffData
+---@field buffTables BuffTables
+---@field dkRuneforges DKRuneforge[]
+---@field instanceContent InstanceContent
+---@field petSpells PetSpells
+---@field stanceRules table<string, StanceRule>
+---@field poisonDefaults table<string, PoisonPreference[]> Default poison order per column
+---@field poisonColumns PoisonColumn[]
+---@field repairSources RepairSources
+---@field isRestingInBag fun(): boolean
+
+---@class ConsumablePreviewTextures
+---@field flask number[]
+---@field food number[]
+---@field oil number
+
+---@class ConsumableFeatures Consumable options that apply only to the item data of the client
+---@field itemLabels boolean
+---@field delveFood boolean
+---@field legacyItems boolean
+
+---@class ConsumableData
+---@field items table<string, table<number, ConsumableItemInfo|boolean>>
+---@field unrememberedFlasks table<number, boolean> Flasks that never become the remembered flask choice
+---@field previewTextures ConsumablePreviewTextures Sample icons for the item display preview in the options
+---@field features ConsumableFeatures

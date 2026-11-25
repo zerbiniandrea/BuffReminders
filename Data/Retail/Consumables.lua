@@ -19,7 +19,7 @@ local L = BR.L
 ---@field weaponClass? "edged"|"blunt" The weapon item fits only this class of weapon. Absent: any weapon.
 
 ---@type table<string, table<number, ConsumableItemInfo|boolean>>
-BR.CONSUMABLE_ITEMS = {
+local ITEMS = {
     food = {
         -- TWW 11.0.0 (legacy)
         [222702] = { label = L["Label.LowSecondary"], legacy = true }, -- Skewered Fillet
@@ -296,8 +296,7 @@ BR.CONSUMABLE_ITEMS = {
     },
 }
 
--- Flask items that never become the remembered flask choice.
-BR.UNREMEMBERED_FLASK_ITEMS = {
+local UNREMEMBERED_FLASKS = {
     [245926] = true, -- Fleeting Flask of Thalassian Resistance (quality 2)
     [245927] = true, -- Fleeting Flask of Thalassian Resistance
     [245928] = true, -- Fleeting Flask of the Shattered Sun (quality 2)
@@ -309,4 +308,16 @@ BR.UNREMEMBERED_FLASK_ITEMS = {
     -- Cauldrons
     [241318] = true, -- Cauldron of Sin'dorei Flasks (quality 2)
     [241319] = true, -- Cauldron of Sin'dorei Flasks
+}
+
+---@type ConsumableData
+BR.ConsumableData = {
+    items = ITEMS,
+    unrememberedFlasks = UNREMEMBERED_FLASKS,
+    previewTextures = {
+        flask = { 7548898, 7548899, 7548900 },
+        food = { 4672193, 1045939 },
+        oil = 7548987,
+    },
+    features = { itemLabels = true, delveFood = true, legacyItems = true },
 }

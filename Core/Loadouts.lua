@@ -444,5 +444,5 @@ BR.Loadouts = Loadouts
 local readyFrame = CreateFrame("Frame")
 BR.Client.RegisterEvent(readyFrame, "PLAYER_ENTERING_WORLD")
 readyFrame:SetScript("OnEvent", function()
-    Loadouts.EnsureAddonsReady(BR.BUFF_TABLES.loadout)
+    Loadouts.EnsureAddonsReady(BR.BuffData.buffTables.loadout)
 end)

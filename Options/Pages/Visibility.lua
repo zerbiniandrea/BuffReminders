@@ -82,7 +82,7 @@ local HIDE_WHEN_ROWS = {
     },
     {
         key = "hideInLegacyInstances",
-        shown = BR.INSTANCE_CONTENT.legacyLoot,
+        shown = BR.BuffData.instanceContent.legacyLoot,
         default = false,
         labelKey = "Options.HideWhen.Legacy",
         tooltipTitle = "Options.HideWhen.Legacy.Title",

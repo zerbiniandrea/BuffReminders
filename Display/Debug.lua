@@ -34,7 +34,7 @@ local function PrintRuneDebug()
 
     -- Enchant name lookup by enchantID from the runeforge table.
     local runeByEnchant = {}
-    for _, rune in ipairs(BR.DK_RUNEFORGES) do
+    for _, rune in ipairs(BR.BuffData.dkRuneforges) do
         runeByEnchant[rune.enchantID] = BR.GetSpellName(rune.spellID) or rune.key
     end
     local function enchantLabel(id)
@@ -269,7 +269,7 @@ local function ShowSpellDebug()
         "category | key | id | name | rank | known | secrecy | on player",
     }
     for _, category in ipairs(SPELL_DEBUG_CATEGORIES) do
-        for _, buff in ipairs(BR.BUFF_TABLES[category] or {}) do
+        for _, buff in ipairs(BR.BuffData.buffTables[category] or {}) do
             for _, id in ipairs(BuffSpellIDs(buff)) do
                 local okLevel, level = pcall(S.GetSpellAuraSecrecy, id)
                 local okAura, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, id)

@@ -5,7 +5,7 @@ local BR = ns
 local L = BR.L
 
 local buffKeyToCategory = {}
-for _, buff in ipairs(BR.BUFF_TABLES.consumable) do
+for _, buff in ipairs(BR.BuffData.buffTables.consumable) do
     if buff.consumableCategory then
         buffKeyToCategory[buff.key] = buff.consumableCategory
     end
