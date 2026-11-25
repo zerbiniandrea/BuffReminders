@@ -303,7 +303,7 @@ local function SendGreeting(name, spellID)
         return
     end
     greeted[name] = true
-    local send = C_ChatInfo and C_ChatInfo.SendChatMessage or SendChatMessage
+    local send = C_ChatInfo.SendChatMessage
     if mode == "whisper" then
         local text = defaults.driveByWhisper or L["DriveBy.WhisperDefault"]
         send(FillGreeting(text, name, spellID), "WHISPER", nil, name)
