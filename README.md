@@ -7,7 +7,8 @@
   <a href="https://discord.gg/qezQ2hXJJ7"><img src="https://shields.io/badge/discord-5865F2?logo=discord&style=for-the-badge&logoColor=white" /></a>
   <a href="https://ko-fi.com/zerbyy"><img src="https://shields.io/badge/ko--fi-FF5E5B?logo=ko-fi&style=for-the-badge&logoColor=white" /></a>
 </p>
-<p align="center">Track missing buffs at a glance</p>
+<h3 align="center">Track missing buffs at a glance</h3>
+<p align="center">Works on Retail and WoW Forever.</p>
 <p align="center">From the author of <a href="https://wago.io/iWkZ4Eq-i">Raid Buffs Tracker</a>, one of the most popular raid buffs tracking WeakAuras.</p>
 
 <p align="center">
@@ -24,24 +25,34 @@ Supports consumables, pets, and more. Add custom buffs to track whatever you wan
 ## Configuration
 
 Type `/br` to open the options panel.
-Choose which buffs you want to track and how you want them to look.
+Choose which buffs you want to track and how you want them to look. The panel matches the look of each client.
 
-<p align="center">
-  <img src="https://github.com/zerbiniandrea/BuffReminders/blob/main/images/settings-buffs.png?raw=true" />
-</p>
+<table>
+  <tr>
+    <th>Retail</th>
+    <th>WoW Forever</th>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/zerbiniandrea/BuffReminders/blob/main/images/settings-buffs.png?raw=true" /></td>
+    <td><img src="https://github.com/zerbiniandrea/BuffReminders/blob/main/images/settings-forever.png?raw=true" /></td>
+  </tr>
+</table>
 
-<p align="center">
-  <img src="https://github.com/zerbiniandrea/BuffReminders/blob/main/images/settings-options.png?raw=true" />
-</p>
+## Highlights
 
-## External Buffs
+- **External buffs (Retail)** - see the Power Infusion, Innervate, Bloodlust, and defensives you receive, even in combat and Mythic+.
+- **Custom buffs** - track any spell or item you like.
+- **Smart counts** - only alive, connected group members who benefit from a buff are counted, filtered by spec where possible.
 
-BuffReminders can also show the buffs you <em>receive</em>: Power Infusion, Innervate, Bloodlust, external defensives like Pain Suppression, and Augmentation Evoker buffs. The game draws these icons itself, so they stay visible in combat, in raid encounters, and in Mythic+. Enable the feature under `/br` > Buffs > External Buffs. The curated list is only the start: add any buff you like by its spell ID, or pull one straight off yourself from the buffs you are carrying right now.
+## Playing WoW Forever?
 
-## Limitations
+BuffReminders comes with extra reminders made just for it:
 
-- **Buff counts** only include group members who are alive, connected, visible (not phased), and allied. Dead, offline, or phased players are excluded. In open world, opposing-faction players are not counted.
-- **Spec-aware filtering** - buffs like Intellect and Attack Power are filtered by specialization (e.g., Feral Druids won't be counted as missing Intellect). Spec data is shared between group members via [LibSpecialization](https://www.curseforge.com/wow/addons/libspecialization), which is bundled with BuffReminders and other popular addons like BigWigs, so most of your group likely already has it. When spec info is unavailable (solo play, ally hasn't broadcasted yet, or unknown/starter specs), filtering falls back to class-level.
+- **Paladin blessings, sorted out** - pick a main and backup blessing per class, use Greater Blessings, and get warned when another paladin already covers your blessing or aura.
+- **Never run out** - low warnings for ammo matched to your bow or gun, and for reagents like Ankhs, Symbol of Kings, and Arcane Powder.
+- **Made for leveling** - tracks your buffs on group mates out in the world, reminds you to set up camp and use the Well-Rested sleeping bag, and turns tracking back on after you die.
+
+...and much more.
 
 ## Support
 

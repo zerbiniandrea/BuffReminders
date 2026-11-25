@@ -153,10 +153,6 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
         if isFirstInstall then
             print("|cff00ccffBuffReminders:|r " .. L["Display.LoginFirstInstall"])
         end
-        -- No saved flag: the notice repeats on each UI load while the client is in beta.
-        if BR.CLIENT_PREVIEW and BR.profile.showLoginMessages ~= false then
-            print("|cff00ccffBuffReminders:|r " .. L["Display.LoginClientBeta"]:format(BR.DISCORD_URL))
-        end
         -- Dead key: no notice reads it.
         glob.snoozeNoticeShown = nil
         if isFirstInstall then

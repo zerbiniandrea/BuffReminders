@@ -401,8 +401,6 @@ english["Display.LoginSnooze"] =
     "Right-click a reminder icon to snooze it or to open its settings. Type |cFFFFD100/br snooze|r to snooze all reminders, or to end all snoozes."
 english["Display.LoginCasterName"] =
     "External Buffs can now show who cast each buff. Turn it on in |cFFFFD100/br|r > Categories > External Buffs."
-english["Display.LoginClientBeta"] =
-    "WoW Forever support is in beta. Report problems on Discord: %s"
 
 -- ============================================================================
 -- OPTIONS: NAVIGATION LABELS
@@ -1309,10 +1307,6 @@ english["CustomBuff.Error"] = "Error:"
 english["Options.JoinDiscord"] = "Join Discord"
 english["Options.JoinDiscord.Title"] = "Click for invite link"
 english["Options.JoinDiscord.Desc"] = "Got feedback, feature requests, or bug reports?\nJoin the Discord!"
-english["Options.ClientBeta"] = "Beta"
-english["Options.ClientBeta.Title"] = "WoW Forever beta"
-english["Options.ClientBeta.Desc"] =
-    "Some reminders are not tested on all classes yet. Click for the Discord invite to report problems."
 
 -- ============================================================================
 -- OPTIONS: KO-FI
