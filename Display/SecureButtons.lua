@@ -18,6 +18,7 @@ local wipe = wipe
 local _, playerClass = UnitClass("player")
 local GetCategorySettings = BR.Helpers.GetCategorySettings
 local IsCategorySplit = BR.Helpers.IsCategorySplit
+local GetCategorySetting = BR.Config.GetCategorySetting
 
 local ChatRequest = BR.ChatRequest
 
@@ -31,9 +32,7 @@ local SubIcons = BR.SubIcons
 ---@param category string?
 ---@return boolean
 local function IsCategoryClickable(category)
-    local cs = category and BR.profile.categorySettings
-    local catSettings = cs and cs[category]
-    return catSettings ~= nil and catSettings.clickable == true
+    return category ~= nil and GetCategorySetting(category, "clickable") == true
 end
 
 -- ============================================================================
@@ -168,10 +167,11 @@ local function HasCustomClickAction(def)
 end
 
 -- ============================================================================
--- LAST TARGET TOOLTIP
+-- INFO TOOLTIPS
 -- ============================================================================
--- Shows the last known target name for targeted buffs. A theme with a native
--- tooltip uses GameTooltip, which that client skins.
+-- Addon info about a cast: the last target of a targeted buff and the next pick.
+-- The description tooltip setting never gates them. A theme with a native tooltip
+-- uses GameTooltip, which that client skins.
 
 local TARGET_TIP = BR.Theme.targetTooltip
 local CHOICE_SPELL_FMT = L["Tooltip.ChoiceSpell"]
@@ -263,19 +263,6 @@ local function HideLastTargetTooltip()
     nativeOwner = nil
 end
 
----@param owner table A consumable button
-local function ShowConsumableTooltip(owner)
-    local defaults = BR.profile.defaults
-    if not defaults or defaults.showConsumableTooltips ~= true or not owner.itemID then
-        return
-    end
-    BR.Display.ShowHoverTooltip(owner, function()
-        GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-        GameTooltip:SetItemByID(owner.itemID)
-        GameTooltip:Show()
-    end)
-end
-
 -- ============================================================================
 -- CLICK-TO-CAST OVERLAY
 -- ============================================================================
@@ -351,6 +338,8 @@ end
 ---@field chatMsg string? Request text without the channel prefix
 ---@field pickDef RaidBuff? PreClick picks the spell and the unit for this buff
 ---@field spellFn (fun(): number?)? PreClick writes the spell that this function returns
+---@field tipSpellID number? Spell that the hover tooltip names, for a macro
+---@field tipItemID number? Item that the hover tooltip names, for a macro. With tipSpellID: the item indoors
 
 -- Every resolver fills this one table, and ApplyAction copies what it needs before
 -- the next fill. A resolve runs for every frame on every display cycle, so it must
@@ -750,6 +739,28 @@ local function CurrentPick(frame)
     return RowOf(def).pick(def)
 end
 
+---The cast of a click on a castOnMissing buff, read at click time. The stored action
+---of a classChoices buff holds any known spell: the member that the click picks names
+---the spell.
+---@param pickDef RaidBuff
+---@param frame table The buff frame
+---@param spellID number? The spell of the stored action
+---@return number? spellID nil casts nothing
+---@return string? unit
+local function PickDefCast(pickDef, frame, spellID)
+    if pickDef.subChoices then
+        return CurrentPick(frame)
+    end
+    local groupSpellID, groupUnit = BR.BuffState.GetGroupCastSpellID(pickDef)
+    if groupSpellID then
+        return groupSpellID, groupUnit
+    end
+    if pickDef.classChoices then
+        return BR.BuffState.GetChoiceCast(pickDef)
+    end
+    return spellID, PickCastUnit(pickDef.key)
+end
+
 ---Shown above the anchor, because the choice row can open below it.
 ---@param anchor table
 ---@param unit string
@@ -791,8 +802,8 @@ local function ShowNextPick(overlay, frame)
         ShowPickTooltip(overlay, unit, spellID, NEXT_LEAD)
         return true
     end
-    -- A self pick names no person, so only the spell tooltip shows it.
-    BR.Display.ShowBuffSpellTooltip(frame, overlay, nil, nil, spellID)
+    -- A self pick names no person, so only the description tooltip shows it.
+    BR.SecureButtons.ShowDescriptionTooltip(overlay, frame, { spellID = spellID })
     return true
 end
 
@@ -924,31 +935,11 @@ local function CreateClickOverlay(frame)
         end
         local pickDef = self._br_pickDef
         if pickDef and not InCombatLockdown() then
-            if pickDef.subChoices then
-                -- The cast that the hover tooltip names. With no pick, the click
-                -- casts nothing, and PostClick writes the spell back.
-                local castID, castUnit = CurrentPick(frame)
-                self:SetAttribute("spell", castID)
-                self._br_spellCleared = castID == nil or nil
-                self:SetAttribute("unit", castUnit or "player")
-            else
-                local groupSpellID, groupUnit = BR.BuffState.GetGroupCastSpellID(pickDef)
-                if groupSpellID then
-                    self:SetAttribute("spell", groupSpellID)
-                    self:SetAttribute("unit", groupUnit or "player")
-                elseif pickDef.classChoices then
-                    -- The stored action holds any known spell of a classChoices buff. The
-                    -- member that the click picks names the spell to cast. With no pick,
-                    -- the click casts nothing, and PostClick writes the spell back.
-                    local castID, castUnit = BR.BuffState.GetChoiceCast(pickDef)
-                    self:SetAttribute("spell", castID)
-                    self._br_spellCleared = castID == nil or nil
-                    self:SetAttribute("unit", castUnit or "player")
-                else
-                    self:SetAttribute("spell", self._br_action.spellID)
-                    self:SetAttribute("unit", PickCastUnit(pickDef.key))
-                end
-            end
+            -- With no pick, the click casts nothing, and PostClick writes the spell back.
+            local castID, castUnit = PickDefCast(pickDef, frame, self._br_action.spellID)
+            self:SetAttribute("spell", castID)
+            self._br_spellCleared = castID == nil or nil
+            self:SetAttribute("unit", castUnit or "player")
         end
         local spellFn = self._br_clickSpellFn
         if spellFn and not InCombatLockdown() then
@@ -1047,8 +1038,11 @@ local function CreateClickOverlay(frame)
         then
             return
         end
-        -- An overlay with no left action exists only for the right-click menu.
-        if overlay._br_action_type == "" and not BR.Display.IsBuffTooltipOn(frame.buffCategory) then
+        -- An overlay with no left action exists only for the right-click menu, so no
+        -- cast target applies. The anchor is the overlay: the cursor is over the
+        -- overlay, not over the buff frame below it.
+        if overlay._br_action_type == "" then
+            BR.SecureButtons.ShowDescriptionTooltip(overlay, frame)
             return
         end
         -- Only the caster class has a meaningful last target.
@@ -1076,40 +1070,39 @@ local function CreateClickOverlay(frame)
                 end
             end
             hint = hint or def.targetHint
-            -- With spell tooltips on, the target name joins the spell tooltip. While
-            -- the tooltip key is up, the short target tooltip shows alone.
-            if BR.Display.IsBuffTooltipOn(frame.buffCategory) then
-                BR.Display.ShowBuffSpellTooltip(frame, overlay, function(tooltip)
-                    if name then
-                        -- The spell tooltip owns GameTooltip by now, so only the own frame hides.
-                        if lastTargetTooltip then
-                            lastTargetTooltip:Hide()
-                        end
-                        local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
-                        local text = hint and (name .. " |cff888888" .. hint .. "|r") or name
-                        tooltip:AddLine(" ")
-                        tooltip:AddLine(
-                            L["Tooltip.TargetLine"]:format(text),
-                            c and c.r or 1,
-                            c and c.g or 1,
-                            c and c.b or 1
-                        )
-                    end
-                end, name and function()
-                    ShowLastTargetTooltip(overlay, name, class, hint)
-                end)
-            elseif name then
+            if not name then
+                BR.SecureButtons.ShowDescriptionTooltip(overlay, frame)
+                return
+            end
+            local function showTargetInfo()
                 ShowLastTargetTooltip(overlay, name, class, hint)
+            end
+            -- The target joins the description as a line. While the tooltip key is
+            -- up, and where the description is off, the target info shows alone.
+            local shown = BR.SecureButtons.ShowDescriptionTooltip(overlay, frame, {
+                addLines = function(tooltip)
+                    -- The description owns GameTooltip by now, so only the own frame hides.
+                    if lastTargetTooltip then
+                        lastTargetTooltip:Hide()
+                    end
+                    local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+                    local text = hint and (name .. " |cff888888" .. hint .. "|r") or name
+                    tooltip:AddLine(" ")
+                    tooltip:AddLine(
+                        L["Tooltip.TargetLine"]:format(text),
+                        c and c.r or 1,
+                        c and c.g or 1,
+                        c and c.b or 1
+                    )
+                end,
+                fallback = showTargetInfo,
+            })
+            if not shown then
+                showTargetInfo()
             end
             return
         end
-        if frame.buffCategory == "consumable" then
-            ShowConsumableTooltip(overlay)
-            return
-        end
-        -- The anchor is the overlay: the cursor is over the overlay, not over the
-        -- buff frame below it.
-        BR.Display.ShowBuffSpellTooltip(frame, overlay)
+        BR.SecureButtons.ShowDescriptionTooltip(overlay, frame)
     end)
     overlay:HookScript("OnLeave", function()
         if HasRow(frame) then
@@ -1191,6 +1184,13 @@ local function ComputeConsumableFontSize(mainIconSize, item)
     return max(6, floor(mainIconSize * BR.TextPositions.GetSizePercent(item) / 100))
 end
 
+---@param owner table An item row button
+local function ShowItemRowTooltip(owner)
+    if owner.itemID and owner._br_buff_frame then
+        BR.SecureButtons.ShowDescriptionTooltip(owner, owner._br_buff_frame, { itemID = owner.itemID })
+    end
+end
+
 ---@return table btn The created button
 local function CreateActionButton()
     local btn = SubIcons.CreateButton()
@@ -1208,7 +1208,7 @@ local function CreateActionButton()
             end
         end)
     end)
-    btn:SetScript("OnEnter", ShowConsumableTooltip)
+    btn:SetScript("OnEnter", ShowItemRowTooltip)
     btn:SetScript("OnLeave", function(self)
         BR.Display.EndHoverTooltip(self)
         GameTooltip:Hide()
@@ -1511,10 +1511,8 @@ local function FillItemRow(frame)
         buttons = {}
         frame.actionButtons = buttons
     end
-    local cs = BR.profile.categorySettings
-    local catSettings = cs and cs[frame.buffCategory]
-    local clickable = catSettings and catSettings.clickable == true or false
-    local showHighlight = clickable and catSettings.clickableHighlight ~= false
+    local clickable = IsCategoryClickable(frame.buffCategory)
+    local showHighlight = clickable and GetCategorySetting(frame.buffCategory, "clickableHighlight") ~= false
     frame._br_rowDirty = nil
     local count = 0
     for i = frame._br_rowStart, #items do
@@ -1645,11 +1643,7 @@ local function CreateChoiceButton(frame)
         end
         local itemID = self.itemID
         if itemID then
-            BR.Display.ShowHoverTooltip(self, function()
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:SetItemByID(itemID)
-                GameTooltip:Show()
-            end)
+            BR.SecureButtons.ShowDescriptionTooltip(self, frame, { itemID = itemID })
             return
         end
         if not (self._br_ranks or self._br_spell) then
@@ -1694,9 +1688,7 @@ local function UpdateChoiceRow(frame, active, shown)
     end
     local valid, count = 0, 0
     if others and unit then
-        local cs = BR.profile.categorySettings
-        local catSettings = cs and cs[frame.buffCategory]
-        local showHighlight = not (catSettings and catSettings.clickableHighlight == false)
+        local showHighlight = GetCategorySetting(frame.buffCategory, "clickableHighlight") ~= false
         for _, choice in ipairs(others) do
             local itemID = choice.itemID
             local fixedID = choice.spellID
@@ -2317,24 +2309,31 @@ local function ResolveAction(frame, category, db)
         local sources = BR.BuffState.GetRepairSources()
         local mountName = sources.mountSpellID and BR.GetSpellName(sources.mountSpellID)
         local itemID = sources.itemID
-        local macro
+        local macro, tipSpellID, tipItemID
         if mountName and itemID then
             -- Where the mount is blocked, the item takes the whole macro: an area
             -- can block mounts and still read as outdoors, and the conditional
             -- would send the click to a cast that fails.
+            tipItemID = itemID
             if BR.BuffState.IsRepairMountUsable() then
                 macro = "/use [indoors] item:" .. itemID .. "\n/cast [outdoors] " .. mountName
+                tipSpellID = sources.mountSpellID
             else
                 macro = "/use item:" .. itemID
             end
         elseif mountName then
             macro = "/cast " .. mountName
+            tipSpellID = sources.mountSpellID
         elseif itemID then
             macro = "/use item:" .. itemID
+            tipItemID = itemID
         else
             return nil
         end
-        return MacroAction("repair", macro)
+        local action = MacroAction("repair", macro)
+        action.tipSpellID = tipSpellID
+        action.tipItemID = tipItemID
+        return action
     end
 
     if def and def.clickMacroText then
@@ -2390,6 +2389,133 @@ local function ResolveAction(frame, category, db)
     return nil
 end
 
+-- ============================================================================
+-- DESCRIPTION TOOLTIPS
+-- ============================================================================
+-- The game tooltip of the spell or item that an icon uses. The tooltip setting of
+-- the category gates it, and it never shows in combat. Info tooltips (the last
+-- target and the next pick) are separate: the setting never gates them.
+
+---@class DescriptionTooltipOpts
+---@field spellID? number Spell to show in place of the resolved subject
+---@field itemID? number Item to show in place of the resolved subject
+---@field addLines? fun(tooltip: table) Adds lines at the end, before the tooltip shows
+---@field fallback? fun() Draws a short tooltip while the tooltip key is up
+
+---The spell or item that a click on the frame uses, read at hover time. Where no
+---click resolves, the spell that the icon shows. Out of combat only: the click
+---resolvers read unit state, which combat can make secret.
+---@param frame table The hovered buff frame or extra frame
+---@return "spell"|"item"|nil kind
+---@return number? id
+local function ResolveDescriptionSubject(frame)
+    if frame._br_item then
+        return "item", frame._br_item.itemID
+    end
+    if frame._br_pet_spellID then
+        return "spell", frame._br_pet_spellID
+    end
+    local def = frame.buffDef
+    if not def then
+        return nil
+    end
+    -- ResolveAction fills the shared scratch action. A hover never runs inside a resolve.
+    local action = ResolveAction(frame, frame.buffCategory, BR.profile)
+    -- A chat request asks for the buff, so the buff spell describes it.
+    if action and not action.chatKey then
+        -- The repair macro uses the item indoors and the mount outdoors.
+        if action.tipSpellID and not (action.tipItemID and IsIndoors()) then
+            return "spell", action.tipSpellID
+        end
+        local itemID = action.tipItemID or action.itemID
+        if itemID then
+            return "item", itemID
+        end
+        local spellID = action.macroSpellID or action.spellID
+        if action.pickDef then
+            spellID = PickDefCast(action.pickDef, frame, spellID)
+        elseif action.spellFn then
+            spellID = action.spellFn()
+        end
+        if spellID then
+            return "spell", spellID
+        end
+    end
+    local spellID = GetActionSpellID(def) or (type(def.spellID) == "table" and def.spellID[1] or def.spellID)
+    if spellID then
+        return "spell", spellID
+    end
+    return nil
+end
+
+---@param owner table
+---@param def table? The buff definition, for the provider line
+---@param kind "spell"|"item"|nil nil shows only the name
+---@param id number?
+---@param name string?
+---@param addLines (fun(tooltip: table))?
+local function DrawDescriptionTooltip(owner, def, kind, id, name, addLines)
+    -- The tooltip key can redraw after combat starts.
+    if InCombatLockdown() then
+        return
+    end
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    if kind == "item" then
+        GameTooltip:SetItemByID(id)
+    elseif kind == "spell" then
+        GameTooltip:SetSpellByID(id)
+        -- The provider line helps only when another class gives the buff.
+        if def and def.class and def.class ~= playerClass then
+            local className = (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[def.class]) or def.class
+            local c = RAID_CLASS_COLORS and RAID_CLASS_COLORS[def.class]
+            GameTooltip:AddLine(
+                L["BuffTooltip.ProvidedBy"]:format(className),
+                c and c.r or 1,
+                c and c.g or 1,
+                c and c.b or 1
+            )
+        end
+    else
+        GameTooltip:SetText(name)
+    end
+    if addLines then
+        addLines(GameTooltip)
+    end
+    GameTooltip:Show()
+end
+
+---Show the description tooltip of a frame. The single gate for description tooltips:
+---callers do not check the setting. The subject resolves once, when the hover starts.
+---@param owner table The hovered frame, which anchors the tooltip
+---@param frame table The buff frame or extra frame that the tooltip describes
+---@param opts DescriptionTooltipOpts?
+---@return boolean shown false when the setting or combat blocks the tooltip, or when nothing describes the frame
+local function ShowDescriptionTooltip(owner, frame, opts)
+    if InCombatLockdown() or not BR.Display.IsDescriptionTooltipOn(frame.buffCategory) then
+        return false
+    end
+    ---@type "spell"|"item"|nil, number?
+    local kind, id
+    if opts and opts.itemID then
+        kind, id = "item", opts.itemID
+    elseif opts and opts.spellID then
+        kind, id = "spell", opts.spellID
+    else
+        kind, id = ResolveDescriptionSubject(frame)
+    end
+    local host = frame.isExtraFrame and frame.mainFrame or frame
+    local def = host.buffDef
+    local name = host.displayName or (def and def.name)
+    if not kind and not name then
+        return false
+    end
+    local addLines = opts and opts.addLines
+    BR.Display.ShowHoverTooltip(owner, function()
+        DrawDescriptionTooltip(owner, def, kind, id, name, addLines)
+    end, opts and opts.fallback)
+    return true
+end
+
 ---@param category string
 local function UpdateActionButtons(category)
     if InCombatLockdown() or BR.Display.IsTestMode() then
@@ -2403,9 +2529,8 @@ local function UpdateActionButtons(category)
     end
 
     local db = BR.profile
-    local cs = db.categorySettings and db.categorySettings[category]
-    local enabled = cs and cs.clickable == true
-    local showHighlight = enabled and (cs.clickableHighlight ~= false)
+    local enabled = IsCategoryClickable(category)
+    local showHighlight = enabled and GetCategorySetting(category, "clickableHighlight") ~= false
 
     -- A category with click-to-cast off still resolves its frames when it can host
     -- a chat request: only the resolver knows whether a given frame lands on one.
@@ -2476,6 +2601,13 @@ local function RefreshChatRequestMacros()
     end
 end
 
+---Rewire every category, also the ones whose click to cast just turned off.
+local function UpdateAllActionButtons()
+    for _, cat in ipairs(BR.CATEGORY_ORDER) do
+        UpdateActionButtons(cat)
+    end
+end
+
 local function RefreshOverlaySpells()
     if InCombatLockdown() or BR.Display.IsTestMode() then
         return
@@ -2486,10 +2618,8 @@ local function RefreshOverlaySpells()
     if not framesByCategory then
         return
     end
-    local db = BR.profile
     for cat in pairs(framesByCategory) do
-        local cs = db.categorySettings and db.categorySettings[cat]
-        if (cs and cs.clickable == true) or cat == "custom" or ChatRequest.WantsCategory(cat) then
+        if IsCategoryClickable(cat) or cat == "custom" or ChatRequest.WantsCategory(cat) then
             UpdateActionButtons(cat)
         end
     end
@@ -2497,6 +2627,8 @@ end
 
 BR.SecureButtons = {
     UpdateActionButtons = UpdateActionButtons,
+    UpdateAllActionButtons = UpdateAllActionButtons,
+    ShowDescriptionTooltip = ShowDescriptionTooltip,
     UnregisterSecureHost = UnregisterSecureHost,
     RefreshOverlaySpells = RefreshOverlaySpells,
     RefreshChatRequestMacros = RefreshChatRequestMacros,

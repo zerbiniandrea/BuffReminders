@@ -342,10 +342,11 @@ local CategorySettingKeys = {
     showBuffReminder = "VisualsRefresh",
     buffTextSize = "VisualsRefresh",
     showText = "VisualsRefresh",
-    showBuffTooltips = "VisualsRefresh", -- Toggles hover capture vs click-through
+    showDescriptionTooltips = "VisualsRefresh", -- Toggles hover capture vs click-through
     -- Toggles
     useCustomAppearance = "VisualsRefresh",
     useCustomGlow = "VisualsRefresh",
+    useCustomInteraction = "VisualsRefresh", -- The options call UpdateActionButtons for the click overlays
     -- Per-category glow style overrides (expiring)
     glowType = "VisualsRefresh",
     glowColor = "VisualsRefresh",
@@ -405,6 +406,9 @@ local DefaultSettingKeys = {
     showExpirationGlow = "DisplayRefresh",
     expirationThreshold = "DisplayRefresh",
     expirationShare = "DisplayRefresh",
+    showDescriptionTooltips = "VisualsRefresh", -- Toggles hover capture vs click-through
+    clickable = false, -- The options call UpdateActionButtons for the click overlays
+    clickableHighlight = false, -- The options call UpdateActionButtons for the click overlays
     preKeyThreshold = "DisplayRefresh",
     glowType = "VisualsRefresh",
     glowColor = "VisualsRefresh",
@@ -472,7 +476,6 @@ local DefaultSettingKeys = {
     consumableBadgeOnSubIcons = "DisplayRefresh",
     consumableTextScale = "VisualsRefresh",
     hideConsumableLabels = "VisualsRefresh",
-    showConsumableTooltips = false, -- No refresh needed, read at tooltip time
     tooltipModifier = false, -- Read at hover time
     rightClickMenu = "DisplayRefresh", -- Re-wires the type2 attribute of the click overlays
     subIconReveal = "DisplayRefresh",
@@ -851,6 +854,13 @@ local GlowKeys = {
     missingGlowYOffset = true,
 }
 
+-- Keys that inherit from defaults while useCustomInteraction is false.
+local InteractionKeys = {
+    clickable = true,
+    clickableHighlight = true,
+    showDescriptionTooltips = true,
+}
+
 ---Get a category setting with inheritance from defaults
 ---@param category string Category name (raid, presence, etc.)
 ---@param key string Setting key (iconSize, showBuffReminder, etc.)
@@ -882,6 +892,13 @@ function BR.Config.GetCategorySetting(category, key)
     -- override switches.
     if GlowKeys[key] then
         if not catSettings.useCustomGlow then
+            return db.defaults and db.defaults[key]
+        end
+        return catSettings[key]
+    end
+
+    if InteractionKeys[key] then
+        if not catSettings.useCustomInteraction then
             return db.defaults and db.defaults[key]
         end
         return catSettings[key]

@@ -609,9 +609,6 @@ L["Options.PetSpecIcon.Desc"] =
     "마우스를 올리면 소환수 아이콘이 특성 능력(교활, 야성, 끈기)으로 바뀝니다."
 L["Options.ShowItemTooltips"] = "아이템 툴팁 표시"
 L["Options.ShowItemTooltips.Desc"] = "소모품 아이콘에 마우스를 올리면 아이템 툴팁이 표시됩니다."
-L["Options.ShowBuffTooltips"] = "버프 툴팁 표시"
-L["Options.ShowBuffTooltips.Desc"] =
-    "이 카테고리의 버프 아이콘에 마우스를 올리면 주문 툴팁과 걸어준 직업이 표시됩니다."
 L["Options.PetPassiveCombat"] = "전투 중에만 수동적 소환수 알림"
 L["Options.PetPassiveCombat.Desc"] =
     "전투 중에만 수동적 소환수 알림을 표시합니다. 비활성화 시 항상 표시됩니다."

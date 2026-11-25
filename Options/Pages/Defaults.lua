@@ -475,9 +475,48 @@ local function Build(content)
     -- ========================================================================
     -- INTERACTION
     -- ========================================================================
-    -- Global only: no category overrides these keys.
     local interactionHeader = LayoutSectionHeader(layout, content, L["Options.Interaction"])
     BR.Options.WhatsNew.AttachDot(interactionHeader, "defaults.interaction")
+
+    -- A category can override the next three keys. The keys below them are global only.
+    local function isClickable()
+        return BR.Config.Get("defaults.clickable") ~= false
+    end
+
+    local clickableHolder = Components.Checkbox(content, {
+        label = L["Options.ClickToCast"],
+        tooltip = { title = L["Options.ClickToCast"], desc = L["Options.ClickToCast.DescFull"] },
+        get = isClickable,
+        onChange = function(checked)
+            BR.Config.Set("defaults.clickable", checked)
+            BR.SecureButtons.UpdateAllActionButtons()
+            Components.RefreshAll()
+        end,
+    })
+    layout:Add(clickableHolder, nil, COMPONENT_GAP)
+
+    layout:SetX(layout:GetX() + DEPENDENT_INDENT)
+    local highlightHolder = Components.Checkbox(content, {
+        label = L["Options.HoverHighlight"],
+        tooltip = { title = L["Options.HoverHighlight"], desc = L["Options.HoverHighlight.Desc"] },
+        get = MakeDefaultsGetter("clickableHighlight", true),
+        enabled = isClickable,
+        disabledReason = L["DisabledReason.ClickToCast"],
+        onChange = function(checked)
+            BR.Config.Set("defaults.clickableHighlight", checked)
+            BR.SecureButtons.UpdateAllActionButtons()
+        end,
+    })
+    layout:Add(highlightHolder, nil, COMPONENT_GAP)
+    layout:SetX(layout:GetX() - DEPENDENT_INDENT)
+
+    local tooltipsHolder = Components.Checkbox(content, {
+        label = L["Options.ShowDescriptionTooltips"],
+        tooltip = { title = L["Options.ShowDescriptionTooltips"], desc = L["Options.ShowDescriptionTooltips.Desc"] },
+        get = MakeDefaultsGetter("showDescriptionTooltips", false),
+        onChange = MakeDefaultsSetter("showDescriptionTooltips"),
+    })
+    layout:Add(tooltipsHolder, nil, COMPONENT_GAP)
 
     local menuHolder = Components.Checkbox(content, {
         label = L["Options.RightClickMenu"],

@@ -88,7 +88,9 @@ local BR = ns
 ---@field placeAtPlayer? boolean
 ---@field consumableDisplayMode? "icon_only"|"sub_icons"|"expanded"
 ---@field consumableBadgeOnSubIcons? boolean
----@field showConsumableTooltips? boolean
+---@field clickable? boolean
+---@field clickableHighlight? boolean
+---@field showDescriptionTooltips? boolean
 ---@field tooltipModifier? "SHIFT"|"CTRL"|"ALT" Key that hover tooltips wait for. nil: no key
 ---@field rightClickMenu? boolean false: the right click does the left-click action
 ---@field subIconReveal? "hover"|"always"
@@ -139,6 +141,7 @@ local BR = ns
 ---@field showText? boolean
 ---@field useCustomAppearance? boolean
 ---@field useCustomGlow? boolean
+---@field useCustomInteraction? boolean clickable, clickableHighlight and showDescriptionTooltips follow defaults while false
 ---@field glowType? number
 ---@field glowColor? number[]
 ---@field glowSize? number
@@ -173,7 +176,7 @@ local BR = ns
 ---@field clickable? boolean
 ---@field clickableHighlight? boolean
 ---@field showOnlyOnReadyCheck? boolean
----@field showBuffTooltips? boolean Spell tooltip on hover (raid, presence, targeted, self)
+---@field showDescriptionTooltips? boolean Loadout ignores it
 ---@field priority? number
 
 --- All category settings must be defined here. When adding a new category:
@@ -225,6 +228,7 @@ local BR = ns
 ---@field isExtraFrame? boolean
 ---@field mainFrame? BuffFrame
 ---@field _br_pet_spell? string             -- Localized spell name for pet click-to-cast
+---@field _br_pet_spellID? number           -- Pet summon spell for the hover tooltip
 ---@field _br_item? table                   -- Consumable item an expanded extra frame shows
 ---@field _br_subIcon? boolean             -- A test-mode sub-icon, not a layout frame
 ---@field _br_pet_spec_icon? number        -- Pet spec ability icon texture for hover swap
@@ -1135,22 +1139,16 @@ end
 -- Map buff key -> consumable category (derived from buff definitions in Data/Buffs.lua)
 local BUFF_KEY_TO_CATEGORY = BR.BUFF_KEY_TO_CATEGORY
 
--- Categories whose icons are spells, so a hover can show the spell tooltip.
-local BUFF_TOOLTIP_CATEGORIES = { raid = true, presence = true, targeted = true, self = true }
-
----True when the category shows the spell tooltip on hover. Off unless the user
----opted in, so a hover never pops a tooltip by surprise.
+---True when the category shows a tooltip on hover. A loadout frame owns its mouse.
 ---@param category? string
 ---@return boolean
-local function IsBuffTooltipOn(category)
-    if not category or not BUFF_TOOLTIP_CATEGORIES[category] then
+local function IsDescriptionTooltipOn(category)
+    if not category or category == "loadout" then
         return false
     end
-    local cs = BR.profile and BR.profile.categorySettings and BR.profile.categorySettings[category]
-    return cs ~= nil and cs.showBuffTooltips == true
+    return BR.Config.GetCategorySetting(category, "showDescriptionTooltips") == true
 end
-BR.Display.IsBuffTooltipOn = IsBuffTooltipOn
-BR.Display.BUFF_TOOLTIP_CATEGORIES = BUFF_TOOLTIP_CATEGORIES
+BR.Display.IsDescriptionTooltipOn = IsDescriptionTooltipOn
 
 local MODIFIER_DOWN = { SHIFT = IsShiftKeyDown, CTRL = IsControlKeyDown, ALT = IsAltKeyDown }
 
@@ -1204,65 +1202,22 @@ end
 BR.Display.ShowHoverTooltip = ShowHoverTooltip
 BR.Display.EndHoverTooltip = EndHoverTooltip
 
-local function DrawBuffSpellTooltip(frame, anchor, addLines, spellID)
-    local def = frame.buffDef
-    if not def then
-        return
-    end
-    spellID = spellID or (type(def.spellID) == "table" and def.spellID[1] or def.spellID)
-    if not spellID then
-        return
-    end
-    GameTooltip:SetOwner(anchor or frame, "ANCHOR_RIGHT")
-    GameTooltip:SetSpellByID(spellID)
-    -- The provider line helps only when another class gives the buff.
-    if def.class and def.class ~= playerClass then
-        local className = (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[def.class]) or def.class
-        local r, g, b = 1, 1, 1
-        local c = RAID_CLASS_COLORS and RAID_CLASS_COLORS[def.class]
-        if c then
-            r, g, b = c.r, c.g, c.b
-        end
-        GameTooltip:AddLine(format(L["BuffTooltip.ProvidedBy"], className), r, g, b)
-    end
-    if addLines then
-        addLines(GameTooltip)
-    end
-    GameTooltip:Show()
-end
-
--- Show the spell tooltip for a buff frame, with a class-colored "Provided by"
--- line. The caller passes the hovered frame as `anchor`, so the tooltip lines up
--- with the cursor when a click overlay covers the icon.
----@param addLines? fun(tooltip: table) Adds lines under the spell before the tooltip shows
----@param fallback? fun() Draws a short tooltip while the tooltip key is up
----@param spellID? number Spell to show. Default: the first spell of the buff
-local function ShowBuffSpellTooltip(frame, anchor, addLines, fallback, spellID)
-    if not IsBuffTooltipOn(frame.buffCategory) then
-        return
-    end
-    ShowHoverTooltip(anchor or frame, function()
-        DrawBuffSpellTooltip(frame, anchor, addLines, spellID)
-    end, fallback)
-end
-BR.Display.ShowBuffSpellTooltip = ShowBuffSpellTooltip
-
 -- Apply mouse interactivity to a buff icon frame. Icons are always click-through
 -- (dragging is handled by anchor handles; click-to-cast/chat-requests live on the
 -- secure overlays that float above the icon). A frame gets hover events ONLY
--- when its category opted in to the buff tooltip - otherwise it stays fully
+-- when its category opted in to the description tooltip - otherwise it stays fully
 -- click-through so the world beneath (camera drag, unit clicks) is reachable.
--- Re-called from UpdateVisuals so toggling showBuffTooltips takes effect live.
+-- Re-called from UpdateVisuals so toggling showDescriptionTooltips takes effect live.
 local function ApplyBuffFrameMouse(frame, category)
     -- WireLoadoutFrameClick owns the mouse of a loadout frame.
     if category == "loadout" then
         return
     end
-    if IsBuffTooltipOn(category) then
+    if IsDescriptionTooltipOn(category) then
         frame:SetMouseClickEnabled(false)
         frame:SetMouseMotionEnabled(true)
         frame:SetScript("OnEnter", function(self)
-            ShowBuffSpellTooltip(self)
+            BR.SecureButtons.ShowDescriptionTooltip(self, self)
         end)
         frame:SetScript("OnLeave", function(self)
             EndHoverTooltip(self)
@@ -2531,6 +2486,7 @@ local function SetupPetExtraFrame(frame, index, action, entry, cachedGlow, frame
     extra.count:Hide()
     extra.stackCount:Hide()
     extra._br_pet_spell = action.spellName
+    extra._br_pet_spellID = action.spellID
     extra._br_pet_spec_icon = action.petSpecIcon
     UpdatePetLabels(extra, action)
     BR.SecureButtons.ReapplyPetSpecIconIfHovered(extra)
@@ -2548,6 +2504,7 @@ end
 local function ApplyPetDisplayMode(frame, entry, frameList)
     if not entry.petActions or #entry.petActions == 0 or not frame:IsShown() then
         frame._br_pet_spell = nil
+        frame._br_pet_spellID = nil
         frame._br_pet_spec_icon = nil
         UpdatePetLabels(frame, nil)
         return
@@ -2569,6 +2526,7 @@ local function ApplyPetDisplayMode(frame, entry, frameList)
         frame.icon:SetTexture(first.icon)
         frame.count:Hide()
         frame._br_pet_spell = first.spellName
+        frame._br_pet_spellID = first.spellID
         frame._br_pet_spec_icon = first.petSpecIcon
         UpdatePetLabels(frame, first)
     else
@@ -2581,6 +2539,7 @@ local function ApplyPetDisplayMode(frame, entry, frameList)
             frame.icon:SetTexture(texture)
         end
         frame._br_pet_spell = preferredAction and preferredAction.spellName
+        frame._br_pet_spellID = preferredAction and preferredAction.spellID
         frame._br_pet_spec_icon = preferredAction and preferredAction.petSpecIcon
         UpdatePetLabels(frame, preferredAction)
     end
@@ -3001,8 +2960,7 @@ local function WireLoadoutFrameClick(frame)
     frame:SetScript("OnMouseUp", function(self, button)
         local db = BR.profile
         if button == "RightButton" and db.defaults.rightClickMenu ~= false then
-            local cs = db.categorySettings and db.categorySettings.loadout
-            if cs and cs.clickable == true then
+            if BR.Config.GetCategorySetting("loadout", "clickable") == true then
                 BR.Display.OpenReminderMenu(self, self)
             end
             return
@@ -3451,7 +3409,7 @@ local function UpdateVisuals()
             BR.TextPositions.Apply(frame.subLabel, frame, lz, lx, ly)
         end
 
-        -- Re-apply mouse state so toggling Show Buff Tooltips (raid/presence)
+        -- Re-apply mouse state so toggling the description tooltips
         -- switches between hover-enabled and fully click-through without /reload.
         ApplyBuffFrameMouse(frame, frame.buffCategory)
 
@@ -3757,8 +3715,11 @@ eventHandlers.PLAYER_ENTERING_WORLD = function()
         -- custom buffs with their own action, or a category that hosts a chat
         -- request, which answers the Chat Requests toggle instead.
         for _, cat in ipairs(CATEGORIES) do
-            local cs = BR.profile.categorySettings and BR.profile.categorySettings[cat]
-            if (cs and cs.clickable) or cat == "custom" or BR.ChatRequest.WantsCategory(cat) then
+            if
+                BR.Config.GetCategorySetting(cat, "clickable") == true
+                or cat == "custom"
+                or BR.ChatRequest.WantsCategory(cat)
+            then
                 BR.SecureButtons.UpdateActionButtons(cat)
             end
         end

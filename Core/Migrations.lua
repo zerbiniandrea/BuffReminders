@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 66
+BR.Migrations.DB_VERSION = 67
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -59,6 +59,122 @@ function BR.Migrations.SplitBuffTooltips(profile)
         end
     end
     profileDefaults.showBuffTooltips = nil
+end
+
+-- The categories that had each interaction control, and the global default of the control.
+local INTERACTION_FOLD = {
+    {
+        key = "clickable",
+        default = true,
+        categories = { "raid", "presence", "targeted", "self", "pet", "consumable", "utility" },
+    },
+    {
+        key = "clickableHighlight",
+        default = true,
+        categories = { "raid", "presence", "targeted", "self", "pet", "consumable", "utility" },
+    },
+    {
+        key = "showDescriptionTooltips",
+        default = false,
+        categories = { "raid", "presence", "targeted", "self", "consumable" },
+    },
+}
+
+-- The saved key that each interaction key replaces.
+local OLD_KEYS = { showDescriptionTooltips = "showBuffTooltips" }
+
+---Fold the per-category interaction keys into global defaults with an override per
+---category (useCustomInteraction). A key whose categories all agree becomes that
+---global value, else the global takes its default. A category that differs from a
+---global keeps its values under an override. A category without a control follows
+---the global. The category key showBuffTooltips becomes showDescriptionTooltips.
+---@param profile table One profile
+function BR.Migrations.FoldInteraction(profile)
+    if type(profile.defaults) ~= "table" then
+        profile.defaults = {}
+    end
+    local profileDefaults = profile.defaults
+    if type(profile.categorySettings) ~= "table" then
+        profile.categorySettings = {}
+    end
+    local categorySettings = profile.categorySettings
+
+    -- The old effective value: clickable and clickableHighlight defaulted to on, and
+    -- the consumable tooltip toggle was defaults.showConsumableTooltips.
+    local function oldValue(category, key)
+        if key == "showDescriptionTooltips" and category == "consumable" then
+            return profileDefaults.showConsumableTooltips == true
+        end
+        local cs = categorySettings[category]
+        local raw
+        if type(cs) == "table" then
+            raw = cs[OLD_KEYS[key] or key]
+        end
+        if key == "showDescriptionTooltips" then
+            return raw == true
+        end
+        return raw ~= false
+    end
+
+    local globals = {}
+    local controls = {}
+    for _, fold in ipairs(INTERACTION_FOLD) do
+        local first = oldValue(fold.categories[1], fold.key)
+        local agree = true
+        for _, category in ipairs(fold.categories) do
+            controls[category] = controls[category] or {}
+            controls[category][fold.key] = true
+            if oldValue(category, fold.key) ~= first then
+                agree = false
+            end
+        end
+        if agree then
+            globals[fold.key] = first
+        else
+            globals[fold.key] = fold.default
+        end
+    end
+
+    local overrides = {}
+    for category, keys in pairs(controls) do
+        for key in pairs(keys) do
+            if oldValue(category, key) ~= globals[key] then
+                local values = {}
+                for _, fold in ipairs(INTERACTION_FOLD) do
+                    if keys[fold.key] then
+                        values[fold.key] = oldValue(category, fold.key)
+                    else
+                        values[fold.key] = globals[fold.key]
+                    end
+                end
+                overrides[category] = values
+                break
+            end
+        end
+    end
+
+    for _, fold in ipairs(INTERACTION_FOLD) do
+        profileDefaults[fold.key] = globals[fold.key]
+    end
+    for _, cs in pairs(categorySettings) do
+        if type(cs) == "table" then
+            for _, fold in ipairs(INTERACTION_FOLD) do
+                cs[fold.key] = nil
+            end
+            cs.showBuffTooltips = nil
+        end
+    end
+    for category, values in pairs(overrides) do
+        if type(categorySettings[category]) ~= "table" then
+            categorySettings[category] = {}
+        end
+        local cs = categorySettings[category]
+        cs.useCustomInteraction = true
+        for key, value in pairs(values) do
+            cs[key] = value
+        end
+    end
+    profileDefaults.showConsumableTooltips = nil
 end
 
 ---Move defaults.feastAtPlayer to defaults.placeAtPlayer. The setting also places cauldrons.
@@ -353,6 +469,12 @@ function BR.Migrations.RunProfile(profile, isImport)
                     catSettings.subIconSide = nil
                 end
             end
+        end,
+        -- [67] Click to cast, the hover highlight and the tooltips become global
+        -- defaults with an Interaction override per category
+        -- (BR.Migrations.FoldInteraction).
+        [67] = function()
+            BR.Migrations.FoldInteraction(profile)
         end,
     }
 

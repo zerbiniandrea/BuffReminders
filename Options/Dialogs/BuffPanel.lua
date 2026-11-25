@@ -1640,8 +1640,7 @@ local SPECIAL_SECTIONS = {
 }
 
 local function IsRaidClickable()
-    local cs = BR.profile.categorySettings
-    return cs ~= nil and cs.raid ~= nil and cs.raid.clickable == true
+    return BR.Config.GetCategorySetting("raid", "clickable") == true
 end
 
 ---@param buff RaidBuff

@@ -700,6 +700,8 @@ english["Options.ClickToCast"] = "Click to cast"
 english["Options.ClickToCast.DescFull"] =
     "Make buff icons clickable to cast the corresponding spell (out of combat only). Only works for spells your character can cast."
 english["Options.HoverHighlight"] = "Hover highlight"
+english["Options.ClickToCast.Custom.Desc"] =
+    "Make the icons of this category clickable for the right-click menu and the hover highlight. A custom buff with its own click action stays clickable while this is off."
 english["Options.HoverHighlight.Desc"] = "Show a subtle highlight when hovering over clickable buff icons."
 english["Options.RightClickMenu"] = "Right-click: snooze and settings menu"
 english["Options.RightClickMenu.Desc"] =
@@ -747,14 +749,12 @@ english["Options.PetSpecIcon"] = "Show hunter pet spec icon on hover"
 english["Options.PetSpecIcon.Title"] = "Pet spec icon on hover"
 english["Options.PetSpecIcon.Desc"] =
     "Swap the pet icon to its specialization ability (Cunning, Ferocity, Tenacity) when hovering."
-english["Options.ShowItemTooltips"] = "Show item tooltips"
-english["Options.ShowItemTooltips.Desc"] = "When hovering over a consumable icon, show its item tooltip."
-english["Options.ShowBuffTooltips"] = "Show buff tooltips"
-english["Options.ShowBuffTooltips.Desc"] =
-    "When the mouse is on a buff icon of this category, show the spell tooltip and which class provides the buff."
+english["Options.ShowDescriptionTooltips"] = "Show tooltips"
+english["Options.ShowDescriptionTooltips.Desc"] =
+    "When the mouse is on a reminder icon, show the tooltip of the spell or item that a click uses. If the click asks the group for a buff, the tooltip shows the buff and which class provides it. There are no tooltips in combat."
 english["Options.TooltipModifier"] = "Tooltip key"
 english["Options.TooltipModifier.Desc"] =
-    "If you select a key, buff and item tooltips show only while you hold that key. You can point at an icon first and push the key after. Turn on the tooltips in the Interaction section of each category."
+    "If you select a key, buff and item tooltips show only while you hold that key. You can point at an icon first and push the key after. Turn on the tooltips in the Interaction section of the Defaults page."
 english["Options.TooltipModifier.None"] = "None"
 english["Options.TooltipModifier.Shift"] = "Shift"
 english["Options.TooltipModifier.Ctrl"] = "Ctrl"
@@ -1033,6 +1033,8 @@ english["Options.Override.Inherited"] = "Inherited from Defaults"
 english["Options.Override.Overriding"] = "Overriding defaults"
 english["Options.Override.Appearance.Desc"] =
     "Override the global appearance defaults for this category.\nWhile off, the controls below show the inherited values from the Defaults page."
+english["Options.Override.Interaction.Desc"] =
+    "Override the global interaction settings for this category.\nWhile off, the controls below show the inherited values from the Defaults page."
 english["Options.Override.Glow.Desc"] =
     "Override the global glow settings for this category.\nWhile off, the controls below show the inherited values from the Defaults page."
 english["Options.Override.Externals.Desc"] =
@@ -1408,7 +1410,8 @@ english["DisabledReason.ClickToCast"] = 'Turn on "Click to cast" first.'
 english["DisabledReason.ShowWithoutItems"] = 'Turn on "Show when not in bags" first.'
 english["DisabledReason.PetLabelsOff"] = 'Pick a position for "Pet labels" first.'
 english["DisabledReason.OverrideRow"] = 'Tick "Override" on this row first.'
-english["DisabledReason.RaidClickToCast"] = 'Needs "Click to cast" on (Categories > Raid tab).'
+english["DisabledReason.RaidClickToCast"] =
+    'Needs "Click to cast" on for raid buffs (Defaults page, or the Interaction override of the Raid tab).'
 
 -- Direction labels
 english["Direction.Left"] = "Left"

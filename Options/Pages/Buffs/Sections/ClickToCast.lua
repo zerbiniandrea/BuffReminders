@@ -5,39 +5,71 @@ local BR = ns
 -- ============================================================================
 -- BUFF PAGE SECTION: Interaction
 -- ============================================================================
--- What the mouse does: click to cast and the options it gates, at one indent,
--- then the buff tooltips, which work without it.
+-- What the mouse does. One override covers click to cast, the hover highlight and
+-- the tooltips. While it is off, the controls show the values of the Defaults page.
 
 local L = BR.L
 local Components = BR.Components
 local Helpers = BR.Options.Helpers
 
 local LayoutSectionHeader = Helpers.LayoutSectionHeader
-local GetCategorySetting = Helpers.GetCategorySetting
-local MakeCategoryGetter = Helpers.MakeCategoryGetter
 
 local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local DEPENDENT_INDENT = BR.Options.Constants.DEPENDENT_INDENT
 
+local INTERACTION_KEYS = { "clickable", "clickableHighlight", "showDescriptionTooltips" }
+
 local function Build(ctx, layout)
     local category = ctx.category
     local parent = ctx.content
+    local prefix = "categorySettings." .. category .. "."
+
+    local function isOverriding()
+        return Helpers.GetCategorySetting(category, "useCustomInteraction", false) == true
+    end
+
+    local function getEffective(key)
+        return BR.Config.GetCategorySetting(category, key)
+    end
+
+    local function isClickable()
+        return getEffective("clickable") == true
+    end
 
     LayoutSectionHeader(layout, parent, L["Options.Interaction"])
 
-    local function isClickable()
-        return GetCategorySetting(category, "clickable", false) == true
-    end
+    Helpers.AddOverrideRow(parent, layout, {
+        get = isOverriding,
+        desc = L["Options.Override.Interaction.Desc"],
+        defaultsLink = true,
+        onChange = function(checked)
+            local changes = { [prefix .. "useCustomInteraction"] = checked }
+            if checked then
+                -- Snapshot the effective values, so the override does not change the display.
+                local profileDefaults = BR.profile.defaults
+                for _, key in ipairs(INTERACTION_KEYS) do
+                    if Helpers.GetCategorySetting(category, key) == nil then
+                        changes[prefix .. key] = profileDefaults[key]
+                    end
+                end
+            end
+            BR.Config.SetMulti(changes)
+            BR.SecureButtons.UpdateActionButtons(category)
+            Components.RefreshAll()
+        end,
+    })
 
     local clickableHolder = Components.Checkbox(parent, {
         label = L["Options.ClickToCast"],
         get = isClickable,
+        enabled = isOverriding,
+        disabledReason = L["DisabledReason.OverrideSection"],
         tooltip = {
             title = L["Options.ClickToCast"],
-            desc = L["Options.ClickToCast.DescFull"],
+            desc = category == "custom" and L["Options.ClickToCast.Custom.Desc"] or L["Options.ClickToCast.DescFull"],
         },
         onChange = function(checked)
-            Helpers.SetCategorySetting(category, "clickable", checked)
+            BR.Config.Set(prefix .. "clickable", checked)
             BR.SecureButtons.UpdateActionButtons(category)
             Components.RefreshAll()
         end,
@@ -48,20 +80,27 @@ local function Build(ctx, layout)
     layout:SetX(baseX + DEPENDENT_INDENT)
     local highlightHolder = Components.Checkbox(parent, {
         label = L["Options.HoverHighlight"],
-        get = MakeCategoryGetter(category, "clickableHighlight", true),
-        enabled = isClickable,
-        disabledReason = L["DisabledReason.ClickToCast"],
+        get = function()
+            return getEffective("clickableHighlight") ~= false
+        end,
+        enabled = function()
+            return isOverriding() and isClickable()
+        end,
+        disabledReason = function()
+            return isOverriding() and L["DisabledReason.ClickToCast"] or L["DisabledReason.OverrideSection"]
+        end,
         tooltip = {
             title = L["Options.HoverHighlight"],
             desc = L["Options.HoverHighlight.Desc"],
         },
         onChange = function(checked)
-            Helpers.SetCategorySetting(category, "clickableHighlight", checked)
+            BR.Config.Set(prefix .. "clickableHighlight", checked)
             BR.SecureButtons.UpdateActionButtons(category)
         end,
     })
     layout:Add(highlightHolder, nil, COMPONENT_GAP)
 
+    -- A global key outside the override: it applies wherever pet clicks are on.
     if category == "pet" then
         local specIconHolder = Components.Checkbox(parent, {
             label = L["Options.PetSpecIcon"],
@@ -80,45 +119,26 @@ local function Build(ctx, layout)
         })
         layout:Add(specIconHolder, nil, COMPONENT_GAP)
     end
-
-    if category == "consumable" then
-        local showTooltipsHolder = Components.Checkbox(parent, {
-            label = L["Options.ShowItemTooltips"],
-            get = function()
-                return BR.Config.Get("defaults.showConsumableTooltips") ~= false
-            end,
-            enabled = isClickable,
-            disabledReason = L["DisabledReason.ClickToCast"],
-            tooltip = {
-                title = L["Options.ShowItemTooltips"],
-                desc = L["Options.ShowItemTooltips.Desc"],
-            },
-            onChange = function(checked)
-                BR.Config.Set("defaults.showConsumableTooltips", checked)
-            end,
-        })
-        layout:Add(showTooltipsHolder, nil, COMPONENT_GAP)
-    end
     layout:SetX(baseX)
 
-    if BR.Display.BUFF_TOOLTIP_CATEGORIES[category] then
-        -- The hover tooltip works on the icon frame itself, not on the click
-        -- overlay. Thus isClickable does not gate it.
-        local showBuffTooltipsHolder = Components.Checkbox(parent, {
-            label = L["Options.ShowBuffTooltips"],
-            get = function()
-                return GetCategorySetting(category, "showBuffTooltips", false) == true
-            end,
-            tooltip = {
-                title = L["Options.ShowBuffTooltips"],
-                desc = L["Options.ShowBuffTooltips.Desc"],
-            },
-            onChange = function(checked)
-                Helpers.SetCategorySetting(category, "showBuffTooltips", checked)
-            end,
-        })
-        layout:Add(showBuffTooltipsHolder, nil, COMPONENT_GAP)
-    end
+    -- The hover tooltip works on the icon frame itself, not on the click overlay.
+    -- Thus click to cast does not gate it.
+    local tooltipsHolder = Components.Checkbox(parent, {
+        label = L["Options.ShowDescriptionTooltips"],
+        get = function()
+            return getEffective("showDescriptionTooltips") == true
+        end,
+        enabled = isOverriding,
+        disabledReason = L["DisabledReason.OverrideSection"],
+        tooltip = {
+            title = L["Options.ShowDescriptionTooltips"],
+            desc = L["Options.ShowDescriptionTooltips.Desc"],
+        },
+        onChange = function(checked)
+            BR.Config.Set(prefix .. "showDescriptionTooltips", checked)
+        end,
+    })
+    layout:Add(tooltipsHolder, nil, COMPONENT_GAP)
 end
 
 BR.Options.BuffSections.ClickToCast = Build

@@ -94,7 +94,7 @@ function Template.Build(content, scrollFrame, category, opts)
 
     Sections.Glow(ctx, layout)
 
-    if not userAuthored then
+    if category ~= "loadout" then
         Sections.ClickToCast(ctx, layout)
     end
 
