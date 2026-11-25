@@ -571,6 +571,7 @@ local DefaultSettingKeys = {
 -- Per-content grids (path = defaults.{grid}.{world|dungeon|raid|pvp}.{choice})
 local ContentGridKeys = {
     warlockDemons = true,
+    warlockSacrificeDemons = true,
     warriorStances = true,
     druidForms = true,
 }

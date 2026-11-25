@@ -312,6 +312,40 @@ local function DemonSetupStep()
     return nil
 end
 
+---Known demon of the first choice that a content grid allows in the current row.
+---@param setting string Key of the grid in profile.defaults
+---@param skipSpellID number?
+---@return PetAction?
+local function GridDemonAction(setting, skipSpellID)
+    local actions = BR.PetHelpers.GetPetActions("WARLOCK")
+    if not actions then
+        return nil
+    end
+    local row = BR.Visibility.GetContentRow()
+    for _, demon in ipairs(BR.PetHelpers.WARLOCK_DEMON_CHOICES) do
+        if demon.spellID ~= skipSpellID and BR.Visibility.IsContentChoiceAllowed(setting, row, demon.key) then
+            for _, action in ipairs(actions) do
+                if action.spellID == demon.spellID then
+                    return action
+                end
+            end
+        end
+    end
+    return nil
+end
+
+---First known demon other than the given one.
+---@param skipSpellID number?
+---@return PetAction?
+local function OtherDemonAction(skipSpellID)
+    for _, action in ipairs(BR.PetHelpers.GetPetActions("WARLOCK") or {}) do
+        if action.spellID ~= skipSpellID then
+            return action
+        end
+    end
+    return nil
+end
+
 ---Demon to summon after a Demonic Pact sacrifice. A summon of the sacrificed demon cancels the buff.
 ---@return PetAction?
 local function PactSummonAction()
@@ -320,12 +354,23 @@ local function PactSummonAction()
     if desired and desired.spellID ~= sacrificed then
         return desired
     end
-    for _, action in ipairs(BR.PetHelpers.GetPetActions("WARLOCK") or {}) do
-        if action.spellID ~= sacrificed then
-            return action
-        end
+    return GridDemonAction("warlockDemons", sacrificed) or OtherDemonAction(sacrificed)
+end
+
+---Demon that the sacrifice click summons when no demon is out.
+---@return PetAction?
+local function SacrificeDemonAction()
+    local chosen = GridDemonAction("warlockSacrificeDemons")
+    if chosen then
+        return chosen
     end
-    return nil
+    local actions = BR.PetHelpers.GetPetActions("WARLOCK")
+    local desired = BR.PetHelpers.GetDesiredWarlockDemon() or (actions and actions[1])
+    -- With Demonic Pact, the preferred demon is the one that stays out after the sacrifice.
+    if desired and KnowsDemonicPact() then
+        return OtherDemonAction(desired.spellID) or desired
+    end
+    return desired
 end
 
 local DEMON_SETUP_TEXT = {
@@ -443,8 +488,7 @@ end
 ---@return string
 local function DemonicSacrificeMacro(spellID)
     local sacrifice = BR.GetSpellName(spellID or DEMONIC_SACRIFICE.spellID) or ""
-    local actions = BR.PetHelpers.GetPetActions("WARLOCK")
-    local demon = actions and actions[actions.genericIndex or 1]
+    local demon = SacrificeDemonAction()
     if not demon then
         return "/cast " .. sacrifice
     end

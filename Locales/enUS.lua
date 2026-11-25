@@ -946,6 +946,8 @@ english["DriveBy.EmoteDefault"] = "buffs {name} with {spell}. Have fun!"
 english["BuffPanel.WarlockDemon.Warn"] = "Warn when a different demon is out"
 english["BuffPanel.WarlockDemon.Warn.Desc"] = "Show a Wrong Demon reminder if the active demon is not one of the demons that you allow for this content."
 english["BuffPanel.WarlockDemon.Hint"] = "Click a demon to allow it. You can allow more than one. If you clear a row, all demons are allowed there."
+english["BuffPanel.SacrificeDemon.Hint"] =
+    "Click the demon to sacrifice in each content. If no demon is out, the sacrifice click summons it first. In an empty row, it summons your preferred demon, or another demon with Demonic Pact."
 english["BuffPanel.WarlockDemon.World"] = "World"
 english["BuffPanel.WarlockDemon.Dungeon"] = "Dungeon"
 english["BuffPanel.WarlockDemon.Dungeon.Desc"] = "Also covers scenarios and Delves."

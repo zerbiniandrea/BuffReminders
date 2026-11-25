@@ -260,6 +260,17 @@ BR.defaults = {
                 pvp = { succubus = true, felhunter = true },
             },
         }),
+        -- The demon that the sacrifice click summons per content row (WoW Forever), at most one.
+        -- The Imp gives +Shadow damage and costs no Soul Shard. An empty row uses the preferred demon.
+        warlockSacrificeDemons = BR.ByClient({
+            retail = BR.NONE,
+            forever = {
+                world = {},
+                dungeon = { imp = true },
+                raid = { imp = true },
+                pvp = {},
+            },
+        }),
         warlockWrongDemon = true,
         -- The blessings of each class (WoW Forever), in priority order. A member gets the
         -- first one that no other paladin gives them. Every slot holds a value, so that

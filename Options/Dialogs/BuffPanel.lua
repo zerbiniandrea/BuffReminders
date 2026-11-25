@@ -206,7 +206,8 @@ end
 ---@param setting string
 ---@param hintText string
 ---@param choices ContentGridChoice[]
-local function AddContentGrid(layout, setting, hintText, choices)
+---@param single? boolean A row holds at most one choice. A click on the selected choice clears the row.
+local function AddContentGrid(layout, setting, hintText, choices, single)
     local IsContentChoiceAllowed = BR.Visibility.IsContentChoiceAllowed
     local hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hint:SetWidth(bodyW)
@@ -279,7 +280,17 @@ local function AddContentGrid(layout, setting, hintText, choices)
             cell.choiceKey = choice.key
             cell:SetScript("OnClick", function()
                 local allowed = IsContentChoiceAllowed(setting, row.key, choice.key)
-                BR.Config.Set("defaults." .. setting .. "." .. row.key .. "." .. choice.key, not allowed)
+                local rowPath = "defaults." .. setting .. "." .. row.key .. "."
+                if single then
+                    -- Every choice gets an explicit value, because a missing key reads the code default.
+                    local changes = {}
+                    for _, other in ipairs(choices) do
+                        changes[rowPath .. other.key] = other == choice and not allowed
+                    end
+                    BR.Config.SetMulti(changes)
+                else
+                    BR.Config.Set(rowPath .. choice.key, not allowed)
+                end
                 Components.RefreshAll()
             end)
             cell:SetScript("OnEnter", function(self)
@@ -300,12 +311,17 @@ local function AddContentGrid(layout, setting, hintText, choices)
     layout:Add(holder, holder:GetHeight(), GRID_GAP + 2)
 end
 
-local function AddWarlockDemonGrid(layout)
+---@return ContentGridChoice[]
+local function WarlockDemonGridChoices()
     local choices = {}
     for i, demon in ipairs(BR.PetHelpers.WARLOCK_DEMON_CHOICES) do
         choices[i] = { key = demon.key, label = demon.label, icon = C_Spell.GetSpellTexture(demon.spellID) }
     end
-    AddContentGrid(layout, "warlockDemons", L["BuffPanel.WarlockDemon.Hint"], choices)
+    return choices
+end
+
+local function AddWarlockDemonGrid(layout)
+    AddContentGrid(layout, "warlockDemons", L["BuffPanel.WarlockDemon.Hint"], WarlockDemonGridChoices())
 
     local felguardSpellID = BR.PetHelpers.FELGUARD_SPELL_ID
     if not felguardSpellID then
@@ -1501,6 +1517,18 @@ local SPECIAL_SECTIONS = {
             })
             tinsert(bodyHolders, drop)
             layout:Add(drop, 26, COMPONENT_GAP)
+        end,
+    },
+
+    demonicSacrifice = {
+        build = function(layout)
+            AddContentGrid(
+                layout,
+                "warlockSacrificeDemons",
+                L["BuffPanel.SacrificeDemon.Hint"],
+                WarlockDemonGridChoices(),
+                true
+            )
         end,
     },
 
