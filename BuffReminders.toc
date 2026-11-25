@@ -50,11 +50,11 @@ Core\Restrictions.lua
 Core\TextPositions.lua
 Core\Profiles.lua
 Core\Migrations.lua
-Core\GameContext.lua
 Data\Retail\Consumables.lua
 Data\Retail\Buffs.lua
 Data\Forever\Consumables.lua
 Data\Forever\Buffs.lua
+Core\GameContext.lua
 Data\BuffIndex.lua
 Data\Defaults.lua
 Data\Beneficiaries.lua

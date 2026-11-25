@@ -1412,7 +1412,7 @@ local BUFF_TABLES = {
             showOnInstanceEntry = true, -- When delveFoodTimer is enabled, only show for 30s on delve entry
             noExpirationGlow = true, -- 10-min duration makes standard thresholds meaningless
             visibilityCondition = function()
-                return BR.BuffState.IsInDelve()
+                return BR.GameContext.IsInDelve()
             end,
             disabledInCompetitivePvP = true,
             ignoresReadyCheckFilter = true, -- always shows in a delve, even with consumable ready-check-only on
@@ -1475,7 +1475,7 @@ local BUFF_TABLES = {
             readyCheckOnly = true,
             ignoresReadyCheckFilter = true,
             visibilityCondition = function()
-                local ct = BR.StateHelpers.GetCurrentContentType()
+                local ct = BR.GameContext.GetContentType()
                 if ct == "openWorld" or ct == "housing" then
                     return false
                 end

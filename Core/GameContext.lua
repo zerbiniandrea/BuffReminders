@@ -3,8 +3,9 @@ local _, ns = ...
 local BR = ns
 
 -- Maps game events to the caches that each event makes stale, and owns the player flags
--- (combat, rest, level, vehicle), the context windows (ready check, dungeon and delve
--- entry, PvP prep), the dismount pause for pet checks and the action-bar glow state.
+-- (combat, rest, level, vehicle), the instance context (content type, difficulty, instance
+-- identity), the context windows (ready check, dungeon and delve entry, PvP prep), the dismount
+-- pause for pet checks and the action-bar glow state.
 -- The Display event dispatcher calls HandleEvent before the Display handler runs, so each
 -- handler reads fresh values.
 -- RenderRequested asks for the render that a change needs. urgent = true asks for it now.
@@ -59,6 +60,214 @@ local glowSpellToBuff = {}
 
 local GameContext = {}
 
+-- ============================================================================
+-- INSTANCE CONTEXT
+-- ============================================================================
+
+-- Instance/content context cache: everything derived from the current zone lives
+-- in ONE table because it all shares one lifecycle. Fields populate lazily and
+-- InvalidateInstanceCache clears the whole table with a single wipe, so a
+-- newly added derived field can never be forgotten in the invalidator.
+---@class InstanceCache
+---@field contentType string?    -- "openWorld"|"dungeon"|"scenario"|"raid"|"housing"|"pvp"
+---@field instanceType string?   -- raw WoW instanceType
+---@field difficultyID number?   -- raw GetInstanceInfo difficultyID
+---@field instanceName string?   -- GetInstanceInfo name
+---@field instanceID number?     -- GetInstanceInfo instanceID
+---@field activeChallenge number? -- active challenge map ID (keystone)
+---@field difficultyKey string?  -- mapped difficulty key (only valid keys are cached)
+---@field competitivePvP boolean? -- arena or rated BG
+---@field legacyInstance boolean? -- legacy loot mode (populated with contentType)
+local instanceCache = {}
+
+local CONTENT_DIFFICULTY_TABLES = BR.BuffData.instanceContent.difficultyIDs
+
+---Get the current content type based on instance/zone (cached)
+---@return string contentType One of "openWorld", "dungeon", "scenario", "raid", "housing", "pvp"
+local function GetContentType()
+    if instanceCache.contentType then
+        return instanceCache.contentType
+    end
+
+    -- Stash the raw GetInstanceInfo identity for reuse - same lifecycle, cleared
+    -- together in InvalidateInstanceCache. The identity fields freeze with the
+    -- content type: a transient nil name at populate time relies on the post-load
+    -- invalidation events to repopulate.
+    local instName, _, difficultyID, _, _, _, _, instanceID = GetInstanceInfo()
+    instanceCache.instanceName = instName
+    instanceCache.instanceID = instanceID
+    instanceCache.difficultyID = difficultyID
+    instanceCache.activeChallenge = C_ChallengeMode
+            and C_ChallengeMode.GetActiveChallengeMapID
+            and C_ChallengeMode.GetActiveChallengeMapID()
+        or nil
+
+    -- Check housing before instance type (housing zones can report as instanced)
+    if
+        C_Housing
+        and (
+            (C_Housing.IsInsideHouseOrPlot and C_Housing.IsInsideHouseOrPlot())
+            or (C_Housing.IsOnNeighborhoodMap and C_Housing.IsOnNeighborhoodMap())
+        )
+    then
+        instanceCache.contentType = "housing"
+        return "housing"
+    end
+
+    -- Delves report inInstance=false but instanceType="scenario" and difficultyID=208;
+    -- check difficultyID first so they are correctly classified as scenarios.
+    if difficultyID == 208 then
+        instanceCache.contentType = "scenario"
+        return "scenario"
+    end
+
+    local inInstance, instanceType = IsInInstance()
+    instanceCache.instanceType = instanceType
+    -- A difficultyID of 0 inside an instance is a transient loading-screen read
+    -- (GetDifficultyKey relies on retrying until it resolves); leave it
+    -- uncached so GetDifficultyID re-reads live until real data arrives.
+    -- Open world legitimately reports 0 and keeps the cached value.
+    if inInstance and difficultyID == 0 then
+        instanceCache.difficultyID = nil
+    end
+    local contentType
+    if not inInstance then
+        contentType = "openWorld"
+    elseif instanceType == "raid" then
+        contentType = "raid"
+    elseif instanceType == "scenario" then
+        contentType = "scenario"
+    else
+        if instanceType == "arena" or instanceType == "pvp" then
+            contentType = "pvp"
+        else
+            contentType = "dungeon"
+        end
+    end
+    instanceCache.contentType = contentType
+
+    -- WoW Forever has no legacy loot mode API.
+    instanceCache.legacyInstance = C_Loot.IsLegacyLootModeEnabled ~= nil and C_Loot.IsLegacyLootModeEnabled() or false
+    return contentType
+end
+
+---Raw difficultyID from GetInstanceInfo, cached alongside the content type
+---(nil cache = not yet computed, or a transient in-instance 0 left unresolved;
+---GetInstanceInfo itself never returns nil here).
+---@return number
+local function GetDifficultyID()
+    local id = instanceCache.difficultyID
+    if id == nil then
+        GetContentType() -- populates instanceCache.difficultyID (unless transient)
+        id = instanceCache.difficultyID
+        if id == nil then
+            -- Content type already cached while the difficulty read was still
+            -- transient: retry live until it resolves, then cache.
+            id = select(3, GetInstanceInfo())
+            if id ~= 0 then
+                instanceCache.difficultyID = id
+            end
+        end
+    end
+    return id or 0
+end
+
+---Instance identity from GetInstanceInfo plus the active challenge map ID,
+---cached alongside the content type (used by loadout instance filters).
+---@return string? name
+---@return number? instanceID
+---@return number? activeChallengeMapID
+function GameContext.GetInstanceContext()
+    if instanceCache.contentType == nil then
+        GetContentType() -- populates the instance identity fields
+    end
+    return instanceCache.instanceName, instanceCache.instanceID, instanceCache.activeChallenge
+end
+
+---Get the current difficulty key (cached)
+---Only caches valid keys; returns nil (retried next call) if the API returns
+---an unmapped difficultyID (e.g. 0 during a loading transition).
+---@return string? difficultyKey or nil if not in a dungeon/raid or unknown difficulty
+local function GetDifficultyKey()
+    if instanceCache.difficultyKey ~= nil then
+        return instanceCache.difficultyKey
+    end
+    local difficultyID = GetDifficultyID()
+    local contentType = GetContentType()
+    local diffTable = CONTENT_DIFFICULTY_TABLES[contentType]
+    if diffTable then
+        local key = diffTable[difficultyID]
+        if key then
+            instanceCache.difficultyKey = key
+        end
+        return key
+    elseif contentType == "scenario" then
+        local key = difficultyID == 208 and "delves" or "others"
+        instanceCache.difficultyKey = key
+        return key
+    elseif contentType == "pvp" then
+        local key = instanceCache.instanceType == "arena" and "arena" or "bg"
+        instanceCache.difficultyKey = key
+        return key
+    end
+    return nil
+end
+
+---Check if the player is in competitive PvP (arena or rated battleground)
+---Consumables flagged disabledInCompetitivePvP are hidden here.
+---@return boolean
+local function IsInCompetitivePvP()
+    if instanceCache.competitivePvP ~= nil then
+        return instanceCache.competitivePvP
+    end
+    local contentType = GetContentType()
+    if contentType ~= "pvp" then
+        instanceCache.competitivePvP = false
+        return false
+    end
+    local result = instanceCache.instanceType == "arena" or C_PvP.IsRatedMap() == true
+    instanceCache.competitivePvP = result
+    return result
+end
+
+---Check if the current zone qualifies for dungeon entry triggers
+---(grouped dungeons only, excluding M+ and follower dungeons)
+---@return boolean
+local function ShouldTriggerDungeonEntry()
+    if BR.BuffState.IsAlone() then
+        return false
+    end
+    if GetContentType() ~= "dungeon" then
+        return false
+    end
+    local diffKey = GetDifficultyKey()
+    return diffKey ~= "mythicPlus" and diffKey ~= "follower"
+end
+
+---Check if the current instance is legacy content (cached alongside content type)
+---@return boolean
+function GameContext.IsLegacyInstance()
+    if instanceCache.legacyInstance == nil then
+        GetContentType() -- populates instanceCache.legacyInstance
+    end
+    return instanceCache.legacyInstance or false
+end
+
+---Delves use difficultyID 208. WoW Forever has no delves, so it never reports it.
+---@return boolean
+function GameContext.IsInDelve()
+    return GetDifficultyID() == 208
+end
+
+local function InvalidateInstanceCache()
+    wipe(instanceCache)
+end
+
+GameContext.GetContentType = GetContentType
+GameContext.GetDifficultyID = GetDifficultyID
+GameContext.GetDifficultyKey = GetDifficultyKey
+GameContext.IsInCompetitivePvP = IsInCompetitivePvP
+
 ---@param urgent boolean
 ---@param reason? "zoneSettled" Lets a subscriber run work for one transition
 local function NotifyChanged(urgent, reason)
@@ -106,7 +315,7 @@ end
 -- One entry can fire both PLAYER_ENTERING_WORLD and ZONE_CHANGED_NEW_AREA, so an open
 -- window is never restarted.
 local function UpdateDelveEntry()
-    if not BR.BuffState.ShouldTriggerDelveEntry() then
+    if not GameContext.IsInDelve() then
         ClearDelveEntry()
         return
     end
@@ -132,7 +341,7 @@ local function OnCombatStart()
 end
 
 local function OnEnteredWorldSettled()
-    if BR.BuffState.ShouldTriggerDungeonEntry() then
+    if ShouldTriggerDungeonEntry() then
         StartDungeonEntry()
     else
         ClearDungeonEntry()
@@ -409,6 +618,7 @@ end
 
 -- Core.lua loads before this file, so its spell name cache registers here.
 GameContext.RegisterCache("spellNameMisses", BR.ClearSpellNameMisses)
+GameContext.RegisterCache("contentType", InvalidateInstanceCache)
 
 ---Clear one cache. An unknown id is a programming error.
 ---@param id CacheId

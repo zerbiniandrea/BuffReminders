@@ -71,6 +71,10 @@ local SpecBeneficiaries = BR.SpecBeneficiaries
 -- Sticky target memory for cast-on-others buffs (Core/TargetMemory.lua)
 local TargetMemory = BR.TargetMemory
 local GameContext = BR.GameContext
+local GetCurrentContentType = GameContext.GetContentType
+local GetCurrentDifficultyKey = GameContext.GetDifficultyKey
+local GetDifficultyIDCached = GameContext.GetDifficultyID
+local IsInCompetitivePvP = GameContext.IsInCompetitivePvP
 
 -- Buffs with class-specific aura variants can resolve to a single spell ID per unit.
 -- This avoids scanning every possible variant for every raid member on each refresh.
@@ -205,25 +209,6 @@ end
 -- ============================================================================
 -- CACHED VALUES (invalidated by specific events)
 -- ============================================================================
-
--- Instance/content context cache: everything derived from the current zone lives
--- in ONE table because it all shares one lifecycle. Fields populate lazily and
--- InvalidateContentTypeCache clears the whole table with a single wipe, so a
--- newly added derived field can never be forgotten in the invalidator.
----@class InstanceCache
----@field contentType string?    -- "openWorld"|"dungeon"|"scenario"|"raid"|"housing"|"pvp"
----@field instanceType string?   -- raw WoW instanceType
----@field difficultyID number?   -- raw GetInstanceInfo difficultyID
----@field instanceName string?   -- GetInstanceInfo name
----@field instanceID number?     -- GetInstanceInfo instanceID
----@field activeChallenge number? -- active challenge map ID (keystone)
----@field difficultyKey string?  -- mapped difficulty key (only valid keys are cached)
----@field competitivePvP boolean? -- arena or rated BG
----@field legacyInstance boolean? -- legacy loot mode (populated with contentType)
-local instanceCache = {}
-local GetDifficultyIDCached -- forward declaration (defined next to GetCurrentContentType)
-
-local CONTENT_DIFFICULTY_TABLES = BR.BuffData.instanceContent.difficultyIDs
 
 -- Maps content type to the DB key holding its difficulty sub-filter. A content type
 -- without a sub-row on this client ignores a saved filter, because no control can clear it.
@@ -1175,75 +1160,6 @@ local function IsBuffEnabled(key)
     return GetDefaultEnabledLookup()[key] ~= false
 end
 
----Get the current content type based on instance/zone (cached)
----@return string contentType One of "openWorld", "dungeon", "scenario", "raid", "housing", "pvp"
-local function GetCurrentContentType()
-    if instanceCache.contentType then
-        return instanceCache.contentType
-    end
-
-    -- Stash the raw GetInstanceInfo identity for reuse - same lifecycle, cleared
-    -- together in InvalidateContentTypeCache. The identity fields freeze with the
-    -- content type: a transient nil name at populate time relies on the post-load
-    -- invalidation events to repopulate.
-    local instName, _, difficultyID, _, _, _, _, instanceID = GetInstanceInfo()
-    instanceCache.instanceName = instName
-    instanceCache.instanceID = instanceID
-    instanceCache.difficultyID = difficultyID
-    instanceCache.activeChallenge = C_ChallengeMode
-            and C_ChallengeMode.GetActiveChallengeMapID
-            and C_ChallengeMode.GetActiveChallengeMapID()
-        or nil
-
-    -- Check housing before instance type (housing zones can report as instanced)
-    if
-        C_Housing
-        and (
-            (C_Housing.IsInsideHouseOrPlot and C_Housing.IsInsideHouseOrPlot())
-            or (C_Housing.IsOnNeighborhoodMap and C_Housing.IsOnNeighborhoodMap())
-        )
-    then
-        instanceCache.contentType = "housing"
-        return "housing"
-    end
-
-    -- Delves report inInstance=false but instanceType="scenario" and difficultyID=208;
-    -- check difficultyID first so they are correctly classified as scenarios.
-    if difficultyID == 208 then
-        instanceCache.contentType = "scenario"
-        return "scenario"
-    end
-
-    local inInstance, instanceType = IsInInstance()
-    instanceCache.instanceType = instanceType
-    -- A difficultyID of 0 inside an instance is a transient loading-screen read
-    -- (GetCurrentDifficultyKey relies on retrying until it resolves); leave it
-    -- uncached so GetDifficultyIDCached re-reads live until real data arrives.
-    -- Open world legitimately reports 0 and keeps the cached value.
-    if inInstance and difficultyID == 0 then
-        instanceCache.difficultyID = nil
-    end
-    local contentType
-    if not inInstance then
-        contentType = "openWorld"
-    elseif instanceType == "raid" then
-        contentType = "raid"
-    elseif instanceType == "scenario" then
-        contentType = "scenario"
-    else
-        if instanceType == "arena" or instanceType == "pvp" then
-            contentType = "pvp"
-        else
-            contentType = "dungeon"
-        end
-    end
-    instanceCache.contentType = contentType
-
-    -- WoW Forever has no legacy loot mode API.
-    instanceCache.legacyInstance = C_Loot.IsLegacyLootModeEnabled ~= nil and C_Loot.IsLegacyLootModeEnabled() or false
-    return contentType
-end
-
 -- Content type -> row of a per-content grid setting. Other content uses the world row.
 local CONTENT_GRID_ROWS = { dungeon = "dungeon", scenario = "dungeon", raid = "raid", pvp = "pvp" }
 
@@ -1274,68 +1190,6 @@ local function IsContentChoiceAllowed(setting, row, key)
         allowed = defaultRow and defaultRow[key]
     end
     return allowed == true
-end
-
----Raw difficultyID from GetInstanceInfo, cached alongside the content type
----(nil cache = not yet computed, or a transient in-instance 0 left unresolved;
----GetInstanceInfo itself never returns nil here).
----@return number
-function GetDifficultyIDCached()
-    local id = instanceCache.difficultyID
-    if id == nil then
-        GetCurrentContentType() -- populates instanceCache.difficultyID (unless transient)
-        id = instanceCache.difficultyID
-        if id == nil then
-            -- Content type already cached while the difficulty read was still
-            -- transient: retry live until it resolves, then cache.
-            id = select(3, GetInstanceInfo())
-            if id ~= 0 then
-                instanceCache.difficultyID = id
-            end
-        end
-    end
-    return id or 0
-end
-
----Instance identity from GetInstanceInfo plus the active challenge map ID,
----cached alongside the content type (used by loadout instance filters).
----@return string? name
----@return number? instanceID
----@return number? activeChallengeMapID
-function BuffState.GetInstanceContext()
-    if instanceCache.contentType == nil then
-        GetCurrentContentType() -- populates the instance identity fields
-    end
-    return instanceCache.instanceName, instanceCache.instanceID, instanceCache.activeChallenge
-end
-
----Get the current difficulty key (cached)
----Only caches valid keys; returns nil (retried next call) if the API returns
----an unmapped difficultyID (e.g. 0 during a loading transition).
----@return string? difficultyKey or nil if not in a dungeon/raid or unknown difficulty
-local function GetCurrentDifficultyKey()
-    if instanceCache.difficultyKey ~= nil then
-        return instanceCache.difficultyKey
-    end
-    local difficultyID = GetDifficultyIDCached()
-    local contentType = GetCurrentContentType()
-    local diffTable = CONTENT_DIFFICULTY_TABLES[contentType]
-    if diffTable then
-        local key = diffTable[difficultyID]
-        if key then
-            instanceCache.difficultyKey = key
-        end
-        return key
-    elseif contentType == "scenario" then
-        local key = difficultyID == 208 and "delves" or "others"
-        instanceCache.difficultyKey = key
-        return key
-    elseif contentType == "pvp" then
-        local key = instanceCache.instanceType == "arena" and "arena" or "bg"
-        instanceCache.difficultyKey = key
-        return key
-    end
-    return nil
 end
 
 ---Whether a category is visible for the current content type
@@ -2170,23 +2024,6 @@ local function IsFreeConsumableVisible(db)
         end
     end
     return true
-end
-
----Check if the player is in competitive PvP (arena or rated battleground)
----Consumables flagged disabledInCompetitivePvP are hidden here.
----@return boolean
-local function IsInCompetitivePvP()
-    if instanceCache.competitivePvP ~= nil then
-        return instanceCache.competitivePvP
-    end
-    local contentType = GetCurrentContentType()
-    if contentType ~= "pvp" then
-        instanceCache.competitivePvP = false
-        return false
-    end
-    local result = instanceCache.instanceType == "arena" or C_PvP.IsRatedMap() == true
-    instanceCache.competitivePvP = result
-    return result
 end
 
 -- Aura spell of the consumable the player runs now, per consumable category. The
@@ -3350,7 +3187,7 @@ local function RefreshConsumables(db, trackingMode, isAuraRestricted, hideExpiri
     -- Delve food ignores the consumable ready-check-only filter (still respects content gates)
     local consumableVisibleNoReadyCheck = IsCategoryVisibleForContent("consumable", true)
     local consExGlow, consMissGlow, consThreshold, consFloor = GetCategoryGlowSettings("consumable")
-    local delveFoodOnly = db.defaults and db.defaults.delveFoodOnly and BuffState.IsInDelve()
+    local delveFoodOnly = db.defaults and db.defaults.delveFoodOnly and GameContext.IsInDelve()
     local freeMode = db.defaults and db.defaults.freeConsumableMode or "override"
     local freeVisible = freeMode == "override" and IsFreeConsumableVisible(db) or false
     -- In follow mode, healthstones use consumable category content gates (without ready check)
@@ -3708,35 +3545,6 @@ function BuffState.Refresh(refreshMode)
     BuffState.lastUpdate = GetTime()
 end
 
----Check if the current zone qualifies for dungeon entry triggers
----(grouped dungeons only, excluding M+ and follower dungeons)
----@return boolean
-function BuffState.ShouldTriggerDungeonEntry()
-    if BuffState.IsAlone() then
-        return false
-    end
-    if GetCurrentContentType() ~= "dungeon" then
-        return false
-    end
-    local diffKey = GetCurrentDifficultyKey()
-    return diffKey ~= "mythicPlus" and diffKey ~= "follower"
-end
-
----Check if the current zone qualifies for delve entry triggers
----@return boolean
-function BuffState.ShouldTriggerDelveEntry()
-    return BuffState.IsInDelve()
-end
-
----Check if the current instance is legacy content (cached alongside content type)
----@return boolean
-function BuffState.IsLegacyInstance()
-    if instanceCache.legacyInstance == nil then
-        GetCurrentContentType() -- populates instanceCache.legacyInstance
-    end
-    return instanceCache.legacyInstance or false
-end
-
 ---Start a snooze. A new snooze replaces the snooze of the same scope and id.
 ---@param scope SnoozeScope
 ---@param id? string The reminder key or the category. Ignored for "all"
@@ -3751,15 +3559,6 @@ function BuffState.Snooze(scope, id)
     local record = { rest = GameContext.IsResting() or nil }
     snoozes[scope][id] = record
     return record
-end
-
----Raw difficultyID from GetInstanceInfo (cached; invalidated with content type)
-BuffState.GetDifficultyID = GetDifficultyIDCached
-
----Delves use difficultyID 208. WoW Forever has no delves, so it never reports it.
----@return boolean
-function BuffState.IsInDelve()
-    return GetDifficultyIDCached() == 208
 end
 
 ---Whether the player is in a restricted context: aura queries return secret
@@ -3807,7 +3606,7 @@ function BuffState.GetHideAllReason(db)
     if db.hideWhileMounted and IsMounted() then
         return "mounted"
     end
-    if db.hideInLegacyInstances and BuffState.IsLegacyInstance() then
+    if db.hideInLegacyInstances and GameContext.IsLegacyInstance() then
         return "legacyInstance"
     end
     if db.hideWhileLeveling and GameContext.GetPlayerLevel() < GameContext.GetMaxExpansionLevel() then
@@ -3915,11 +3714,6 @@ end
 -- ============================================================================
 -- CACHE INVALIDATION
 -- ============================================================================
-
----Invalidate content type cache
-function BuffState.InvalidateContentTypeCache()
-    wipe(instanceCache)
-end
 
 ---Invalidate the scan results of foreign classChoices copies.
 function BuffState.InvalidateForeignAuraCache()
@@ -4207,7 +4001,6 @@ BR.StateHelpers = {
     UpdateEatingState = UpdateEatingState,
     ScanEatingState = ScanEatingState,
     GetEatingExpirationTime = GetEatingExpirationTime,
-    GetCurrentContentType = GetCurrentContentType,
     GetContentRow = GetContentRow,
     IsContentChoiceAllowed = IsContentChoiceAllowed,
     IsCategoryVisibleForContent = IsCategoryVisibleForContent,
@@ -4223,7 +4016,6 @@ BR.StateHelpers = {
 
 BR.BuffState = BuffState
 
-BR.GameContext.RegisterCache("contentType", BuffState.InvalidateContentTypeCache)
 BR.GameContext.RegisterCache("auraTrackable", BuffState.InvalidateAuraTrackableCache)
 BR.GameContext.RegisterCache("spell", BuffState.InvalidateSpellCache)
 BR.GameContext.RegisterCache("spec", BuffState.InvalidateSpecCache)
