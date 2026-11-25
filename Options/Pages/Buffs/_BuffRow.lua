@@ -51,10 +51,6 @@ local LINK_GAP = 8
 local GLYPH_SIZE = 13
 local GLYPH_GAP = 5
 local GLYPH_TO_LINK_GAP = 7
--- Space the label clamp reserves for glyphs so a row with every glyph shown can
--- never overlap the buff name, regardless of how glyph visibility changes later.
--- Three slots: new-buff dot, detached pin, sound.
-local GLYPH_RESERVE = 3 * (GLYPH_SIZE + GLYPH_GAP)
 local MATCH_HINT_GAP = 6
 local MATCH_HINT_PREFIX = "\194\183 "
 
@@ -168,6 +164,16 @@ local function CreateBuffRow(
     end)
     newDot:Hide()
 
+    local matchHint = holder:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    BR.ApplyNoteColor(matchHint)
+    matchHint:SetPoint("LEFT", holder.infoIcon or holder.label, "RIGHT", MATCH_HINT_GAP, 0)
+    matchHint:SetJustifyH("LEFT")
+    matchHint:SetWordWrap(false)
+    matchHint:Hide()
+
+    local labelNaturalW = holder.label:GetStringWidth()
+    local infoTrailing = holder.infoIcon and INFO_ICON_TRAILING or 0
+
     -- Repaints the trailing cluster from the buff's live state. Registered as a
     -- refreshable below, because the drawer edits these values and calls RefreshAll.
     local function syncTrailing()
@@ -196,43 +202,33 @@ local function CreateBuffRow(
         soundGlyph.dynamicDesc = sound and BR.Sounds.Label(sound) or nil
 
         local anchor, anchorGap = settingsBtn, GLYPH_TO_LINK_GAP
+        local trailingW = settingsBtn:GetWidth()
         for _, g in ipairs({ { newDot, isRowNew }, { pinGlyph, hasPin }, { soundGlyph, hasSound } }) do
             local glyph, active = g[1], g[2]
             if active then
                 glyph:ClearAllPoints()
                 glyph:SetPoint("RIGHT", anchor, "LEFT", -anchorGap, 0)
                 glyph:Show()
+                trailingW = trailingW + anchorGap + GLYPH_SIZE
                 anchor, anchorGap = glyph, GLYPH_GAP
             else
                 glyph:Hide()
             end
         end
+
+        -- The label and its info icon must end before the leftmost visible glyph.
+        local maxLabelW = holder:GetWidth() - holder.labelOffset - infoTrailing - trailingW - LINK_GAP
+        if labelNaturalW > maxLabelW then
+            holder.label:SetWidth(maxLabelW)
+            holder.label:SetJustifyH("LEFT")
+        else
+            holder.label:SetWidth(0)
+        end
+        matchHint:SetPoint("RIGHT", anchor, "LEFT", -LINK_GAP, 0)
     end
     syncTrailing()
     settingsBtn.Refresh = syncTrailing
     tinsert(BR.RefreshableComponents, settingsBtn)
-
-    -- Clamp the label so it (and its trailing info icon) can never run under the
-    -- trailing cluster, whatever the buff name's length or which glyphs show.
-    local infoTrailing = holder.infoIcon and INFO_ICON_TRAILING or 0
-    local maxLabelW = holder:GetWidth()
-        - holder.labelOffset
-        - infoTrailing
-        - settingsBtn:GetWidth()
-        - GLYPH_RESERVE
-        - LINK_GAP
-    if holder.label:GetStringWidth() > maxLabelW then
-        holder.label:SetWidth(math.min(maxLabelW, holder.label:GetStringWidth()))
-        holder.label:SetJustifyH("LEFT")
-    end
-
-    local matchHint = holder:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    BR.ApplyNoteColor(matchHint)
-    matchHint:SetPoint("LEFT", holder.infoIcon or holder.label, "RIGHT", MATCH_HINT_GAP, 0)
-    matchHint:SetPoint("RIGHT", settingsBtn, "LEFT", -(GLYPH_RESERVE + LINK_GAP), 0)
-    matchHint:SetJustifyH("LEFT")
-    matchHint:SetWordWrap(false)
-    matchHint:Hide()
     ---Shows the search term that kept the row, when the row name does not show it.
     ---@param term? string
     function holder:SetMatchHint(term)
