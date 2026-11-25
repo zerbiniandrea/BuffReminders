@@ -1925,9 +1925,7 @@ ToggleTestMode = function()
         -- Reset layout signatures so positioning runs fresh
         lastMainSignature = ""
         wipe(lastSplitSignatures)
-        if BR.AuraTracker then
-            BR.AuraTracker.SetTestMode(false)
-        end
+        BR.CallbackRegistry:TriggerEvent("TestModeChanged", false)
         UpdateDisplay()
         return false
     else
@@ -1949,9 +1947,7 @@ ToggleTestMode = function()
         BR.SecureButtons.HideAllSecureFrames()
         lastMainSignature = ""
         wipe(lastSplitSignatures)
-        if BR.AuraTracker then
-            BR.AuraTracker.SetTestMode(true)
-        end
+        BR.CallbackRegistry:TriggerEvent("TestModeChanged", true)
         UpdateDisplay()
         return true
     end
@@ -3667,10 +3663,7 @@ local function SetFrameLocked(locked)
     else
         BR.Movers.UpdateAnchor()
     end
-    -- External buffs sit outside the category/mover system but share the same lock.
-    if BR.AuraTracker then
-        BR.AuraTracker.SetUnlocked(not locked)
-    end
+    CallbackRegistry:TriggerEvent("FrameLockChanged", locked)
 end
 
 local function ToggleLock()

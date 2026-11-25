@@ -288,6 +288,8 @@ CallbackRegistry:GenerateCallbackEvents({
     "CustomAnchorsChanged", -- Fired when the user's anchor-target list gains or loses a name
     "ActiveConsumableChanged", -- Fired when the running consumable aura changes: (category, spellID)
     "RenderRequested", -- A change needs a render: (urgent, reason?)
+    "TestModeChanged", -- Test mode turned on or off: (enabled)
+    "FrameLockChanged", -- The global frame lock changed: (locked)
 })
 BR.CallbackRegistry = CallbackRegistry
 

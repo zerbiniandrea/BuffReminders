@@ -773,8 +773,7 @@ function ScheduleRecovery()
     end)
 end
 
----Driven by Display.lua's ToggleTestMode alongside the reminder categories. A
----denied reconfigure (toggled during combat) is retried by the lift watcher.
+---A denied reconfigure (toggled during combat) is retried by the lift watcher.
 local function SetTestMode(enabled)
     testMode = enabled == true
     Refresh()
@@ -872,14 +871,10 @@ BR.CallbackRegistry:RegisterCallback("ExternalsRefresh", Refresh)
 -- `defaults` and fire VisualsRefresh. A change to them must restyle these buttons
 -- too. Refresh does nothing while the display is disabled.
 BR.CallbackRegistry:RegisterCallback("VisualsRefresh", Refresh)
-
-BR.AuraTracker = {
-    Refresh = Refresh,
-    SetUnlocked = SetUnlocked,
-    SetTestMode = SetTestMode,
-    BuildSpellIDMap = BuildSpellIDMap,
-    ---True when a reconfigure was denied and waits for a restriction lift.
-    IsApplyPending = function()
-        return applyPending
-    end,
-}
+BR.CallbackRegistry:RegisterCallback("TestModeChanged", function(_, enabled)
+    SetTestMode(enabled)
+end)
+-- The externals display has no category mover, but it shares the global frame lock.
+BR.CallbackRegistry:RegisterCallback("FrameLockChanged", function(_, locked)
+    SetUnlocked(not locked)
+end)
