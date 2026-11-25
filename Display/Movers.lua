@@ -152,6 +152,13 @@ end
 local PositionMoverFrame
 local SaveDetachedPosition, PositionDetachedMoverFrame
 
+-- Click overlays sit at screen coordinates, so each move of a container must sync them.
+local function ScheduleOverlaySync()
+    if BR.SecureButtons then
+        BR.SecureButtons.ScheduleSecureSync()
+    end
+end
+
 ---Save a position for a category key (or detached icon key) and reposition its frame
 ---@param catKey string "main", a category name, or a detached icon buff key
 ---@param x number
@@ -166,6 +173,7 @@ local function SavePosition(catKey, x, y)
     if IsIconDetached(catKey) then
         SaveDetachedPosition(catKey, x, y)
         PositionDetachedMoverFrame(catKey)
+        ScheduleOverlaySync()
         return
     end
 
@@ -195,6 +203,7 @@ local function SavePosition(catKey, x, y)
     end
 
     PositionMoverFrame(catKey)
+    ScheduleOverlaySync()
 end
 
 local function GetMainFrameLabel()
@@ -309,9 +318,6 @@ local function FinishMoverDrag(mover, catKey)
             SavePosition(catKey, x, y)
             SyncPopupCoords(catKey, x, y)
             RestoreContainer(catKey)
-            if BR.SecureButtons then
-                BR.SecureButtons.ScheduleSecureSync()
-            end
             return
         end
     end
@@ -333,9 +339,6 @@ local function FinishMoverDrag(mover, catKey)
     SavePosition(catKey, x, y)
     SyncPopupCoords(catKey, x, y)
     RestoreContainer(catKey)
-    if BR.SecureButtons then
-        BR.SecureButtons.ScheduleSecureSync()
-    end
 end
 
 local ANCHOR_POINT_OPTIONS = {
@@ -1500,9 +1503,7 @@ local function FinishDetachedMoverDrag(mover, key)
         coordPopup.yEdit:SetText(tostring(y))
     end
     RestoreContainer(key)
-    if BR.SecureButtons then
-        BR.SecureButtons.ScheduleSecureSync()
-    end
+    ScheduleOverlaySync()
 end
 
 ---Position a detached mover at its saved coordinates

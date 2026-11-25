@@ -4078,6 +4078,11 @@ eventHandlers.UI_SCALE_CHANGED = OnPixelGridChanged
 eventHandlers.DISPLAY_SIZE_CHANGED = OnPixelGridChanged
 hooksecurefunc(UIParent, "SetScale", OnPixelGridChanged)
 
+-- Click overlays sit at screen coordinates, so they do not follow an anchor frame that Edit Mode moves.
+eventHandlers.EDIT_MODE_LAYOUTS_UPDATED = function()
+    BR.SecureButtons.ScheduleSecureSync()
+end
+
 eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
     GameContext.HandleEvent(event, arg1, arg2, arg3)
     local handler = eventHandlers[event]
