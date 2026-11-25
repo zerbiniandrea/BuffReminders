@@ -51,12 +51,13 @@ Core\TextPositions.lua
 Core\Profiles.lua
 Core\Migrations.lua
 Core\GameContext.lua
-Data\Buffs.lua
-Data\Buffs_Forever.lua
+Data\Retail\Consumables.lua
+Data\Retail\Buffs.lua
+Data\Forever\Consumables.lua
+Data\Forever\Buffs.lua
 Data\BuffIndex.lua
 Data\Defaults.lua
 Data\Beneficiaries.lua
-Data\ConsumableItems.lua
 Data\Pets.lua
 Data\Externals.lua
 Data\AlertSounds.lua

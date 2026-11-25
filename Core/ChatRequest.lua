@@ -8,7 +8,6 @@ local L = BR.L
 -- ============================================================================
 -- Single source of truth for "request this buff in chat". A buff is requestable
 -- only when its definition in BR.BUFF_TABLES carries `chatRequestable = true`.
--- To add a requestable buff, set that flag in Data/Buffs.lua.
 
 local ChatRequest = {}
 

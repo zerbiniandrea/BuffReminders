@@ -121,7 +121,7 @@ BR.defaults = {
     },
 
     -- Rogue poison preferences: ordered list per category, array index = priority (1 = highest).
-    -- Shared with Data/Buffs.lua. Each profile gets its own copy from the AceDB defaults.
+    -- Shared with the buff tables. Each profile gets its own copy from the AceDB defaults.
     roguePoisonPreferences = BR.DEFAULT_POISON_PREFERENCES,
 
     minimap = {

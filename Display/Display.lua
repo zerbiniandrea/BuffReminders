@@ -1190,7 +1190,7 @@ local function UpdateIconStyling(frame, catSettings)
     SetBlizzardIconArt(frame, blizzardStyle, iconWidth, iconHeight)
 end
 
--- Map buff key -> consumable category (derived from buff definitions in Data/Buffs.lua)
+-- Map buff key -> consumable category (derived from the buff definitions)
 local BUFF_KEY_TO_CATEGORY = BR.BUFF_KEY_TO_CATEGORY
 
 ---True when the category shows a tooltip on hover. A loadout frame owns its mouse.
