@@ -3745,6 +3745,8 @@ local function SlashHandler(msg)
         BR.Display.PrintSecretDebug(arg)
     elseif cmd == "spelldebug" then
         BR.Display.ShowSpellDebug()
+    elseif cmd == "auras" then
+        BR.Options.Dialogs.AuraPicker.Show(msg:match("^%S+%s+(%S+)"))
     elseif cmd == "shownew" then
         local WhatsNew = BR.Options.WhatsNew
         local arg = msg:match("^%S+%s+(%S+)")

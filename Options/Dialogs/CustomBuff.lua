@@ -379,6 +379,20 @@ local function BuildBuffTab(ctx, frame)
     end)
     addBtn:SetSize(110, FIELD_H)
 
+    local pickBtn = CreateButton(trackBlock, L["CustomBuff.PickFromAuras"], function()
+        BR.Options.Dialogs.AuraPicker.Show("player", function(spellID)
+            for _, row in ipairs(ctx.spellRows) do
+                if row.editBox:GetText() == "" then
+                    row.editBox:SetText(tostring(spellID))
+                    return
+                end
+            end
+            ctx.AddSpellRow(spellID)
+        end)
+    end)
+    pickBtn:SetSize(130, FIELD_H)
+    pickBtn:SetPoint("LEFT", addBtn, "RIGHT", 6, 0)
+
     local rest = CreateFrame("Frame", nil, frame)
     rest:SetSize(CONTENT_W, 10)
     rest:SetPoint("TOPLEFT", trackBlock, "BOTTOMLEFT", 0, -ROW_GAP)
