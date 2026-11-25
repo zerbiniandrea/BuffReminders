@@ -30,10 +30,8 @@ BR.BuffBeneficiaries = {
 }
 
 -- Hunters use mana on WoW Forever. Spirit helps the same mana users.
-if BR.CLIENT == BR.ClientType.Forever then
-    BR.BuffBeneficiaries.intellect.HUNTER = true
-    BR.BuffBeneficiaries.spirit = BR.BuffBeneficiaries.intellect
-end
+BR.BuffBeneficiaries.intellect.HUNTER = BR.ByClient({ retail = BR.NONE, forever = true })
+BR.BuffBeneficiaries.spirit = BR.ByClient({ retail = BR.NONE, forever = BR.BuffBeneficiaries.intellect })
 
 -- Specs that benefit from each buff (used when spec ID is known via LibSpecialization)
 -- nil = everyone benefits (same as BuffBeneficiaries)

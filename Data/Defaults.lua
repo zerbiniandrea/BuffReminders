@@ -91,9 +91,9 @@ BR.defaults = {
     -- Per-context tracking overrides: each is a tracking mode, or "default" for
     -- no override. When several apply at once, the most restrictive mode wins.
     -- Forever players level in open-world groups, so buffs on group mates matter there.
-    outsideInstancesMode = BR.CLIENT == BR.ClientType.Forever and "my_buffs" or "self_only",
+    outsideInstancesMode = BR.ByClient({ retail = "self_only", forever = "my_buffs" }),
     combatMode = "default",
-    levelingMode = BR.CLIENT == BR.ClientType.Forever and "default" or "my_buffs",
+    levelingMode = BR.ByClient({ retail = "my_buffs", forever = "default" }),
     hideAllInVehicle = false,
     hideWhileMounted = false,
     hideInLegacyInstances = true,
@@ -166,21 +166,21 @@ BR.defaults = {
         -- Appearance
         iconSize = 64,
         -- iconWidth: nil = same as iconSize (square). Set explicitly for non-square icons.
-        textSize = BR.CLIENT == BR.ClientType.Forever and 17 or 20,
+        textSize = BR.ByClient({ retail = 20, forever = 17 }),
         textOutline = "OUTLINE",
         slugOutline = true,
         iconAlpha = 1,
         textAlpha = 1,
         textColor = { 1, 1, 1 },
-        spacing = BR.CLIENT == BR.ClientType.Forever and 4 or 8, -- px
+        spacing = BR.ByClient({ retail = 8, forever = 4 }), -- px
         iconZoom = 0, -- percentage (additional zoom on top of base TEXCOORD_INSET crop)
         borderSize = 2,
         growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT", "UP", "DOWN"
-        iconStyle = BR.CLIENT == BR.ClientType.Forever and "blizzard" or "modern",
+        iconStyle = BR.ByClient({ retail = "modern", forever = "blizzard" }),
         -- Behavior (glow settings)
         showExpirationGlow = false,
         showMissingGlow = false,
-        expirationThreshold = BR.CLIENT == BR.ClientType.Forever and 5 or 15, -- minutes
+        expirationThreshold = BR.ByClient({ retail = 15, forever = 5 }), -- minutes
         expirationShare = 25, -- percent of a buff duration, capped by expirationThreshold
         preKeyThreshold = 0, -- minutes (0 = off); used in M0 before inserting a keystone
         glowType = 2, -- BR.Glow.Type: Pixel=1, AutoCast=2, Border=3, Proc=4 (expiring default)
@@ -245,48 +245,57 @@ BR.defaults = {
         -- Allowed warlock demons per content row (WARLOCK_DEMON_CHOICES keys). A row
         -- with none allows all demons. Demonology with Felguard talented ignores it.
         -- WoW Forever rows allow a demon below level 30, where Felhunter is not learned.
-        warlockDemons = BR.CLIENT == BR.ClientType.Forever and {
-            world = { imp = true, voidwalker = true, succubus = true, felhunter = true },
-            dungeon = { imp = true, felhunter = true },
-            raid = { imp = true, succubus = true },
-            pvp = { succubus = true, felhunter = true },
-        } or {
-            world = { felhunter = true },
-            dungeon = { felhunter = true },
-            raid = { imp = true, felhunter = true, sayaad = true },
-            pvp = { felhunter = true },
-        },
+        warlockDemons = BR.ByClient({
+            retail = {
+                world = { felhunter = true },
+                dungeon = { felhunter = true },
+                raid = { imp = true, felhunter = true, sayaad = true },
+                pvp = { felhunter = true },
+            },
+            forever = {
+                world = { imp = true, voidwalker = true, succubus = true, felhunter = true },
+                dungeon = { imp = true, felhunter = true },
+                raid = { imp = true, succubus = true },
+                pvp = { succubus = true, felhunter = true },
+            },
+        }),
         warlockWrongDemon = true,
         -- The blessings of each class (WoW Forever), in priority order. A member gets the
         -- first one that no other paladin gives them. Every slot holds a value, so that
         -- AceDB cannot fill a slot that the user emptied.
-        paladinBlessingsByClass = BR.CLIENT == BR.ClientType.Forever and {
-            WARRIOR = { "might", "kings", false },
-            ROGUE = { "might", "kings", false },
-            HUNTER = { "kings", "wisdom", false },
-            MAGE = { "wisdom", "kings", false },
-            WARLOCK = { "wisdom", "kings", false },
-            PRIEST = { "wisdom", "kings", false },
-            DRUID = { "wisdom", "kings", false },
-            SHAMAN = { "wisdom", "kings", false },
-            PALADIN = { "wisdom", "kings", false },
-        } or nil,
+        paladinBlessingsByClass = BR.ByClient({
+            retail = BR.NONE,
+            forever = {
+                WARRIOR = { "might", "kings", false },
+                ROGUE = { "might", "kings", false },
+                HUNTER = { "kings", "wisdom", false },
+                MAGE = { "wisdom", "kings", false },
+                WARLOCK = { "wisdom", "kings", false },
+                PRIEST = { "wisdom", "kings", false },
+                DRUID = { "wisdom", "kings", false },
+                SHAMAN = { "wisdom", "kings", false },
+                PALADIN = { "wisdom", "kings", false },
+            },
+        }),
         -- WoW Forever: "self" checks and blesses only the player.
-        paladinBlessingScope = BR.CLIENT == BR.ClientType.Forever and "group" or nil,
+        paladinBlessingScope = BR.ByClient({ retail = BR.NONE, forever = "group" }),
         -- WoW Forever: "all" adds creature tracking to the gathering tracking.
-        trackingScope = BR.CLIENT == BR.ClientType.Forever and "gathering" or nil,
+        trackingScope = BR.ByClient({ retail = BR.NONE, forever = "gathering" }),
         -- The paladin auras of each content row (WoW Forever): the main aura, then the
         -- backup. An empty row accepts any aura. Every slot holds a value, so that AceDB
         -- cannot fill a slot that the user emptied.
-        paladinAuraOrder = BR.CLIENT == BR.ClientType.Forever and {
-            world = { false, false },
-            dungeon = { false, false },
-            raid = { false, false },
-            pvp = { false, false },
-        } or nil,
+        paladinAuraOrder = BR.ByClient({
+            retail = BR.NONE,
+            forever = {
+                world = { false, false },
+                dungeon = { false, false },
+                raid = { false, false },
+                pvp = { false, false },
+            },
+        }),
         -- thornsRequest: absent - nil means off
-        righteousFuryShow = BR.CLIENT == BR.ClientType.Forever and "tank" or nil,
-        mageArmorPreference = BR.CLIENT == BR.ClientType.Forever and "mage" or nil,
+        righteousFuryShow = BR.ByClient({ retail = BR.NONE, forever = "tank" }),
+        mageArmorPreference = BR.ByClient({ retail = BR.NONE, forever = "mage" }),
         -- Per-text-item size override, as a percentage of the icon size. An
         -- absent key follows consumableTextScale.
         textSizes = {},
@@ -334,7 +343,7 @@ BR.defaults = {
         },
         targeted = {
             -- Forever druids keep Thorns on themselves while leveling in the open world.
-            openWorld = BR.CLIENT == BR.ClientType.Forever,
+            openWorld = BR.ByClient({ retail = false, forever = true }),
             dungeon = true,
             scenario = true,
             raid = true,
@@ -380,7 +389,7 @@ BR.defaults = {
         },
         consumable = {
             -- Forever players use food, stones and poisons while leveling in the open world.
-            openWorld = BR.CLIENT == BR.ClientType.Forever,
+            openWorld = BR.ByClient({ retail = false, forever = true }),
             dungeon = true,
             scenario = true,
             raid = true,

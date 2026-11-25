@@ -79,6 +79,26 @@ BR.ClientType = {
 ---@type ClientType
 BR.CLIENT = WOW_PROJECT_ID == WOW_PROJECT_CAMELOT and BR.ClientType.Forever or BR.ClientType.Retail
 
+---Marks "no value" in BR.ByClient. A nil field drops out of the table, so the type check cannot see it.
+BR.NONE = {}
+
+-- Fields must not accept nil: LuaLS treats a nil-able field as optional and skips the missing-field check.
+---@class ClientValues
+---@field retail boolean|number|string|table|function
+---@field forever boolean|number|string|table|function
+
+---The value of the running client, or nil for BR.NONE.
+---Each call builds a table, so resolve at load time, not in the refresh path.
+---@param values ClientValues
+---@return any
+function BR.ByClient(values)
+    local value = values[BR.CLIENT]
+    if value == BR.NONE then
+        return nil
+    end
+    return value
+end
+
 -- Stance key for "no stance" (stance bar form 0) in the allowed-stances sets of BR.STANCE_RULES.
 BR.NO_STANCE = 0
 

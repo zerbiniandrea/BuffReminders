@@ -145,7 +145,7 @@ end
 function BR.Migrations.BorderInside(profile)
     local profileDefaults = type(profile.defaults) == "table" and profile.defaults or nil
     local iconStyle = profileDefaults and profileDefaults.iconStyle
-        or (BR.CLIENT == BR.ClientType.Forever and "blizzard" or "modern")
+        or BR.ByClient({ retail = "modern", forever = "blizzard" })
     local masqueLoaded = C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("Masque")
     if iconStyle ~= "blizzard" and not masqueLoaded then
         if not profileDefaults then

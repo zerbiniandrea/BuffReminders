@@ -12,7 +12,7 @@ local BR = ns
 local GetItemSpell = C_Item.GetItemSpell
 
 -- WoW Forever has no specializations, so its memory uses one fixed key in place of the spec ID.
-local NO_SPEC_KEY = BR.CLIENT == BR.ClientType.Forever and 0 or nil
+local NO_SPEC_KEY = BR.ByClient({ retail = BR.NONE, forever = 0 })
 
 ---@param specId number?
 ---@return number?

@@ -709,7 +709,7 @@ local function BuildForever()
     return theme
 end
 
-BR.Theme = BR.CLIENT == BR.ClientType.Forever and BuildForever() or BuildRetail()
+BR.Theme = BR.ByClient({ retail = BuildRetail, forever = BuildForever })()
 BR.THEME_CLEAR = CLEAR
 
 -- ============================================================================

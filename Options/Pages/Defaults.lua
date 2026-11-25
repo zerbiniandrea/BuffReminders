@@ -299,8 +299,8 @@ local function Build(content)
     local labelWidth = defGrid.labelWidth
 
     -- One stored value; the label names the art that the client draws.
-    local blizzardStyleLabel = BR.CLIENT == BR.ClientType.Forever and L["Options.IconStyle.Forever"]
-        or L["Options.IconStyle.Blizzard"]
+    local blizzardStyleLabel =
+        BR.ByClient({ retail = L["Options.IconStyle.Blizzard"], forever = L["Options.IconStyle.Forever"] })
     local iconStyleHolder = Components.Dropdown(content, {
         label = L["Options.IconStyle"],
         labelWidth = labelWidth,
