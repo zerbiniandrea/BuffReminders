@@ -78,6 +78,7 @@ UI\Components.lua
 UI\Glow.lua
 Display\Icons.lua
 Display\Fonts.lua
+Display\Pixels.lua
 Display\Display.lua
 Core\ImportExport.lua
 Display\Movers.lua

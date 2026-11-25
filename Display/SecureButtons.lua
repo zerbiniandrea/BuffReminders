@@ -28,6 +28,7 @@ local Plain = BR.Secret.Plain
 local BuffTargets = BR.StateHelpers.BuffTargets
 local IsCountdownEntry = BR.StateHelpers.IsCountdownEntry
 local SubIcons = BR.SubIcons
+local Pixels = BR.Pixels
 
 ---@param category string?
 ---@return boolean
@@ -644,7 +645,7 @@ local function StyleOverlayHighlight(overlay)
             highlight._br_actionArt = true
         end
         local width, height = overlay:GetSize()
-        highlight:SetSize(width * IconStyle.FRAME_WIDTH_RATIO, height)
+        highlight:SetSize(width, height)
     elseif highlight._br_actionArt then
         highlight:ClearAllPoints()
         highlight:SetAllPoints()
@@ -1942,6 +1943,8 @@ local function SyncSecureButtons()
                     local catSettings = GetCategorySettings(effectiveCat)
                     local baseIconSize = (catSettings.iconSize or 64) - 2 * hostInset
                     local size, btnSpacing = SubIcons.Metrics(baseIconSize)
+                    size = Pixels.Snap(size, frame)
+                    btnSpacing = Pixels.Snap(btnSpacing, frame)
                     local subIconSide = (BR.profile.defaults or {}).subIconSide or "BOTTOM"
                     local visibleCount = 0
                     for _, btn in ipairs(frame.actionButtons) do
@@ -1971,6 +1974,7 @@ local function SyncSecureButtons()
                                     size,
                                     btnSpacing
                                 )
+                                btnX, btnY = Pixels.Round(btnX, frame), Pixels.Round(btnY, frame)
                                 -- The size and outline stamps let the dirty check see
                                 -- a font setting change. A face change needs no stamp:
                                 -- linked fontstrings follow the shared font object.

@@ -265,6 +265,7 @@ local IsInGroup = IsInGroup
 
 -- Shared display font (Display/Fonts.lua), aliased for hot render paths
 local DisplayFonts = BR.DisplayFonts
+local Pixels = BR.Pixels
 local ApplyFont = DisplayFonts.Apply
 local GetFontPath = DisplayFonts.GetFontPath
 local GetOutline = DisplayFonts.GetOutline
@@ -1031,9 +1032,15 @@ local function ArtSize(frame, size)
     return size - 2 * (frame._br_borderInset or 0)
 end
 
+---The art fits the frame, so the frame edge is the visible edge. The icon takes the part of
+---the art that an action button gives its icon.
 local function SizeBlizzardIconArt(frame, width, height)
-    frame.iconFrameArt:SetSize(width * BLIZZARD_ICON_ART.frameWidthRatio, height)
-    frame.iconMask:SetSize(width * BLIZZARD_ICON_ART.maskRatio, height * BLIZZARD_ICON_ART.maskRatio)
+    local iconWidth = width / BLIZZARD_ICON_ART.frameWidthRatio
+    frame.iconFrameArt:SetSize(width, height)
+    frame.icon:ClearAllPoints()
+    frame.icon:SetPoint("TOPLEFT")
+    frame.icon:SetPoint("BOTTOMRIGHT", -Pixels.Round(width - iconWidth, frame), 0)
+    frame.iconMask:SetSize(iconWidth * BLIZZARD_ICON_ART.maskRatio, height * BLIZZARD_ICON_ART.maskRatio)
 end
 
 ---Create the hidden action-button frame and mask on a frame with an `icon` texture.
@@ -1132,6 +1139,9 @@ local function SetBlizzardIconArt(frame, shown, iconWidth, iconHeight)
         if frame._br_masked then
             frame.icon:RemoveMaskTexture(frame.iconMask)
             frame._br_masked = false
+            -- The art narrowed the icon.
+            frame.icon:ClearAllPoints()
+            frame.icon:SetAllPoints()
         end
     end
 end
@@ -1167,27 +1177,31 @@ local function UpdateIconStyling(frame, catSettings)
     -- The action-button frame shows the full icon, with its built-in dark border.
     local blizzardStyle = UsesBlizzardIconStyle()
     -- The border lies inside the frame, so the frame edge is the visible edge.
-    local borderInset = blizzardStyle and 0 or (catSettings.borderSize or DEFAULT_BORDER_SIZE)
+    local borderInset = blizzardStyle and 0 or Pixels.Snap(catSettings.borderSize or DEFAULT_BORDER_SIZE, frame, true)
+    local iconHeight = catSettings.iconSize or 64
+    local iconWidth = GetEffectiveWidth(catSettings.iconWidth, iconHeight)
+    -- Before the icon anchors: the art anchors the icon in the Blizzard style.
+    SetBlizzardIconArt(frame, blizzardStyle, iconWidth, iconHeight)
     frame._br_borderInset = borderInset
-    frame.icon:ClearAllPoints()
     if borderInset > 0 then
+        frame.icon:ClearAllPoints()
         frame.icon:SetPoint("TOPLEFT", borderInset, -borderInset)
         frame.icon:SetPoint("BOTTOMRIGHT", -borderInset, borderInset)
         frame.border:ClearAllPoints()
         frame.border:SetAllPoints()
         frame.border:Show()
     else
-        frame.icon:SetAllPoints()
+        if not blizzardStyle then
+            frame.icon:ClearAllPoints()
+            frame.icon:SetAllPoints()
+        end
         frame.border:Hide()
     end
     local additionalZoom = (catSettings.iconZoom or DEFAULT_ICON_ZOOM) / 100
     local inset = (blizzardStyle and 0 or TEXCOORD_INSET) + additionalZoom
-    local iconHeight = catSettings.iconSize or 64
-    local iconWidth = GetEffectiveWidth(catSettings.iconWidth, iconHeight)
-    local xInset, yInset =
-        GetAspectCropInsets(inset, max(1, iconWidth - 2 * borderInset), max(1, iconHeight - 2 * borderInset))
+    local artWidth = blizzardStyle and iconWidth / BLIZZARD_ICON_ART.frameWidthRatio or iconWidth - 2 * borderInset
+    local xInset, yInset = GetAspectCropInsets(inset, max(1, artWidth), max(1, iconHeight - 2 * borderInset))
     frame.icon:SetTexCoord(xInset, 1 - xInset, yInset, 1 - yInset)
-    SetBlizzardIconArt(frame, blizzardStyle, iconWidth, iconHeight)
 end
 
 -- Map buff key -> consumable category (derived from the buff definitions)
@@ -1448,37 +1462,6 @@ local function GetOrCreateExtraFrame(frame, index)
     return extra
 end
 
-local lastPhysicalHeight = 1080
-
----Gap after an icon such that icon plus gap spans a whole number of screen pixels. Each icon
----then starts at the same sub-pixel phase, so the client rounds every gap the same way.
----@param mainSize number Icon dimension along the growth direction
----@param spacing number Requested gap in UI units
----@param container table Frame whose effective scale applies
----@return number gap
-local function PixelAlignedGap(mainSize, spacing, container)
-    -- Flush icons share an edge, so they round the same way with no snap.
-    if spacing <= 0 then
-        return spacing
-    end
-    -- The physical height reads 0 during a display mode change.
-    local _, physicalHeight = GetPhysicalScreenSize()
-    if physicalHeight and physicalHeight > 0 then
-        lastPhysicalHeight = physicalHeight
-    end
-    local scale = container:GetEffectiveScale()
-    if not scale or scale <= 0 then
-        return spacing
-    end
-    local onePixel = 768 / (lastPhysicalHeight * scale)
-    -- The epsilon keeps a value near a half-pixel boundary on the same side across reloads.
-    local pitch = floor((mainSize + spacing) / onePixel + 0.5 + 0.001) * onePixel
-    if pitch < mainSize then
-        pitch = pitch + onePixel
-    end
-    return pitch - mainSize
-end
-
 local function PositionFramesInContainer(container, frames, iconWidth, iconHeight, spacing, direction)
     local count = #frames
     if count == 0 then
@@ -1557,22 +1540,30 @@ local function PositionFramesVariable(container, frames, widths, heights, gaps, 
         return
     end
 
-    -- Anchor points place frames at the center of the cross-axis edge,
-    -- so smaller frames are automatically centered - no manual offset needed.
+    -- Anchor points place frames at the center of the cross-axis edge, so smaller frames
+    -- center on their own. An odd size difference needs a half pixel to stay on the grid.
     local offset = 0
     local isVertical = direction == "UP" or direction == "DOWN"
     local layout = DIRECTION_LAYOUT[direction]
-    local containerWidth = (direction == "CENTER") and container:GetWidth() or 0
+    local containerWidth, containerHeight = container:GetSize()
 
     for i, frame in ipairs(frames) do
         local mainSize = isVertical and heights[i] or widths[i]
+        local crossX = isVertical and Pixels.CenterOffset(containerWidth, widths[i], container) or 0
+        local crossY = isVertical and 0 or Pixels.CenterOffset(containerHeight, heights[i], container)
 
         frame:ClearAllPoints()
         if layout then
-            frame:SetPoint(layout.anchor, container, layout.anchor, layout.xMult * offset, layout.yMult * offset)
+            frame:SetPoint(
+                layout.anchor,
+                container,
+                layout.anchor,
+                layout.xMult * offset + crossX,
+                layout.yMult * offset + crossY
+            )
         else -- CENTER (horizontal)
             local startX = -containerWidth / 2 + offset
-            frame:SetPoint("CENTER", container, "CENTER", startX + widths[i] / 2, 0)
+            frame:SetPoint("CENTER", container, "CENTER", startX + widths[i] / 2, crossY)
         end
 
         if i < count then
@@ -1603,11 +1594,11 @@ local function PositionMainContainer(mainFrameBuffs)
         for i, frame in ipairs(mainFrameBuffs) do
             local effectiveCat = GetEffectiveCategory(frame)
             local settings = GetCategorySettings(effectiveCat)
-            local iconSize = settings.iconSize or 64
-            local iconWidth = GetEffectiveWidth(settings.iconWidth, iconSize)
+            local iconSize = Pixels.Snap(settings.iconSize or 64, mainFrame)
+            local iconWidth = Pixels.Snap(GetEffectiveWidth(settings.iconWidth, settings.iconSize or 64), mainFrame)
             widths[i] = iconWidth
             heights[i] = iconSize
-            spacings[i] = settings.spacing or defaults.defaults.spacing
+            spacings[i] = Pixels.Snap(settings.spacing or defaults.defaults.spacing, mainFrame, true)
             frame:SetSize(iconWidth, iconSize)
             if iconWidth > maxWidth then
                 maxWidth = iconWidth
@@ -1623,7 +1614,7 @@ local function PositionMainContainer(mainFrameBuffs)
             local mainSize = isVertical and heights[i] or widths[i]
             totalMain = totalMain + mainSize
             if i < #widths then
-                gaps[i] = PixelAlignedGap(mainSize, max(spacings[i], spacings[i + 1]), mainFrame)
+                gaps[i] = max(spacings[i], spacings[i + 1])
                 totalMain = totalMain + gaps[i]
             end
         end
@@ -1645,7 +1636,7 @@ local function PositionMainContainer(mainFrameBuffs)
             local extAnchor = EXT_DIRECTION_ANCHORS[extPoint] and EXT_DIRECTION_ANCHORS[extPoint][direction] or anchor
             mainFrame:SetPoint(extAnchor, extFrame, extPoint, pos.x or 0, pos.y or 0)
         else
-            mainFrame:SetPoint(anchor, UIParent, "CENTER", pos.x or 0, pos.y or 0)
+            Pixels.SetPoint(mainFrame, anchor, pos.x or 0, pos.y or 0)
         end
 
         PositionFramesVariable(mainFrame, mainFrameBuffs, widths, heights, gaps, direction)
@@ -1674,11 +1665,11 @@ local function PositionSplitCategory(category, frames)
         local direction = catSettings.growDirection or "CENTER"
         local anchor = DIRECTION_ANCHORS[direction] or "CENTER"
         local pos = catSettings.position or { point = "CENTER", x = 0, y = 0 }
-        local iconSize = catSettings.iconSize or 64
-        local iconWidth = GetEffectiveWidth(catSettings.iconWidth, iconSize)
+        local iconSize = Pixels.Snap(catSettings.iconSize or 64, catFrame)
+        local iconWidth = Pixels.Snap(GetEffectiveWidth(catSettings.iconWidth, catSettings.iconSize or 64), catFrame)
         local isVertical = direction == "UP" or direction == "DOWN"
         local mainSize = isVertical and iconSize or iconWidth
-        local spacing = PixelAlignedGap(mainSize, catSettings.spacing or defaults.defaults.spacing, catFrame)
+        local spacing = Pixels.Snap(catSettings.spacing or defaults.defaults.spacing, catFrame, true)
 
         for _, frame in ipairs(frames) do
             frame:SetSize(iconWidth, iconSize)
@@ -1698,7 +1689,7 @@ local function PositionSplitCategory(category, frames)
             local extAnchor = EXT_DIRECTION_ANCHORS[extPoint] and EXT_DIRECTION_ANCHORS[extPoint][direction] or anchor
             catFrame:SetPoint(extAnchor, extFrame, extPoint, pos.x or 0, pos.y or 0)
         else
-            catFrame:SetPoint(anchor, UIParent, "CENTER", pos.x or 0, pos.y or 0)
+            Pixels.SetPoint(catFrame, anchor, pos.x or 0, pos.y or 0)
         end
 
         PositionFramesInContainer(catFrame, frames, iconWidth, iconSize, spacing, direction)
@@ -1734,8 +1725,8 @@ local function PositionDetachedIcon(key, frame)
 
     local effectiveCat = GetEffectiveCategory(frame)
     local catSettings = GetCategorySettings(effectiveCat)
-    local iconSize = catSettings.iconSize or 64
-    local iconWidth = GetEffectiveWidth(catSettings.iconWidth, iconSize)
+    local iconSize = Pixels.Snap(catSettings.iconSize or 64, container)
+    local iconWidth = Pixels.Snap(GetEffectiveWidth(catSettings.iconWidth, catSettings.iconSize or 64), container)
 
     local totalFrames = 1
     if frame.extraFrames then
@@ -1747,15 +1738,14 @@ local function PositionDetachedIcon(key, frame)
     end
 
     -- Size the container to fit all visible frames (stacked horizontally)
-    local spacing = totalFrames > 1
-            and PixelAlignedGap(iconWidth, catSettings.spacing or defaults.defaults.spacing, container)
+    local spacing = totalFrames > 1 and Pixels.Snap(catSettings.spacing or defaults.defaults.spacing, container, true)
         or 0
     local totalWidth = totalFrames * iconWidth + (totalFrames - 1) * spacing
     container:SetSize(totalWidth, iconSize)
 
     local pos = GetDetachedPosition(key)
     container:ClearAllPoints()
-    container:SetPoint("CENTER", UIParent, "CENTER", pos.x or 0, pos.y or 0)
+    Pixels.SetPoint(container, "CENTER", pos.x or 0, pos.y or 0)
 
     frame:SetSize(iconWidth, iconSize)
     frame:ClearAllPoints()
@@ -2407,6 +2397,7 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
             local catSettings = GetCategorySettings(GetEffectiveCategory(frame))
             local iconSize = ArtSize(frame, catSettings.iconSize or 64)
             local size, spacing = BR.SubIcons.Metrics(iconSize)
+            size, spacing = Pixels.Snap(size, frame), Pixels.Snap(spacing, frame)
             local side = (BR.profile.defaults or {}).subIconSide or "BOTTOM"
             local width, height = frame:GetWidth(), frame:GetHeight()
             local hostInset = frame._br_borderInset or 0
@@ -2437,7 +2428,7 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
                     spacing
                 )
                 extra:ClearAllPoints()
-                extra:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", x, y)
+                extra:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", Pixels.Round(x, frame), Pixels.Round(y, frame))
                 extra:Show()
             end
         elseif not testMode then
@@ -2461,7 +2452,7 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
                 extra._br_subIcon = nil
                 extra._br_item = items[i] -- The click overlay uses the item this frame shows.
                 extra:SetParent(parentFrame)
-                extra:SetSize(expandedSize, frame:GetHeight())
+                extra:SetSize(frame:GetWidth(), frame:GetHeight())
                 extra.icon:SetTexture(items[i].icon)
                 ApplyFont(extra.stackCount, stackFontSize)
                 extra.stackCount:SetText(BR.SecureButtons.FormatStackCount(items[i]))
@@ -3702,7 +3693,6 @@ BR.IconStyle = {
     SetArt = SetBlizzardIconArt,
     AnchorCooldown = BLIZZARD_ICON_ART.AnchorCooldown,
     StyleItemCooldown = BLIZZARD_ICON_ART.StyleItemCooldown,
-    FRAME_WIDTH_RATIO = BLIZZARD_ICON_ART.frameWidthRatio,
     ARTWORK_AVAILABLE = BLIZZARD_ICON_ART.available,
 }
 
@@ -4071,11 +4061,18 @@ eventHandlers.UNIT_ENTERED_VEHICLE = function(arg1)
 end
 eventHandlers.UNIT_EXITED_VEHICLE = eventHandlers.UNIT_ENTERED_VEHICLE
 
--- The icon gaps align to the screen pixel grid, which moves with the scale and the resolution.
--- UIParent:SetScale() from another addon fires no event, and a scale slider calls it every frame.
+-- Icon sizes, borders and gaps snap to the screen pixel grid, which moves with the scale and
+-- the resolution. UIParent:SetScale() from another addon fires no event, and a scale slider
+-- calls it every frame, so one refresh covers the calls of a short window.
 local function OnPixelGridChanged()
-    ResetLayoutSignatures()
-    SetDirty()
+    if not mainFrame or eventFrame._br_pixelGridPending then
+        return
+    end
+    eventFrame._br_pixelGridPending = true
+    C_Timer.After(0.2, function()
+        eventFrame._br_pixelGridPending = nil
+        CallbackRegistry:TriggerEvent("VisualsRefresh")
+    end)
 end
 eventHandlers.UI_SCALE_CHANGED = OnPixelGridChanged
 eventHandlers.DISPLAY_SIZE_CHANGED = OnPixelGridChanged
