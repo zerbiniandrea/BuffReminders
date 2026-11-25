@@ -368,7 +368,7 @@ local function BuildLoadoutRulesArray()
     -- per-rule satisfied/icon verdicts can now be keyed to stale definitions.
     BR.BuffState.InvalidateLoadoutCache()
     wipe(LoadoutRules)
-    if not db or not db.loadoutReminders or not BR.Loadouts then
+    if not db or not db.loadoutReminders or not BR.IsCategoryAvailable("loadout") then
         return
     end
     local sortedKeys = {}
@@ -3810,9 +3810,6 @@ local eventHandlers = {}
 eventHandlers.PLAYER_ENTERING_WORLD = function()
     UpdateAuraEventRegistration()
     BR.StateHelpers.ScanEatingState()
-    if BR.Loadouts then
-        BR.Loadouts.EnsureAddonsReady(LoadoutRules)
-    end
     DisplayFonts.Resolve()
     if not mainFrame then
         InitializeFrames()
