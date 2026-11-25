@@ -125,6 +125,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@field suppressedByEntry? string Hide when this entry key is already visible (e.g., self buff covers it)
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
 ---@field castReady? fun(isRestricted: boolean): boolean? For a caster of the class. false hides the missing reminder
+---@field castSpellID? number|number[] Click-to-cast spell when different from spellID. A list casts the first known spell
 ---@field casterCheck? fun(isRestricted: boolean): string?, boolean? For a player of the class, replaces the group scan. Returns the overlay text (nil = no reminder) and true when a click must cast nothing
 ---@field choiceOrder? ChoiceOrderGrid The user lists the buff choices per content row. An empty row accepts any
 ---@field clickMacro? fun(spellID: number?): string
@@ -188,6 +189,7 @@ BR.DK_RUNEFORGES = DK_RUNEFORGES
 ---@class PetSacrifice
 ---@field spellID number
 ---@field auraIDs number[] Buffs that the sacrifice gives
+---@field reminderKey? string Self-buff reminder of the sacrifice. While it shows, it covers the missing pet
 
 ---@class ConsumableBuff
 ---@field spellID? SpellID
@@ -288,6 +290,9 @@ BR.IsInDelve = IsInDelve
 BR.CONTENT_GRID_DUNGEON_DESC = L["BuffPanel.WarlockDemon.Dungeon.Desc"]
 
 BR.SHADOWFORM_SPELL_ID = 232698
+
+---@type SoulstoneVisibility
+BR.SOULSTONE_DEFAULT_VISIBILITY = "readyCheck"
 
 -- Icon of the eating channel aura, the same for all food types.
 BR.EATING_AURA_ICON = 133950
@@ -831,47 +836,7 @@ BR.BUFF_TABLES = {
                 return nil
             end,
             clickMacro = function(spellID)
-                local name = BR.GetSpellName(spellID) or ""
-                -- Hard-assigned target: cast ONLY on them - alive (pre-emptive stone)
-                -- or dead (offers them a res). Deliberately no fallback: if the pin
-                -- is absent or out of group the click is a safe no-op, so the stone
-                -- can never silently land on the wrong person.
-                local db = BR.profile
-                local pinned = db.defaults and db.defaults.soulstonePinnedTarget
-                if pinned and pinned ~= "" then
-                    -- Re-sanitize at use: imported profiles bypass the options input,
-                    -- and this string must never break out of the macro conditional
-                    return "/cast [@" .. pinned:gsub("[%[%]\r\n]", "") .. ",help] " .. name
-                end
-                -- Priority: sticky last target > first living healer > mouseover > target > self
-                local lastTarget = BR.TargetMemory and BR.TargetMemory.Get("soulstone")
-                if lastTarget then
-                    return "/cast [@"
-                        .. lastTarget
-                        .. ",help,nodead][@mouseover,help,nodead][@target,help,nodead][@player] "
-                        .. name
-                end
-                local numMembers = GetNumGroupMembers()
-                if numMembers > 0 then
-                    local prefix = IsInRaid() and "raid" or "party"
-                    for i = 1, numMembers do
-                        local unitId = prefix .. i
-                        if UnitExists(unitId) and not UnitIsDeadOrGhost(unitId) then
-                            -- Runs inside the secure button's PreClick, i.e. in combat,
-                            -- where a compare against a secret role can throw
-                            if Plain(UnitGroupRolesAssigned(unitId)) == "HEALER" then
-                                local healerName = GetUnitName(unitId, true)
-                                if healerName then
-                                    return "/cast [@"
-                                        .. healerName
-                                        .. ",help,nodead][@mouseover,help,nodead][@target,help,nodead][@player] "
-                                        .. name
-                                end
-                            end
-                        end
-                    end
-                end
-                return "/cast [@mouseover,help,nodead][@target,help,nodead][@player] " .. name
+                return "/cast " .. BR.SoulstoneTargetConditions() .. (BR.GetSpellName(spellID) or "")
             end,
         },
     },

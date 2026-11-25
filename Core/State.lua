@@ -3221,11 +3221,13 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring)
             local readyCheckOk = not buff.readyCheckOnly or GameContext.IsInReadyCheck()
             -- Soulstone visibility mode overrides readyCheckOnly
             if buff.key == "soulstone" and not readyCheckOk then
-                local ssMode = db.defaults and db.defaults.soulstoneVisibility or "readyCheck"
+                local ssMode = db.defaults and db.defaults.soulstoneVisibility or BR.SOULSTONE_DEFAULT_VISIBILITY
                 if ssMode == "always" then
                     readyCheckOk = true
                 elseif ssMode == "casterOnly" then
                     readyCheckOk = playerClass == "WARLOCK"
+                elseif ssMode == "readyCheckSolo" then
+                    readyCheckOk = cachedIsAlone
                 end
             end
             if not readyCheckOk and not dungeonEntryOk then
@@ -3354,6 +3356,10 @@ end
 local function IsPetSacrificed(sacrifice, isAuraRestricted)
     if not IsPlayerSpellCached(sacrifice.spellID) then
         return false
+    end
+    local reminder = sacrifice.reminderKey and BuffState.entries[sacrifice.reminderKey]
+    if reminder and reminder.visible then
+        return true
     end
     if isAuraRestricted then
         for _, id in ipairs(sacrifice.auraIDs) do

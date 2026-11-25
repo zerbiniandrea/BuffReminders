@@ -67,7 +67,7 @@ local BR = ns
 ---@field healthstoneVisibility? "readyCheck"|"always"|"casterOnly"
 ---@field healthstoneThreshold? number
 ---@field healthstoneLowStock? boolean
----@field soulstoneVisibility? "readyCheck"|"always"|"casterOnly"
+---@field soulstoneVisibility? SoulstoneVisibility
 ---@field soulstoneHideCooldown? boolean
 ---@field soulstonePinnedTarget? string
 ---@field repairThreshold? number Durability percent

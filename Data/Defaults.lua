@@ -215,7 +215,7 @@ BR.defaults = {
         -- driveByWhisper, driveByEmoteText: absent - nil means the localized default text
         driveByEmote = "WAVE",
         driveByAllowPvP = false,
-        soulstoneVisibility = "readyCheck",
+        soulstoneVisibility = BR.SOULSTONE_DEFAULT_VISIBILITY,
         soulstoneHideCooldown = false,
         -- soulstonePinnedTarget: deliberately absent - nil means "no pin" (set via BuffPanel drawer)
         consumableDisplayMode = "sub_icons",

@@ -70,6 +70,8 @@
 -- Which copies satisfy the caster: any caster's copy, or only the player's own.
 -- A viewer of another class always counts any copy. The category gives the default.
 ---@alias BuffCopies "any"|"own"
+-- When the Soulstone reminder shows. readyCheckSolo: at a ready check, and always while solo.
+---@alias SoulstoneVisibility "readyCheck"|"readyCheckSolo"|"casterOnly"|"always"
 ---@alias SpecID number
 ---@alias BuffBeneficiaries table<string, table<ClassName, boolean>>
 ---@alias SpecBeneficiaries table<string, table<SpecID, boolean>>

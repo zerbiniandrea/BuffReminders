@@ -45,22 +45,41 @@ local editorHolders = {}
 -- ============================================================================
 -- SHOW (ready check) MODELS
 -- ============================================================================
--- Regular readyCheckOnly buffs store their override in
--- readyCheckOnlyOverrides[key] (nil = ready-check-only, false = always).
--- Healthstone/Soulstone store a three-value mode in defaults.*Visibility;
--- the caster checkbox covers the middle value.
+-- Each model gives the values of the Show dropdown, ordered from least to most visible.
 
-local function MakeOverrideShowModel(key)
+---@class ShowOption
+---@field value string
+---@field label string
+---@field desc string
+
+---@class ShowModel
+---@field options ShowOption[]
+---@field get fun(): string
+---@field set fun(value: string)
+---@field note? string
+
+local SHOW_READY_CHECK =
+    { value = "readyCheck", label = L["BuffPanel.Show.ReadyCheck"], desc = L["BuffPanel.Show.ReadyCheck.Desc"] }
+local SHOW_READY_CHECK_SOLO = {
+    value = "readyCheckSolo",
+    label = L["BuffPanel.Show.ReadyCheckSolo"],
+    desc = L["BuffPanel.Show.ReadyCheckSolo.Desc"],
+}
+local SHOW_CASTER = { value = "casterOnly", label = L["BuffPanel.Show.Caster"], desc = L["BuffPanel.Show.Caster.Desc"] }
+local SHOW_ALWAYS = { value = "always", label = L["BuffPanel.Show.Always"], desc = L["BuffPanel.Show.Always.Desc"] }
+
+-- A buff with no mode setting of its own. readyCheckOnlyOverrides[key]: nil = ready check only, false = always.
+---@return ShowModel
+local function MakePerBuffShowModel(key)
     return {
-        isReadyCheck = function()
+        options = { SHOW_READY_CHECK, SHOW_ALWAYS },
+        get = function()
             local overrides = BR.profile.readyCheckOnlyOverrides
-            return not overrides or overrides[key] ~= false
+            return overrides and overrides[key] == false and "always" or "readyCheck"
         end,
-        setReadyCheck = function(checked)
-            -- `checked and nil or false` cannot replace this branch: the idiom always
-            -- yields false, because the true-branch value (nil) is itself falsy.
+        set = function(value)
             local override
-            if not checked then
+            if value == "always" then
                 override = false
             end
             BR.Config.Set("readyCheckOnlyOverrides." .. key, override)
@@ -68,43 +87,46 @@ local function MakeOverrideShowModel(key)
     }
 end
 
-local function MakeVisibilityShowModel(configKey)
+---@param configKey string
+---@param options ShowOption[]
+---@return ShowModel
+local function MakeModeShowModel(configKey, options)
     local path = "defaults." .. configKey
-    local model
-    model = {
-        isReadyCheck = function()
-            return BR.Config.Get(path) ~= "always"
+    return {
+        options = options,
+        get = function()
+            return BR.Config.Get(path)
         end,
-        setReadyCheck = function(checked)
-            if not checked then
-                BR.Config.Set(path, "always")
-            elseif model.isCasterAlways() then
-                BR.Config.Set(path, "casterOnly")
-            else
-                BR.Config.Set(path, "readyCheck")
-            end
+        set = function(value)
+            BR.Config.Set(path, value)
         end,
-        isCasterAlways = function()
-            return BR.Config.Get(path) == "casterOnly"
-        end,
-        setCasterAlways = function(checked)
-            BR.Config.Set(path, checked and "casterOnly" or "readyCheck")
-        end,
-        hasCasterOption = true,
     }
-    return model
 end
 
 local SHOW_MODELS = {
     healthstone = function()
-        return MakeVisibilityShowModel("healthstoneVisibility")
+        return MakeModeShowModel("healthstoneVisibility", { SHOW_READY_CHECK, SHOW_CASTER, SHOW_ALWAYS })
     end,
-    soulstone = function()
-        return MakeVisibilityShowModel("soulstoneVisibility")
+    ---@param info table
+    soulstone = function(info)
+        -- An "ally" buff never shows solo, so the solo value needs a target that includes the player.
+        local options = info.target == "ally" and { SHOW_READY_CHECK, SHOW_CASTER, SHOW_ALWAYS }
+            or { SHOW_READY_CHECK, SHOW_READY_CHECK_SOLO, SHOW_CASTER, SHOW_ALWAYS }
+        return MakeModeShowModel("soulstoneVisibility", options)
     end,
+    -- The mana gem shares the Healthstone value. Its own list has no caster value,
+    -- so a caster value reads as a ready check and survives a ready check choice.
     manaGem = function()
-        local model = MakeVisibilityShowModel("healthstoneVisibility")
-        model.hasCasterOption = false
+        local model = MakeModeShowModel("healthstoneVisibility", { SHOW_READY_CHECK, SHOW_ALWAYS })
+        local get, set = model.get, model.set
+        model.get = function()
+            return get() == "always" and "always" or "readyCheck"
+        end
+        model.set = function(value)
+            if value ~= model.get() then
+                set(value)
+            end
+        end
         model.note = L["BuffPanel.ShowSharedWithHealthstone"]
         return model
     end,
@@ -1831,43 +1853,29 @@ local function AddShowRow(layout, info)
     local showModelFactory = SHOW_MODELS[key]
     local showModel
     if showModelFactory then
-        showModel = showModelFactory()
+        showModel = showModelFactory(info)
     elseif info.readyCheckOnly and not info.freeConsumable then
-        showModel = MakeOverrideShowModel(key)
+        showModel = MakePerBuffShowModel(key)
     end
     if not showModel then
         return
     end
 
-    local function ToggleLabel(checked)
-        return checked and L["Options.ReadyCheck"] or L["Options.Always"]
+    local descLines = {}
+    for i, option in ipairs(showModel.options) do
+        descLines[i] = option.label .. ": " .. option.desc
     end
-    local showRow = CreateFrame("Frame", nil, body)
-    showRow:SetSize(bodyW, 22)
-    local showLabel = showRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    showLabel:SetPoint("LEFT", 0, 0)
-    showLabel:SetWidth(DRAWER_LABEL_W)
-    showLabel:SetJustifyH("LEFT")
-    showLabel:SetText(L["BuffPanel.Show"])
-
-    local toggle
-    toggle = Components.Toggle(showRow, {
-        label = ToggleLabel(showModel.isReadyCheck()),
-        get = showModel.isReadyCheck,
-        onChange = function(checked)
-            showModel.setReadyCheck(checked)
-            toggle.label:SetText(ToggleLabel(checked))
-            Components.RefreshAll()
-        end,
+    local drop = Components.Dropdown(body, {
+        label = L["BuffPanel.Show"],
+        labelWidth = DRAWER_LABEL_W,
+        width = DRAWER_FIELD_W,
+        options = showModel.options,
+        get = showModel.get,
+        tooltip = { title = L["BuffPanel.Show"], desc = table.concat(descLines, "\n") },
+        onChange = showModel.set,
     })
-    toggle:SetPoint("LEFT", showRow, "LEFT", DRAWER_LABEL_W + 4, 0)
-    local origToggleRefresh = toggle.Refresh
-    function toggle:Refresh()
-        origToggleRefresh(self)
-        self.label:SetText(ToggleLabel(showModel.isReadyCheck()))
-    end
-    tinsert(bodyHolders, toggle)
-    layout:Add(showRow, 22, COMPONENT_GAP)
+    tinsert(bodyHolders, drop)
+    layout:Add(drop, 26, COMPONENT_GAP)
 
     if showModel.note then
         local note = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -1876,23 +1884,6 @@ local function AddShowRow(layout, info)
         note:SetText(showModel.note)
         layout:SetX(DRAWER_LABEL_W + 4)
         layout:AddText(note, math.max(12, math.ceil(note:GetStringHeight())), COMPONENT_GAP)
-        layout:SetX(0)
-    end
-
-    if showModel.hasCasterOption then
-        layout:SetX(DRAWER_LABEL_W + 4)
-        local casterHolder = Components.Checkbox(body, {
-            label = L["BuffPanel.CasterAlways"],
-            get = showModel.isCasterAlways,
-            enabled = showModel.isReadyCheck,
-            disabledReason = L["DisabledReason.CasterAlways"],
-            tooltip = { title = L["BuffPanel.CasterAlways"], desc = L["BuffPanel.CasterAlways.Desc"] },
-            onChange = function(checked)
-                showModel.setCasterAlways(checked)
-            end,
-        })
-        tinsert(bodyHolders, casterHolder)
-        layout:Add(casterHolder, nil, COMPONENT_GAP)
         layout:SetX(0)
     end
 end
@@ -1948,7 +1939,8 @@ local function AddSoundRow(layout, model)
             Components.RefreshAll()
         end,
     })
-    soundDrop:SetPoint("LEFT", soundRow, "LEFT", DRAWER_LABEL_W + 4, 0)
+    -- Dropdown puts its button 5 px after the label, so this matches the drawer dropdowns with a label.
+    soundDrop:SetPoint("LEFT", soundRow, "LEFT", DRAWER_LABEL_W, 0)
     tinsert(bodyHolders, soundDrop)
 
     local playBtn = BR.Options.Helpers.SoundPreviewButton(soundRow, effectiveValue)

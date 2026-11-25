@@ -1184,6 +1184,46 @@ function BR.TargetedClickMacro(buffKey)
     end
 end
 
+---Macro conditions of a Soulstone click, with a trailing space. A pinned target gets
+---no fallback: if the pin is absent or out of group, the click is a no-op, so the
+---stone never lands on the wrong player. Else: last target, first living healer,
+---mouseover, target, self.
+---@return string
+function BR.SoulstoneTargetConditions()
+    local defaults = BR.profile.defaults
+    local pinned = defaults and defaults.soulstonePinnedTarget
+    if pinned and pinned ~= "" then
+        -- An imported profile bypasses the options input, so the name must not
+        -- break out of the macro conditional.
+        return "[@" .. pinned:gsub("[%[%]\r\n]", "") .. ",help] "
+    end
+    local fallback = "[@mouseover,help,nodead][@target,help,nodead][@player] "
+    local lastTarget = BR.TargetMemory and BR.TargetMemory.Get("soulstone")
+    if lastTarget then
+        return "[@" .. lastTarget .. ",help,nodead]" .. fallback
+    end
+    local numMembers = GetNumGroupMembers()
+    if numMembers > 0 then
+        local prefix = IsInRaid() and "raid" or "party"
+        for i = 1, numMembers do
+            local unitId = prefix .. i
+            -- Runs in the PreClick of the secure button, so in combat too, where
+            -- a compare against a secret role can throw.
+            if
+                UnitExists(unitId)
+                and not UnitIsDeadOrGhost(unitId)
+                and BR.Secret.Plain(UnitGroupRolesAssigned(unitId)) == "HEALER"
+            then
+                local healerName = GetUnitName(unitId, true)
+                if healerName then
+                    return "[@" .. healerName .. ",help,nodead]" .. fallback
+                end
+            end
+        end
+    end
+    return fallback
+end
+
 ---Drop the cached misses, so the next BR.GetSpellName reads the API again.
 function BR.ClearSpellNameMisses()
     for spellID, name in pairs(spellNameCache) do

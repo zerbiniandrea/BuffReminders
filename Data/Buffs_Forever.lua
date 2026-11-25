@@ -13,6 +13,7 @@ local max = math.max
 local AuraByIndex = BR.Secret.AuraByIndex
 local AuraField = BR.Secret.AuraField
 local Plain = BR.Secret.Plain
+local CooldownsRestricted = BR.Restrictions.CooldownsRestricted
 local UnitIsUnit = UnitIsUnit
 
 local REPAIR_LABEL = L["Overlay.RepairLabel"]
@@ -38,6 +39,10 @@ end
 BR.CONTENT_GRID_DUNGEON_DESC = nil
 
 BR.SHADOWFORM_SPELL_ID = 15473
+
+-- Classic warlocks keep a stone on themselves while they play solo.
+---@type SoulstoneVisibility
+BR.SOULSTONE_DEFAULT_VISIBILITY = "readyCheckSolo"
 
 BR.EATING_AURA_ICON = 134062
 
@@ -441,10 +446,13 @@ local PET_HAPPINESS = {
 
 -- Demonic Sacrifice and its buffs: Burning Shadow, Fel Stamina, Touch of Fire, Fel Energy.
 ---@type PetSacrifice
-local DEMONIC_SACRIFICE = { spellID = 18788, auraIDs = { 18789, 18790, 18791, 18792 } }
+local DEMONIC_SACRIFICE =
+    { spellID = 18788, auraIDs = { 18789, 18790, 18791, 18792 }, reminderKey = "demonicSacrifice" }
 
 -- IsSpellKnown answers true only for the highest rank, so each list holds every rank.
 local CREATE_HEALTHSTONE = { 11730, 11729, 5699, 6202, 6201 }
+local CREATE_SOULSTONE = { 20757, 20756, 20755, 20752, 693 }
+local SOULSTONE_ITEMS = { 16896, 16895, 16893, 16892, 5232 } -- Major to Minor
 local CONJURE_MANA_GEM = { 10054, 10053, 3552, 759 } -- Ruby, Citrine, Jade, Agate
 -- Shaman weapon imbues per setting value, highest rank first.
 local SHAMAN_IMBUE_RANKS = {
@@ -493,6 +501,42 @@ end
 local function CastHighestKnownMacro(spellIDs)
     local id = HighestKnownSpell(spellIDs)
     return id and ("/cast " .. (BR.GetSpellName(id) or "")) or ""
+end
+
+---@return number? itemID
+local function SoulstoneInBags()
+    for _, id in ipairs(SOULSTONE_ITEMS) do
+        if C_Item.GetItemCount(id) > 0 then
+            return id
+        end
+    end
+    return nil
+end
+
+-- All Soulstone ranks share one cooldown. A stone outside the bags still reports it.
+---@return boolean
+local function SoulstoneReady()
+    for _, id in ipairs(SOULSTONE_ITEMS) do
+        local _, duration = C_Item.GetItemCooldown(id)
+        duration = Plain(duration)
+        if duration and duration > 0 then
+            return false
+        end
+    end
+    return true
+end
+
+-- A demon must be out for the sacrifice, so with no demon the click summons one.
+---@param spellID number?
+---@return string
+local function DemonicSacrificeMacro(spellID)
+    local sacrifice = BR.GetSpellName(spellID or DEMONIC_SACRIFICE.spellID) or ""
+    local actions = BR.PetHelpers.GetPetActions("WARLOCK")
+    local demon = actions and actions[actions.genericIndex or 1]
+    if not demon then
+        return "/cast " .. sacrifice
+    end
+    return "/cast [nopet] " .. demon.spellName .. "; " .. sacrifice
 end
 
 ---Highest known rank of the preferred imbue, else of the first known fallback imbue.
@@ -1791,6 +1835,47 @@ BR.BUFF_TABLES = {
             end,
             infoTooltip = { title = L["Tooltip.PaladinDuplicate"], desc = L["Tooltip.PaladinAuraDuplicate.Desc"] },
         },
+        -- The target gets the buff from a Soulstone item, so the click uses the stone in
+        -- the bags, else creates one.
+        {
+            spellID = { 20765, 20764, 20763, 20762, 20707 }, -- Soulstone Resurrection, one per rank
+            key = "soulstone",
+            name = L["Buff.Soulstone"],
+            class = "WARLOCK",
+            reach = "raid",
+            levelRequired = 18, -- Create Soulstone (Minor)
+            overlayText = L["Overlay.NoSoulstone"],
+            chatRequestable = true,
+            readyCheckOnly = true,
+            target = "allyOrSelf", -- solo, a warlock stones itself
+            copies = "own",
+            castSpellID = CREATE_SOULSTONE,
+            castReady = function()
+                if playerClass ~= "WARLOCK" then
+                    return nil
+                end
+                local defaults = BR.profile.defaults
+                if not (defaults and defaults.soulstoneHideCooldown) then
+                    return nil
+                end
+                if CooldownsRestricted() then
+                    return false
+                end
+                return SoulstoneReady()
+            end,
+            pinnedTarget = function()
+                local defaults = BR.profile.defaults
+                local pinned = defaults and defaults.soulstonePinnedTarget
+                return pinned ~= "" and pinned or nil
+            end,
+            clickMacro = function(spellID)
+                local stone = SoulstoneInBags()
+                if stone then
+                    return "/use " .. BR.SoulstoneTargetConditions() .. "item:" .. stone
+                end
+                return "/cast " .. (BR.GetSpellName(spellID) or "")
+            end,
+        },
     },
     ---@type TargetedBuff[]
     targeted = {
@@ -1840,6 +1925,15 @@ BR.BUFF_TABLES = {
             name = L["Buff.WarlockArmor"],
             class = "WARLOCK",
             overlayText = L["Overlay.NoArmor"],
+        },
+        {
+            spellID = DEMONIC_SACRIFICE.spellID,
+            buffIdOverride = DEMONIC_SACRIFICE.auraIDs,
+            key = "demonicSacrifice",
+            name = L["Buff.DemonicSacrifice"],
+            class = "WARLOCK",
+            overlayText = L["Overlay.NoSacrifice"],
+            clickMacro = DemonicSacrificeMacro,
         },
         -- The stance bar stays readable in combat, so this reminder works there.
         {
