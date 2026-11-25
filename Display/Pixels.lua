@@ -39,12 +39,16 @@ local function IsOddPixels(length, onePixel)
     return floor(length / onePixel + 0.5) % 2 == 1
 end
 
----Snap a distance to whole screen pixels, in UI units. A positive value keeps at least one pixel.
+---Snap a distance to whole screen pixels, in UI units. A positive value keeps at least one
+---pixel. A negative pixel count stays negative: a negative spacing overlaps the icons.
 ---@param value number Distance in UI units, or in screen pixels with inPixels
 ---@param frame table Frame whose effective scale applies
 ---@param inPixels? boolean The value counts screen pixels: spacing and border widths
 ---@return number
 function Pixels.Snap(value, frame, inPixels)
+    if inPixels and value < 0 then
+        return floor(value + 0.5) * OnePixel(frame)
+    end
     if value <= 0 then
         return 0
     end

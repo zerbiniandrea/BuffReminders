@@ -3693,6 +3693,7 @@ end
 ---@field disabledReason? string|fun(): string     Hover text while `enabled` returns false
 ---@field labelWidth? number                        Shared label column; omitted = measured from the grid labels
 ---@field zoomMax? number                           Zoom slider maximum (default 15)
+---@field spacingMin? number                        Spacing slider minimum (default -8: icons can overlap)
 ---@field borderBlocked? fun(): boolean               True when the border does not draw (disables the border slider)
 ---@field borderBlockedReason? string|fun(): string Hover text while `borderBlocked` returns true
 
@@ -3924,7 +3925,7 @@ function Components.AppearanceGrid(parent, config)
 
     local spacingHolder = Components.Slider(frame, {
         label = L["Appearance.Spacing"],
-        min = 0,
+        min = config.spacingMin or -8,
         max = 64,
         labelWidth = LW,
         inherited = config.inherited,

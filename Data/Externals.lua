@@ -174,6 +174,10 @@ function BR.GetExternalSetting(key)
         return settings[key]
     end
     local defaults = BR.profile and BR.profile.defaults or BR.defaults.defaults
+    if key == "spacing" then
+        -- A negative gap overlaps reminder icons. The externals container gets no overlap.
+        return math.max(0, defaults.spacing or 0)
+    end
     return defaults[key]
 end
 
