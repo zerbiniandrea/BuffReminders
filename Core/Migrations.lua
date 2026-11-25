@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 67
+BR.Migrations.DB_VERSION = 68
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -59,6 +59,58 @@ function BR.Migrations.SplitBuffTooltips(profile)
         end
     end
     profileDefaults.showBuffTooltips = nil
+end
+
+local VERTICAL_DIRECTIONS = { UP = true, DOWN = true }
+
+---Convert one appearance scope's spacing from a fraction of the icon size to whole pixels.
+---The pixel value is the gap that the display drew: the fraction times the icon dimension
+---along the growth direction, rounded down.
+---@param scope table defaults, or a category's settings
+---@param direction string Effective growth direction of the scope
+---@param keepNil boolean Leave a nil spacing as nil (it inherits)
+local function SpacingScopeToPixels(scope, direction, keepNil)
+    local fraction = scope.spacing
+    if type(fraction) ~= "number" then
+        if keepNil then
+            scope.spacing = nil
+            return
+        end
+        fraction = 0.2
+    end
+    local height = tonumber(scope.iconSize) or 64
+    local width = tonumber(scope.iconWidth) or height
+    local mainDim = VERTICAL_DIRECTIONS[direction] and height or width
+    scope.spacing = math.floor(fraction * mainDim)
+end
+
+---Spacing changes from a fraction of the icon size to whole pixels. Each stored value
+---converts with the icon size of its own scope, so the gaps on screen stay the same.
+---A category under the appearance override with no stored spacing drew 20% of its own
+---size, so it gets that value in pixels. The main frame reads the Defaults spacing, so
+---its own key has no reader.
+---@param profile table One profile
+function BR.Migrations.SpacingToPixels(profile)
+    local profileDefaults = type(profile.defaults) == "table" and profile.defaults or nil
+    local globalDirection = profileDefaults and profileDefaults.growDirection or "CENTER"
+    if profileDefaults then
+        SpacingScopeToPixels(profileDefaults, globalDirection, false)
+    end
+    local categorySettings = profile.categorySettings
+    if type(categorySettings) ~= "table" then
+        return
+    end
+    for category, catSettings in pairs(categorySettings) do
+        if category == "main" and type(catSettings) == "table" then
+            catSettings.spacing = nil
+        elseif type(catSettings) == "table" then
+            local direction = globalDirection
+            if catSettings.split and catSettings.layoutDirection then
+                direction = catSettings.layoutDirection
+            end
+            SpacingScopeToPixels(catSettings, direction, not catSettings.useCustomAppearance)
+        end
+    end
 end
 
 -- The categories that had each interaction control, and the global default of the control.
@@ -475,6 +527,11 @@ function BR.Migrations.RunProfile(profile, isImport)
         -- (BR.Migrations.FoldInteraction).
         [67] = function()
             BR.Migrations.FoldInteraction(profile)
+        end,
+        -- [68] Spacing becomes whole pixels, not a fraction of the icon size
+        -- (BR.Migrations.SpacingToPixels).
+        [68] = function()
+            BR.Migrations.SpacingToPixels(profile)
         end,
     }
 

@@ -21,7 +21,7 @@ local BR = ns
 ---@field iconZoom number
 ---@field borderSize number
 ---@field iconAlpha number
----@field spacing number Absolute px (Blizzard's elementSpacing), not an iconSize multiplier
+---@field spacing number Gap in px
 ---@field durationSize number Countdown text, centered on the icon
 ---@field showSwipe boolean Radial sweep that uncovers as the time runs out
 ---@field growDirection "LEFT"|"RIGHT"|"UP"|"DOWN" The flow layout has no centered growth
@@ -172,7 +172,7 @@ BR.defaults = {
         iconAlpha = 1,
         textAlpha = 1,
         textColor = { 1, 1, 1 },
-        spacing = 0.2, -- multiplier of iconSize
+        spacing = 12, -- px
         iconZoom = 0, -- percentage (additional zoom on top of base TEXCOORD_INSET crop)
         borderSize = 2,
         growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT", "UP", "DOWN"

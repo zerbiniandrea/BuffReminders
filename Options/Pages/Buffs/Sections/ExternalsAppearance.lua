@@ -156,7 +156,6 @@ local function BuildAppearance(parent, layout)
             end
             return L["DisabledReason.OverrideSection"]
         end,
-        spacingPx = true,
         zoomMax = 40,
     })
     gridFrame:SetSize(480, grid.height)

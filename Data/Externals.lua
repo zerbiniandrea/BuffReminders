@@ -149,7 +149,6 @@ function BR.AreExternalsEnabled()
     return entries ~= nil and next(entries) ~= nil
 end
 
-local floor = math.floor
 local tconcat = table.concat
 
 -- Appearance keys that follow the global `defaults` table while
@@ -175,12 +174,6 @@ function BR.GetExternalSetting(key)
         return settings[key]
     end
     local defaults = BR.profile and BR.profile.defaults or BR.defaults.defaults
-    if key == "spacing" then
-        -- defaults.spacing is a size multiplier; the flow layout wants absolute px.
-        -- Same math as the reminder rows' horizontal gap.
-        local width = defaults.iconWidth or defaults.iconSize or 64
-        return floor((defaults.spacing or 0) * width)
-    end
     return defaults[key]
 end
 

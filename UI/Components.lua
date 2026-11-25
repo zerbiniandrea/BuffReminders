@@ -3692,7 +3692,6 @@ end
 ---@field inherited? fun(): boolean                 True while the values follow the Defaults page
 ---@field disabledReason? string|fun(): string     Hover text while `enabled` returns false
 ---@field labelWidth? number                        Shared label column; omitted = measured from the grid labels
----@field spacingPx? boolean                       Spacing in absolute pixels (0-32), not a fraction of the icon width
 ---@field zoomMax? number                           Zoom slider maximum (default 15)
 ---@field borderBlocked? fun(): boolean               True when the border does not draw (disables the border slider)
 ---@field borderBlockedReason? string|fun(): string Hover text while `borderBlocked` returns true
@@ -3923,25 +3922,20 @@ function Components.AppearanceGrid(parent, config)
     })
     borderHolder:SetPoint("TOPLEFT", COL2, -ROW_H)
 
-    -- Spacing is a fraction of the icon width, or absolute pixels with spacingPx.
-    local spacingPx = config.spacingPx == true
     local spacingHolder = Components.Slider(frame, {
         label = L["Appearance.Spacing"],
         min = 0,
-        max = spacingPx and 32 or 50,
+        max = 64,
         labelWidth = LW,
         inherited = config.inherited,
         disabledReason = config.disabledReason,
-        suffix = spacingPx and "px" or "%",
+        suffix = "px",
         get = function()
-            if spacingPx then
-                return config.get("spacing", 4)
-            end
-            return floor((config.get("spacing", 0.2)) * 100)
+            return config.get("spacing", 12)
         end,
         enabled = enabled and baseEnabled or nil,
         onChange = function(val)
-            config.set("spacing", spacingPx and val or val / 100)
+            config.set("spacing", val)
         end,
     })
     spacingHolder:SetPoint("TOPLEFT", 0, -ROW_H * 2)

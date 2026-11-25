@@ -78,6 +78,7 @@ read_globals = {
     "GetPetActionInfo",
     "INVSLOT_RANGED",
     "GetCursorPosition",
+    "GetPhysicalScreenSize",
     "GetCurrentKeyBoardFocus",
     "GetMouseFoci",
     "GetNumGroupMembers",

@@ -576,7 +576,7 @@ local function BuildCategorySettings(category)
             iconAlpha = globalDefaults.iconAlpha or 1,
             textAlpha = globalDefaults.textAlpha or 1,
             textColor = globalDefaults.textColor or { 1, 1, 1 },
-            spacing = globalDefaults.spacing or 0.2,
+            spacing = globalDefaults.spacing or 12,
             iconZoom = globalDefaults.iconZoom or 0,
             borderSize = globalDefaults.borderSize or 2,
             growDirection = globalDefaults.growDirection or "CENTER",
@@ -604,7 +604,7 @@ local function BuildCategorySettings(category)
         result.iconAlpha = (catSettings and catSettings.iconAlpha) or 1
         result.textAlpha = (catSettings and catSettings.textAlpha) or 1
         result.textColor = (catSettings and catSettings.textColor) or { 1, 1, 1 }
-        result.spacing = (catSettings and catSettings.spacing) or 0.2
+        result.spacing = (catSettings and catSettings.spacing) or 12
         result.iconZoom = (catSettings and catSettings.iconZoom) or 0
         result.borderSize = (catSettings and catSettings.borderSize) or 2
     else
@@ -614,7 +614,7 @@ local function BuildCategorySettings(category)
         result.iconAlpha = globalDefaults.iconAlpha or 1
         result.textAlpha = globalDefaults.textAlpha or 1
         result.textColor = globalDefaults.textColor or { 1, 1, 1 }
-        result.spacing = globalDefaults.spacing or 0.2
+        result.spacing = globalDefaults.spacing or 12
         result.iconZoom = globalDefaults.iconZoom or 0
         result.borderSize = globalDefaults.borderSize or 2
     end
@@ -1394,6 +1394,37 @@ local function GetOrCreateExtraFrame(frame, index)
     return extra
 end
 
+local lastPhysicalHeight = 1080
+
+---Gap after an icon such that icon plus gap spans a whole number of screen pixels. Each icon
+---then starts at the same sub-pixel phase, so the client rounds every gap the same way.
+---@param mainSize number Icon dimension along the growth direction
+---@param spacing number Requested gap in UI units
+---@param container table Frame whose effective scale applies
+---@return number gap
+local function PixelAlignedGap(mainSize, spacing, container)
+    -- Flush icons share an edge, so they round the same way with no snap.
+    if spacing <= 0 then
+        return spacing
+    end
+    -- The physical height reads 0 during a display mode change.
+    local _, physicalHeight = GetPhysicalScreenSize()
+    if physicalHeight and physicalHeight > 0 then
+        lastPhysicalHeight = physicalHeight
+    end
+    local scale = container:GetEffectiveScale()
+    if not scale or scale <= 0 then
+        return spacing
+    end
+    local onePixel = 768 / (lastPhysicalHeight * scale)
+    -- The epsilon keeps a value near a half-pixel boundary on the same side across reloads.
+    local pitch = floor((mainSize + spacing) / onePixel + 0.5 + 0.001) * onePixel
+    if pitch < mainSize then
+        pitch = pitch + onePixel
+    end
+    return pitch - mainSize
+end
+
 local function PositionFramesInContainer(container, frames, iconWidth, iconHeight, spacing, direction)
     local count = #frames
     if count == 0 then
@@ -1464,9 +1495,9 @@ end
 ---@param frames table[]
 ---@param widths number[] per-frame icon widths
 ---@param heights number[] per-frame icon heights
----@param spacings number[] per-frame absolute spacing values
+---@param gaps number[] gap after each frame, pixel-aligned
 ---@param direction string grow direction
-local function PositionFramesVariable(container, frames, widths, heights, spacings, direction)
+local function PositionFramesVariable(container, frames, widths, heights, gaps, direction)
     local count = #frames
     if count == 0 then
         return
@@ -1491,8 +1522,7 @@ local function PositionFramesVariable(container, frames, widths, heights, spacin
         end
 
         if i < count then
-            local gap = max(spacings[i], spacings[i + 1])
-            offset = offset + mainSize + gap
+            offset = offset + mainSize + gaps[i]
         end
     end
 end
@@ -1513,7 +1543,7 @@ local function PositionMainContainer(mainFrameBuffs)
 
         local widths = {}
         local heights = {}
-        local spacings = {} -- absolute pixel spacing per frame
+        local spacings = {}
         local maxWidth = 0
         local maxHeight = 0
         for i, frame in ipairs(mainFrameBuffs) do
@@ -1523,8 +1553,7 @@ local function PositionMainContainer(mainFrameBuffs)
             local iconWidth = GetEffectiveWidth(settings.iconWidth, iconSize)
             widths[i] = iconWidth
             heights[i] = iconSize
-            local mainDim = isVertical and iconSize or iconWidth
-            spacings[i] = floor(mainDim * (settings.spacing or 0.2))
+            spacings[i] = settings.spacing or 12
             frame:SetSize(iconWidth, iconSize)
             if iconWidth > maxWidth then
                 maxWidth = iconWidth
@@ -1534,12 +1563,14 @@ local function PositionMainContainer(mainFrameBuffs)
             end
         end
 
+        local gaps = {}
         local totalMain = 0
         for i = 1, #widths do
             local mainSize = isVertical and heights[i] or widths[i]
             totalMain = totalMain + mainSize
             if i < #widths then
-                totalMain = totalMain + max(spacings[i], spacings[i + 1])
+                gaps[i] = PixelAlignedGap(mainSize, max(spacings[i], spacings[i + 1]), mainFrame)
+                totalMain = totalMain + gaps[i]
             end
         end
 
@@ -1563,7 +1594,7 @@ local function PositionMainContainer(mainFrameBuffs)
             mainFrame:SetPoint(anchor, UIParent, "CENTER", pos.x or 0, pos.y or 0)
         end
 
-        PositionFramesVariable(mainFrame, mainFrameBuffs, widths, heights, spacings, direction)
+        PositionFramesVariable(mainFrame, mainFrameBuffs, widths, heights, gaps, direction)
         mainFrame:Show()
     else
         lastMainSignature = ""
@@ -1593,7 +1624,7 @@ local function PositionSplitCategory(category, frames)
         local iconWidth = GetEffectiveWidth(catSettings.iconWidth, iconSize)
         local isVertical = direction == "UP" or direction == "DOWN"
         local mainSize = isVertical and iconSize or iconWidth
-        local spacing = floor(mainSize * (catSettings.spacing or 0.2))
+        local spacing = PixelAlignedGap(mainSize, catSettings.spacing or 12, catFrame)
 
         for _, frame in ipairs(frames) do
             frame:SetSize(iconWidth, iconSize)
@@ -1662,7 +1693,7 @@ local function PositionDetachedIcon(key, frame)
     end
 
     -- Size the container to fit all visible frames (stacked horizontally)
-    local spacing = totalFrames > 1 and floor(iconWidth * (catSettings.spacing or 0.2)) or 0
+    local spacing = totalFrames > 1 and PixelAlignedGap(iconWidth, catSettings.spacing or 12, container) or 0
     local totalWidth = totalFrames * iconWidth + (totalFrames - 1) * spacing
     container:SetSize(totalWidth, iconSize)
 
@@ -3968,6 +3999,16 @@ eventHandlers.UNIT_ENTERED_VEHICLE = function(arg1)
     end
 end
 eventHandlers.UNIT_EXITED_VEHICLE = eventHandlers.UNIT_ENTERED_VEHICLE
+
+-- The icon gaps align to the screen pixel grid, which moves with the scale and the resolution.
+-- UIParent:SetScale() from another addon fires no event, and a scale slider calls it every frame.
+local function OnPixelGridChanged()
+    ResetLayoutSignatures()
+    SetDirty()
+end
+eventHandlers.UI_SCALE_CHANGED = OnPixelGridChanged
+eventHandlers.DISPLAY_SIZE_CHANGED = OnPixelGridChanged
+hooksecurefunc(UIParent, "SetScale", OnPixelGridChanged)
 
 eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
     GameContext.HandleEvent(event, arg1, arg2, arg3)
