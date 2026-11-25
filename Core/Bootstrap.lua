@@ -171,4 +171,7 @@ bootstrapFrame:SetScript("OnEvent", function(_, event, arg1)
             print("|cff00ccffBuffReminders:|r " .. L["Display.LoginSnooze"])
         end
     end)
+
+    -- Last, so that a missing cache registration cannot stop the setup above.
+    BR.GameContext.AssertCachesRegistered()
 end)

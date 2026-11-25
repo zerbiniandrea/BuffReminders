@@ -420,6 +420,18 @@ function GameContext.Invalidate(id)
     fn()
 end
 
+---Raise an error for each cache id that an event clears but no module registered.
+---Call it after every file loads: Invalidate reports a missing id only when its event fires.
+function GameContext.AssertCachesRegistered()
+    for event, entry in pairs(EVENT_CACHES) do
+        for _, id in ipairs(entry.caches or {}) do
+            if not invalidators[id] then
+                error("GameContext: event '" .. event .. "' clears unregistered cache '" .. id .. "'")
+            end
+        end
+    end
+end
+
 ---@param ids CacheId[]
 local function InvalidateAll(ids)
     for i = 1, #ids do
