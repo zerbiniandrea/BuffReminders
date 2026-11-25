@@ -85,6 +85,7 @@ local BR = ns
 ---@field driveByAllowPvP? boolean Drive-by buffs also offer PvP-flagged targets
 ---@field mageFoodContent? "all"|"dungeon"|"raid"
 ---@field shamanImbue? "windfury"|"flametongue"|"rockbiter"|"frostbrand" The imbue that the WoW Forever click casts
+---@field warlockStone? "spellstone"|"firestone" The stone that the WoW Forever click applies or creates
 ---@field placeAtPlayer? boolean
 ---@field consumableDisplayMode? "icon_only"|"sub_icons"|"expanded"
 ---@field consumableBadgeOnSubIcons? boolean

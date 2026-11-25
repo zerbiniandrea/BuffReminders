@@ -1504,6 +1504,29 @@ local SPECIAL_SECTIONS = {
         end,
     },
 
+    warlockStone = {
+        build = function(layout)
+            local drop = Components.Dropdown(body, {
+                label = L["BuffPanel.WarlockStone"],
+                labelWidth = DRAWER_LABEL_W,
+                width = DRAWER_FIELD_W,
+                options = {
+                    { label = BR.GetSpellName(1237152) or L["Buff.Spellstone"], value = "spellstone" },
+                    { label = BR.GetSpellName(758) or L["Buff.Firestone"], value = "firestone" },
+                },
+                tooltip = { title = L["BuffPanel.WarlockStone"], desc = L["BuffPanel.WarlockStone.Desc"] },
+                get = function()
+                    return BR.Config.Get("defaults.warlockStone", "spellstone")
+                end,
+                onChange = function(val)
+                    BR.Config.Set("defaults.warlockStone", val)
+                end,
+            })
+            tinsert(bodyHolders, drop)
+            layout:Add(drop, 26, COMPONENT_GAP)
+        end,
+    },
+
     driveByBuffs = {
         build = function(layout, relayout)
             local function GreetingMode()

@@ -512,6 +512,7 @@ local DefaultSettingKeys = {
     delveFoodTimer = "DisplayRefresh",
     mageFoodContent = "DisplayRefresh",
     shamanImbue = "DisplayRefresh",
+    warlockStone = "DisplayRefresh",
     freeConsumableMode = "DisplayRefresh",
     freeConsumableVisibility = "DisplayRefresh",
     healthstoneVisibility = "DisplayRefresh",

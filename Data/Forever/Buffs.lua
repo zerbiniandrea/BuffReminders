@@ -368,6 +368,33 @@ for _, key in ipairs({ "rockbiter", "flametongue", "frostbrand", "windfury" }) d
         SHAMAN_IMBUES[#SHAMAN_IMBUES + 1] = id
     end
 end
+-- Warlock stones per setting value, highest rank first. A stone takes the imbue slot,
+-- so it stacks with a weapon oil.
+local WARLOCK_STONES = {
+    spellstone = {
+        create = { 17728, 17727, 2362 },
+        items = { 13603, 13602, 5522 },
+        enchants = { 8061, 8060, 8059 },
+        icon = 134131,
+    },
+    firestone = {
+        create = { 17953, 17952, 17951, 6366 },
+        items = { 13701, 13700, 13699, 1254 },
+        enchants = { 1825, 1824, 1823, 1803 },
+        icon = 134085,
+    },
+}
+local WARLOCK_STONE_CREATE = {}
+local WARLOCK_STONE_ENCHANTS = {}
+for _, key in ipairs({ "spellstone", "firestone" }) do
+    local stone = WARLOCK_STONES[key]
+    for _, id in ipairs(stone.create) do
+        WARLOCK_STONE_CREATE[#WARLOCK_STONE_CREATE + 1] = id
+    end
+    for _, id in ipairs(stone.enchants) do
+        WARLOCK_STONE_ENCHANTS[id] = true
+    end
+end
 
 ---@param spellIDs number[] Highest rank first
 ---@return number?
@@ -456,7 +483,7 @@ local function ShamanImbueCastID()
     return nil
 end
 
--- A poison sits in the imbue slot of a weapon, beside a stone or an oil in the temporary slot.
+-- A poison sits in the imbue slot of a weapon, beside an oil in the temporary slot.
 -- Poison items per type, highest rank first. The rank 1 spell names the type.
 local POISON_ITEMS = {
     [8679] = { 8928, 8927, 8926, 6950, 6949, 6947 }, -- Instant Poison
@@ -566,6 +593,31 @@ local function PoisonMacro()
     end
     local itemID = PickPoison(hand.column)
     return itemID and ("/use item:" .. itemID .. "\n/use " .. hand.slot) or ""
+end
+
+---The preferred stone, else the other stone if the player knows only that one.
+---@return table stone entry of WARLOCK_STONES
+local function WarlockStone()
+    local defaults = BR.profile.defaults
+    local preferred = WARLOCK_STONES[defaults and defaults.warlockStone] or WARLOCK_STONES.spellstone
+    if HighestKnownSpell(preferred.create) then
+        return preferred
+    end
+    local other = preferred == WARLOCK_STONES.spellstone and WARLOCK_STONES.firestone or WARLOCK_STONES.spellstone
+    return HighestKnownSpell(other.create) and other or preferred
+end
+
+---Applies a stone from the bags to the main hand, else creates one.
+---@return string
+local function WarlockStoneMacro()
+    local stone = WarlockStone()
+    local GetItemCountCached = BR.StateHelpers.GetItemCountCached
+    for _, itemID in ipairs(stone.items) do
+        if GetItemCountCached(itemID) > 0 then
+            return "/use item:" .. itemID .. "\n/use 16"
+        end
+    end
+    return CastHighestKnownMacro(stone.create)
 end
 
 local NO_STANCE = BR.NO_STANCE
@@ -1854,6 +1906,25 @@ local BUFF_TABLES = {
             end,
             clickMacro = DemonSetupMacro,
             infoTooltip = { title = L["Tooltip.DemonSetup"], desc = L["Tooltip.DemonSetup.Desc"] },
+        },
+        {
+            spellID = WARLOCK_STONE_CREATE,
+            key = "warlockStone",
+            name = L["Buff.WarlockStone"],
+            class = "WARLOCK",
+            overlayText = L["Overlay.NoStone"],
+            enchantID = WARLOCK_STONE_ENCHANTS,
+            enchantDuration = 7200, -- seconds
+            visibilityCondition = function()
+                return HandHoldsWeapon(16)
+            end,
+            icons = {
+                textures = { WARLOCK_STONES.spellstone.icon, WARLOCK_STONES.firestone.icon },
+                dynamic = function()
+                    return WarlockStone().icon
+                end,
+            },
+            clickMacro = WarlockStoneMacro,
         },
         -- The stance bar stays readable in combat, so this reminder works there.
         {

@@ -191,6 +191,7 @@ BR.defaults = {
         delveFoodTimer = false,
         mageFoodContent = "all", -- "all" | "dungeon" | "raid"
         shamanImbue = "windfury", -- "windfury" | "flametongue" | "rockbiter" | "frostbrand"
+        warlockStone = "spellstone", -- "spellstone" | "firestone"
         freeConsumableMode = "override",
         freeConsumableVisibility = {
             openWorld = false,
