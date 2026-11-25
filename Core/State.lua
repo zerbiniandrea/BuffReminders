@@ -287,16 +287,6 @@ local cachedLoadoutState = {}
 -- so every satisfied rule can hold this one table.
 local SATISFIED_LOADOUT_STATE = { satisfied = true }
 
--- Creature family of the current pet (false = no pet, nil = unresolved).
----@type number|false|nil
-local cachedPetFamily = nil
-
--- Happiness of the current pet (false = no pet or no value, nil = unresolved).
--- C_PetInfo.GetPetHappiness exists only on a client with pet happiness.
----@type number|false|nil
-local cachedPetHappiness = nil
-local GetPetHappiness = C_PetInfo and C_PetInfo.GetPetHappiness
-
 -- Weapon enchant info for current refresh cycle (set once per BuffState.Refresh())
 local currentWeaponEnchants = {
     hasMainHand = false,
@@ -4215,36 +4205,6 @@ function BuffState.InvalidateLoadoutCache()
     cachedLoadoutState = {}
 end
 
----Check whether the player's current pet is not an allowed demon. Returns false
----when there is no pet or no desired demon. If the family read hits a secret
----value, the result stays uncached so later refreshes retry.
----@return boolean
-function BuffState.IsWrongDemonPet()
-    if not BR.PetHelpers.GetDesiredWarlockDemon() then
-        return false
-    end
-    if cachedPetFamily == nil then
-        if not UnitExists("pet") then
-            cachedPetFamily = false
-        else
-            local _, familyID = UnitCreatureFamily("pet")
-            familyID = Plain(familyID)
-            if type(familyID) ~= "number" then
-                -- Pet data is not resolved yet, or is a secret value. Do not cache, so the
-                -- next Refresh retries.
-                return false
-            end
-            cachedPetFamily = familyID
-        end
-    end
-    return cachedPetFamily ~= false and not BR.PetHelpers.IsAllowedWarlockFamily(cachedPetFamily)
-end
-
----Invalidate wrong-pet cache
-function BuffState.InvalidatePetCache()
-    cachedPetFamily = nil
-end
-
 do
     local ammoID, ammoCount -- false = read and empty, nil = not read
 
@@ -4315,31 +4275,6 @@ do
     function BuffState.InvalidateTrackingCache()
         trackingActive = nil
     end
-end
-
----Happiness of the current pet (cached): 1 unhappy, 2 content, 3 happy.
----@return number? happiness nil without a pet or on a client without pet happiness
-function BuffState.GetPetHappiness()
-    if not GetPetHappiness then
-        return nil
-    end
-    if cachedPetHappiness == nil then
-        if not UnitExists("pet") then
-            cachedPetHappiness = false
-        else
-            local happiness = Plain(GetPetHappiness())
-            if type(happiness) ~= "number" then
-                -- Pet data is not resolved yet. Do not cache, so the next Refresh retries.
-                return nil
-            end
-            cachedPetHappiness = happiness
-        end
-    end
-    return cachedPetHappiness or nil
-end
-
-function BuffState.InvalidatePetHappinessCache()
-    cachedPetHappiness = nil
 end
 
 do
@@ -4508,10 +4443,8 @@ BR.GameContext.RegisterCache("item", BuffState.InvalidateItemCache)
 BR.GameContext.RegisterCache("durability", BuffState.InvalidateDurabilityCache)
 BR.GameContext.RegisterCache("repairSource", BuffState.InvalidateRepairSourceCache)
 BR.GameContext.RegisterCache("loadout", BuffState.InvalidateLoadoutCache)
-BR.GameContext.RegisterCache("pet", BuffState.InvalidatePetCache)
 BR.GameContext.RegisterCache("ammo", BuffState.InvalidateAmmoCache)
 BR.GameContext.RegisterCache("tracking", BuffState.InvalidateTrackingCache)
-BR.GameContext.RegisterCache("petHappiness", BuffState.InvalidatePetHappinessCache)
 BR.GameContext.RegisterCache("spellUsable", BuffState.InvalidateSpellUsableCache)
 BR.GameContext.RegisterCache("itemCooldown", BuffState.InvalidateItemCooldownCache)
 BR.GameContext.RegisterCache("foreignAura", BuffState.InvalidateForeignAuraCache)
