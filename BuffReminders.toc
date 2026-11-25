@@ -68,6 +68,7 @@ Core\TargetMemory.lua
 Core\TalentLoadoutEx.lua
 Core\Loadouts.lua
 Core\LoadoutActions.lua
+Core\Visibility.lua
 Core\State.lua
 Core\State\Stances.lua
 Core\State\Pets.lua

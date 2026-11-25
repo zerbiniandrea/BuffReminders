@@ -512,11 +512,11 @@ local function GridStanceRule(grid)
         -- The set is reused, so a caller must read it before the next call.
         allowed = function()
             wipe(allowedSet)
-            local row = BR.StateHelpers.GetContentRow()
+            local row = BR.Visibility.GetContentRow()
             local any = false
             for _, choice in ipairs(grid.choices) do
                 local known = KnownChoiceSpell(choice)
-                if known and BR.StateHelpers.IsContentChoiceAllowed(grid.setting, row, choice.key) then
+                if known and BR.Visibility.IsContentChoiceAllowed(grid.setting, row, choice.key) then
                     any = true
                     allowedSet[known] = true
                     for _, id in ipairs(choice.spellIDs) do
@@ -527,10 +527,10 @@ local function GridStanceRule(grid)
             return any and allowedSet or nil
         end,
         castID = function()
-            local row = BR.StateHelpers.GetContentRow()
+            local row = BR.Visibility.GetContentRow()
             for _, choice in ipairs(grid.choices) do
                 local known = KnownChoiceSpell(choice)
-                if known and BR.StateHelpers.IsContentChoiceAllowed(grid.setting, row, choice.key) then
+                if known and BR.Visibility.IsContentChoiceAllowed(grid.setting, row, choice.key) then
                     return known
                 end
             end
@@ -811,7 +811,7 @@ end
 local function WantedPaladinAura()
     local defaults = BR.profile.defaults
     local byRow = defaults and defaults.paladinAuraOrder
-    local order = type(byRow) == "table" and byRow[BR.StateHelpers.GetContentRow()]
+    local order = type(byRow) == "table" and byRow[BR.Visibility.GetContentRow()]
     if type(order) ~= "table" then
         return nil
     end

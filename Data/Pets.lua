@@ -224,14 +224,14 @@ local WARLOCK_DEMON_PREFERENCE = DemonList(PET_SPELLS.demonPreference)
 
 ---@return string
 local function GetWarlockDemonRow()
-    return BR.StateHelpers.GetContentRow()
+    return BR.Visibility.GetContentRow()
 end
 
 ---@param row string
 ---@param key string
 ---@return boolean
 local function IsWarlockDemonAllowed(row, key)
-    return BR.StateHelpers.IsContentChoiceAllowed("warlockDemons", row, key)
+    return BR.Visibility.IsContentChoiceAllowed("warlockDemons", row, key)
 end
 
 ---Summon spell ID for the current content row: the first demon in preference order

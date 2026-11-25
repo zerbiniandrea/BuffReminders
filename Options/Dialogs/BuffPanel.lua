@@ -207,7 +207,7 @@ end
 ---@param hintText string
 ---@param choices ContentGridChoice[]
 local function AddContentGrid(layout, setting, hintText, choices)
-    local IsContentChoiceAllowed = BR.StateHelpers.IsContentChoiceAllowed
+    local IsContentChoiceAllowed = BR.Visibility.IsContentChoiceAllowed
     local hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hint:SetWidth(bodyW)
     hint:SetJustifyH("LEFT")
@@ -367,7 +367,7 @@ local DRUID_FORM_GRID = BR.BuffData.stanceRules.DRUID.grid
 local function StanceGridNeedsSetup(grid)
     for _, row in ipairs(GRID_ROWS) do
         for _, choice in ipairs(grid.choices) do
-            if BR.StateHelpers.IsContentChoiceAllowed(grid.setting, row.key, choice.key) then
+            if BR.Visibility.IsContentChoiceAllowed(grid.setting, row.key, choice.key) then
                 return false
             end
         end
