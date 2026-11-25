@@ -30,11 +30,6 @@ local _, playerClass = UnitClass("player")
 ---@type DKRuneforge[]
 BR.DK_RUNEFORGES = {}
 
----@return boolean
-function BR.IsInDelve()
-    return false
-end
-
 ---@type string?
 BR.CONTENT_GRID_DUNGEON_DESC = nil
 

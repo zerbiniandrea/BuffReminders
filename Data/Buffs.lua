@@ -278,13 +278,6 @@ local function IsNotEarthen()
     return BR.playerRace ~= "EarthenDwarf"
 end
 
----Check if the player is inside a delve (difficultyID 208)
----@return boolean
-local function IsInDelve()
-    return BR.BuffState.GetDifficultyID() == 208
-end
-BR.IsInDelve = IsInDelve
-
 -- Extra content that the dungeon row of a per-content grid covers. nil = dungeons only.
 ---@type string?
 BR.CONTENT_GRID_DUNGEON_DESC = L["BuffPanel.WarlockDemon.Dungeon.Desc"]
@@ -1442,7 +1435,9 @@ BR.BUFF_TABLES = {
             groupId = "delveFood",
             showOnInstanceEntry = true, -- When delveFoodTimer is enabled, only show for 30s on delve entry
             noExpirationGlow = true, -- 10-min duration makes standard thresholds meaningless
-            visibilityCondition = BR.IsInDelve,
+            visibilityCondition = function()
+                return BR.BuffState.IsInDelve()
+            end,
             disabledInCompetitivePvP = true,
             ignoresReadyCheckFilter = true, -- always shows in a delve, even with consumable ready-check-only on
         },

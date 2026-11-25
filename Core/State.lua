@@ -3416,7 +3416,7 @@ local function RefreshConsumables(db, trackingMode, isAuraRestricted, hideExpiri
     -- Delve food ignores the consumable ready-check-only filter (still respects content gates)
     local consumableVisibleNoReadyCheck = IsCategoryVisibleForContent("consumable", true)
     local consExGlow, consMissGlow, consThreshold, consFloor = GetCategoryGlowSettings("consumable")
-    local delveFoodOnly = db.defaults and db.defaults.delveFoodOnly and BR.IsInDelve()
+    local delveFoodOnly = db.defaults and db.defaults.delveFoodOnly and BuffState.IsInDelve()
     local freeMode = db.defaults and db.defaults.freeConsumableMode or "override"
     local freeVisible = freeMode == "override" and IsFreeConsumableVisible(db) or false
     -- In follow mode, healthstones use consumable category content gates (without ready check)
@@ -3791,7 +3791,7 @@ end
 ---Check if the current zone qualifies for delve entry triggers
 ---@return boolean
 function BuffState.ShouldTriggerDelveEntry()
-    return BR.IsInDelve()
+    return BuffState.IsInDelve()
 end
 
 ---Check if the current instance is legacy content (cached alongside content type)
@@ -3821,6 +3821,12 @@ end
 
 ---Raw difficultyID from GetInstanceInfo (cached; invalidated with content type)
 BuffState.GetDifficultyID = GetDifficultyIDCached
+
+---Delves use difficultyID 208. WoW Forever has no delves, so it never reports it.
+---@return boolean
+function BuffState.IsInDelve()
+    return GetDifficultyIDCached() == 208
+end
 
 ---Whether the player is in a restricted context: aura queries return secret
 ---values. Measured through C_Secrets.ShouldAurasBeSecret.
