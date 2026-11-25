@@ -896,6 +896,21 @@ local function OpenRow(frame)
     BR.SecureButtons.ScheduleSecureSync()
 end
 
+---Draw the 5 s swipe of the chat-request lockout over a click overlay.
+---@param overlay table
+---@param frame table The buff frame of the overlay
+local function ShowRequestLockout(overlay, frame)
+    if not overlay._br_chatRequestCooldown then
+        local cd = CreateFrame("Cooldown", nil, overlay, "CooldownFrameTemplate")
+        cd:SetDrawBling(false)
+        cd:SetHideCountdownNumbers(true)
+        cd.noCooldownCount = true
+        overlay._br_chatRequestCooldown = cd
+    end
+    BR.IconStyle.AnchorCooldown(overlay._br_chatRequestCooldown, overlay, frame)
+    overlay._br_chatRequestCooldown:SetCooldown(GetTime(), 5)
+end
+
 -- The overlay is parented to UIParent with NO anchor to the buff frame hierarchy:
 -- a layout dependency on that hierarchy makes the hierarchy protected.
 -- SyncSecureButtons positions it after each layout pass.
@@ -971,15 +986,7 @@ local function CreateClickOverlay(frame)
             if BR.profile.chatRequestCooldown ~= false then
                 self._br_chatRequestCooldownUntil = GetTime() + 5
                 self:EnableMouse(false)
-                if not self._br_chatRequestCooldown then
-                    local cd = CreateFrame("Cooldown", nil, self, "CooldownFrameTemplate")
-                    cd:SetAllPoints(self)
-                    cd:SetDrawBling(false)
-                    cd:SetHideCountdownNumbers(true)
-                    cd.noCooldownCount = true
-                    self._br_chatRequestCooldown = cd
-                end
-                self._br_chatRequestCooldown:SetCooldown(GetTime(), 5)
+                ShowRequestLockout(self, frame)
                 C_Timer.After(5, function()
                     -- ApplyAction and DisableOverlay clear the flag, so a stale
                     -- fire after a role change does nothing.
@@ -1946,6 +1953,7 @@ local function SyncSecureButtons()
                         local stackFontSize = ComputeConsumableFontSize(baseIconSize, "stackCount")
                         local badgeFontSize = ComputeConsumableFontSize(baseIconSize, "badge")
                         local showSubIconBadge = BR.Config.Get("defaults.consumableBadgeOnSubIcons") == true
+                        local blizzardArt = BR.IconStyle.UsesBlizzardArt()
                         -- The buttons already inherit the UIParent alpha.
                         local uiAlpha = UIParent:GetEffectiveAlpha()
                         local hostAlpha = uiAlpha > 0 and frame:GetEffectiveAlpha() / uiAlpha or 1
@@ -1973,9 +1981,12 @@ local function SyncSecureButtons()
                                     or btn._br_font_size ~= stackFontSize
                                     or btn._br_badge_font_size ~= badgeFontSize
                                     or btn._br_font_outline ~= outlineFlag
+                                    or btn._br_blizzardArt ~= blizzardArt
                                 if needsUpdate then
                                     btn:ClearAllPoints()
                                     btn:SetSize(size, size)
+                                    SubIcons.ApplyStyle(btn, blizzardArt)
+                                    StyleOverlayHighlight(btn)
                                     local strata = frame:GetFrameStrata()
                                     btn:SetFrameStrata(btn._br_choice and SubIcons.STRATA_ABOVE[strata] or strata)
                                     btn:SetFrameLevel(frame:GetFrameLevel() + 4)
@@ -2011,7 +2022,13 @@ local function SyncSecureButtons()
                                             btn._br_badgeLabel = btn:CreateFontString(nil, "OVERLAY", nil, 7)
                                         end
                                         btn._br_badgeLabel:ClearAllPoints()
-                                        btn._br_badgeLabel:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
+                                        btn._br_badgeLabel:SetPoint(
+                                            "TOPLEFT",
+                                            btn,
+                                            "TOPLEFT",
+                                            btn._br_textInset,
+                                            -btn._br_textInset
+                                        )
                                         ApplyFont(btn._br_badgeLabel, badgeFontSize)
                                         btn._br_badgeLabel:SetTextColor(bc.r, bc.g, bc.b, 1)
                                         btn._br_badgeLabel:SetText(btn._br_badge)
@@ -2032,11 +2049,11 @@ local function SyncSecureButtons()
                                     if cdStart then
                                         if not btn._br_cooldown then
                                             local cd = CreateFrame("Cooldown", nil, btn, "CooldownFrameTemplate")
-                                            cd:SetAllPoints()
-                                            cd:SetDrawEdge(true)
                                             cd:EnableMouse(false)
                                             btn._br_cooldown = cd
                                         end
+                                        BR.IconStyle.AnchorCooldown(btn._br_cooldown, btn, btn)
+                                        BR.IconStyle.StyleItemCooldown(btn._br_cooldown, btn)
                                         btn._br_cooldown:SetCooldown(cdStart, cdDuration)
                                     elseif btn._br_cooldown then
                                         btn._br_cooldown:Clear()

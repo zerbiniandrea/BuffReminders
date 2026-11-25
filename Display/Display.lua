@@ -800,6 +800,8 @@ local BLIZZARD_ICON_ART = {
     maskRatio = 91 / 64,
     -- Inset of the count on a 45 px action button.
     textInsetRatio = 5 / 45,
+    -- Inset of the cooldown on a 45 px action button. A cooldown swipe ignores masks.
+    cooldownInsetRatio = 3 / 45,
 }
 -- A missing mask atlas would hide the icon, so the style needs both atlases.
 BLIZZARD_ICON_ART.available = BR.HasThemeAtlas(BLIZZARD_ICON_ART.frameAtlas)
@@ -1034,20 +1036,9 @@ local function SizeBlizzardIconArt(frame, width, height)
     frame.iconMask:SetSize(width * BLIZZARD_ICON_ART.maskRatio, height * BLIZZARD_ICON_ART.maskRatio)
 end
 
--- Create icon and border textures on a buff frame (no positioning - call UpdateIconStyling after)
-local function CreateIconTextures(frame, texture)
-    frame.icon = frame:CreateTexture(nil, "ARTWORK")
-    frame.icon:SetAllPoints()
-    frame.icon:SetDesaturated(false)
-    frame.icon:SetVertexColor(1, 1, 1, 1)
-    frame.icon._br_desaturated = false
-    if texture then
-        frame.icon:SetTexture(texture)
-    end
-
-    frame.border = frame:CreateTexture(nil, "BACKGROUND")
-    frame.border:SetColorTexture(0, 0, 0, 1)
-
+---Create the hidden action-button frame and mask on a frame with an `icon` texture.
+---@param frame table
+function BLIZZARD_ICON_ART.CreateArt(frame)
     -- Above the icon, below the count and overlay text.
     frame.iconFrameArt = frame:CreateTexture(nil, "ARTWORK", nil, 7)
     frame.iconFrameArt:SetAtlas(BLIZZARD_ICON_ART.frameAtlas)
@@ -1064,6 +1055,59 @@ local function CreateIconTextures(frame, texture)
             SizeBlizzardIconArt(self, width, height)
         end
     end)
+end
+
+---Anchor a cooldown over an icon region. With the frame art shown, the swipe keeps
+---inside the art. Safe to call every render pass.
+---@param cd table The Cooldown frame
+---@param region table The region that the swipe covers
+---@param artFrame table The frame that holds the art
+function BLIZZARD_ICON_ART.AnchorCooldown(cd, region, artFrame)
+    local insetX, insetY = 0, 0
+    if artFrame._br_masked then
+        -- An anchored icon texture reads 0 until its rect resolves. The frame has an explicit size.
+        local width, height = artFrame:GetSize()
+        insetX = floor(width * BLIZZARD_ICON_ART.cooldownInsetRatio + 0.5)
+        insetY = floor(height * BLIZZARD_ICON_ART.cooldownInsetRatio + 0.5)
+    end
+    if cd._br_region == region and cd._br_insetX == insetX and cd._br_insetY == insetY then
+        return
+    end
+    cd._br_region, cd._br_insetX, cd._br_insetY = region, insetX, insetY
+    cd:ClearAllPoints()
+    cd:SetPoint("TOPLEFT", region, "TOPLEFT", insetX, -insetY)
+    cd:SetPoint("BOTTOMRIGHT", region, "BOTTOMRIGHT", -insetX, insetY)
+end
+
+---Give an item cooldown the look of an action-bar cooldown while the frame art shows:
+---no edge and no bling. Safe to call every render pass.
+---@param cd table The Cooldown frame
+---@param artFrame table The frame that holds the art
+function BLIZZARD_ICON_ART.StyleItemCooldown(cd, artFrame)
+    local actionLook = artFrame._br_masked == true
+    if cd._br_actionLook == actionLook then
+        return
+    end
+    cd._br_actionLook = actionLook
+    cd:SetDrawEdge(not actionLook)
+    cd:SetDrawBling(not actionLook)
+end
+
+-- Create icon and border textures on a buff frame (no positioning - call UpdateIconStyling after)
+local function CreateIconTextures(frame, texture)
+    frame.icon = frame:CreateTexture(nil, "ARTWORK")
+    frame.icon:SetAllPoints()
+    frame.icon:SetDesaturated(false)
+    frame.icon:SetVertexColor(1, 1, 1, 1)
+    frame.icon._br_desaturated = false
+    if texture then
+        frame.icon:SetTexture(texture)
+    end
+
+    frame.border = frame:CreateTexture(nil, "BACKGROUND")
+    frame.border:SetColorTexture(0, 0, 0, 1)
+
+    BLIZZARD_ICON_ART.CreateArt(frame)
 end
 
 ---Show or hide the action-button frame and mask. AddMaskTexture stacks, so the
@@ -2024,12 +2068,12 @@ local function ApplyItemCooldown(frame, item)
     end
     if not frame.itemCooldown then
         local cd = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
-        cd:SetAllPoints(frame.icon)
         cd:SetFrameLevel(frame:GetFrameLevel() + 1)
-        cd:SetDrawEdge(true)
         cd:EnableMouse(false)
         frame.itemCooldown = cd
     end
+    BLIZZARD_ICON_ART.AnchorCooldown(frame.itemCooldown, frame.icon, frame)
+    BLIZZARD_ICON_ART.StyleItemCooldown(frame.itemCooldown, frame)
     frame.itemCooldown:SetCooldown(start, duration)
 end
 
@@ -2047,7 +2091,6 @@ local function ApplyCountdownSweep(frame, expTime, duration)
     end
     if not sweep then
         sweep = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
-        sweep:SetAllPoints(frame.icon)
         sweep:SetDrawBling(false)
         sweep:SetHideCountdownNumbers(true)
         sweep.noCooldownCount = true
@@ -2065,6 +2108,7 @@ local function ApplyCountdownSweep(frame, expTime, duration)
         frame.countdownTextHost = textHost
     end
     frame.countdownTextHost:SetFrameLevel(sweep:GetFrameLevel() + 2)
+    BLIZZARD_ICON_ART.AnchorCooldown(sweep, frame.icon, frame)
     sweep:SetCooldown(expTime - duration, duration)
 end
 
@@ -3661,6 +3705,10 @@ end
 
 BR.IconStyle = {
     UsesBlizzardArt = UsesBlizzardIconStyle,
+    CreateArt = BLIZZARD_ICON_ART.CreateArt,
+    SetArt = SetBlizzardIconArt,
+    AnchorCooldown = BLIZZARD_ICON_ART.AnchorCooldown,
+    StyleItemCooldown = BLIZZARD_ICON_ART.StyleItemCooldown,
     FRAME_WIDTH_RATIO = BLIZZARD_ICON_ART.frameWidthRatio,
     ARTWORK_AVAILABLE = BLIZZARD_ICON_ART.available,
 }

@@ -94,10 +94,9 @@ function SubIcons.CreateButton()
 
     btn.icon = btn:CreateTexture(nil, "ARTWORK")
     btn.icon:SetAllPoints()
-    btn.icon:SetTexCoord(BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET, BR.TEXCOORD_INSET, 1 - BR.TEXCOORD_INSET)
+    BR.IconStyle.CreateArt(btn)
 
     btn.count = btn:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-    btn.count:SetPoint("BOTTOMRIGHT", -1, 1)
 
     btn.highlight = btn:CreateTexture(nil, "HIGHLIGHT")
     btn.highlight:SetAllPoints()
@@ -123,6 +122,20 @@ function SubIcons.CreateButton()
     btn._br_alphaOut = alphaOut
     btn._br_alpha = 1
     return btn
+end
+
+---Give a sized button the icon style of the buff icons. The Blizzard style shows
+---the full icon, because its frame art covers the icon edge.
+---@param btn table
+---@param blizzardArt boolean
+function SubIcons.ApplyStyle(btn, blizzardArt)
+    local inset = blizzardArt and 0 or BR.TEXCOORD_INSET
+    btn.icon:SetTexCoord(inset, 1 - inset, inset, 1 - inset)
+    BR.IconStyle.SetArt(btn, blizzardArt)
+    btn._br_blizzardArt = blizzardArt
+    btn._br_textInset = max(1, floor(btn:GetWidth() * (btn._br_textInsetRatio or 0) + 0.5))
+    btn.count:ClearAllPoints()
+    btn.count:SetPoint("BOTTOMRIGHT", -btn._br_textInset, btn._br_textInset)
 end
 
 ---Match the alpha of a button to its host icon. A button is a child of UIParent, so
