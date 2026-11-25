@@ -1270,18 +1270,25 @@ end
 BR.Display.ShowHoverTooltip = ShowHoverTooltip
 BR.Display.EndHoverTooltip = EndHoverTooltip
 
+-- Lock state is session-only: frames start locked on every login/reload and the
+-- unlocked state is never persisted. A user cannot accidentally leave anchor
+-- handles showing across sessions.
+local frameLocked = true
+
 -- Apply mouse interactivity to a buff icon frame. Icons are always click-through
 -- (dragging is handled by anchor handles; click-to-cast/chat-requests live on the
 -- secure overlays that float above the icon). A frame gets hover events ONLY
 -- when its category opted in to the description tooltip - otherwise it stays fully
 -- click-through so the world beneath (camera drag, unit clicks) is reachable.
 -- Re-called from UpdateVisuals so toggling showDescriptionTooltips takes effect live.
+-- While the frames are unlocked, every icon is click-through.
 local function ApplyBuffFrameMouse(frame, category)
-    -- WireLoadoutFrameClick owns the mouse of a loadout frame.
+    -- WireLoadoutFrameClick owns the scripts of a loadout frame.
     if category == "loadout" then
+        frame:EnableMouse(frameLocked)
         return
     end
-    if IsDescriptionTooltipOn(category) then
+    if frameLocked and IsDescriptionTooltipOn(category) then
         frame:SetMouseClickEnabled(false)
         frame:SetMouseMotionEnabled(true)
         frame:SetScript("OnEnter", function(self)
@@ -3044,7 +3051,6 @@ local ReparentBuffFrames
 -- or opening the talent UI are not protected actions out of combat, so they do not
 -- need a SecureActionButton overlay like the click-to-cast categories do.
 local function WireLoadoutFrameClick(frame)
-    frame:EnableMouse(true)
     frame:SetScript("OnMouseUp", function(self, button)
         local db = BR.profile
         if button == "RightButton" and db.defaults.rightClickMenu ~= false then
@@ -3640,15 +3646,14 @@ BR.Helpers = {
     end,
 }
 
--- Lock state is session-only: frames start locked on every login/reload and the
--- unlocked state is never persisted. A user cannot accidentally leave anchor
--- handles showing across sessions.
-local frameLocked = true
 local function IsFrameLocked()
     return frameLocked
 end
 local function SetFrameLocked(locked)
     frameLocked = locked
+    for _, frame in pairs(buffFrames) do
+        ApplyBuffFrameMouse(frame, frame.buffCategory)
+    end
     if locked then
         BR.Movers.HideAll()
     else

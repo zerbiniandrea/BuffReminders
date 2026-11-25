@@ -1884,8 +1884,8 @@ local function SyncSecureButtons()
     if InCombatLockdown() then
         return
     end
-    -- Test mode shows frames that no real buff state backs.
-    if BR.Display.IsTestMode() then
+    -- Test mode shows frames that no real buff state backs. Unlock mode moves the frames, so a click must not cast.
+    if BR.Display.IsTestMode() or not BR.Display.IsFrameLocked() then
         HideAllSecureFrames()
         return
     end
@@ -2114,6 +2114,8 @@ local function ScheduleSecureSync()
         SyncSecureButtons()
     end)
 end
+
+BR.CallbackRegistry:RegisterCallback("FrameLockChanged", ScheduleSecureSync)
 
 ---@param overlay table SecureActionButton overlay
 local function DisableOverlay(overlay)
