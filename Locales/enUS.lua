@@ -257,7 +257,7 @@ english["Buff.Tracking"] = "Tracking"
 english["Buff.SleepingBag"] = "Cozy Sleeping Bag"
 english["Buff.Camp"] = "Camp Benefits"
 english["Buff.DruidForm"] = "Druid Form"
-english["Buff.DemonicSacrifice"] = "Demonic Sacrifice"
+english["Buff.DemonicSacrificeSoulLink"] = "Demonic Sacrifice & Soul Link"
 english["Buff.GrimoireOfSacrifice"] = "Grimoire of Sacrifice"
 english["Buff.BurningRush"] = "Burning Rush"
 english["Buff.RiteOfAdjuration"] = "Rite of Adjuration"
@@ -347,6 +347,9 @@ english["Tooltip.TankHint"] = "(tank)"
 english["Tooltip.TankTarget"] = "Tank Target"
 english["Tooltip.ThornsTank.Desc"] =
     "In a group, checks your tanks (Tank role or Main Tank) and a click casts Thorns on them. Solo or with no tank, it checks you."
+english["Tooltip.DemonSetup"] = "Demon Setup"
+english["Tooltip.DemonSetup.Desc"] =
+    "Shows the next step of your demon setup. With Soul Link, link your demon. With Demonic Pact, sacrifice a demon, summon a different one, then link it."
 english["BuffTooltip.ProvidedBy"] = "Provided by %s"
 
 -- ============================================================================

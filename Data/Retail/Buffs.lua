@@ -178,6 +178,7 @@ local DK_RUNEFORGES = {
 ---@field petSacrifice? PetSacrifice The player can sacrifice the pet for a buff
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
 ---@field showWhenPresent? boolean Show when buff IS active (inverts normal "show when missing" logic)
+---@field overlayTextFn? fun(): string Live overlay text, wins over overlayText
 ---@field noClickToCast? boolean Suppress click-to-cast overlay (e.g., CastSpellByID can't toggle this spell)
 ---@field noExpirationGlow? boolean Show only the missing state, never the expiring state (permanent enchants, short buffs)
 ---@field skipSpellKnownCheck? boolean Skip the "player knows spell" check (for custom/dynamic entries)

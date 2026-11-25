@@ -2657,7 +2657,11 @@ local function RefreshSelf(isAuraRestricted, hideExpiring)
             if not isAuraRestricted or trackable or useGlowDet then
                 if useGlowDet then
                     if IsAnySpellGlowing(buff) then
-                        SetEntryText(entry, buff.overlayText, selfMissGlow)
+                        SetEntryText(
+                            entry,
+                            buff.overlayTextFn and buff.overlayTextFn() or buff.overlayText,
+                            selfMissGlow
+                        )
                         BR.Icons.ApplyDynamicIcon(entry, buff)
                     end
                 else
@@ -2666,7 +2670,11 @@ local function RefreshSelf(isAuraRestricted, hideExpiring)
                     local wantPresent = buff.showWhenPresent
                     local show = (wantPresent and shouldShow == false) or (not wantPresent and shouldShow)
                     if show then
-                        SetEntryText(entry, buff.overlayText, selfMissGlow)
+                        SetEntryText(
+                            entry,
+                            buff.overlayTextFn and buff.overlayTextFn() or buff.overlayText,
+                            selfMissGlow
+                        )
                         BR.Icons.ApplyDynamicIcon(entry, buff)
                     elseif
                         shouldShow == false

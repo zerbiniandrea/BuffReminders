@@ -245,6 +245,94 @@ local PET_HAPPINESS = {
 ---@type PetSacrifice
 local DEMONIC_SACRIFICE =
     { spellID = 18788, auraIDs = { 18789, 18790, 18791, 18792 }, reminderKey = "demonicSacrifice" }
+-- Sacrifice buff -> summon spell of the sacrificed demon.
+local SACRIFICED_DEMON = { [18789] = 688, [18790] = 691, [18791] = 712, [18792] = 697 }
+-- Soul Link needs a live demon, so without Demonic Pact it excludes the sacrifice.
+-- Demonic Pact keeps the sacrifice buff through the summon of a different demon.
+local SOUL_LINK = 19028
+local SOUL_LINK_AURA = 25228
+local DEMONIC_PACT = 425464
+-- Summon spells of the demons that Soul Link accepts: Imp, Voidwalker, Felhunter, Succubus.
+local SOUL_LINK_DEMONS = { 688, 697, 691, 712 }
+
+---@param familyID number
+---@return boolean
+local function IsSoulLinkFamily(familyID)
+    local families = BR.PetHelpers.WARLOCK_DEMON_FAMILIES
+    for _, summonID in ipairs(SOUL_LINK_DEMONS) do
+        if families[summonID][familyID] then
+            return true
+        end
+    end
+    return false
+end
+
+---Summon spell of the sacrificed demon, nil without a sacrifice buff.
+---@return number?
+local function SacrificedDemon()
+    for auraID, summonID in pairs(SACRIFICED_DEMON) do
+        if C_UnitAuras.GetPlayerAuraBySpellID(auraID) then
+            return summonID
+        end
+    end
+    return nil
+end
+
+---@return boolean
+local function KnowsDemonicPact()
+    local IsKnown = BR.StateHelpers.IsPlayerSpellCached
+    return IsKnown(SOUL_LINK) and IsKnown(DEMONIC_PACT)
+end
+
+---@alias DemonSetupStep "sacrifice"|"summon"|"link"
+
+---Next step of the sacrifice and Soul Link setup, nil when the setup is complete or does not apply.
+---@return DemonSetupStep?
+local function DemonSetupStep()
+    local link = BR.StateHelpers.IsPlayerSpellCached(SOUL_LINK)
+    local pact = link and KnowsDemonicPact()
+    local sacrificed = SacrificedDemon()
+    if not sacrificed and (pact or not link) then
+        return "sacrifice"
+    end
+    if not link then
+        return nil
+    end
+    local familyID = BR.BuffState.GetPetFamily()
+    if familyID == nil then
+        return nil
+    end
+    if familyID == false or UnitIsDead("pet") then
+        -- Without Demonic Pact, the missing-demon reminder covers this state.
+        return pact and "summon" or nil
+    end
+    if IsSoulLinkFamily(familyID) and not C_UnitAuras.GetPlayerAuraBySpellID(SOUL_LINK_AURA) then
+        return "link"
+    end
+    return nil
+end
+
+---Demon to summon after a Demonic Pact sacrifice. A summon of the sacrificed demon cancels the buff.
+---@return PetAction?
+local function PactSummonAction()
+    local sacrificed = SacrificedDemon()
+    local desired = BR.PetHelpers.GetDesiredWarlockDemon()
+    if desired and desired.spellID ~= sacrificed then
+        return desired
+    end
+    for _, action in ipairs(BR.PetHelpers.GetPetActions("WARLOCK") or {}) do
+        if action.spellID ~= sacrificed then
+            return action
+        end
+    end
+    return nil
+end
+
+local DEMON_SETUP_TEXT = {
+    sacrifice = L["Overlay.NoSacrifice"],
+    summon = L["Overlay.NoPet"],
+    link = L["Overlay.NoLink"],
+}
 
 -- IsSpellKnown answers true only for the highest rank, so each list holds every rank.
 local CREATE_HEALTHSTONE = { 11730, 11729, 5699, 6202, 6201 }
@@ -334,6 +422,20 @@ local function DemonicSacrificeMacro(spellID)
         return "/cast " .. sacrifice
     end
     return "/cast [nopet] " .. demon.spellName .. "; " .. sacrifice
+end
+
+---@param spellID number?
+---@return string
+local function DemonSetupMacro(spellID)
+    local step = DemonSetupStep()
+    if step == "link" then
+        return "/cast " .. (BR.GetSpellName(SOUL_LINK) or "")
+    end
+    if step == "summon" then
+        local demon = PactSummonAction()
+        return demon and ("/cast " .. demon.spellName) or ""
+    end
+    return DemonicSacrificeMacro(spellID)
 end
 
 ---Highest known rank of the preferred imbue, else of the first known fallback imbue.
@@ -1722,14 +1824,36 @@ local BUFF_TABLES = {
             class = "WARLOCK",
             overlayText = L["Overlay.NoArmor"],
         },
+        -- One reminder for the whole setup, because the order of the steps matters: a
+        -- sacrifice kills the linked demon. The link ends with its demon, so each summon needs a new cast.
         {
             spellID = DEMONIC_SACRIFICE.spellID,
-            buffIdOverride = DEMONIC_SACRIFICE.auraIDs,
+            -- Sacrifice buffs first, so that the expiration check reads the timed buff.
+            buffIdOverride = { 18789, 18790, 18791, 18792, SOUL_LINK_AURA },
             key = "demonicSacrifice",
-            name = L["Buff.DemonicSacrifice"],
+            name = L["Buff.DemonicSacrificeSoulLink"],
             class = "WARLOCK",
             overlayText = L["Overlay.NoSacrifice"],
-            clickMacro = DemonicSacrificeMacro,
+            overlayTextFn = function()
+                return DEMON_SETUP_TEXT[DemonSetupStep() or "sacrifice"]
+            end,
+            icons = {
+                spells = { DEMONIC_SACRIFICE.spellID, SOUL_LINK },
+                dynamic = function()
+                    local step = DemonSetupStep()
+                    if step == "summon" then
+                        local demon = PactSummonAction()
+                        return demon and demon.icon
+                    end
+                    return BR.Icons.GetBuffTexture(step == "link" and SOUL_LINK or DEMONIC_SACRIFICE.spellID)
+                end,
+            },
+            requiresSpellID = DEMONIC_SACRIFICE.spellID,
+            customCheck = function()
+                return DemonSetupStep() ~= nil
+            end,
+            clickMacro = DemonSetupMacro,
+            infoTooltip = { title = L["Tooltip.DemonSetup"], desc = L["Tooltip.DemonSetup.Desc"] },
         },
         -- The stance bar stays readable in combat, so this reminder works there.
         {
@@ -1968,6 +2092,11 @@ local BUFF_TABLES = {
             customCheck = function()
                 local defaults = BR.profile.defaults
                 if defaults and defaults.warlockWrongDemon == false then
+                    return false
+                end
+                -- A summon of the sacrificed demon cancels the Demonic Pact buff.
+                local desired = BR.PetHelpers.GetDesiredWarlockDemon()
+                if desired and desired.spellID == SacrificedDemon() and KnowsDemonicPact() then
                     return false
                 end
                 return BR.BuffState.IsWrongDemonPet()

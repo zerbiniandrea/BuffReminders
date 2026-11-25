@@ -19,14 +19,9 @@ local cachedPetFamily = nil
 local cachedPetHappiness = nil
 local GetPetHappiness = C_PetInfo and C_PetInfo.GetPetHappiness
 
----Check whether the player's current pet is not an allowed demon. Returns false
----when there is no pet or no desired demon. If the family read hits a secret
----value, the result stays uncached so later refreshes retry.
----@return boolean
-function BuffState.IsWrongDemonPet()
-    if not BR.PetHelpers.GetDesiredWarlockDemon() then
-        return false
-    end
+---Creature family of the current pet (cached).
+---@return number|false|nil familyID false = no pet, nil = unresolved or secret, not cached so later refreshes retry
+function BuffState.GetPetFamily()
     if cachedPetFamily == nil then
         if not UnitExists("pet") then
             cachedPetFamily = false
@@ -34,14 +29,23 @@ function BuffState.IsWrongDemonPet()
             local _, familyID = UnitCreatureFamily("pet")
             familyID = Plain(familyID)
             if type(familyID) ~= "number" then
-                -- Pet data is not resolved yet, or is a secret value. Do not cache, so the
-                -- next Refresh retries.
-                return false
+                return nil
             end
             cachedPetFamily = familyID
         end
     end
-    return cachedPetFamily ~= false and not BR.PetHelpers.IsAllowedWarlockFamily(cachedPetFamily)
+    return cachedPetFamily
+end
+
+---Check whether the player's current pet is not an allowed demon. Returns false
+---when there is no pet, no desired demon, or an unresolved family.
+---@return boolean
+function BuffState.IsWrongDemonPet()
+    if not BR.PetHelpers.GetDesiredWarlockDemon() then
+        return false
+    end
+    local familyID = BuffState.GetPetFamily()
+    return familyID ~= nil and familyID ~= false and not BR.PetHelpers.IsAllowedWarlockFamily(familyID)
 end
 
 ---Invalidate wrong-pet cache
