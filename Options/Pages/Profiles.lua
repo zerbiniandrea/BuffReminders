@@ -152,29 +152,26 @@ local function Build(content, scrollFrame)
     })
     layout:Add(specEnabled, 20, COMPONENT_GAP)
 
-    local numSpecs = BR.CLIENT == BR.ClientType.Retail and GetNumSpecializations() or 0
     local specDropdowns = {}
-    for i = 1, numSpecs do
-        local _, specName = GetSpecializationInfo(i)
-        if specName then
-            local specDropdown = Components.Dropdown(content, {
-                label = specName,
-                labelWidth = 100,
-                width = 150,
-                options = GetProfileOptions(),
-                get = function()
-                    return BR.Profiles.GetSpecProfile(i)
-                end,
-                enabled = function()
-                    return BR.Profiles.IsPerSpecEnabled()
-                end,
-                onChange = function(value)
-                    BR.Profiles.SetSpecProfile(i, value)
-                end,
-            })
-            layout:Add(specDropdown, 26, COMPONENT_GAP)
-            specDropdowns[i] = specDropdown
-        end
+    for _, spec in ipairs(BR.Client.ListPlayerSpecs()) do
+        local i = spec.index
+        local specDropdown = Components.Dropdown(content, {
+            label = spec.name,
+            labelWidth = 100,
+            width = 150,
+            options = GetProfileOptions(),
+            get = function()
+                return BR.Profiles.GetSpecProfile(i)
+            end,
+            enabled = function()
+                return BR.Profiles.IsPerSpecEnabled()
+            end,
+            onChange = function(value)
+                BR.Profiles.SetSpecProfile(i, value)
+            end,
+        })
+        layout:Add(specDropdown, 26, COMPONENT_GAP)
+        specDropdowns[i] = specDropdown
     end
 
     local baseRefreshProfileDropdown = RefreshProfileDropdown

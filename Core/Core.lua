@@ -126,6 +126,39 @@ function BR.Client.GetSpecID()
     return GetSpecializationInfo(specIndex), specIndex
 end
 
+---The specializations of the player class, in spec index order. Empty on WoW Forever.
+---@return { index: number, name: string }[]
+function BR.Client.ListPlayerSpecs()
+    local specs = {}
+    if BR.CLIENT == BR.ClientType.Forever then
+        return specs
+    end
+    for i = 1, GetNumSpecializations() do
+        local _, name = GetSpecializationInfo(i)
+        if name then
+            specs[#specs + 1] = { index = i, name = name }
+        end
+    end
+    return specs
+end
+
+---The specializations of a class, in spec index order. Empty on WoW Forever.
+---@param classID number
+---@return { specID: number, name: string }[]
+function BR.Client.ListClassSpecs(classID)
+    local specs = {}
+    if BR.CLIENT == BR.ClientType.Forever then
+        return specs
+    end
+    for i = 1, 4 do
+        local specID, name = GetSpecializationInfoForClassID(classID, i)
+        if specID then
+            specs[#specs + 1] = { specID = specID, name = name }
+        end
+    end
+    return specs
+end
+
 local IsEventValid = C_EventUtils and C_EventUtils.IsEventValid
 
 ---Register the event on the frame if the client defines it. RegisterEvent throws on an event
@@ -1162,13 +1195,8 @@ local CLASS_IDS = {
 BR.CLASS_SPEC_OPTIONS = {}
 for token, classID in pairs(CLASS_IDS) do
     local specs = {}
-    if BR.CLIENT == BR.ClientType.Retail then
-        for i = 1, 4 do
-            local specID, name = GetSpecializationInfoForClassID(classID, i)
-            if specID then
-                table.insert(specs, { value = specID, label = name })
-            end
-        end
+    for _, spec in ipairs(BR.Client.ListClassSpecs(classID)) do
+        table.insert(specs, { value = spec.specID, label = spec.name })
     end
     table.sort(specs, function(a, b)
         return a.label < b.label
