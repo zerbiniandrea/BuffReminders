@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 68
+BR.Migrations.DB_VERSION = 69
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -110,6 +110,66 @@ function BR.Migrations.SpacingToPixels(profile)
             end
             SpacingScopeToPixels(catSettings, direction, not catSettings.useCustomAppearance)
         end
+    end
+end
+
+---Grow one appearance scope by its border, so the icon art and the visible gap stay the same.
+---@param scope table defaults, a category's settings, or externals
+---@param fallbackBorder number Border width when the scope stores none
+---@param fill boolean Write the code defaults for keys the scope does not store
+---@param sizeDefault number Code default of iconSize
+---@param spacingDefault number Code default of spacing
+local function GrowScopeByBorder(scope, fallbackBorder, fill, sizeDefault, spacingDefault)
+    local border = tonumber(scope.borderSize) or fallbackBorder
+    if border <= 0 then
+        return
+    end
+    local iconSize = tonumber(scope.iconSize) or (fill and sizeDefault or nil)
+    if iconSize then
+        scope.iconSize = iconSize + 2 * border
+    end
+    if type(scope.iconWidth) == "number" then
+        scope.iconWidth = scope.iconWidth + 2 * border
+    end
+    local spacing = tonumber(scope.spacing) or (fill and spacingDefault or nil)
+    if spacing then
+        scope.spacing = math.max(0, spacing - 2 * border)
+    end
+end
+
+---The native border moves from outside the icon frame to inside it. Each scope that drew
+---the border grows by it, so the icon art and the visible gaps stay the same. The
+---Blizzard icon style and a Masque skin draw no native border on the reminder icons. The
+---Masque check is an estimate: a disabled Masque group still counts as a skin.
+---@param profile table One profile
+function BR.Migrations.BorderInside(profile)
+    local profileDefaults = type(profile.defaults) == "table" and profile.defaults or nil
+    local iconStyle = profileDefaults and profileDefaults.iconStyle
+        or (BR.CLIENT == BR.ClientType.Forever and "blizzard" or "modern")
+    local masqueLoaded = C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("Masque")
+    if iconStyle ~= "blizzard" and not masqueLoaded then
+        if not profileDefaults then
+            profileDefaults = {}
+            profile.defaults = profileDefaults
+        end
+        local defaultBorder = tonumber(profileDefaults.borderSize) or 2
+        GrowScopeByBorder(profileDefaults, 2, true, 64, 12)
+        if type(profile.categorySettings) == "table" then
+            for category, catSettings in pairs(profile.categorySettings) do
+                if category ~= "main" and type(catSettings) == "table" then
+                    if catSettings.useCustomAppearance then
+                        GrowScopeByBorder(catSettings, 2, true, 64, 12)
+                    else
+                        GrowScopeByBorder(catSettings, defaultBorder, false, 64, 12)
+                    end
+                end
+            end
+        end
+    end
+    -- The externals draw the native border under every icon style and skin.
+    local externals = profile.externals
+    if type(externals) == "table" and externals.useCustomAppearance then
+        GrowScopeByBorder(externals, 2, true, 40, 4)
     end
 end
 
@@ -532,6 +592,10 @@ function BR.Migrations.RunProfile(profile, isImport)
         -- (BR.Migrations.SpacingToPixels).
         [68] = function()
             BR.Migrations.SpacingToPixels(profile)
+        end,
+        -- [69] The icon border moves inside the icon frame (BR.Migrations.BorderInside).
+        [69] = function()
+            BR.Migrations.BorderInside(profile)
         end,
     }
 

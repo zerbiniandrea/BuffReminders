@@ -172,7 +172,7 @@ BR.defaults = {
         iconAlpha = 1,
         textAlpha = 1,
         textColor = { 1, 1, 1 },
-        spacing = 12, -- px
+        spacing = BR.CLIENT == BR.ClientType.Forever and 4 or 8, -- px
         iconZoom = 0, -- percentage (additional zoom on top of base TEXCOORD_INSET crop)
         borderSize = 2,
         growDirection = "CENTER", -- "LEFT", "CENTER", "RIGHT", "UP", "DOWN"

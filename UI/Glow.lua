@@ -440,21 +440,19 @@ end
 ---Show/hide expiration glow on a buff frame (reads type + color from DB or cached settings)
 ---@param frame table
 ---@param show boolean
----@param category? string Category name for per-category glow settings (nil = use global defaults)
 ---@param cachedSettings? table Pre-fetched glow settings to avoid DB reads
-function BR.Glow.SetExpiration(frame, show, category, cachedSettings)
+function BR.Glow.SetExpiration(frame, show, cachedSettings)
     local state = frame[GLOW_STATE_KEY]
 
     if show then
-        local typeIndex, color, size, borderOffset, params, glowXOff, glowYOff
+        local typeIndex, color, size, params, xOff, yOff
         if cachedSettings then
             typeIndex = cachedSettings.typeIndex
             color = cachedSettings.color
             size = cachedSettings.size
-            borderOffset = cachedSettings.borderSize or BR.DEFAULT_BORDER_SIZE
             params = cachedSettings.params
-            glowXOff = cachedSettings.glowXOffset or 0
-            glowYOff = cachedSettings.glowYOffset or 0
+            xOff = cachedSettings.glowXOffset or 0
+            yOff = cachedSettings.glowYOffset or 0
         else
             local db = BR.profile
             local d = db and db.defaults or {}
@@ -464,20 +462,10 @@ function BR.Glow.SetExpiration(frame, show, category, cachedSettings)
                 color = nil
             end
             size = d.glowSize or 2
-            if BR.IconStyle.UsesBlizzardArt() then
-                borderOffset = 0
-            else
-                borderOffset = (category and BR.Config.GetCategorySetting(category, "borderSize"))
-                    or d.borderSize
-                    or BR.DEFAULT_BORDER_SIZE
-            end
             params = BR.Glow.BuildAdvancedParams(d, typeIndex)
-            glowXOff = d.glowXOffset or 0
-            glowYOff = d.glowYOffset or 0
+            xOff = d.glowXOffset or 0
+            yOff = d.glowYOffset or 0
         end
-
-        local xOff = borderOffset + glowXOff
-        local yOff = borderOffset + glowYOff
 
         -- Do not restart an identical glow: a restart resets the animation state.
         -- state.started gates the short-circuit. A deferred request keeps

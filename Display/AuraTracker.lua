@@ -146,7 +146,7 @@ end
 
 local durationFormatter
 
--- dx/dy point away from the icon and scale the border gap.
+-- dx/dy point away from the icon and scale the gap.
 local CASTER_NAME_SIDES = {
     TOP = { from = "BOTTOM", to = "TOP", justify = "CENTER", dx = 0, dy = 1 },
     BOTTOM = { from = "TOP", to = "BOTTOM", justify = "CENTER", dx = 0, dy = -1 },
@@ -172,7 +172,9 @@ local function StyleButton(button)
     -- stretching. Blizzard's per-aura update only calls SetTexture, so this
     -- survives every icon swap.
     local inset = TEXCOORD_INSET + (Setting("iconZoom") or 0) / 100
-    local xInset, yInset = GetAspectCropInsets(inset, width, height)
+    local artWidth = math.max(1, width - 2 * borderSize)
+    local artHeight = math.max(1, height - 2 * borderSize)
+    local xInset, yInset = GetAspectCropInsets(inset, artWidth, artHeight)
     regions.icon:SetTexCoord(xInset, 1 - xInset, yInset, 1 - yInset)
     regions.icon:SetAlpha(Setting("iconAlpha") or 1)
 
@@ -189,21 +191,23 @@ local function StyleButton(button)
         regions.cooldown:SetDrawSwipe(Setting("showSwipe") ~= false)
     end
 
-    -- Border protrudes past the button's bounds, same as the reminder icons.
-    -- Regions can extend outside a button; only their parentage is constrained.
+    -- The border lies inside the button, the same as on the reminder icons.
+    regions.icon:ClearAllPoints()
     if borderSize > 0 then
+        regions.icon:SetPoint("TOPLEFT", borderSize, -borderSize)
+        regions.icon:SetPoint("BOTTOMRIGHT", -borderSize, borderSize)
         regions.border:ClearAllPoints()
-        regions.border:SetPoint("TOPLEFT", -borderSize, borderSize)
-        regions.border:SetPoint("BOTTOMRIGHT", borderSize, -borderSize)
+        regions.border:SetAllPoints()
         regions.border:Show()
     else
+        regions.icon:SetAllPoints()
         regions.border:Hide()
     end
 
     -- Blizzard writes the caster, whose identity is secret in restricted contexts.
     local casterName = regions.casterName
     local anchor = CASTER_NAME_SIDES[Setting("casterNamePosition")] or CASTER_NAME_SIDES.BOTTOM
-    local gap = borderSize + 2
+    local gap = 2
     local x = anchor.dx * gap + (Setting("casterNameOffsetX") or 0)
     local y = anchor.dy * gap + (Setting("casterNameOffsetY") or 0)
     BR.DisplayFonts.Apply(casterName, Setting("casterNameSize") or 12)
@@ -245,7 +249,7 @@ local function InitializeButton(button)
     -- it from the aura's own duration, so the sweep runs for auras the addon cannot
     -- read. Reverse: the swipe UNCOVERS the icon as the time runs out.
     regions.cooldown = CreateFrame("Cooldown", nil, button, "CooldownFrameTemplate")
-    regions.cooldown:SetAllPoints(button)
+    regions.cooldown:SetAllPoints(regions.icon)
     regions.cooldown:SetDrawEdge(false)
     regions.cooldown:SetReverse(true)
     -- The countdown text below belongs to the addon; the swipe must not print a second one.
@@ -288,7 +292,7 @@ local function InitializeButton(button)
     end
 
     regions.count = regions.textHost:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-    regions.count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -1, 1)
+    regions.count:SetPoint("BOTTOMRIGHT", regions.icon, "BOTTOMRIGHT", -1, 1)
     button:SetApplicationCount(regions.count)
 
     -- Registered once, like the countdown. The setting toggles this carrier, because

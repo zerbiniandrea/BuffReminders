@@ -42,6 +42,13 @@ local ZONES = {
 }
 BR.TextPositions.Zones = ZONES
 
+-- Direction from the anchored frame edge toward the icon art, per axis.
+for _, z in pairs(ZONES) do
+    local rel = z.relPoint
+    z.artX = rel:find("LEFT") and 1 or (rel:find("RIGHT") and -1 or 0)
+    z.artY = rel:find("TOP") and -1 or (rel:find("BOTTOM") and 1 or 0)
+end
+
 -- Repositionable text items the UI exposes, in display order. The `count` key
 -- name is too narrow: the region also carries countdowns and "NO FLASK"-style
 -- labels. The UI calls it "Main text".
@@ -198,6 +205,10 @@ function BR.TextPositions.Apply(region, frame, zone, offsetX, offsetY)
             dy = (dy > 0 and 1 or -1) * math.max(math.abs(dy), math.floor(height * ratio + 0.5))
         end
     end
+    -- Zones place text relative to the icon art, which a border insets from the frame edge.
+    local borderInset = frame._br_borderInset or 0
+    dx = dx + z.artX * borderInset
+    dy = dy + z.artY * borderInset
     region:ClearAllPoints()
     region:SetPoint(z.point, frame, z.relPoint, dx + (offsetX or 0), dy + (offsetY or 0))
 end

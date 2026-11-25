@@ -235,6 +235,7 @@ local BR = ns
 ---@field _br_pet_label_key? string        -- Cache key for pet label updates
 ---@field _br_count_scale? number          -- Font scale the count text was last written with
 ---@field _br_textInsetRatio? number      -- Share of the icon size that keeps inside text off the frame art
+---@field _br_borderInset? number        -- Border width inside the frame edge, 0 without a native border
 ---@field _br_pet_name_text? FontString    -- Pet name label below icon
 ---@field _br_pet_family_text? FontString  -- Pet spec label below name
 ---@field _br_pet_extra_text? FontString   -- Spirit Beast label below spec
@@ -576,7 +577,7 @@ local function BuildCategorySettings(category)
             iconAlpha = globalDefaults.iconAlpha or 1,
             textAlpha = globalDefaults.textAlpha or 1,
             textColor = globalDefaults.textColor or { 1, 1, 1 },
-            spacing = globalDefaults.spacing or 12,
+            spacing = globalDefaults.spacing or defaults.defaults.spacing,
             iconZoom = globalDefaults.iconZoom or 0,
             borderSize = globalDefaults.borderSize or 2,
             growDirection = globalDefaults.growDirection or "CENTER",
@@ -604,7 +605,7 @@ local function BuildCategorySettings(category)
         result.iconAlpha = (catSettings and catSettings.iconAlpha) or 1
         result.textAlpha = (catSettings and catSettings.textAlpha) or 1
         result.textColor = (catSettings and catSettings.textColor) or { 1, 1, 1 }
-        result.spacing = (catSettings and catSettings.spacing) or 12
+        result.spacing = (catSettings and catSettings.spacing) or defaults.defaults.spacing
         result.iconZoom = (catSettings and catSettings.iconZoom) or 0
         result.borderSize = (catSettings and catSettings.borderSize) or 2
     else
@@ -614,7 +615,7 @@ local function BuildCategorySettings(category)
         result.iconAlpha = globalDefaults.iconAlpha or 1
         result.textAlpha = globalDefaults.textAlpha or 1
         result.textColor = globalDefaults.textColor or { 1, 1, 1 }
-        result.spacing = globalDefaults.spacing or 12
+        result.spacing = globalDefaults.spacing or defaults.defaults.spacing
         result.iconZoom = globalDefaults.iconZoom or 0
         result.borderSize = globalDefaults.borderSize or 2
     end
@@ -879,7 +880,6 @@ local function GetCachedGlowSettings(category, kind)
         typeIndex = typeIndex,
         color = color,
         size = size,
-        borderSize = UsesBlizzardIconStyle() and 0 or GetSetting(category, "borderSize") or DEFAULT_BORDER_SIZE,
         params = params,
         glowXOffset = xOff,
         glowYOffset = yOff,
@@ -892,10 +892,9 @@ end
 ---@param frame BuffFrame
 ---@param overlayText? string
 ---@param shouldGlow? boolean
----@param category? CategoryName
 ---@param cachedGlow? {typeIndex: number, color: number[], size: number}
 ---@return boolean true (for anyVisible chaining)
-local function ShowTextFrame(frame, overlayText, shouldGlow, category, cachedGlow)
+local function ShowTextFrame(frame, overlayText, shouldGlow, cachedGlow)
     frame.stackCount:Hide()
     if frame.statLabel then
         frame.statLabel:Hide()
@@ -913,7 +912,7 @@ local function ShowTextFrame(frame, overlayText, shouldGlow, category, cachedGlo
         frame.count:Hide()
     end
     frame:Show()
-    SetExpirationGlow(frame, shouldGlow or false, category, cachedGlow)
+    SetExpirationGlow(frame, shouldGlow or false, cachedGlow)
     return true
 end
 
@@ -1022,6 +1021,14 @@ local function CreateCategoryFrame(category)
     return frame
 end
 
+---Side of the icon art inside the border, for the overlays that scale with the icon.
+---@param frame table
+---@param size number Frame side
+---@return number
+local function ArtSize(frame, size)
+    return size - 2 * (frame._br_borderInset or 0)
+end
+
 local function SizeBlizzardIconArt(frame, width, height)
     frame.iconFrameArt:SetSize(width * BLIZZARD_ICON_ART.frameWidthRatio, height)
     frame.iconMask:SetSize(width * BLIZZARD_ICON_ART.maskRatio, height * BLIZZARD_ICON_ART.maskRatio)
@@ -1091,6 +1098,7 @@ local function UpdateIconStyling(frame, catSettings)
         -- Masque controls styling; hide the native border (Masque manages its own textures via ReSkin)
         frame.border:Hide()
         SetBlizzardIconArt(frame, false)
+        frame._br_borderInset = 0
         return
     end
     -- When Masque is loaded but disabled, hide textures it created (Backdrop, Shadow, Gloss, etc.)
@@ -1109,31 +1117,33 @@ local function UpdateIconStyling(frame, catSettings)
         end
     end
     -- Restore native state (Masque changes icon anchors, border texture/draw layer/alpha when skinning)
-    frame.icon:ClearAllPoints()
-    frame.icon:SetAllPoints()
     frame.border:SetDrawLayer("BACKGROUND")
     frame.border:SetAlpha(1)
     frame.border:SetColorTexture(0, 0, 0, 1)
     -- The action-button frame shows the full icon, with its built-in dark border.
     local blizzardStyle = UsesBlizzardIconStyle()
+    -- The border lies inside the frame, so the frame edge is the visible edge.
+    local borderInset = blizzardStyle and 0 or (catSettings.borderSize or DEFAULT_BORDER_SIZE)
+    frame._br_borderInset = borderInset
+    frame.icon:ClearAllPoints()
+    if borderInset > 0 then
+        frame.icon:SetPoint("TOPLEFT", borderInset, -borderInset)
+        frame.icon:SetPoint("BOTTOMRIGHT", -borderInset, borderInset)
+        frame.border:ClearAllPoints()
+        frame.border:SetAllPoints()
+        frame.border:Show()
+    else
+        frame.icon:SetAllPoints()
+        frame.border:Hide()
+    end
     local additionalZoom = (catSettings.iconZoom or DEFAULT_ICON_ZOOM) / 100
     local inset = (blizzardStyle and 0 or TEXCOORD_INSET) + additionalZoom
     local iconHeight = catSettings.iconSize or 64
     local iconWidth = GetEffectiveWidth(catSettings.iconWidth, iconHeight)
-    local xInset, yInset = GetAspectCropInsets(inset, iconWidth, iconHeight)
+    local xInset, yInset =
+        GetAspectCropInsets(inset, max(1, iconWidth - 2 * borderInset), max(1, iconHeight - 2 * borderInset))
     frame.icon:SetTexCoord(xInset, 1 - xInset, yInset, 1 - yInset)
     SetBlizzardIconArt(frame, blizzardStyle, iconWidth, iconHeight)
-    local borderSize = catSettings.borderSize or DEFAULT_BORDER_SIZE
-    if blizzardStyle then
-        frame.border:Hide()
-    elseif borderSize > 0 then
-        frame.border:ClearAllPoints()
-        frame.border:SetPoint("TOPLEFT", -borderSize, borderSize)
-        frame.border:SetPoint("BOTTOMRIGHT", borderSize, -borderSize)
-        frame.border:Show()
-    else
-        frame.border:Hide()
-    end
 end
 
 -- Map buff key -> consumable category (derived from buff definitions in Data/Buffs.lua)
@@ -1553,7 +1563,7 @@ local function PositionMainContainer(mainFrameBuffs)
             local iconWidth = GetEffectiveWidth(settings.iconWidth, iconSize)
             widths[i] = iconWidth
             heights[i] = iconSize
-            spacings[i] = settings.spacing or 12
+            spacings[i] = settings.spacing or defaults.defaults.spacing
             frame:SetSize(iconWidth, iconSize)
             if iconWidth > maxWidth then
                 maxWidth = iconWidth
@@ -1624,7 +1634,7 @@ local function PositionSplitCategory(category, frames)
         local iconWidth = GetEffectiveWidth(catSettings.iconWidth, iconSize)
         local isVertical = direction == "UP" or direction == "DOWN"
         local mainSize = isVertical and iconSize or iconWidth
-        local spacing = PixelAlignedGap(mainSize, catSettings.spacing or 12, catFrame)
+        local spacing = PixelAlignedGap(mainSize, catSettings.spacing or defaults.defaults.spacing, catFrame)
 
         for _, frame in ipairs(frames) do
             frame:SetSize(iconWidth, iconSize)
@@ -1693,7 +1703,9 @@ local function PositionDetachedIcon(key, frame)
     end
 
     -- Size the container to fit all visible frames (stacked horizontally)
-    local spacing = totalFrames > 1 and PixelAlignedGap(iconWidth, catSettings.spacing or 12, container) or 0
+    local spacing = totalFrames > 1
+            and PixelAlignedGap(iconWidth, catSettings.spacing or defaults.defaults.spacing, container)
+        or 0
     local totalWidth = totalFrames * iconWidth + (totalFrames - 1) * spacing
     container:SetSize(totalWidth, iconSize)
 
@@ -1934,12 +1946,12 @@ local EATING_ICON = BR.EATING_AURA_ICON
 ---Apply consumable overlays (stat label top-left, badge/quality bottom-left) to a frame.
 ---@param frame table
 ---@param item table Bucket item with .statLabel, .badge, and .qualityAtlas fields
----@param iconSize number? Icon width the overlay sizes derive from (frame width if nil)
+---@param iconSize number? Icon art width the overlay sizes derive from (from the frame width if nil)
 local function ApplyConsumableOverlays(frame, item, iconSize)
     if not item.statLabel and not item.badge and not item.qualityAtlas then
         return
     end
-    iconSize = iconSize or frame:GetWidth()
+    iconSize = iconSize or ArtSize(frame, frame:GetWidth())
     local hideLabels = (BR.profile.defaults or {}).hideConsumableLabels
     if item.statLabel and not hideLabels then
         if not frame.statLabel then
@@ -1964,7 +1976,7 @@ local function ApplyConsumableOverlays(frame, item, iconSize)
             holder:SetFrameLevel(frame:GetFrameLevel() + 10)
             frame.qualityIcon = holder:CreateTexture(nil, "OVERLAY", nil, 7)
         end
-        local qOffset = -floor(iconSize * 0.125)
+        local qOffset = (frame._br_borderInset or 0) - floor(iconSize * 0.125)
         local qSize = max(14, floor(iconSize * 0.45))
         frame.qualityIcon:ClearAllPoints()
         frame.qualityIcon:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", qOffset, qOffset)
@@ -2012,7 +2024,7 @@ local function ApplyItemCooldown(frame, item)
     end
     if not frame.itemCooldown then
         local cd = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
-        cd:SetAllPoints()
+        cd:SetAllPoints(frame.icon)
         cd:SetFrameLevel(frame:GetFrameLevel() + 1)
         cd:SetDrawEdge(true)
         cd:EnableMouse(false)
@@ -2035,7 +2047,7 @@ local function ApplyCountdownSweep(frame, expTime, duration)
     end
     if not sweep then
         sweep = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
-        sweep:SetAllPoints()
+        sweep:SetAllPoints(frame.icon)
         sweep:SetDrawBling(false)
         sweep:SetHideCountdownNumbers(true)
         sweep.noCooldownCount = true
@@ -2152,7 +2164,7 @@ local function ResolveConsumableFrame(frame)
             frame.icon:SetTexture(items[1].icon)
         end
         SetIconDesaturated(frame.icon, false)
-        local mainSize = frame:GetWidth()
+        local mainSize = ArtSize(frame, frame:GetWidth())
         frame.count:Hide()
         ApplyFont(frame.stackCount, BR.SecureButtons.ComputeConsumableFontSize(mainSize, "stackCount"))
         frame.stackCount:SetText(BR.SecureButtons.FormatStackCount(items[1]))
@@ -2216,7 +2228,10 @@ local function RenderVisibleEntry(frame, entry)
             frame.count:Hide()
         end
         if entry.progressText then
-            ApplyFont(frame.stackCount, BR.SecureButtons.ComputeConsumableFontSize(frame:GetWidth(), "stackCount"))
+            ApplyFont(
+                frame.stackCount,
+                BR.SecureButtons.ComputeConsumableFontSize(ArtSize(frame, frame:GetWidth()), "stackCount")
+            )
             frame.stackCount:SetText(entry.progressText)
             frame.stackCount:Show()
         end
@@ -2256,7 +2271,7 @@ local function RenderVisibleEntry(frame, entry)
         SetCountText(frame, entry.countText or "", COUNT_TEXT_SCALE)
         frame.count:Show()
         frame:Show()
-        SetExpirationGlow(frame, entry.shouldGlow, entry.category, cachedGlow)
+        SetExpirationGlow(frame, entry.shouldGlow, cachedGlow)
         -- Show consumable stat label for expiring consumables (resolve from cached items)
         if entry.displayType == "expiring" and BUFF_KEY_TO_CATEGORY[frame.key] then
             local items = GetCachedItems(frame)
@@ -2280,18 +2295,18 @@ local function RenderVisibleEntry(frame, entry)
             local result = ResolveConsumableFrame(frame)
             if result == "items" then
                 frame:Show()
-                SetExpirationGlow(frame, entry.shouldGlow, entry.category, cachedGlow)
+                SetExpirationGlow(frame, entry.shouldGlow, cachedGlow)
             elseif result == "missing" then
-                ShowTextFrame(frame, entry.overlayText, entry.shouldGlow, entry.category, cachedGlow)
+                ShowTextFrame(frame, entry.overlayText, entry.shouldGlow, cachedGlow)
             else
                 if testMode then
-                    ShowTextFrame(frame, entry.overlayText, entry.shouldGlow, entry.category, cachedGlow)
+                    ShowTextFrame(frame, entry.overlayText, entry.shouldGlow, cachedGlow)
                 else
                     return false
                 end
             end
         else
-            ShowTextFrame(frame, entry.overlayText, entry.shouldGlow, entry.category, cachedGlow)
+            ShowTextFrame(frame, entry.overlayText, entry.shouldGlow, cachedGlow)
         end
     end
 
@@ -2350,10 +2365,11 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
         if testMode and items and #items > 1 then
             -- Test mode: render visual-only sub-icon frames (no secure buttons)
             local catSettings = GetCategorySettings(GetEffectiveCategory(frame))
-            local iconSize = catSettings.iconSize or 64
+            local iconSize = ArtSize(frame, catSettings.iconSize or 64)
             local size, spacing = BR.SubIcons.Metrics(iconSize)
             local side = (BR.profile.defaults or {}).subIconSide or "BOTTOM"
             local width, height = frame:GetWidth(), frame:GetHeight()
+            local hostInset = frame._br_borderInset or 0
             local cFontSize = BR.SecureButtons.ComputeConsumableFontSize(iconSize, "stackCount")
             for i = 2, #items do
                 local extra = GetOrCreateExtraFrame(frame, i - 1)
@@ -2369,7 +2385,17 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
                 SetExpirationGlow(extra, false)
                 extra:SetFrameLevel(frame:GetFrameLevel() + 4)
 
-                local x, y = BR.SubIcons.Position(i - 2, #items - 1, side, 0, 0, width, height, size, spacing)
+                local x, y = BR.SubIcons.Position(
+                    i - 2,
+                    #items - 1,
+                    side,
+                    hostInset,
+                    hostInset,
+                    width - 2 * hostInset,
+                    height - 2 * hostInset,
+                    size,
+                    spacing
+                )
                 extra:ClearAllPoints()
                 extra:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", x, y)
                 extra:Show()
@@ -2388,7 +2414,7 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
                         entry.glowKindOverride or (expiring and "expiring" or "missing")
                     )
                 or nil
-            local expandedSize = frame:GetWidth()
+            local expandedSize = ArtSize(frame, frame:GetWidth())
             local stackFontSize = BR.SecureButtons.ComputeConsumableFontSize(expandedSize, "stackCount")
             for i = 2, #items do
                 local extra = GetOrCreateExtraFrame(frame, i - 1)
@@ -2408,7 +2434,7 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
                     extra.stackCount:Hide()
                 end
                 extra:Show()
-                SetExpirationGlow(extra, entry.shouldGlow, entry.category, cachedGlow)
+                SetExpirationGlow(extra, entry.shouldGlow, cachedGlow)
                 -- Apply consumable overlays (clear first to handle toggle-off)
                 ClearConsumableOverlays(extra)
                 if showText then
@@ -2522,7 +2548,7 @@ local function SetupPetExtraFrame(frame, index, action, entry, cachedGlow, frame
     UpdatePetLabels(extra, action)
     BR.SecureButtons.ReapplyPetSpecIconIfHovered(extra)
     extra:Show()
-    SetExpirationGlow(extra, entry.shouldGlow, entry.category, cachedGlow)
+    SetExpirationGlow(extra, entry.shouldGlow, cachedGlow)
     if frameList then
         frameList[#frameList + 1] = extra
     end
@@ -3401,19 +3427,20 @@ local function UpdateVisuals()
 
         -- Consumable overlay font/size + reposition (per-category zones)
         if frame.statLabel or frame.badgeLabel or frame.qualityIcon then
+            local artSize = ArtSize(frame, size)
             if frame.statLabel then
-                ApplyFont(frame.statLabel, BR.SecureButtons.ComputeConsumableFontSize(size, "statLabel"))
+                ApplyFont(frame.statLabel, BR.SecureButtons.ComputeConsumableFontSize(artSize, "statLabel"))
                 local sz, sx, sy = BR.TextPositions.Get("statLabel")
                 BR.TextPositions.Apply(frame.statLabel, frame, sz, sx, sy)
             end
             if frame.badgeLabel then
-                ApplyFont(frame.badgeLabel, BR.SecureButtons.ComputeConsumableFontSize(size, "badge"))
+                ApplyFont(frame.badgeLabel, BR.SecureButtons.ComputeConsumableFontSize(artSize, "badge"))
                 local bz, bx, by = BR.TextPositions.Get("badge")
                 BR.TextPositions.Apply(frame.badgeLabel, frame, bz, bx, by)
             end
             if frame.qualityIcon then
-                local qOffset = -floor(size * 0.125)
-                local qSize = max(14, floor(size * 0.45))
+                local qOffset = (frame._br_borderInset or 0) - floor(artSize * 0.125)
+                local qSize = max(14, floor(artSize * 0.45))
                 frame.qualityIcon:ClearAllPoints()
                 frame.qualityIcon:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", qOffset, qOffset)
                 frame.qualityIcon:SetSize(qSize, qSize)
@@ -3454,6 +3481,12 @@ local function UpdateVisuals()
             for _, extra in ipairs(frame.extraFrames) do
                 extra:SetSize(width, size)
                 UpdateIconStyling(extra, catSettings)
+                do
+                    local sz, sx, sy = BR.TextPositions.Get("stackCount")
+                    BR.TextPositions.Apply(extra.stackCount, extra, sz, sx, sy)
+                    local cz, cx, cy = BR.TextPositions.Get("count")
+                    BR.TextPositions.Apply(extra.count, extra, cz, cx, cy)
+                end
                 extra:SetAlpha(catSettings.iconAlpha or 1)
             end
         end

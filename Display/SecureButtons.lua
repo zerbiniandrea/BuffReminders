@@ -1927,9 +1927,14 @@ local function SyncSecureButtons()
             if frame:IsVisible() then
                 local left, bottom, width, height = frame:GetRect()
                 if left then
+                    -- The row and its metrics follow the icon art, inside the border.
+                    local hostInset = frame._br_borderInset or 0
+                    left, bottom = left + hostInset, bottom + hostInset
+                    width, height = width - 2 * hostInset, height - 2 * hostInset
                     local effectiveCat = GetEffectiveCategory(frame)
                     local catSettings = GetCategorySettings(effectiveCat)
-                    local size, btnSpacing = SubIcons.Metrics(catSettings.iconSize or 64)
+                    local baseIconSize = (catSettings.iconSize or 64) - 2 * hostInset
+                    local size, btnSpacing = SubIcons.Metrics(baseIconSize)
                     local subIconSide = (BR.profile.defaults or {}).subIconSide or "BOTTOM"
                     local visibleCount = 0
                     for _, btn in ipairs(frame.actionButtons) do
@@ -1938,7 +1943,6 @@ local function SyncSecureButtons()
                         end
                     end
                     if visibleCount > 0 then
-                        local baseIconSize = catSettings.iconSize or 64
                         local stackFontSize = ComputeConsumableFontSize(baseIconSize, "stackCount")
                         local badgeFontSize = ComputeConsumableFontSize(baseIconSize, "badge")
                         local showSubIconBadge = BR.Config.Get("defaults.consumableBadgeOnSubIcons") == true

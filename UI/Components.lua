@@ -3931,7 +3931,7 @@ function Components.AppearanceGrid(parent, config)
         disabledReason = config.disabledReason,
         suffix = "px",
         get = function()
-            return config.get("spacing", 12)
+            return config.get("spacing", BR.defaults.defaults.spacing)
         end,
         enabled = enabled and baseEnabled or nil,
         onChange = function(val)
