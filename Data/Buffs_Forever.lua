@@ -30,17 +30,6 @@ local _, playerClass = UnitClass("player")
 ---@type DKRuneforge[]
 BR.DK_RUNEFORGES = {}
 
----@type string?
-BR.CONTENT_GRID_DUNGEON_DESC = nil
-
-BR.SHADOWFORM_SPELL_ID = 15473
-
--- Classic warlocks keep a stone on themselves while they play solo.
----@type SoulstoneVisibility
-BR.SOULSTONE_DEFAULT_VISIBILITY = "readyCheckSolo"
-
-BR.EATING_AURA_ICON = 134062
-
 -- Sample icons for the consumable item display preview in the options.
 BR.CONSUMABLE_PREVIEW_TEXTURES = {
     flask = { 134842, 134877, 134821 }, -- Titans, Distilled Wisdom, Supreme Power

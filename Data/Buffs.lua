@@ -278,18 +278,6 @@ local function IsNotEarthen()
     return BR.playerRace ~= "EarthenDwarf"
 end
 
--- Extra content that the dungeon row of a per-content grid covers. nil = dungeons only.
----@type string?
-BR.CONTENT_GRID_DUNGEON_DESC = L["BuffPanel.WarlockDemon.Dungeon.Desc"]
-
-BR.SHADOWFORM_SPELL_ID = 232698
-
----@type SoulstoneVisibility
-BR.SOULSTONE_DEFAULT_VISIBILITY = "readyCheck"
-
--- Icon of the eating channel aura, the same for all food types.
-BR.EATING_AURA_ICON = 133950
-
 -- Sample icons for the consumable item display preview in the options.
 BR.CONSUMABLE_PREVIEW_TEXTURES = {
     flask = { 7548898, 7548899, 7548900 },

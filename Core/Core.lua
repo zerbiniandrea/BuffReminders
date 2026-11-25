@@ -102,6 +102,14 @@ end
 -- Stance key for "no stance" (stance bar form 0) in the allowed-stances sets of BR.STANCE_RULES.
 BR.NO_STANCE = 0
 
+BR.SHADOWFORM_SPELL_ID = BR.ByClient({ retail = 232698, forever = 15473 })
+
+-- Icon of the eating channel aura, the same for all food types.
+BR.EATING_AURA_ICON = BR.ByClient({ retail = 133950, forever = 134062 })
+
+---@type SoulstoneVisibility
+BR.SOULSTONE_DEFAULT_VISIBILITY = BR.ByClient({ retail = "readyCheck", forever = "readyCheckSolo" })
+
 BR.Client = {}
 
 ---The player's specialization, or nil on WoW Forever and before the spec loads.

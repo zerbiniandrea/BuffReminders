@@ -162,7 +162,11 @@ end
 
 local GRID_ROWS = {
     { key = "world", label = L["BuffPanel.WarlockDemon.World"] },
-    { key = "dungeon", label = L["BuffPanel.WarlockDemon.Dungeon"], desc = BR.CONTENT_GRID_DUNGEON_DESC },
+    {
+        key = "dungeon",
+        label = L["BuffPanel.WarlockDemon.Dungeon"],
+        desc = BR.ByClient({ retail = L["BuffPanel.WarlockDemon.Dungeon.Desc"], forever = BR.NONE }),
+    },
     { key = "raid", label = L["BuffPanel.WarlockDemon.Raid"] },
     { key = "pvp", label = L["BuffPanel.WarlockDemon.PvP"] },
 }
