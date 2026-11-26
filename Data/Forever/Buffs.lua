@@ -843,11 +843,10 @@ for _, list in ipairs({ ICE_ARMOR_IDS, MAGE_ARMOR_IDS }) do
     end
 end
 
----Highest known rank of the preferred armor, else of the other armor.
+---Highest known rank of the armor that the content row picks, else of the other armor.
 ---@return number?
 local function PreferredMageArmor()
-    local defaults = BR.profile.defaults
-    local preferIce = defaults ~= nil and defaults.mageArmorPreference == "ice"
+    local preferIce = BR.Visibility.IsContentChoiceAllowed("mageArmors", BR.Visibility.GetContentRow(), "ice")
     local first, second = MAGE_ARMOR_IDS, ICE_ARMOR_IDS
     if preferIce then
         first, second = ICE_ARMOR_IDS, MAGE_ARMOR_IDS

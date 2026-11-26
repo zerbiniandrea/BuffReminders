@@ -120,7 +120,7 @@ local BR = ns
 ---@field paladinAuraOrder? table<string, (string|false)[]> Content row -> aura keys in priority order. An empty row accepts any aura
 ---@field thornsRequest? boolean A tank of another class sees a Thorns request reminder
 ---@field righteousFuryShow? "tank"|"always"
----@field mageArmorPreference? "mage"|"ice" Armor that the icon shows and the click casts
+---@field mageArmors? table<string, table<string, boolean>> Content row -> the armor that the icon shows and the click casts, at most one (WoW Forever)
 ---@field textPositions? table<string, {zone: string, offsetX: number, offsetY: number}>
 ---@field textSizes? table<string, number> Screen pixels
 

@@ -317,7 +317,16 @@ BR.defaults = {
         }),
         -- thornsRequest: absent - nil means off
         righteousFuryShow = BR.ByClient({ retail = BR.NONE, forever = "tank" }),
-        mageArmorPreference = BR.ByClient({ retail = BR.NONE, forever = "mage" }),
+        -- The armor that the icon shows and a click casts in each content row (WoW Forever), at most one.
+        mageArmors = BR.ByClient({
+            retail = BR.NONE,
+            forever = {
+                world = { ice = true },
+                dungeon = { mage = true },
+                raid = { mage = true },
+                pvp = { ice = true },
+            },
+        }),
         -- Per-text-item size override in screen pixels. An
         -- absent key follows itemTextSize.
         textSizes = {},

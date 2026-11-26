@@ -560,7 +560,6 @@ local DefaultSettingKeys = {
     paladinAuraOrder = "DisplayRefresh",
     thornsRequest = "DisplayRefresh",
     righteousFuryShow = "DisplayRefresh",
-    mageArmorPreference = "DisplayRefresh",
     -- Font (global-only, lives under defaults)
     fontFace = "VisualsRefresh",
     textOutline = "VisualsRefresh",
@@ -573,6 +572,7 @@ local ContentGridKeys = {
     warlockDemons = true,
     warlockSacrificeDemons = true,
     warlockStones = true,
+    mageArmors = true,
     warriorStances = true,
     druidForms = true,
     trackingSpells = true,

@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 74
+BR.Migrations.DB_VERSION = 75
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -910,6 +910,14 @@ function BR.Migrations.RunProfile(profile, isImport)
             local profileDefaults = profile.defaults
             if type(profileDefaults) == "table" then
                 profileDefaults.reagentThreshold = nil
+            end
+        end,
+        -- [75] The mage armor choice becomes one choice per content row. The old choice
+        -- is not carried over, so every profile starts on the new per-content defaults.
+        [75] = function()
+            local profileDefaults = profile.defaults
+            if type(profileDefaults) == "table" then
+                profileDefaults.mageArmorPreference = nil
             end
         end,
     }

@@ -210,10 +210,11 @@ end
 ---@param setting string
 ---@param hintText string
 ---@param choices ContentGridChoice[]
----@param single? boolean A row holds at most one choice. A click on the selected choice clears the row.
+---@param pick? "atMostOne"|"exactlyOne" Choices per row. Default any number. "atMostOne": a click on the
+---selected choice clears the row. "exactlyOne": a click on the selected choice does nothing.
 ---@param rows? { key: string, label: string, desc: string?, choices: ContentGridChoice[]? }[] The content rows if nil.
 ---A row with its own choices ignores the choices argument. Cells wrap at the body width.
-local function AddContentGrid(layout, setting, hintText, choices, single, rows)
+local function AddContentGrid(layout, setting, hintText, choices, pick, rows)
     rows = rows or GRID_ROWS
     local IsContentChoiceAllowed = BR.Visibility.IsContentChoiceAllowed
     local hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -297,7 +298,9 @@ local function AddContentGrid(layout, setting, hintText, choices, single, rows)
             cell:SetScript("OnClick", function()
                 local allowed = IsContentChoiceAllowed(setting, row.key, choice.key)
                 local rowPath = "defaults." .. setting .. "." .. row.key .. "."
-                if single then
+                if pick == "exactlyOne" and allowed then
+                    return
+                elseif pick then
                     -- Every choice gets an explicit value, because a missing key reads the code default.
                     local changes = {}
                     for _, other in ipairs(rowChoices) do
@@ -1348,24 +1351,18 @@ local SPECIAL_SECTIONS = {
 
     mageArmor = {
         build = function(layout)
-            local drop = Components.Dropdown(body, {
-                label = L["BuffPanel.MageArmor"],
-                labelWidth = DRAWER_LABEL_W,
-                width = DRAWER_FIELD_W,
-                options = {
-                    { label = L["BuffPanel.MageArmor.Mage"], value = "mage" },
-                    { label = L["BuffPanel.MageArmor.Ice"], value = "ice" },
+            AddContentGrid(layout, "mageArmors", L["BuffPanel.MageArmor.Hint"], {
+                {
+                    key = "mage",
+                    label = L["BuffPanel.MageArmor.Mage"],
+                    icon = C_Spell.GetSpellTexture(22783),
                 },
-                get = function()
-                    return BR.Config.Get("defaults.mageArmorPreference", "mage")
-                end,
-                tooltip = { title = L["BuffPanel.MageArmor"], desc = L["BuffPanel.MageArmor.Desc"] },
-                onChange = function(val)
-                    BR.Config.Set("defaults.mageArmorPreference", val)
-                end,
-            })
-            tinsert(bodyHolders, drop)
-            layout:Add(drop, 26, COMPONENT_GAP)
+                {
+                    key = "ice",
+                    label = L["BuffPanel.MageArmor.Ice"],
+                    icon = C_Spell.GetSpellTexture(10220),
+                },
+            }, "exactlyOne")
         end,
     },
 
@@ -1518,7 +1515,7 @@ local SPECIAL_SECTIONS = {
                 "warlockSacrificeDemons",
                 L["BuffPanel.SacrificeDemon.Hint"],
                 WarlockDemonGridChoices(),
-                true,
+                "atMostOne",
                 TALENT_GROUP_ROWS
             )
         end,
@@ -1529,7 +1526,7 @@ local SPECIAL_SECTIONS = {
             AddContentGrid(layout, "warlockStones", L["BuffPanel.WarlockStone.Hint"], {
                 { key = "spellstone", label = BR.GetSpellName(1237152) or L["Buff.Spellstone"], icon = 134131 },
                 { key = "firestone", label = BR.GetSpellName(758) or L["Buff.Firestone"], icon = 134085 },
-            }, true, TALENT_GROUP_ROWS)
+            }, "atMostOne", TALENT_GROUP_ROWS)
         end,
     },
 
@@ -1680,7 +1677,7 @@ local SPECIAL_SECTIONS = {
                     icon = C_Spell.GetSpellTexture(spell.spellID),
                 }
             end
-            AddContentGrid(layout, "trackingSpells", L["BuffPanel.Tracking.Hint"], {}, false, rows)
+            AddContentGrid(layout, "trackingSpells", L["BuffPanel.Tracking.Hint"], {}, nil, rows)
         end,
         warn = function()
             if not BR.StateHelpers.IsBuffEnabled("tracking") then
