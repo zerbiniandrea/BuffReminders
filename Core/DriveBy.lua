@@ -352,6 +352,7 @@ BR.Client.RegisterEvent(eventFrame, "UNIT_FLAGS", "target")
 BR.Client.RegisterEvent(eventFrame, "UNIT_LEVEL", "target")
 BR.Client.RegisterEvent(eventFrame, "UNIT_CONNECTION", "target")
 BR.Client.RegisterEvent(eventFrame, "UNIT_FACTION", "target", "player")
+BR.Client.RegisterEvent(eventFrame, "SPELLS_CHANGED")
 BR.Client.RegisterEvent(eventFrame, "UNIT_SPELLCAST_SENT", "player")
 BR.Client.RegisterEvent(eventFrame, "UNIT_SPELLCAST_SUCCEEDED", "player")
 

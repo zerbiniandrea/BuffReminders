@@ -4032,9 +4032,23 @@ eventHandlers.TRAIT_CONFIG_UPDATED = function()
     end)
 end
 
-eventHandlers.SPELLS_CHANGED = function()
-    -- Catch delayed spell availability after spec/talent changes (noisy event, keep cheap)
-    SetDirty()
+do
+    local overlayRefreshPending = false
+
+    local function RefreshOverlaySpellsSoon()
+        overlayRefreshPending = false
+        BR.SecureButtons.RefreshOverlaySpells()
+    end
+
+    eventHandlers.SPELLS_CHANGED = function()
+        SetDirty()
+        -- A stored click action keeps its spell ID, so a newly learned rank needs a resolve.
+        -- The event comes in bursts, so one resolve covers the burst.
+        if not overlayRefreshPending then
+            overlayRefreshPending = true
+            C_Timer.After(0.2, RefreshOverlaySpellsSoon)
+        end
+    end
 end
 
 eventHandlers.PLAYER_EQUIPMENT_CHANGED = function()
