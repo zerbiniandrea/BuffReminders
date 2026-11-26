@@ -495,7 +495,7 @@ end
 ---@return number? itemID
 local function SoulstoneInBags()
     for _, id in ipairs(SOULSTONE_ITEMS) do
-        if C_Item.GetItemCount(id) > 0 then
+        if BR.StateHelpers.GetItemCountCached(id) > 0 then
             return id
         end
     end
@@ -862,20 +862,6 @@ local function PreferredMageArmor()
         first, second = ICE_ARMOR_IDS, MAGE_ARMOR_IDS
     end
     return HighestKnownSpell(first) or HighestKnownSpell(second)
-end
-
--- State remembers the tank that a role buff goes on. With no tank, the buff goes on the player.
----@param buffKey string
----@return fun(spellID: number?): string
-local function TankOrSelfMacro(buffKey)
-    return function(spellID)
-        local name = BR.GetSpellName(spellID) or ""
-        local tank = BR.TargetMemory.Get(buffKey)
-        if tank then
-            return "/cast [@" .. tank .. ",help,nodead] " .. name
-        end
-        return "/cast [@player] " .. name
-    end
 end
 
 local SYMBOL_OF_KINGS = 21177
@@ -2093,13 +2079,8 @@ local BUFF_TABLES = {
                 local pinned = defaults and defaults.soulstonePinnedTarget
                 return pinned ~= "" and pinned or nil
             end,
-            clickMacro = function(spellID)
-                local stone = SoulstoneInBags()
-                if stone then
-                    return "/use " .. BR.SoulstoneTargetConditions() .. "item:" .. stone
-                end
-                return "/cast " .. (BR.GetSpellName(spellID) or "")
-            end,
+            fallbackRole = "HEALER",
+            clickItem = SoulstoneInBags,
         },
     },
     ---@type TargetedBuff[]
@@ -2111,7 +2092,6 @@ local BUFF_TABLES = {
             name = L["Buff.OathOfLight"],
             class = "PALADIN",
             overlayText = L["Overlay.NoOath"],
-            clickMacro = BR.TargetedClickMacro("oathOfLight"),
         },
         {
             spellID = { 9910, 9756, 8914, 1075, 782, 467 },
@@ -2129,7 +2109,6 @@ local BUFF_TABLES = {
                 local defaults = BR.profile.defaults
                 return playerClass == "DRUID" or (defaults ~= nil and defaults.thornsRequest == true)
             end,
-            clickMacro = TankOrSelfMacro("thorns"),
             infoTooltip = { title = L["Tooltip.TankTarget"], desc = L["Tooltip.ThornsTank.Desc"] },
         },
     },

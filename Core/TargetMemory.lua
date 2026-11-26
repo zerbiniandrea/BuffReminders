@@ -6,7 +6,7 @@ local BR = ns
 -- TARGET MEMORY
 -- ============================================================================
 -- Remembers who the player's cast-on-others buffs are on (buffKey -> name/class)
--- so click macros can re-target the same person and tooltips can show them.
+-- so a click can cast on the same person and tooltips can show them.
 -- Runtime-only (not saved): the aura is the source of truth. A live scan
 -- rebuilds the memory when the aura API allows the query.
 

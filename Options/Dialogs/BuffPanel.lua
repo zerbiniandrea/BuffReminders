@@ -1274,9 +1274,7 @@ local SPECIAL_SECTIONS = {
                     return BR.Config.Get("defaults.soulstonePinnedTarget") or ""
                 end,
                 onChange = function(text)
-                    -- Strip macro-structural characters: the name is spliced into
-                    -- macrotext and must never break out of the [@...] conditional
-                    text = strtrim(((text or ""):gsub("[%[%]\r\n]", "")))
+                    text = strtrim(text or "")
                     BR.Config.Set("defaults.soulstonePinnedTarget", text ~= "" and text or nil)
                     Components.RefreshAll()
                 end,

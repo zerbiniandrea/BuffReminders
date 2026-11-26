@@ -119,6 +119,8 @@ local DK_RUNEFORGES = {
 ---@field target? BuffTarget Default "anyone"
 ---@field copies? BuffCopies Default "any"
 ---@field pinnedTarget? fun(): string? User-assigned hard target name, nil when unset (e.g., Soulstone pin)
+---@field fallbackRole? RoleType With no pin and no remembered target, the click casts on the first member with this role
+---@field clickItem? fun(): number? Item that the click uses on the cast target. nil: the click casts castSpellID
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
 ---@field groupOnly? boolean Only show when in a group (hide when solo)
 ---@field suppressedByEntry? string Hide when this entry key is already visible (e.g., self buff covers it)
@@ -142,12 +144,12 @@ local DK_RUNEFORGES = {
 ---@field requireSpecId? number
 ---@field infoTooltip? TooltipText
 ---@field defaultEnabled? boolean Ships disabled when false (opt-in); enabled otherwise. Resolved at read time by IsBuffEnabled.
----@field clickMacro? fun(spellID: number?): string
 ---@field casterBuffId? number Check this buff on the caster instead of scanning group
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
 ---@field target? BuffTarget Default "ally"
 ---@field copies? BuffCopies Default "own"
 ---@field targetHint? string Gray text after the remembered target name in the icon tooltip
+---@field fallbackRole? RoleType With no remembered target, the click casts on the first member with this role
 ---@field levelRequired? number A caster in the group must have this level to count
 ---@field noExpirationGlow? boolean
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
@@ -434,8 +436,6 @@ local STANCE_RULES = {
         end,
     },
 }
-
-local TargetedClickMacro = BR.TargetedClickMacro
 
 -- The single source of truth for the default poison order.
 -- BR.profile.roguePoisonPreferences overrides it, with a per-entry enabled flag.
@@ -811,9 +811,7 @@ local BUFF_TABLES = {
                 end
                 return nil
             end,
-            clickMacro = function(spellID)
-                return "/cast " .. BR.SoulstoneTargetConditions() .. (BR.GetSpellName(spellID) or "")
-            end,
+            fallbackRole = "HEALER",
         },
     },
     ---@type TargetedBuff[]
@@ -829,7 +827,6 @@ local BUFF_TABLES = {
             glowDetectable = true,
             excludeSpellID = 200025, -- Hide when Beacon of Virtue is known
             icons = { textures = { 236247 } }, -- Force original icon (talents replace the texture)
-            clickMacro = TargetedClickMacro("beaconOfLight"),
         },
         {
             spellID = 156910,
@@ -841,7 +838,6 @@ local BUFF_TABLES = {
             requireSpecId = 65, -- Holy only
             glowDetectable = true,
             excludeSpellID = 200025, -- Hide when Beacon of Virtue is known
-            clickMacro = TargetedClickMacro("beaconOfFaith"),
         },
         {
             spellID = 360827,
@@ -850,7 +846,6 @@ local BUFF_TABLES = {
             class = "EVOKER",
             overlayText = L["Overlay.NoScales"],
             requireSpecId = 1473, -- Augmentation
-            clickMacro = TargetedClickMacro("blisteringScales"),
         },
         {
             spellID = 974,
@@ -862,7 +857,6 @@ local BUFF_TABLES = {
                 title = L["Tooltip.MayShowExtraIcon"],
                 desc = L["Tooltip.MayShowExtraIcon.Desc"],
             },
-            clickMacro = TargetedClickMacro("earthShieldOthers"),
         },
         {
             spellID = 369459,
@@ -871,7 +865,7 @@ local BUFF_TABLES = {
             class = "EVOKER",
             beneficiaryRole = "HEALER",
             overlayText = L["Overlay.NoSource"],
-            clickMacro = TargetedClickMacro("sourceOfMagic"),
+            fallbackRole = "HEALER",
         },
         {
             spellID = 474750,
@@ -880,7 +874,6 @@ local BUFF_TABLES = {
             name = L["Buff.SymbioticRelationship"],
             class = "DRUID",
             overlayText = L["Overlay.NoLink"],
-            clickMacro = TargetedClickMacro("symbioticRelationship"),
         },
         {
             spellID = 412710,
@@ -889,7 +882,6 @@ local BUFF_TABLES = {
             class = "EVOKER",
             overlayText = L["Overlay.NoTimeless"],
             requireSpecId = 1473, -- Augmentation
-            clickMacro = TargetedClickMacro("timelessness"),
         },
         {
             -- 408233 is the cast spell (known by the player); 410318 is the link aura applied
@@ -902,7 +894,6 @@ local BUFF_TABLES = {
             class = "EVOKER",
             overlayText = L["Overlay.NoWeyrnstone"],
             icons = { spells = { 408233 } }, -- Force the cast-spell icon (avoid duplicate icons from spellID list)
-            clickMacro = TargetedClickMacro("weyrnstone"),
         },
     },
     ---@type SelfBuff[]

@@ -2989,6 +2989,12 @@ UpdateDisplay = function(refreshMode)
             -- An aura can change the action of a utility reminder (the camp stage).
             BR.SecureButtons.UpdateActionButtons("utility")
         end
+        -- The cast unit follows the roster, the auras, the remembered target and the bags.
+        if not InCombatLockdown() then
+            BR.SecureButtons.UpdateActionButtons("raid")
+            BR.SecureButtons.UpdateActionButtons("presence")
+            BR.SecureButtons.UpdateActionButtons("targeted")
+        end
     end
 end
 

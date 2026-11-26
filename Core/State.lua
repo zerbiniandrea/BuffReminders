@@ -3896,6 +3896,12 @@ BR.StateHelpers = {
     FirstOwnedItem = FirstOwnedItem,
     CustomItemMode = CustomItemMode,
     IsPlayerTank = IsPlayerTank,
+    GetUnitRole = GetUnitRole,
+    ---Members who can receive a cast, from the last roster scan. The list is reused.
+    ---@return table[]
+    GetValidUnits = function()
+        return currentValidUnits
+    end,
     AsSpellList = AsSpellList,
     BuffTargets = BuffTargets,
 }
