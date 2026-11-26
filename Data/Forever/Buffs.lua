@@ -1993,6 +1993,15 @@ local BUFF_TABLES = {
     ---@type TargetedBuff[]
     targeted = {
         {
+            spellID = 1328548,
+            key = "oathOfLight",
+            target = "allyOrSelf",
+            name = L["Buff.OathOfLight"],
+            class = "PALADIN",
+            overlayText = L["Overlay.NoOath"],
+            clickMacro = BR.TargetedClickMacro("oathOfLight"),
+        },
+        {
             spellID = { 9910, 9756, 8914, 1075, 782, 467 },
             key = "thorns",
             name = L["Buff.Thorns"],
@@ -2011,18 +2020,25 @@ local BUFF_TABLES = {
             clickMacro = TankOrSelfMacro("thorns"),
             infoTooltip = { title = L["Tooltip.TankTarget"], desc = L["Tooltip.ThornsTank.Desc"] },
         },
-        {
-            spellID = 1328548,
-            key = "oathOfLight",
-            target = "allyOrSelf",
-            name = L["Buff.OathOfLight"],
-            class = "PALADIN",
-            overlayText = L["Overlay.NoOath"],
-            clickMacro = BR.TargetedClickMacro("oathOfLight"),
-        },
     },
     ---@type SelfBuff[]
     self = {
+        -- spellID holds the racials for the known-spell gate. Each Skyborne race knows one of them.
+        {
+            spellID = SKYBORNE_RACIALS,
+            buffIdOverride = { 1259691, 1270893 }, -- Attuned, Charged
+            key = "skyborneAttunement",
+            defaultEnabled = false, -- opt-in: ships disabled
+            name = L["Buff.SkyborneAttunement"],
+            overlayText = L["Overlay.FindLeyline"],
+            icons = {
+                spells = SKYBORNE_RACIALS,
+                dynamic = function()
+                    local id = HighestKnownSpell(SKYBORNE_RACIALS)
+                    return id and BR.Icons.GetBuffTexture(id)
+                end,
+            },
+        },
         {
             spellID = {
                 11735, -- Demon Armor
@@ -2069,34 +2085,6 @@ local BUFF_TABLES = {
             end,
             clickMacro = DemonSetupMacro,
             infoTooltip = { title = L["Tooltip.DemonSetup"], desc = L["Tooltip.DemonSetup.Desc"] },
-        },
-        {
-            spellID = WARLOCK_STONE_CREATE,
-            key = "warlockStone",
-            name = L["Buff.WarlockStone"],
-            class = "WARLOCK",
-            overlayText = L["Overlay.NoStone"],
-            -- The enchant set times the expiry warning. customCheck decides what is missing.
-            enchantID = WARLOCK_STONE_ENCHANTS,
-            enchantDuration = 7200, -- seconds
-            visibilityCondition = function()
-                return HandHoldsWeapon(16)
-            end,
-            customCheck = function()
-                if not HighestKnownSpell(WARLOCK_STONE_CREATE) then
-                    return nil
-                end
-                local id = BR.BuffState.GetWeaponImbue(16)
-                local picked = PickedStone()
-                return not (id and (picked and picked.enchants or WARLOCK_STONE_ENCHANTS)[id])
-            end,
-            icons = {
-                textures = { WARLOCK_STONES[1].icon, WARLOCK_STONES[2].icon },
-                dynamic = function()
-                    return (ClickStone()).icon
-                end,
-            },
-            clickMacro = WarlockStoneMacro,
         },
         -- The stance bar stays readable in combat, so this reminder works there.
         {
@@ -2229,6 +2217,34 @@ local BUFF_TABLES = {
             end,
         },
         {
+            spellID = WARLOCK_STONE_CREATE,
+            key = "warlockStone",
+            name = L["Buff.WarlockStone"],
+            class = "WARLOCK",
+            overlayText = L["Overlay.NoStone"],
+            -- The enchant set times the expiry warning. customCheck decides what is missing.
+            enchantID = WARLOCK_STONE_ENCHANTS,
+            enchantDuration = 7200, -- seconds
+            visibilityCondition = function()
+                return HandHoldsWeapon(16)
+            end,
+            customCheck = function()
+                if not HighestKnownSpell(WARLOCK_STONE_CREATE) then
+                    return nil
+                end
+                local id = BR.BuffState.GetWeaponImbue(16)
+                local picked = PickedStone()
+                return not (id and (picked and picked.enchants or WARLOCK_STONE_ENCHANTS)[id])
+            end,
+            icons = {
+                textures = { WARLOCK_STONES[1].icon, WARLOCK_STONES[2].icon },
+                dynamic = function()
+                    return (ClickStone()).icon
+                end,
+            },
+            clickMacro = WarlockStoneMacro,
+        },
+        {
             spellID = { 20906, 20905, 19506, 1299348, 1299346 },
             key = "trueshotAura",
             name = L["Buff.TrueshotAura"],
@@ -2286,22 +2302,6 @@ local BUFF_TABLES = {
                 local id = ShamanImbueCastID()
                 return id and ("/cast " .. (BR.GetSpellName(id) or "")) or ""
             end,
-        },
-        -- spellID holds the racials for the known-spell gate. Each Skyborne race knows one of them.
-        {
-            spellID = SKYBORNE_RACIALS,
-            buffIdOverride = { 1259691, 1270893 }, -- Attuned, Charged
-            key = "skyborneAttunement",
-            defaultEnabled = false, -- opt-in: ships disabled
-            name = L["Buff.SkyborneAttunement"],
-            overlayText = L["Overlay.FindLeyline"],
-            icons = {
-                spells = SKYBORNE_RACIALS,
-                dynamic = function()
-                    local id = HighestKnownSpell(SKYBORNE_RACIALS)
-                    return id and BR.Icons.GetBuffTexture(id)
-                end,
-            },
         },
     },
     ---@type SelfBuff[]
@@ -2505,79 +2505,6 @@ local BUFF_TABLES = {
     },
     ---@type UtilityBuff[]
     utility = {
-        -- spellID gives the click overlay a known spell. PreClick replaces it with the pick.
-        {
-            key = "driveByBuffs",
-            defaultEnabled = false, -- opt-in: casts on strangers
-            name = L["Buff.DriveByBuffs"],
-            spellID = SINGLE_TARGET_RANKS,
-            icons = {
-                spells = { 10157, 10938, 9885 },
-                dynamic = function()
-                    local spellID = BR.DriveBy.Pick()
-                    return spellID and BR.Icons.GetBuffTexture(spellID)
-                end,
-            },
-            overlayText = L["Overlay.DriveBy"],
-            infoTooltip = { title = L["Buff.DriveByBuffs"], desc = L["Tooltip.DriveBy.Desc"] },
-            castUnit = "target",
-            subChoices = DRIVE_BY_ROW,
-            clickSpell = function()
-                return BR.DriveBy.Pick()
-            end,
-            customCheck = function()
-                return BR.DriveBy.Pick() ~= nil
-            end,
-        },
-        {
-            key = "tracking",
-            name = L["Buff.Tracking"],
-            spellID = TRACKING_SPELL_IDS,
-            icons = {
-                spells = { 2383, 2580, 1494 },
-                dynamic = function()
-                    local spellID = BR.Tracking.Pick()
-                    return spellID and BR.Icons.GetBuffTexture(spellID)
-                end,
-            },
-            overlayText = L["Overlay.NoTracking"],
-            subChoices = TRACKING_ROW,
-            clickSpell = function()
-                return BR.Tracking.Pick()
-            end,
-            customCheck = function()
-                if BR.GameContext.IsInCombat() then
-                    return false
-                end
-                return BR.Tracking.Pick() ~= nil and not BR.BuffState.IsTrackingActive()
-            end,
-        },
-        {
-            key = "sleepingBag",
-            name = L["Buff.SleepingBag"],
-            icons = { textures = { C_Item.GetItemIconByID(SLEEPING_BAG.itemID) or 134400 } }, -- else a question mark
-            overlayText = L["Overlay.SleepingBag"],
-            infoTooltip = { title = L["Buff.SleepingBag"], desc = L["Tooltip.SleepingBag.Desc"] },
-            clickItem = SLEEPING_BAG.itemID,
-            countdown = SleepingBagRestEnd,
-            customCheck = function(isAuraRestricted)
-                local GameContext = BR.GameContext
-                if isAuraRestricted or GameContext.IsInCombat() then
-                    return false
-                end
-                if GameContext.GetPlayerLevel() >= GameContext.GetMaxExpansionLevel() then
-                    return false
-                end
-                -- The bag itself makes the player rest, so this check comes before the rest check.
-                if SleepingBagRestEnd() then
-                    return true
-                end
-                return CanPlaceSleepingBag(isAuraRestricted)
-                    and not C_UnitAuras.GetUnitAuraBySpellID("player", SLEEPING_BAG.auraID)
-            end,
-            renewAuraID = SLEEPING_BAG.auraID,
-            canRenew = CanPlaceSleepingBag,
-        },
         {
             key = "camp",
             name = L["Buff.Camp"],
@@ -2612,6 +2539,56 @@ local BUFF_TABLES = {
             end,
             renewAuraID = CAMP.benefitsID,
             canRenew = CanRenewCamp,
+        },
+        {
+            key = "sleepingBag",
+            name = L["Buff.SleepingBag"],
+            icons = { textures = { C_Item.GetItemIconByID(SLEEPING_BAG.itemID) or 134400 } }, -- else a question mark
+            overlayText = L["Overlay.SleepingBag"],
+            infoTooltip = { title = L["Buff.SleepingBag"], desc = L["Tooltip.SleepingBag.Desc"] },
+            clickItem = SLEEPING_BAG.itemID,
+            countdown = SleepingBagRestEnd,
+            customCheck = function(isAuraRestricted)
+                local GameContext = BR.GameContext
+                if isAuraRestricted or GameContext.IsInCombat() then
+                    return false
+                end
+                if GameContext.GetPlayerLevel() >= GameContext.GetMaxExpansionLevel() then
+                    return false
+                end
+                -- The bag itself makes the player rest, so this check comes before the rest check.
+                if SleepingBagRestEnd() then
+                    return true
+                end
+                return CanPlaceSleepingBag(isAuraRestricted)
+                    and not C_UnitAuras.GetUnitAuraBySpellID("player", SLEEPING_BAG.auraID)
+            end,
+            renewAuraID = SLEEPING_BAG.auraID,
+            canRenew = CanPlaceSleepingBag,
+        },
+        -- spellID gives the click overlay a known spell. PreClick replaces it with the pick.
+        {
+            key = "driveByBuffs",
+            defaultEnabled = false, -- opt-in: casts on strangers
+            name = L["Buff.DriveByBuffs"],
+            spellID = SINGLE_TARGET_RANKS,
+            icons = {
+                spells = { 10157, 10938, 9885 },
+                dynamic = function()
+                    local spellID = BR.DriveBy.Pick()
+                    return spellID and BR.Icons.GetBuffTexture(spellID)
+                end,
+            },
+            overlayText = L["Overlay.DriveBy"],
+            infoTooltip = { title = L["Buff.DriveByBuffs"], desc = L["Tooltip.DriveBy.Desc"] },
+            castUnit = "target",
+            subChoices = DRIVE_BY_ROW,
+            clickSpell = function()
+                return BR.DriveBy.Pick()
+            end,
+            customCheck = function()
+                return BR.DriveBy.Pick() ~= nil
+            end,
         },
         {
             key = "lowAmmo",
@@ -2685,6 +2662,29 @@ local BUFF_TABLES = {
             end,
             customCheck = function()
                 return BR.BuffState.GetLowestDurability() < (BR.Config.Get("defaults.repairThreshold", 20) / 100)
+            end,
+        },
+        {
+            key = "tracking",
+            name = L["Buff.Tracking"],
+            spellID = TRACKING_SPELL_IDS,
+            icons = {
+                spells = { 2383, 2580, 1494 },
+                dynamic = function()
+                    local spellID = BR.Tracking.Pick()
+                    return spellID and BR.Icons.GetBuffTexture(spellID)
+                end,
+            },
+            overlayText = L["Overlay.NoTracking"],
+            subChoices = TRACKING_ROW,
+            clickSpell = function()
+                return BR.Tracking.Pick()
+            end,
+            customCheck = function()
+                if BR.GameContext.IsInCombat() then
+                    return false
+                end
+                return BR.Tracking.Pick() ~= nil and not BR.BuffState.IsTrackingActive()
             end,
         },
     },
