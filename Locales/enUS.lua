@@ -464,7 +464,6 @@ english["Externals.ShowTooltips.Desc"] =
 english["Externals.CasterName"] = "Caster name"
 english["Externals.CasterName.Desc"] =
     "Show who cast the buff next to the icon, in class color."
-english["Externals.CasterNameOff"] = "Pick a side for Caster name first."
 english["Externals.Sound.Claimed"] = "%s already plays a sound for this spell ID."
 -- Externals: the player's own entries
 english["Externals.Custom"] = "Your Buffs"
@@ -673,7 +672,6 @@ english["Options.ShowMissingCountOnly.Desc"] =
 -- ============================================================================
 -- OPTIONS: TEXT POSITIONS
 -- ============================================================================
-english["Options.TextPositions.Zone"] = "Position"
 english["Options.TextPositions.Offset"] = "Offset"
 english["Options.TextPositions.OffsetX.Short"] = "X"
 english["Options.TextPositions.OffsetY.Short"] = "Y"
@@ -793,7 +791,6 @@ english["Options.PetDisplay.Mode.Desc"] = "How missing pet reminders are display
 english["Options.PetLabels"] = "Pet labels"
 english["Options.PetLabels.Classes"] = "Labels for"
 english["Options.PetLabels.Classes.Desc"] = "Pet labels show only on the pets of the ticked classes."
-english["Options.PetLabels.Desc"] = "Show pet name and specialization below each icon."
 
 -- ============================================================================
 -- OPTIONS: CONSUMABLE DISPLAY
@@ -1377,8 +1374,6 @@ english["Options.ResetToDefaults"] = "Reset to Defaults"
 -- ============================================================================
 english["Options.Off"] = "Off"
 english["Options.Auto"] = "Auto"
-english["Options.Always"] = "Always"
-english["Options.ReadyCheck"] = "Ready check"
 english["Options.Min"] = "min"
 
 -- ============================================================================
