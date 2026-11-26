@@ -21,12 +21,12 @@ local BR = ns
 ---@field countText string?                  -- "17/20" for raid buffs, "5m" for expiring consumables
 ---@field overlayText string?                -- "NO\nAURA" for non-raid
 ---@field shouldGlow boolean                 -- Expiration glow?
----@field iconByRole table<RoleType,number>? -- Role-based icon override
 ---@field rebuffWarning boolean?             -- Consumable rebuff pulsing border?
 ---@field isEating boolean?                 -- Food entry: player is currently eating
 ---@field countdownExpirationTime number?   -- GetTime()-based end of a live countdown
 ---@field countdownDuration number?         -- Length of the progress sweep that ends with the countdown
 ---@field progressText string?              -- Progress toward the goal of the countdown, e.g. "1/3"
+---@field stackText string?                 -- Bag count of the click item, shown above 1
 ---@field petActions PetActionList?           -- Expanded pet summon actions
 ---@field dynamicIcon number|string|nil      -- Dynamic icon texture override (e.g. next poison to cast)
 ---@field glowKindOverride "expiring"|"missing"|nil -- Override glow kind (e.g. healthstone low stock uses expiring glow)
@@ -761,6 +761,25 @@ local function GetItemCountCached(itemID, live)
     -- Failed/nil read: do not cache, so the next refresh retries instead of
     -- freezing a false 0 until the next bag event.
     return 0
+end
+
+---@type table<number, number>
+local cachedItemIcons = {}
+
+---@param itemID number
+---@return number?
+local function GetItemIconCached(itemID)
+    local icon = cachedItemIcons[itemID]
+    if icon then
+        return icon
+    end
+    -- pcall: the ID is user-entered and an invalid ID can throw.
+    local ok, fileID = pcall(C_Item.GetItemIconByID, itemID)
+    if ok and fileID then
+        cachedItemIcons[itemID] = fileID
+        return fileID
+    end
+    return nil
 end
 
 -- ============================================================================
@@ -3208,6 +3227,17 @@ local function RefreshCustom(isAuraRestricted, hideExpiring)
                 TrySetEntryExpiring(entry, remaining, lead, customExGlow)
             end
         end
+
+        entry.stackText = nil
+        if entry.visible and buff.castItemID then
+            local ownedItemID = FirstOwnedItem(buff.castItemID)
+            -- Same pick as the click: the first owned item, else the first listed item.
+            entry.dynamicIcon = GetItemIconCached(ownedItemID or AsSpellList(buff.castItemID)[1])
+            local count = ownedItemID and GetItemCountCached(ownedItemID) or 0
+            if count > 1 then
+                entry.stackText = tostring(count)
+            end
+        end
     end
 end
 
@@ -3271,6 +3301,7 @@ function BuffState.Refresh(refreshMode)
             entry.countdownExpirationTime = nil
             entry.countdownDuration = nil
             entry.progressText = nil
+            entry.stackText = nil
             entry.petActions = nil
             entry.dynamicIcon = nil
             entry.glowKindOverride = nil
@@ -3629,6 +3660,7 @@ end
 function BuffState.InvalidateItemCache()
     cachedItemOwnership = {}
     cachedItemCounts = {}
+    cachedItemIcons = {}
 end
 
 ---Aura spell of the consumable the player runs now, or nil when none is up.

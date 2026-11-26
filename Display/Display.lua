@@ -736,25 +736,17 @@ local FormatRemainingTime = BR.StateHelpers.FormatRemainingTime
 local FormatCountdownTime = BR.StateHelpers.FormatCountdownTime
 local IsCountdownEntry = BR.StateHelpers.IsCountdownEntry
 
-local GetBuffTexture = BR.Icons.GetBuffTexture
 local GetBuffIcons = BR.Icons.GetBuffIcons
-local ResolveRoleTexture = BR.Icons.ResolveRoleTexture
 local ResolveFrameTexture = BR.Icons.ResolveFrameTexture
 
----Invalidate the cached texture for a spell ID and re-resolve every buff
----frame whose def uses it. Used after spell data settles to pick up cosmetic
----overrides (e.g. warlock green fire on Burning Rush) that
----C_Spell.GetSpellTexture does not return at login time. Consumable frames
----paint bag-item icons per render and do not reference these spell IDs, so
----this function leaves them alone - no flash.
+---A cosmetic override (e.g. warlock green fire on Burning Rush) is missing from the
+---spell texture read at login, so the cached texture must be read again.
 ---@param spellID number
 local function InvalidateBuffIconBySpellID(spellID)
     BR.Icons.InvalidateSpell(spellID)
     for _, frame in pairs(buffFrames) do
         local def = frame.buffDef
-        if def and frame.icon then
-            -- def.spellID is SpellID (number|number[]); match either form so
-            -- a future multi-spell buff sharing this ID is also covered.
+        if def then
             local sid = def.spellID
             local matches = sid == spellID
             if not matches and type(sid) == "table" then
@@ -767,13 +759,10 @@ local function InvalidateBuffIconBySpellID(spellID)
             end
             if matches then
                 BR.Icons.InvalidateBuffIcons(def)
-                local texture = ResolveFrameTexture(frame)
-                if texture then
-                    frame.icon:SetTexture(texture)
-                end
             end
         end
     end
+    SetDirty()
 end
 
 -- Forward declarations
@@ -1791,7 +1780,6 @@ local function GenerateTestEntries()
         entry.countdownDuration = nil
         entry.progressText = nil
         entry.petActions = nil
-        entry.iconByRole = nil
         entry.dynamicIcon = nil
         entry.subLabel = nil
     end
@@ -1842,7 +1830,6 @@ local function GenerateTestEntries()
                 elseif category == "pet" then
                     entry.displayType = "text"
                     entry.overlayText = buff.overlayText
-                    entry.iconByRole = buff.icons and buff.icons.byRole
                     entry.shouldGlow = missGlowEnabled
                     if buff.groupId == "pets" and BR.PetHelpers then
                         local actions = BR.PetHelpers.GetPetActions(playerClass)
@@ -1854,7 +1841,6 @@ local function GenerateTestEntries()
                     -- consumable, presence, targeted, self, custom, loadout, utility
                     entry.displayType = "text"
                     entry.overlayText = buff.overlayTextFn and buff.overlayTextFn() or buff.overlayText
-                    entry.iconByRole = buff.icons and buff.icons.byRole
                     entry.shouldGlow = missGlowEnabled
 
                     -- Loadout rules resolve their icon live (no persisted icons table);
@@ -2232,7 +2218,6 @@ local function RenderVisibleEntry(frame, entry)
     -- Clear consumable overlays at the start of each render (re-applied by relevant paths below)
     ClearConsumableOverlays(frame)
 
-    -- Hide stack count by default; only the consumable-with-items path shows it
     frame.stackCount:Hide()
 
     -- State provides these fields as a snapshot, so the display
@@ -2290,14 +2275,10 @@ local function RenderVisibleEntry(frame, entry)
     local glowKind = entry.glowKindOverride or (entry.displayType == "expiring" and "expiring" or "missing")
     local cachedGlow = entry.category and GetCachedGlowSettings(entry.category, glowKind) or nil
 
-    -- Apply dynamic icon overrides (e.g. rogue poison expiring soonest, role-based shields)
-    if entry.dynamicIcon then
-        frame.icon:SetTexture(entry.dynamicIcon)
-    elseif entry.iconByRole and frame.buffDef then
-        local texture = ResolveRoleTexture(frame.buffDef)
-        if texture then
-            frame.icon:SetTexture(texture)
-        end
+    -- The render owns the icon. The consumable and pet paths below paint over it.
+    local texture = entry.dynamicIcon or ResolveFrameTexture(frame)
+    if texture then
+        frame.icon:SetTexture(texture)
     end
 
     if entry.displayType == "count" or entry.displayType == "expiring" then
@@ -2344,6 +2325,12 @@ local function RenderVisibleEntry(frame, entry)
         else
             ShowTextFrame(frame, entry.overlayText, entry.shouldGlow, cachedGlow)
         end
+    end
+
+    if entry.stackText then
+        ApplyFont(frame.stackCount, BR.SecureButtons.ComputeConsumableFontSize("stackCount"))
+        frame.stackCount:SetText(entry.stackText)
+        frame.stackCount:Show()
     end
 
     -- Loadout reminders: the icon shows the "what is wrong" tag; frame.subLabel
@@ -3352,10 +3339,6 @@ BR.CustomBuffs = {
     UpdateFrame = function(key, spellIDValue, displayName)
         local frame = buffFrames[key]
         if frame then
-            local texture = GetBuffTexture(spellIDValue)
-            if texture then
-                frame.icon:SetTexture(texture)
-            end
             frame.displayName = displayName
             frame.spellIDs = spellIDValue
             -- Rebuild array (dialog creates a new object for db.customBuffs[key], staling the old ref)
@@ -3851,21 +3834,7 @@ eventHandlers.PLAYER_ENTERING_WORLD = function()
     end
     -- Delayed update to catch glow events that fire after reload
     C_Timer.After(0.5, SetDirty)
-    -- Refresh custom buff icons after spell data is fully loaded (talent-modified icons)
-    -- and warm up the static icon cache for every buff in one pass so the next menu
-    -- open / detached-icons render hits the cached path.
-    C_Timer.After(1.5, function()
-        BR.Icons.PreFillIconCaches()
-        for key, def in pairs(BR.profile.customBuffs or {}) do
-            local frame = buffFrames[key]
-            if frame and def.spellID then
-                local texture = GetBuffTexture(def.spellID)
-                if texture then
-                    frame.icon:SetTexture(texture)
-                end
-            end
-        end
-    end)
+    C_Timer.After(1.5, BR.Icons.PreFillIconCaches)
 end
 
 -- Instance-group state can flip on a zone change without GROUP_ROSTER_UPDATE

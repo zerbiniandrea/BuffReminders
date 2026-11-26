@@ -6,8 +6,7 @@ local BR = ns
 -- ICON / TEXTURE RESOLUTION
 -- ============================================================================
 -- Single source of truth for "given a buff def, what texture(s) represent it".
--- Pure resolution + caching; no frames. Frame-side cache invalidation
--- (re-texturing live frames) lives in Display.lua.
+-- Resolution and caching only. This module never touches a frame.
 
 local tinsert = table.insert
 
@@ -118,19 +117,13 @@ local function GetBuffIcons(buff)
     return out
 end
 
----Apply a buff's dynamic icon spec to a state entry. The `dynamic` function runs at
----call time. `byRole` resolves at render time.
+---`byRole` has no entry field: ResolveFrameTexture resolves it at render time.
 ---@param entry table
 ---@param buff table
 local function ApplyDynamicIcon(entry, buff)
     local icons = buff.icons
-    if not icons then
-        return
-    end
-    if icons.dynamic then
+    if icons and icons.dynamic then
         entry.dynamicIcon = icons.dynamic()
-    elseif icons.byRole then
-        entry.iconByRole = icons.byRole
     end
 end
 
@@ -176,7 +169,6 @@ BR.Icons = {
     GetBuffIcons = GetBuffIcons,
     ApplyDynamicIcon = ApplyDynamicIcon,
     PreFillIconCaches = PreFillIconCaches,
-    ResolveRoleTexture = ResolveRoleTexture,
     ResolveFrameTexture = ResolveFrameTexture,
     ---Invalidate one spell ID's cached texture so the next resolve re-queries the API.
     ---@param spellID number
