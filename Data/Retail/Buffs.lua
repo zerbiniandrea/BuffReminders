@@ -88,6 +88,7 @@ local DK_RUNEFORGES = {
 ---@field defaultEnabled? boolean Ships disabled when false (opt-in); enabled otherwise. Resolved at read time by IsBuffEnabled.
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
 ---@field castOnMissing? boolean The cast takes one target: the click casts on a member who lacks the buff
+---@field castBlocked? fun(unit: string): boolean True when an aura on the unit makes the cast fail. That unit counts as buffed
 ---@field groupCast? GroupCastRank[] Group ranks that use a reagent, highest first. The user turns them on per buff
 ---@field requiresKnownSpell? boolean Only a player who knows one of the spells sees it, except a chatRequestSpell requester. The talents of other members are unreadable
 ---@field chatRequestSpell? fun(): number? The spell that a player of another class asks for. That player checks only their own aura, out of combat. The chat request names the spell
@@ -343,6 +344,7 @@ local PET_SPELLS = {
 ---@field iconSpellID? number Icon of a choice with no spell
 ---@field groupCast? GroupCastRank[] Group ranks of a buff choice, highest first
 ---@field auraIDs? number[] Every aura ID that counts as the buff choice
+---@field castBlocked? fun(unit: string): boolean True when an aura on the unit makes the cast fail
 ---@field resistance? boolean A paladin resistance aura: it reaches the whole raid and suits one boss
 
 ---@class ChoiceOrderGrid

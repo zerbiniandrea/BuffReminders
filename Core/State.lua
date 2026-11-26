@@ -1332,12 +1332,23 @@ end
 ---@param threshold number Input of Lead.Of
 ---@param floor number Input of Lead.Of
 ---@param missingUnits? string[] Wiped, then filled with the unit of each counted member who lacks the buff
+---@param castBlocked? fun(unit: string): boolean
 ---@return number missing
 ---@return number total
 ---@return number? minRemaining Remaining time of the copy that Lead.Pick chose
 ---@return number? minLead Lead of that copy
 ---@return number? nextSlack Seconds until the next copy enters its window
-local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, partyOnly, threshold, floor, missingUnits)
+local function CountMissingBuff(
+    spellIDs,
+    buffKey,
+    playerOnly,
+    playersOnly,
+    partyOnly,
+    threshold,
+    floor,
+    missingUnits,
+    castBlocked
+)
     if missingUnits then
         wipe(missingUnits)
     end
@@ -1354,6 +1365,9 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
         end
         total = 1
         local hasBuff, remaining, _, duration = UnitHasBuff("player", GetUnitSpellIDs(buffKey, spellIDs, playerClass))
+        if not hasBuff and castBlocked and castBlocked("player") then
+            hasBuff = true
+        end
         if not hasBuff then
             missing = 1
             if missingUnits then
@@ -1377,6 +1391,9 @@ local function CountMissingBuff(spellIDs, buffKey, playerOnly, playersOnly, part
             if UnitBenefitsFromBuff(specBeneficiaries, beneficiaries, allySpecCache[data.name], data.class) then
                 local hasBuff, remaining, _, duration =
                     UnitHasBuff(data.unit, GetUnitSpellIDs(buffKey, spellIDs, data.class))
+                if not hasBuff and castBlocked and castBlocked(data.unit) then
+                    hasBuff = true
+                end
                 -- A phased ally counts only when the buff is already on them. A
                 -- phased member without the buff is an unfixable gap - nobody can
                 -- cast on them - so both totals omit them.
@@ -2206,7 +2223,7 @@ local classChoiceStates = {}
 ---@param choices StanceChoice[]
 ---@param readSources boolean Only out of combat, because source reads need plain aura data
 ---@param memo? table<string, table<string, table|false>> Scan results by unit, then choice key. nil = no scan, because no other caster is in the group
----@return StanceChoice? wanted nil when other casters give every choice
+---@return StanceChoice? wanted nil when other casters give every choice, or the unit cannot take it
 ---@return boolean has The unit has the wanted choice from the player
 ---@return number? remaining
 ---@return number? duration
@@ -2216,16 +2233,17 @@ local function WantedChoice(unit, choices, readSources, memo)
         local auraIDs = choice.auraIDs or choice.spellIDs
         local has, remaining, sourceUnit, duration = UnitHasBuff(unit, auraIDs)
         if not has then
-            return choice, false
-        end
-        if not readSources then
+            -- A choice that the unit cannot take passes to the next one, as a foreign copy does.
+            if not (choice.castBlocked and choice.castBlocked(unit)) then
+                return choice, false
+            end
+        elseif not readSources then
             return choice, true, remaining, duration
-        end
-        -- The same choice from two casters does not stack, so a foreign instance
-        -- covers the unit, also when the player's own instance is present.
-        -- GetUnitAuraBySpellID returns one instance, so only a scan finds a second one.
-        -- A caster outside the group reads as a nil source on that one instance.
-        if sourceUnit and Plain(UnitIsUnit(sourceUnit, "player")) == true then
+        elseif sourceUnit and Plain(UnitIsUnit(sourceUnit, "player")) == true then
+            -- The same choice from two casters does not stack, so a foreign instance
+            -- covers the unit, also when the player's own instance is present.
+            -- GetUnitAuraBySpellID returns one instance, so only a scan finds a second one.
+            -- A caster outside the group reads as a nil source on that one instance.
             local foreign = false ---@type table|false
             local unitMemo = memo and memo[unit]
             local known = unitMemo and unitMemo[choice.key]
@@ -2604,7 +2622,8 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, mis
                         false,
                         raidThreshold,
                         raidFloor,
-                        missingUnits
+                        missingUnits,
+                        buff.castBlocked
                     )
                 end
                 if missing > 0 then
@@ -2622,7 +2641,8 @@ local function RefreshRaid(db, trackingMode, isAuraRestricted, hideExpiring, mis
                     buff.reach == "party",
                     raidThreshold,
                     raidFloor,
-                    missingUnits
+                    missingUnits,
+                    buff.castBlocked
                 )
             end
 

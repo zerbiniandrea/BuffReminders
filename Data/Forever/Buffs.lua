@@ -849,53 +849,174 @@ end
 
 local SYMBOL_OF_KINGS = 21177
 
+---@class RankSpec
+---@field key string
+---@field ranks number[][] Single-target ranks, highest first: spell ID, SpellLevel, base points of the first effect
+---@field groupCast? GroupCastRank[] Highest rank first
+---@field blockers? number[] Scroll auras. Each camp feature adds the aura of its buff
+
+---@class RankedBuff : StanceChoice, RankSpec
+---@field blockers number[] The auras exclude each other, so the first one found decides
+
+-- A rank lands only on a target whose level is at least the rank level minus this span.
+local RANK_LEVEL_SPAN = 10
+---@type table<number, number> Single-target rank -> SpellLevel
+local RANK_LEVELS = {}
+---@type table<number, number> Single-target rank -> base points of the first effect
+local RANK_POINTS = {}
+-- Every single-target rank, in the order of the definitions.
+local SINGLE_TARGET_RANKS = {}
+
+---A cast that is not stronger than an aura of the same stat on the target fails:
+---"A more powerful spell is already active". The rank is the one that the unit level
+---accepts, else the highest rank. An aura with unreadable points blocks.
+---@param buff RankedBuff
+---@return fun(unit: string): boolean
+local function CastBlockedBy(buff)
+    return function(unit)
+        for _, id in ipairs(buff.blockers) do
+            local aura = C_UnitAuras.GetUnitAuraBySpellID(unit, id)
+            if aura then
+                local points = BR.Secret.AuraField(aura, "points")
+                local held = points and BR.Secret.Plain(points[1])
+                if not held then
+                    return true
+                end
+                local castID = BR.Ranks.Fit(buff.spellIDs, BR.Secret.Plain(UnitLevel(unit)) or -1)
+                return held >= (RANK_POINTS[castID or buff.spellIDs[1]] or 0)
+            end
+        end
+        return false
+    end
+end
+
+---@param spec RankSpec
+---@return RankedBuff
+local function Ranked(spec)
+    ---@cast spec RankedBuff
+    local spellIDs, auraIDs = {}, {}
+    for _, rank in ipairs(spec.ranks) do
+        local id = rank[1]
+        spellIDs[#spellIDs + 1] = id
+        auraIDs[#auraIDs + 1] = id
+        SINGLE_TARGET_RANKS[#SINGLE_TARGET_RANKS + 1] = id
+        RANK_LEVELS[id] = rank[2]
+        RANK_POINTS[id] = rank[3]
+    end
+    for _, rank in ipairs(spec.groupCast or {}) do
+        auraIDs[#auraIDs + 1] = rank.spellID
+    end
+    spec.spellIDs = spellIDs
+    spec.auraIDs = auraIDs
+    spec.blockers = spec.blockers or {}
+    spec.castBlocked = CastBlockedBy(spec)
+    return spec
+end
+
+-- Single-target rank data from the SpellLevels and SpellEffect DB2 tables.
+local ARCANE_INTELLECT = Ranked({
+    key = "intellect",
+    ranks = { { 10157, 56, 31 }, { 10156, 42, 22 }, { 1461, 28, 15 }, { 1460, 14, 7 }, { 1459, 1, 2 } },
+    groupCast = { { spellID = 23028, reagent = 17020 } },
+    blockers = { 12176, 8098, 8097, 8096 }, -- Scroll of Intellect IV to I
+})
+local MARK_OF_THE_WILD = Ranked({
+    key = "versatility",
+    ranks = {
+        { 9885, 60, 385 },
+        { 9884, 50, 324 },
+        { 8907, 40, 263 },
+        { 5234, 30, 203 },
+        { 6756, 20, 142 },
+        { 5232, 10, 88 },
+        { 1126, 1, 34 },
+    },
+    groupCast = { { spellID = 21850, reagent = 17026 }, { spellID = 21849, reagent = 17021 } },
+})
+local POWER_WORD_FORTITUDE = Ranked({
+    key = "stamina",
+    ranks = {
+        { 10938, 60, 70 },
+        { 10937, 48, 56 },
+        { 2791, 36, 42 },
+        { 1245, 24, 26 },
+        { 1244, 12, 10 },
+        { 1243, 1, 4 },
+    },
+    groupCast = { { spellID = 21564, reagent = 17029 }, { spellID = 21562, reagent = 17028 } },
+    blockers = { 12178, 8101, 8100, 8099 }, -- Scroll of Stamina IV to I
+})
+local DIVINE_SPIRIT = Ranked({
+    key = "spirit",
+    ranks = { { 27841, 60, 40 }, { 14819, 50, 33 }, { 14818, 40, 23 }, { 14752, 30, 17 } },
+    groupCast = { { spellID = 27681, reagent = 17029 } },
+    blockers = { 12177, 8114, 8113, 8112 }, -- Scroll of Spirit IV to I
+})
+
 -- A player keeps one blessing from each paladin, and the same blessing from two
 -- paladins does not stack. A Greater Blessing reaches every group member of the
 -- target's class.
----@type StanceChoice[]
+---@type RankedBuff[]
 local PALADIN_BLESSINGS = {
-    {
+    Ranked({
         key = "might",
-        spellIDs = { 25291, 19838, 19837, 19836, 19835, 19834, 19740 },
+        ranks = {
+            { 25291, 60, 133 },
+            { 19838, 52, 112 },
+            { 19837, 42, 83 },
+            { 19836, 32, 61 },
+            { 19835, 22, 40 },
+            { 19834, 12, 25 },
+            { 19740, 4, 14 },
+        },
         groupCast = {
             { spellID = 25916, reagent = SYMBOL_OF_KINGS },
             { spellID = 25782, reagent = SYMBOL_OF_KINGS },
         },
-    },
-    {
+    }),
+    Ranked({
         key = "wisdom",
-        spellIDs = { 25290, 19854, 19853, 19852, 19850, 19742 },
+        ranks = {
+            { 25290, 60, 40 },
+            { 19854, 54, 36 },
+            { 19853, 44, 30 },
+            { 19852, 34, 24 },
+            { 19850, 24, 18 },
+            { 19742, 14, 12 },
+        },
         groupCast = {
             { spellID = 25918, reagent = SYMBOL_OF_KINGS },
             { spellID = 25894, reagent = SYMBOL_OF_KINGS },
         },
-    },
-    {
+    }),
+    Ranked({
         key = "kings",
-        spellIDs = { 20217 },
+        ranks = { { 20217, 20, 10 } },
         groupCast = { { spellID = 25898, reagent = SYMBOL_OF_KINGS } },
-    },
+    }),
 }
+
+---@class SpellRankData
+---@field levelSpan number
+---@field levels table<number, number> Single-target rank -> SpellLevel
+
+-- Only code of this client reads this export, so retail has no mirror.
+---@type SpellRankData
+BR.SPELL_RANKS = { levelSpan = RANK_LEVEL_SPAN, levels = RANK_LEVELS }
 
 -- Every rank of a blessing covers the member, whoever cast it. The stored click
 -- action is the first known ID in spellID, so the single-target ranks come first.
 local ALL_BLESSING_IDS = {}
----@type table<string, StanceChoice>
+---@type table<string, RankedBuff>
 local BLESSING_BY_KEY = {}
----@type table<number, StanceChoice> Every aura ID of a blessing -> the blessing
+---@type table<number, RankedBuff> Every aura ID of a blessing -> the blessing
 local BLESSING_BY_SPELL = {}
 for _, choice in ipairs(PALADIN_BLESSINGS) do
-    local auraIDs = {}
     for _, id in ipairs(choice.spellIDs) do
-        auraIDs[#auraIDs + 1] = id
         ALL_BLESSING_IDS[#ALL_BLESSING_IDS + 1] = id
     end
-    for _, rank in ipairs(choice.groupCast) do
-        auraIDs[#auraIDs + 1] = rank.spellID
-    end
-    choice.auraIDs = auraIDs
     BLESSING_BY_KEY[choice.key] = choice
-    for _, id in ipairs(auraIDs) do
+    for _, id in ipairs(choice.auraIDs) do
         BLESSING_BY_SPELL[id] = choice
     end
 end
@@ -1322,14 +1443,6 @@ end
 
 local BATTLE_SHOUT = { 25289, 11551, 11550, 11549, 6192, 5242, 6673 }
 
--- Every rank of a raid buff, the group version included.
-local RAID_BUFF_IDS = {
-    intellect = { 10157, 10156, 1461, 1460, 1459, 23028 },
-    spirit = { 27841, 14819, 14818, 14752, 27681 },
-    versatility = { 9885, 9884, 8907, 5234, 6756, 5232, 1126, 21850, 21849 },
-    stamina = { 10938, 10937, 2791, 1245, 1244, 1243, 21564, 21562 },
-}
-
 -- Rage drains between fights, so the reminder shows only while the shout is castable.
 -- The usable check includes talents that change the rage cost.
 ---@return boolean
@@ -1346,74 +1459,16 @@ local function BattleShoutReady()
     return castID ~= nil and BR.BuffState.IsSpellUsable(castID)
 end
 
--- Drive-by buffs: the single-target ranks that can buff another player, with the
--- SpellLevel of each rank from the SpellLevels DB2 table. A rank lands only on a
--- target whose level is at least the rank level minus levelSpan.
-local DRIVE_BY_RANKS = {
-    { 10157, 56 }, -- Arcane Intellect
-    { 10156, 42 },
-    { 1461, 28 },
-    { 1460, 14 },
-    { 1459, 1 },
-    { 9885, 60 }, -- Mark of the Wild
-    { 9884, 50 },
-    { 8907, 40 },
-    { 5234, 30 },
-    { 6756, 20 },
-    { 5232, 10 },
-    { 1126, 1 },
-    { 10938, 60 }, -- Power Word: Fortitude
-    { 10937, 48 },
-    { 2791, 36 },
-    { 1245, 24 },
-    { 1244, 12 },
-    { 1243, 1 },
-    { 27841, 60 }, -- Divine Spirit
-    { 14819, 50 },
-    { 14818, 40 },
-    { 14752, 30 },
-    { 25291, 60 }, -- Blessing of Might
-    { 19838, 52 },
-    { 19837, 42 },
-    { 19836, 32 },
-    { 19835, 22 },
-    { 19834, 12 },
-    { 19740, 4 },
-    { 25290, 60 }, -- Blessing of Wisdom
-    { 19854, 54 },
-    { 19853, 44 },
-    { 19852, 34 },
-    { 19850, 24 },
-    { 19742, 14 },
-    { 20217, 20 }, -- Blessing of Kings
-}
-local DRIVE_BY_SPELLS = {}
----@type table<number, number>
-local DRIVE_BY_RANK_LEVELS = {}
-for i, rank in ipairs(DRIVE_BY_RANKS) do
-    DRIVE_BY_SPELLS[i] = rank[1]
-    DRIVE_BY_RANK_LEVELS[rank[1]] = rank[2]
-end
-
----@class DriveByData
----@field levelSpan number
----@field rankLevels table<number, number> Spell ID of a single-target rank -> spell level
-
--- Only code of this client reads this export, so retail has no mirror.
----@type DriveByData
-BR.DRIVE_BY = { levelSpan = 10, rankLevels = DRIVE_BY_RANK_LEVELS }
-
 ---A single-target blessing rank that the level of the unit accepts.
 ---@param spellID number
 ---@param unit string
 ---@return number
 local function FitBlessingRank(spellID, unit)
     local choice = BLESSING_BY_SPELL[spellID]
-    local pickRank = BR.DriveBy and BR.DriveBy.PickRank
-    if not choice or not pickRank or not DRIVE_BY_RANK_LEVELS[spellID] or unit == "player" then
+    if not choice or not RANK_LEVELS[spellID] or unit == "player" then
         return spellID
     end
-    return pickRank(choice.spellIDs, BR.Secret.Plain(UnitLevel(unit)) or -1) or spellID
+    return BR.Ranks.Fit(choice.spellIDs, BR.Secret.Plain(UnitLevel(unit)) or -1) or spellID
 end
 
 ---@param def RaidBuff
@@ -1447,24 +1502,22 @@ local function UnitHasAnyAura(unit, auraIDs)
 end
 
 ---Every known blessing except the one that the main click casts and the ones that
----the unit has from any paladin. The class lists do not apply, so the row can
----override them. A blessing needs a rank that the level of the unit accepts.
+---the unit has from any paladin or cannot take. The class lists do not apply, so the
+---row can override them. A blessing needs a rank that the level of the unit accepts.
 ---@param unit string
 ---@param spellID number
 ---@return number[][]
 local function OtherBlessings(_, unit, spellID)
     wipe(otherBlessings)
     local main = BLESSING_BY_SPELL[spellID]
-    local pickRank = BR.DriveBy and BR.DriveBy.PickRank
     local level = BR.Secret.Plain(UnitLevel(unit)) or -1
     for _, choice in ipairs(PALADIN_BLESSINGS) do
-        local castID
-        if pickRank then
-            castID = pickRank(choice.spellIDs, level)
-        else
-            castID = HighestKnownSpell(choice.spellIDs)
-        end
-        if choice ~= main and castID and not UnitHasAnyAura(unit, choice.auraIDs) then
+        if
+            choice ~= main
+            and BR.Ranks.Fit(choice.spellIDs, level)
+            and not UnitHasAnyAura(unit, choice.auraIDs)
+            and not choice.castBlocked(unit)
+        then
             otherBlessings[#otherBlessings + 1] = choice.spellIDs
         end
     end
@@ -1577,30 +1630,32 @@ end
 
 ---@class CampFeature
 ---@field itemIDs number[] Highest tier first. A higher tier also gives the buff of its tier 1 feature
----@field conflict? number[] Aura IDs of the class buff that does not stack with the feature buff
+---@field auraID? number The feature buff, from the "mutually exclusive" spell tooltip
+---@field conflict? RankedBuff The class buff that does not stack with the feature buff
+---@field conflictAuras? number[] Aura IDs of a totem or aura that does not stack with the feature buff
 
 -- The placeable features that give a buff to players who sit nearby. A feature needs
 -- a campfire nearby, and all features share one cooldown.
 ---@type CampFeature[]
 local CAMP_FEATURES = {
     -- Alchemy Laboratory, Fermenter, Mana Well
-    { itemIDs = { 279990, 279970, 279956 }, conflict = BLESSING_BY_KEY.wisdom.auraIDs },
+    { itemIDs = { 279990, 279970, 279956 }, auraID = 1230587, conflict = BLESSING_BY_KEY.wisdom },
     -- Master Forge, Anvil, Sharpening Wheel. Strength of Earth Totem ranks 5 to 1
-    { itemIDs = { 279955, 279988, 279944 }, conflict = { 25362, 10441, 8163, 8162, 8076 } },
+    { itemIDs = { 279955, 279988, 279944 }, conflictAuras = { 25362, 10441, 8163, 8162, 8076 } },
     -- Arcane Forge, Arcane Salvager, Enchanted Lute
-    { itemIDs = { 279987, 279985, 279976 }, conflict = RAID_BUFF_IDS.versatility },
+    { itemIDs = { 279987, 279985, 279976 }, auraID = 1230653, conflict = MARK_OF_THE_WILD },
     -- Plague Doctor's Laboratory, Toxin Study, First Aid Kit
-    { itemIDs = { 279951, 279940, 279968 }, conflict = RAID_BUFF_IDS.stamina },
+    { itemIDs = { 279951, 279940, 279968 }, auraID = 1230124, conflict = POWER_WORD_FORTITUDE },
     -- Fishing Hut, Fishing Rack, Fish Bowl
-    { itemIDs = { 279966, 279965, 279967 }, conflict = BLESSING_BY_KEY.kings.auraIDs },
+    { itemIDs = { 279966, 279965, 279967 }, auraID = 1230098, conflict = BLESSING_BY_KEY.kings },
     -- Seed Hybridizer, Greenhouse, Incense Candle
-    { itemIDs = { 279947, 279964, 279962 }, conflict = RAID_BUFF_IDS.intellect },
+    { itemIDs = { 279947, 279964, 279962 }, auraID = 1229513, conflict = ARCANE_INTELLECT },
     -- Molten Foundry, Rock Garden, Lodestone
-    { itemIDs = { 279952, 279948, 279960 }, conflict = BLESSING_BY_KEY.might.auraIDs },
+    { itemIDs = { 279952, 279948, 279960 }, auraID = 1230164, conflict = BLESSING_BY_KEY.might },
     -- Field Guide, Camp Chair. Moonkin Aura
-    { itemIDs = { 279969, 279979 }, conflict = { 24907 } },
+    { itemIDs = { 279969, 279979 }, conflictAuras = { 24907 } },
     -- Loom, Spinning Wheel, Faction Banner (Horde, Alliance)
-    { itemIDs = { 279959, 279943, 279972, 279973 }, conflict = RAID_BUFF_IDS.spirit },
+    { itemIDs = { 279959, 279943, 279972, 279973 }, auraID = 1229718, conflict = DIVINE_SPIRIT },
     -- Sewing Machine, Tanning Rack, Camp Tent
     { itemIDs = { 279945, 279941, 279978 } },
 }
@@ -1609,6 +1664,10 @@ local CAMP_FEATURE_CHOICES = {}
 for _, feature in ipairs(CAMP_FEATURES) do
     for _, itemID in ipairs(feature.itemIDs) do
         CAMP_FEATURE_CHOICES[itemID] = { itemID = itemID }
+    end
+    if feature.conflict and feature.auraID then
+        local blockers = feature.conflict.blockers
+        blockers[#blockers + 1] = feature.auraID
     end
 end
 
@@ -1686,7 +1745,8 @@ local function CampFeatureChoices()
     local GetItemCount = BR.StateHelpers.GetItemCountCached
     local covered = 0
     for _, feature in ipairs(CAMP_FEATURES) do
-        local last = feature.conflict ~= nil and UnitHasAnyAura("player", feature.conflict)
+        local conflictIDs = feature.conflict and feature.conflict.auraIDs or feature.conflictAuras
+        local last = conflictIDs ~= nil and UnitHasAnyAura("player", conflictIDs)
         for _, itemID in ipairs(feature.itemIDs) do
             if GetItemCount(itemID) > 0 then
                 local choice = CAMP_FEATURE_CHOICES[itemID]
@@ -1772,14 +1832,15 @@ local BUFF_TABLES = {
     ---@type RaidBuff[]
     raid = {
         {
-            spellID = RAID_BUFF_IDS.intellect,
+            spellID = ARCANE_INTELLECT.auraIDs,
+            castBlocked = ARCANE_INTELLECT.castBlocked,
             key = "intellect",
             name = L["Buff.ArcaneIntellect"],
             class = "MAGE",
             reach = "raid",
             icons = { spells = { 10157 } },
             castOnMissing = true,
-            groupCast = { { spellID = 23028, reagent = 17020 } },
+            groupCast = ARCANE_INTELLECT.groupCast,
             chatRequestable = true,
         },
         {
@@ -1792,26 +1853,28 @@ local BUFF_TABLES = {
             visibilityCondition = BattleShoutReady,
         },
         {
-            spellID = RAID_BUFF_IDS.spirit,
+            spellID = DIVINE_SPIRIT.auraIDs,
+            castBlocked = DIVINE_SPIRIT.castBlocked,
             key = "spirit",
             name = L["Buff.DivineSpirit"],
             class = "PRIEST",
             reach = "raid",
             icons = { spells = { 27841 } },
             castOnMissing = true,
-            groupCast = { { spellID = 27681, reagent = 17029 } },
+            groupCast = DIVINE_SPIRIT.groupCast,
             -- A talent: only a priest who knows it sees the reminder.
             requiresKnownSpell = true,
         },
         {
-            spellID = RAID_BUFF_IDS.versatility,
+            spellID = MARK_OF_THE_WILD.auraIDs,
+            castBlocked = MARK_OF_THE_WILD.castBlocked,
             key = "versatility",
             name = L["Buff.MarkOfTheWild"],
             class = "DRUID",
             reach = "raid",
             icons = { spells = { 9885 } },
             castOnMissing = true,
-            groupCast = { { spellID = 21850, reagent = 17026 }, { spellID = 21849, reagent = 17021 } },
+            groupCast = MARK_OF_THE_WILD.groupCast,
             chatRequestable = true,
         },
         -- Each member gets the blessing of their class list in the options grid.
@@ -1835,14 +1898,15 @@ local BUFF_TABLES = {
             end,
         },
         {
-            spellID = RAID_BUFF_IDS.stamina,
+            spellID = POWER_WORD_FORTITUDE.auraIDs,
+            castBlocked = POWER_WORD_FORTITUDE.castBlocked,
             key = "stamina",
             name = L["Buff.PowerWordFortitude"],
             class = "PRIEST",
             reach = "raid",
             icons = { spells = { 10938 } },
             castOnMissing = true,
-            groupCast = { { spellID = 21564, reagent = 17029 }, { spellID = 21562, reagent = 17028 } },
+            groupCast = POWER_WORD_FORTITUDE.groupCast,
             chatRequestable = true,
         },
         {
@@ -2428,7 +2492,7 @@ local BUFF_TABLES = {
             key = "driveByBuffs",
             defaultEnabled = false, -- opt-in: casts on strangers
             name = L["Buff.DriveByBuffs"],
-            spellID = DRIVE_BY_SPELLS,
+            spellID = SINGLE_TARGET_RANKS,
             icons = {
                 spells = { 10157, 10938, 9885 },
                 dynamic = function()

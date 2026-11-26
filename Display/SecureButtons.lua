@@ -672,8 +672,8 @@ local openRows = setmetatable({}, { __mode = "k" })
 ---@param unit string
 ---@return number?
 local function FitRank(ranks, unit)
-    local pickRank = BR.DriveBy and BR.DriveBy.PickRank
-    local rank = pickRank and pickRank(ranks, Plain(UnitLevel(unit)) or -1)
+    local fit = BR.Ranks and BR.Ranks.Fit
+    local rank = fit and fit(ranks, Plain(UnitLevel(unit)) or -1)
     if rank then
         return rank
     end
