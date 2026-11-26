@@ -512,7 +512,6 @@ local DefaultSettingKeys = {
     delveFoodTimer = "DisplayRefresh",
     mageFoodContent = "DisplayRefresh",
     shamanImbue = "DisplayRefresh",
-    warlockStone = "DisplayRefresh",
     freeConsumableMode = "DisplayRefresh",
     freeConsumableVisibility = "DisplayRefresh",
     healthstoneVisibility = "DisplayRefresh",
@@ -568,10 +567,11 @@ local DefaultSettingKeys = {
     position = false, -- No auto-refresh, saved directly by movers
 }
 
--- Per-content grids (path = defaults.{grid}.{world|dungeon|raid|pvp}.{choice})
+-- Choice grids (path = defaults.{grid}.{row}.{choice})
 local ContentGridKeys = {
     warlockDemons = true,
     warlockSacrificeDemons = true,
+    warlockStones = true,
     warriorStances = true,
     druidForms = true,
 }

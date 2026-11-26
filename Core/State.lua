@@ -220,6 +220,9 @@ local cachedSpellKnowledge = {}
 -- Spec ID cache
 local cachedSpecId = nil
 
+-- Active talent group cache
+local cachedSpecGroup = nil
+
 -- Player role cache
 local cachedPlayerRole = nil
 
@@ -587,6 +590,14 @@ local function GetPlayerSpecId()
     end
     cachedSpecId = BR.Client.GetSpecID()
     return cachedSpecId
+end
+
+---@return number groupIndex 1 or 2
+local function GetPlayerSpecGroup()
+    if not cachedSpecGroup then
+        cachedSpecGroup = C_SpecializationInfo.GetActiveSpecGroup()
+    end
+    return cachedSpecGroup
 end
 
 ---Get the player's current role (cached)
@@ -3518,6 +3529,7 @@ end
 ---Invalidate spec ID cache
 function BuffState.InvalidateSpecCache()
     cachedSpecId = nil
+    cachedSpecGroup = nil
     cachedPlayerRole = nil
 end
 
@@ -3774,6 +3786,7 @@ end
 -- Utility functions the display layer uses.
 BR.StateHelpers = {
     GetPlayerSpecId = GetPlayerSpecId,
+    GetPlayerSpecGroup = GetPlayerSpecGroup,
     FormatRemainingTime = FormatRemainingTime,
     AuraLead = Lead.Of,
     FormatCountdownTime = FormatCountdownTime,

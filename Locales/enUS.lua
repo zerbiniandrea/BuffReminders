@@ -921,9 +921,10 @@ english["BuffPanel.MageFoodContent.Raid"] = "Raids only"
 english["BuffPanel.ShamanImbue"] = "Click casts"
 english["BuffPanel.ShamanImbue.Desc"] =
     "Until you learn it, the click casts Windfury, then Flametongue, then Rockbiter."
-english["BuffPanel.WarlockStone"] = "Stone"
-english["BuffPanel.WarlockStone.Desc"] =
-    "The click applies this stone from your bags. If your bags have none, the click creates one. Until you learn it, the click uses the other stone."
+english["BuffPanel.WarlockStone.Hint"] =
+    "Click the stone of each talent group. In an empty row, either stone counts. The click applies the stone from your bags, or creates one."
+english["BuffPanel.WarlockStone.Spec1"] = "Primary"
+english["BuffPanel.WarlockStone.Spec2"] = "Secondary"
 english["BuffPanel.DriveBy.AllowPvP"] = "Allow PvP-flagged targets"
 english["BuffPanel.DriveBy.AllowPvP.Desc"] =
     "Buffing a PvP-flagged player flags you too. When off, flagged players are ignored unless you are flagged."

@@ -538,6 +538,7 @@ local EVENT_CACHES = {
         handle = PruneGlowingSpells,
     },
     TRAIT_CONFIG_UPDATED = { caches = SPELL_SET, handle = PruneGlowingSpells },
+    ACTIVE_TALENT_GROUP_CHANGED = { caches = { "spec" } },
     SPELL_ACTIVATION_OVERLAY_GLOW_SHOW = {
         handle = function(spellID)
             glowingSpells[spellID] = true

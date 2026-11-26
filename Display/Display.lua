@@ -85,7 +85,6 @@ local BR = ns
 ---@field driveByAllowPvP? boolean Drive-by buffs also offer PvP-flagged targets
 ---@field mageFoodContent? "all"|"dungeon"|"raid"
 ---@field shamanImbue? "windfury"|"flametongue"|"rockbiter"|"frostbrand" The imbue that the WoW Forever click casts
----@field warlockStone? "spellstone"|"firestone" The stone that the WoW Forever click applies or creates
 ---@field placeAtPlayer? boolean
 ---@field consumableDisplayMode? "icon_only"|"sub_icons"|"expanded"
 ---@field consumableBadgeOnSubIcons? boolean
@@ -108,6 +107,7 @@ local BR = ns
 ---@field useFelDomination? boolean
 ---@field warlockDemons? table<string, table<string, boolean>> Content row -> allowed demon keys
 ---@field warlockSacrificeDemons? table<string, table<string, boolean>> Content row -> demon keys to sacrifice (WoW Forever)
+---@field warlockStones? table<string, table<string, boolean>> Talent group row -> the picked stone, at most one (WoW Forever)
 ---@field warlockWrongDemon? boolean
 ---@field warriorStances? table<string, table<string, boolean>> Content row -> allowed stance keys
 ---@field druidForms? table<string, table<string, boolean>> Content row -> allowed form keys
@@ -4002,6 +4002,7 @@ eventHandlers.UPDATE_EXPANSION_LEVEL = eventHandlers.PLAYER_UPDATE_RESTING
 eventHandlers.PLAYER_MOUNT_DISPLAY_CHANGED = eventHandlers.PLAYER_UPDATE_RESTING
 eventHandlers.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW = eventHandlers.PLAYER_UPDATE_RESTING
 eventHandlers.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE = eventHandlers.PLAYER_UPDATE_RESTING
+eventHandlers.ACTIVE_TALENT_GROUP_CHANGED = eventHandlers.PLAYER_UPDATE_RESTING
 
 eventHandlers.PLAYER_SPECIALIZATION_CHANGED = function(arg1)
     if arg1 ~= "player" then

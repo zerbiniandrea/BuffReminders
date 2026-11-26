@@ -53,6 +53,7 @@ read_globals = {
     "C_Loot",
     "C_SpellActivationOverlay",
     "C_SpellBook",
+    "C_SpecializationInfo",
     "C_Timer",
     "C_UnitAuras",
     "CreateFont",

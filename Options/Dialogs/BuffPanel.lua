@@ -201,13 +201,15 @@ end
 ---@field label string
 ---@field icon number?
 
--- One row of choice toggles per content row of the grid in profile.defaults[setting].
+-- One row of choice toggles per row of the grid in profile.defaults[setting].
 ---@param layout table
 ---@param setting string
 ---@param hintText string
 ---@param choices ContentGridChoice[]
 ---@param single? boolean A row holds at most one choice. A click on the selected choice clears the row.
-local function AddContentGrid(layout, setting, hintText, choices, single)
+---@param rows? { key: string, label: string, desc: string? }[] The content rows if nil
+local function AddContentGrid(layout, setting, hintText, choices, single, rows)
+    rows = rows or GRID_ROWS
     local IsContentChoiceAllowed = BR.Visibility.IsContentChoiceAllowed
     local hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hint:SetWidth(bodyW)
@@ -216,11 +218,11 @@ local function AddContentGrid(layout, setting, hintText, choices, single)
     layout:AddText(hint, math.max(12, math.ceil(hint:GetStringHeight())), GRID_GAP + 2)
 
     local rowLabels = {}
-    for i, row in ipairs(GRID_ROWS) do
+    for i, row in ipairs(rows) do
         rowLabels[i] = row.label
     end
     local labelW = Components.MeasureSharedLabelWidth(rowLabels, "GameFontHighlightSmall", DRAWER_LABEL_W)
-    for _, row in ipairs(GRID_ROWS) do
+    for _, row in ipairs(rows) do
         if row.desc then
             local w = Components.MeasureSharedLabelWidth({ row.label }, "GameFontHighlightSmall", 0)
             labelW = math.max(labelW, w + GRID_INFO_ICON)
@@ -228,7 +230,7 @@ local function AddContentGrid(layout, setting, hintText, choices, single)
     end
 
     local holder = CreateFrame("Frame", nil, body)
-    holder:SetSize(bodyW, #GRID_ROWS * (GRID_CELL + GRID_GAP) - GRID_GAP)
+    holder:SetSize(bodyW, #rows * (GRID_CELL + GRID_GAP) - GRID_GAP)
     local cells = {}
 
     function holder:Refresh()
@@ -241,7 +243,7 @@ local function AddContentGrid(layout, setting, hintText, choices, single)
         end
     end
 
-    for r, row in ipairs(GRID_ROWS) do
+    for r, row in ipairs(rows) do
         local y = -(r - 1) * (GRID_CELL + GRID_GAP)
         local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         label:SetPoint("LEFT", holder, "TOPLEFT", 0, y - GRID_CELL / 2)
@@ -1534,24 +1536,20 @@ local SPECIAL_SECTIONS = {
 
     warlockStone = {
         build = function(layout)
-            local drop = Components.Dropdown(body, {
-                label = L["BuffPanel.WarlockStone"],
-                labelWidth = DRAWER_LABEL_W,
-                width = DRAWER_FIELD_W,
-                options = {
-                    { label = BR.GetSpellName(1237152) or L["Buff.Spellstone"], value = "spellstone" },
-                    { label = BR.GetSpellName(758) or L["Buff.Firestone"], value = "firestone" },
+            AddContentGrid(
+                layout,
+                "warlockStones",
+                L["BuffPanel.WarlockStone.Hint"],
+                {
+                    { key = "spellstone", label = BR.GetSpellName(1237152) or L["Buff.Spellstone"], icon = 134131 },
+                    { key = "firestone", label = BR.GetSpellName(758) or L["Buff.Firestone"], icon = 134085 },
                 },
-                tooltip = { title = L["BuffPanel.WarlockStone"], desc = L["BuffPanel.WarlockStone.Desc"] },
-                get = function()
-                    return BR.Config.Get("defaults.warlockStone", "spellstone")
-                end,
-                onChange = function(val)
-                    BR.Config.Set("defaults.warlockStone", val)
-                end,
-            })
-            tinsert(bodyHolders, drop)
-            layout:Add(drop, 26, COMPONENT_GAP)
+                true,
+                {
+                    { key = "spec1", label = L["BuffPanel.WarlockStone.Spec1"] },
+                    { key = "spec2", label = L["BuffPanel.WarlockStone.Spec2"] },
+                }
+            )
         end,
     },
 

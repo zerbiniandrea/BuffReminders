@@ -413,30 +413,38 @@ for _, key in ipairs({ "rockbiter", "flametongue", "frostbrand", "windfury" }) d
         SHAMAN_IMBUES[#SHAMAN_IMBUES + 1] = id
     end
 end
--- Warlock stones per setting value, highest rank first. A stone takes the imbue slot,
--- so it stacks with a weapon oil.
+---@class WarlockStone
+---@field key string Choice key in the warlockStones grid
+---@field create number[] Create spells, highest rank first
+---@field items number[] Stone items, highest rank first
+---@field enchants table<number, true>
+---@field icon number
+
+-- A stone takes the imbue slot, so it stacks with a weapon oil.
+---@type WarlockStone[]
 local WARLOCK_STONES = {
-    spellstone = {
+    {
+        key = "spellstone",
         create = { 17728, 17727, 2362 },
         items = { 13603, 13602, 5522 },
-        enchants = { 8061, 8060, 8059 },
+        enchants = { [8061] = true, [8060] = true, [8059] = true },
         icon = 134131,
     },
-    firestone = {
+    {
+        key = "firestone",
         create = { 17953, 17952, 17951, 6366 },
         items = { 13701, 13700, 13699, 1254 },
-        enchants = { 1825, 1824, 1823, 1803 },
+        enchants = { [1825] = true, [1824] = true, [1823] = true, [1803] = true },
         icon = 134085,
     },
 }
 local WARLOCK_STONE_CREATE = {}
 local WARLOCK_STONE_ENCHANTS = {}
-for _, key in ipairs({ "spellstone", "firestone" }) do
-    local stone = WARLOCK_STONES[key]
+for _, stone in ipairs(WARLOCK_STONES) do
     for _, id in ipairs(stone.create) do
         WARLOCK_STONE_CREATE[#WARLOCK_STONE_CREATE + 1] = id
     end
-    for _, id in ipairs(stone.enchants) do
+    for id in pairs(stone.enchants) do
         WARLOCK_STONE_ENCHANTS[id] = true
     end
 end
@@ -639,27 +647,57 @@ local function PoisonMacro()
     return itemID and ("/use item:" .. itemID .. "\n/use " .. hand.slot) or ""
 end
 
----The preferred stone, else the other stone if the player knows only that one.
----@return table stone entry of WARLOCK_STONES
-local function WarlockStone()
-    local defaults = BR.profile.defaults
-    local preferred = WARLOCK_STONES[defaults and defaults.warlockStone] or WARLOCK_STONES.spellstone
-    if HighestKnownSpell(preferred.create) then
-        return preferred
+---The known stone that the active talent group picks, or nil when either stone counts.
+---@return WarlockStone?
+local function PickedStone()
+    local row = "spec" .. BR.StateHelpers.GetPlayerSpecGroup()
+    for _, stone in ipairs(WARLOCK_STONES) do
+        if BR.Visibility.IsContentChoiceAllowed("warlockStones", row, stone.key) then
+            return HighestKnownSpell(stone.create) and stone or nil
+        end
     end
-    local other = preferred == WARLOCK_STONES.spellstone and WARLOCK_STONES.firestone or WARLOCK_STONES.spellstone
-    return HighestKnownSpell(other.create) and other or preferred
+    return nil
 end
 
----Applies a stone from the bags to the main hand, else creates one.
----@return string
-local function WarlockStoneMacro()
-    local stone = WarlockStone()
+---@param stone WarlockStone
+---@return number? itemID
+local function StoneInBags(stone)
     local GetItemCountCached = BR.StateHelpers.GetItemCountCached
     for _, itemID in ipairs(stone.items) do
         if GetItemCountCached(itemID) > 0 then
-            return "/use item:" .. itemID .. "\n/use 16"
+            return itemID
         end
+    end
+    return nil
+end
+
+---The stone of the click: the picked stone, else a stone in the bags, else the first known stone.
+---@return WarlockStone stone
+---@return number? itemID nil when the click creates the stone
+local function ClickStone()
+    local picked = PickedStone()
+    if picked then
+        return picked, StoneInBags(picked)
+    end
+    for _, stone in ipairs(WARLOCK_STONES) do
+        local itemID = StoneInBags(stone)
+        if itemID then
+            return stone, itemID
+        end
+    end
+    for _, stone in ipairs(WARLOCK_STONES) do
+        if HighestKnownSpell(stone.create) then
+            return stone
+        end
+    end
+    return WARLOCK_STONES[1]
+end
+
+---@return string
+local function WarlockStoneMacro()
+    local stone, itemID = ClickStone()
+    if itemID then
+        return "/use item:" .. itemID .. "\n/use 16"
     end
     return CastHighestKnownMacro(stone.create)
 end
@@ -1957,15 +1995,24 @@ local BUFF_TABLES = {
             name = L["Buff.WarlockStone"],
             class = "WARLOCK",
             overlayText = L["Overlay.NoStone"],
+            -- The enchant set times the expiry warning. customCheck decides what is missing.
             enchantID = WARLOCK_STONE_ENCHANTS,
             enchantDuration = 7200, -- seconds
             visibilityCondition = function()
                 return HandHoldsWeapon(16)
             end,
+            customCheck = function()
+                if not HighestKnownSpell(WARLOCK_STONE_CREATE) then
+                    return nil
+                end
+                local id = BR.BuffState.GetWeaponImbue(16)
+                local picked = PickedStone()
+                return not (id and (picked and picked.enchants or WARLOCK_STONE_ENCHANTS)[id])
+            end,
             icons = {
-                textures = { WARLOCK_STONES.spellstone.icon, WARLOCK_STONES.firestone.icon },
+                textures = { WARLOCK_STONES[1].icon, WARLOCK_STONES[2].icon },
                 dynamic = function()
-                    return WarlockStone().icon
+                    return (ClickStone()).icon
                 end,
             },
             clickMacro = WarlockStoneMacro,

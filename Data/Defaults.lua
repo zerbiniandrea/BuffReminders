@@ -191,7 +191,6 @@ BR.defaults = {
         delveFoodTimer = false,
         mageFoodContent = "all", -- "all" | "dungeon" | "raid"
         shamanImbue = "windfury", -- "windfury" | "flametongue" | "rockbiter" | "frostbrand"
-        warlockStone = "spellstone", -- "spellstone" | "firestone"
         freeConsumableMode = "override",
         freeConsumableVisibility = {
             openWorld = false,
@@ -270,6 +269,11 @@ BR.defaults = {
                 raid = { imp = true },
                 pvp = {},
             },
+        }),
+        -- The stone of each talent group (WoW Forever), at most one. An empty row accepts either stone.
+        warlockStones = BR.ByClient({
+            retail = BR.NONE,
+            forever = { spec1 = {}, spec2 = {} },
         }),
         warlockWrongDemon = true,
         -- The blessings of each class (WoW Forever), in priority order. A member gets the
