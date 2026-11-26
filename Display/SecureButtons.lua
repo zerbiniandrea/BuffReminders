@@ -286,6 +286,18 @@ local function SetActionType(button, actionType)
     button._br_rightClick = nil
 end
 
+---The `unit` attribute of a spell cast. On hover, the game highlights the unit of
+---this attribute, so a self-only spell gets no unit.
+---@param spellID number?
+---@param unit string?
+---@return string?
+local function CastUnit(spellID, unit)
+    if spellID and unit and C_Spell.SpellHasRange(spellID) then
+        return unit
+    end
+    return nil
+end
+
 -- "menu" neutralises the right button with an empty type2, which resolves to no
 -- handler, and PostClick opens the reminder menu. "own" gives the button's own
 -- action to the right click.
@@ -544,7 +556,7 @@ local function ApplyAction(button, action)
             button:SetAttribute("spell", action.spellID)
             -- Always write unit, because nil clears it. A stale "player" from a
             -- previous action retargets the cast onto the player.
-            button:SetAttribute("unit", action.unit)
+            button:SetAttribute("unit", CastUnit(action.spellID, action.unit))
         end
         StoreAction(button, action)
     end
@@ -958,7 +970,7 @@ local function CreateClickOverlay(frame)
             local castID, castUnit = PickDefCast(pickDef, frame, self._br_action.spellID)
             self:SetAttribute("spell", castID)
             self._br_spellCleared = castID == nil or nil
-            self:SetAttribute("unit", castUnit or "player")
+            self:SetAttribute("unit", CastUnit(castID, castUnit or "player"))
         end
         local spellFn = self._br_clickSpellFn
         if spellFn and not InCombatLockdown() then
@@ -970,6 +982,7 @@ local function CreateClickOverlay(frame)
             self._br_spellCleared = nil
             if not InCombatLockdown() then
                 self:SetAttribute("spell", self._br_action.spellID)
+                self:SetAttribute("unit", CastUnit(self._br_action.spellID, self._br_action.unit))
             end
         end
         if HandleMenuClick(self, button, down, frame) then
@@ -1641,8 +1654,9 @@ local function CreateChoiceButton(frame)
             return
         end
         local unit = ChoiceUnit(frame) or "player"
-        self:SetAttribute("spell", ChoiceCast(self, unit))
-        self:SetAttribute("unit", unit)
+        local castID = ChoiceCast(self, unit)
+        self:SetAttribute("spell", castID)
+        self:SetAttribute("unit", CastUnit(castID, unit))
     end)
     btn:SetScript("PostClick", function(self, button, down)
         HandleMenuClick(self, button, down, frame)
@@ -2397,10 +2411,11 @@ local function ResolveAction(frame, category, db)
         if frame._br_pet_spell then
             return PetAction(castableID, db)
         end
-        -- The unit stays "player" in the stored action. PreClick writes the
-        -- real spell and unit, so the refresh never overwrites a picked target.
+        -- The stored unit is the current pick, for the hover highlight. PreClick
+        -- picks again at click time, because the group can change in between.
         if category == "raid" and def and def.castOnMissing then
-            local action = SpellAction(castableID, "player")
+            local _, pickUnit = PickDefCast(def, frame, castableID)
+            local action = SpellAction(castableID, pickUnit or "player")
             action.pickDef = def
             return action
         end
