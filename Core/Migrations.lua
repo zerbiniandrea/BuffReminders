@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 75
+BR.Migrations.DB_VERSION = 76
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -919,6 +919,40 @@ function BR.Migrations.RunProfile(profile, isImport)
             if type(profileDefaults) == "table" then
                 profileDefaults.mageArmorPreference = nil
             end
+        end,
+        -- [76] WoW Forever: the stance and form grids change from content rows to talent group
+        -- rows, and the imbue choice becomes one choice per talent group. Each talent group
+        -- gets the old dungeon row. A content row does not tell which talent group it suits.
+        [76] = function()
+            local profileDefaults = profile.defaults
+            if type(profileDefaults) ~= "table" then
+                return
+            end
+            for _, setting in ipairs({ "warriorStances", "druidForms" }) do
+                local grid = profileDefaults[setting]
+                if type(grid) == "table" then
+                    local dungeon = type(grid.dungeon) == "table" and grid.dungeon or nil
+                    local newGrid = {}
+                    if dungeon then
+                        for _, row in ipairs({ "spec1", "spec2" }) do
+                            newGrid[row] = {}
+                            for key, allowed in pairs(dungeon) do
+                                newGrid[row][key] = allowed
+                            end
+                        end
+                    end
+                    profileDefaults[setting] = newGrid
+                end
+            end
+            local imbue = profileDefaults.shamanImbue
+            if imbue == "flametongue" or imbue == "rockbiter" or imbue == "frostbrand" then
+                -- The default row allows Windfury, so the row writes it as false.
+                profileDefaults.shamanImbues = {
+                    spec1 = { windfury = false, [imbue] = true },
+                    spec2 = { windfury = false, [imbue] = true },
+                }
+            end
+            profileDefaults.shamanImbue = nil
         end,
     }
 

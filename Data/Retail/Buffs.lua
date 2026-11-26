@@ -381,7 +381,7 @@ local PET_SPELLS = {
 ---@class StanceRule
 ---@field allowed fun(): table<number, boolean>? Allowed stance spells (BR.NO_STANCE = no stance). nil = no reminder
 ---@field castID fun(): number? Stance spell that the click casts. BR.NO_STANCE = cancel the current form
----@field grid? StanceGrid Allowed choices per content row
+---@field grid? StanceGrid Allowed choices per talent group
 
 local STANCE_BATTLE = 386164
 local STANCE_BERSERKER = 386196

@@ -193,7 +193,6 @@ BR.defaults = {
         delveFoodOnly = true,
         delveFoodTimer = false,
         mageFoodContent = "all", -- "all" | "dungeon" | "raid"
-        shamanImbue = "windfury", -- "windfury" | "flametongue" | "rockbiter" | "frostbrand"
         freeConsumableMode = "override",
         freeConsumableVisibility = {
             openWorld = false,
@@ -275,6 +274,12 @@ BR.defaults = {
             forever = { spec1 = {}, spec2 = {} },
         }),
         warlockWrongDemon = true,
+        -- The imbue that a click casts in each talent group (WoW Forever), at most one. An empty
+        -- row casts the first known imbue.
+        shamanImbues = BR.ByClient({
+            retail = BR.NONE,
+            forever = { spec1 = { windfury = true }, spec2 = { windfury = true } },
+        }),
         -- The blessings of each class (WoW Forever), in priority order. A member gets the
         -- first one that no other paladin gives them. Every slot holds a value, so that
         -- AceDB cannot fill a slot that the user emptied.

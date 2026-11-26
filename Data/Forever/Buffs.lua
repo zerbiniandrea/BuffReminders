@@ -388,7 +388,7 @@ local SOULSTONE_ITEMS = { 16896, 16895, 16893, 16892, 5232 } -- Major to Minor
 local CONJURE_MANA_GEM = { 10054, 10053, 3552, 759 } -- Ruby, Citrine, Jade, Agate
 local SKYBORNE_RACIALS = { 1259705, 1259686 } -- Read Leyline (High Order), Skysight (Windshaper)
 
--- Shaman weapon imbues per setting value, highest rank first.
+-- Shaman weapon imbues per choice key of the shamanImbues grid, highest rank first.
 local SHAMAN_IMBUE_RANKS = {
     windfury = { 16362, 10486, 8235, 8232 },
     flametongue = { 16342, 16341, 16339, 8030, 8027, 8024 },
@@ -554,17 +554,20 @@ local function DemonSetupMacro(spellID)
     return DemonicSacrificeMacro(spellID)
 end
 
----Highest known rank of the preferred imbue, else of the first known fallback imbue.
+---Highest known rank of the imbue that the active talent group picks, else of the first known fallback imbue.
 ---@return number?
 local function ShamanImbueCastID()
-    local defaults = BR.profile.defaults
-    local ranks = SHAMAN_IMBUE_RANKS[defaults and defaults.shamanImbue or "windfury"]
-    local id = ranks and HighestKnownSpell(ranks)
-    if id then
-        return id
+    local row = TalentGroupRow()
+    for key, ranks in pairs(SHAMAN_IMBUE_RANKS) do
+        if BR.Visibility.IsContentChoiceAllowed("shamanImbues", row, key) then
+            local id = HighestKnownSpell(ranks)
+            if id then
+                return id
+            end
+        end
     end
     for _, key in ipairs(SHAMAN_IMBUE_FALLBACK) do
-        id = HighestKnownSpell(SHAMAN_IMBUE_RANKS[key])
+        local id = HighestKnownSpell(SHAMAN_IMBUE_RANKS[key])
         if id then
             return id
         end
@@ -775,7 +778,7 @@ local function KnownChoiceSpell(choice)
     return HighestKnownSpell(choice.spellIDs)
 end
 
----A choice counts only if the current content row allows it and the player knows it.
+---A choice counts only if the active talent group allows it and the player knows it.
 ---@param grid StanceGrid
 ---@return StanceRule
 local function GridStanceRule(grid)
@@ -785,7 +788,7 @@ local function GridStanceRule(grid)
         -- The set is reused, so a caller must read it before the next call.
         allowed = function()
             wipe(allowedSet)
-            local row = BR.Visibility.GetContentRow()
+            local row = TalentGroupRow()
             local any = false
             for _, choice in ipairs(grid.choices) do
                 local known = KnownChoiceSpell(choice)
@@ -800,7 +803,7 @@ local function GridStanceRule(grid)
             return any and allowedSet or nil
         end,
         castID = function()
-            local row = BR.Visibility.GetContentRow()
+            local row = TalentGroupRow()
             for _, choice in ipairs(grid.choices) do
                 local known = KnownChoiceSpell(choice)
                 if known and BR.Visibility.IsContentChoiceAllowed(grid.setting, row, choice.key) then
@@ -2319,6 +2322,32 @@ local BUFF_TABLES = {
                 return not BR.BuffState.IsShadowFormActive()
             end,
         },
+        -- Vanilla shamans do not dual-wield, so any imbue on the weapon counts.
+        {
+            spellID = SHAMAN_IMBUES,
+            key = "shamanImbue",
+            name = L["Buff.ShamanImbue"],
+            class = "SHAMAN",
+            overlayText = L["Overlay.NoImbue"],
+            enchantID = SHAMAN_IMBUE_ENCHANTS,
+            enchantDuration = 3600, -- seconds
+            -- An unarmed hand or a fishing pole takes no imbue.
+            visibilityCondition = function()
+                local subclass = BR.BuffState.GetWeaponSubclass(16)
+                return subclass ~= nil and subclass ~= 20 -- Enum.ItemWeaponSubclass.Fishingpole
+            end,
+            icons = {
+                spells = { 16362, 16342, 16316, 16356 }, -- Windfury, Flametongue, Rockbiter, Frostbrand
+                dynamic = function()
+                    local id = ShamanImbueCastID()
+                    return id and BR.Icons.GetBuffTexture(id)
+                end,
+            },
+            clickMacro = function()
+                local id = ShamanImbueCastID()
+                return id and ("/cast " .. (BR.GetSpellName(id) or "")) or ""
+            end,
+        },
         {
             spellID = WARLOCK_STONE_CREATE,
             key = "warlockStone",
@@ -2378,32 +2407,6 @@ local BUFF_TABLES = {
             end,
             clickMacro = function()
                 return StanceMacro(BR.BuffState.GetExpectedWarriorStanceID())
-            end,
-        },
-        -- Vanilla shamans do not dual-wield, so any imbue on the weapon counts.
-        {
-            spellID = SHAMAN_IMBUES,
-            key = "shamanImbue",
-            name = L["Buff.ShamanImbue"],
-            class = "SHAMAN",
-            overlayText = L["Overlay.NoImbue"],
-            enchantID = SHAMAN_IMBUE_ENCHANTS,
-            enchantDuration = 3600, -- seconds
-            -- An unarmed hand or a fishing pole takes no imbue.
-            visibilityCondition = function()
-                local subclass = BR.BuffState.GetWeaponSubclass(16)
-                return subclass ~= nil and subclass ~= 20 -- Enum.ItemWeaponSubclass.Fishingpole
-            end,
-            icons = {
-                spells = { 16362, 16342, 16316, 16356 }, -- Windfury, Flametongue, Rockbiter, Frostbrand
-                dynamic = function()
-                    local id = ShamanImbueCastID()
-                    return id and BR.Icons.GetBuffTexture(id)
-                end,
-            },
-            clickMacro = function()
-                local id = ShamanImbueCastID()
-                return id and ("/cast " .. (BR.GetSpellName(id) or "")) or ""
             end,
         },
     },

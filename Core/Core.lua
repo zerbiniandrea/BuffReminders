@@ -513,7 +513,6 @@ local DefaultSettingKeys = {
     delveFoodOnly = "DisplayRefresh",
     delveFoodTimer = "DisplayRefresh",
     mageFoodContent = "DisplayRefresh",
-    shamanImbue = "DisplayRefresh",
     freeConsumableMode = "DisplayRefresh",
     freeConsumableVisibility = "DisplayRefresh",
     healthstoneVisibility = "DisplayRefresh",
@@ -575,6 +574,7 @@ local ContentGridKeys = {
     mageArmors = true,
     warriorStances = true,
     druidForms = true,
+    shamanImbues = true,
     trackingSpells = true,
 }
 

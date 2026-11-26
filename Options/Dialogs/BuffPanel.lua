@@ -402,7 +402,7 @@ local TRACKING_SPELLS = BR.TRACKING_SPELLS
 ---@param grid StanceGrid
 ---@return boolean
 local function StanceGridNeedsSetup(grid)
-    for _, row in ipairs(GRID_ROWS) do
+    for _, row in ipairs(TALENT_GROUP_ROWS) do
         for _, choice in ipairs(grid.choices) do
             if BR.Visibility.IsContentChoiceAllowed(grid.setting, row.key, choice.key) then
                 return false
@@ -424,7 +424,7 @@ local function AddStanceGrid(layout, grid)
             icon = C_Spell.GetSpellTexture(spellID),
         }
     end
-    AddContentGrid(layout, grid.setting, grid.hint, choices)
+    AddContentGrid(layout, grid.setting, grid.hint, choices, nil, TALENT_GROUP_ROWS)
 end
 
 ---A stored list without unknown keys, repeats and empty slots.
@@ -1481,30 +1481,27 @@ local SPECIAL_SECTIONS = {
 
     shamanImbue = {
         build = function(layout)
-            local options = {}
+            local choices = {}
             for _, imbue in ipairs({
-                { value = "windfury", spellID = 8232, fallback = L["Buff.WindfuryWeapon"] },
-                { value = "flametongue", spellID = 8024, fallback = L["Buff.FlametongueWeapon"] },
-                { value = "rockbiter", spellID = 8017, fallback = L["Buff.RockbiterWeapon"] },
-                { value = "frostbrand", spellID = 8033, fallback = L["Buff.FrostbrandWeapon"] },
+                { key = "windfury", spellID = 8232, fallback = L["Buff.WindfuryWeapon"] },
+                { key = "flametongue", spellID = 8024, fallback = L["Buff.FlametongueWeapon"] },
+                { key = "rockbiter", spellID = 8017, fallback = L["Buff.RockbiterWeapon"] },
+                { key = "frostbrand", spellID = 8033, fallback = L["Buff.FrostbrandWeapon"] },
             }) do
-                tinsert(options, { label = BR.GetSpellName(imbue.spellID) or imbue.fallback, value = imbue.value })
+                tinsert(choices, {
+                    key = imbue.key,
+                    label = BR.GetSpellName(imbue.spellID) or imbue.fallback,
+                    icon = C_Spell.GetSpellTexture(imbue.spellID),
+                })
             end
-            local drop = Components.Dropdown(body, {
-                label = L["BuffPanel.ShamanImbue"],
-                labelWidth = DRAWER_LABEL_W,
-                width = DRAWER_FIELD_W,
-                options = options,
-                tooltip = { title = L["BuffPanel.ShamanImbue"], desc = L["BuffPanel.ShamanImbue.Desc"] },
-                get = function()
-                    return BR.Config.Get("defaults.shamanImbue", "windfury")
-                end,
-                onChange = function(val)
-                    BR.Config.Set("defaults.shamanImbue", val)
-                end,
-            })
-            tinsert(bodyHolders, drop)
-            layout:Add(drop, 26, COMPONENT_GAP)
+            AddContentGrid(
+                layout,
+                "shamanImbues",
+                L["BuffPanel.ShamanImbue.Hint"],
+                choices,
+                "atMostOne",
+                TALENT_GROUP_ROWS
+            )
         end,
     },
 

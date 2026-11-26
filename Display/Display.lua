@@ -87,7 +87,7 @@ local BR = ns
 ---@field driveByEmoteText? string Custom greeting emote. nil = the localized default
 ---@field driveByAllowPvP? boolean Drive-by buffs also offer PvP-flagged targets
 ---@field mageFoodContent? "all"|"dungeon"|"raid"
----@field shamanImbue? "windfury"|"flametongue"|"rockbiter"|"frostbrand" The imbue that the WoW Forever click casts
+---@field shamanImbues? table<string, table<string, boolean>> Talent group row -> the imbue that the click casts, at most one (WoW Forever)
 ---@field placeAtPlayer? boolean
 ---@field consumableDisplayMode? "icon_only"|"sub_icons"|"expanded"
 ---@field consumableBadgeOnSubIcons? boolean
@@ -112,8 +112,8 @@ local BR = ns
 ---@field warlockSacrificeDemons? table<string, table<string, boolean>> Talent group row -> the demon to sacrifice, at most one (WoW Forever)
 ---@field warlockStones? table<string, table<string, boolean>> Talent group row -> the picked stone, at most one (WoW Forever)
 ---@field warlockWrongDemon? boolean
----@field warriorStances? table<string, table<string, boolean>> Content row -> allowed stance keys
----@field druidForms? table<string, table<string, boolean>> Content row -> allowed form keys
+---@field warriorStances? table<string, table<string, boolean>> Talent group row -> allowed stance keys (WoW Forever)
+---@field druidForms? table<string, table<string, boolean>> Talent group row -> allowed form keys (WoW Forever)
 ---@field paladinBlessingsByClass? table<string, (string|false)[]> Class token -> blessing keys in priority order
 ---@field paladinBlessingScope? "group"|"self"
 ---@field trackingSpells? table<TrackingKind, table<string, boolean>> Tracking kind -> allowed spell keys (WoW Forever)
