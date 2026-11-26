@@ -386,6 +386,8 @@ local CREATE_HEALTHSTONE = { 11730, 11729, 5699, 6202, 6201 }
 local CREATE_SOULSTONE = { 20757, 20756, 20755, 20752, 693 }
 local SOULSTONE_ITEMS = { 16896, 16895, 16893, 16892, 5232 } -- Major to Minor
 local CONJURE_MANA_GEM = { 10054, 10053, 3552, 759 } -- Ruby, Citrine, Jade, Agate
+local SKYBORNE_RACIALS = { 1259705, 1259686 } -- Read Leyline (High Order), Skysight (Windshaper)
+
 -- Shaman weapon imbues per setting value, highest rank first.
 local SHAMAN_IMBUE_RANKS = {
     windfury = { 16362, 10486, 8235, 8232 },
@@ -2284,6 +2286,22 @@ local BUFF_TABLES = {
                 local id = ShamanImbueCastID()
                 return id and ("/cast " .. (BR.GetSpellName(id) or "")) or ""
             end,
+        },
+        -- spellID holds the racials for the known-spell gate. Each Skyborne race knows one of them.
+        {
+            spellID = SKYBORNE_RACIALS,
+            buffIdOverride = { 1259691, 1270893 }, -- Attuned, Charged
+            key = "skyborneAttunement",
+            defaultEnabled = false, -- opt-in: ships disabled
+            name = L["Buff.SkyborneAttunement"],
+            overlayText = L["Overlay.FindLeyline"],
+            icons = {
+                spells = SKYBORNE_RACIALS,
+                dynamic = function()
+                    local id = HighestKnownSpell(SKYBORNE_RACIALS)
+                    return id and BR.Icons.GetBuffTexture(id)
+                end,
+            },
         },
     },
     ---@type SelfBuff[]
