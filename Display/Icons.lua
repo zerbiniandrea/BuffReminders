@@ -117,16 +117,6 @@ local function GetBuffIcons(buff)
     return out
 end
 
----`byRole` has no entry field: ResolveFrameTexture resolves it at render time.
----@param entry table
----@param buff table
-local function ApplyDynamicIcon(entry, buff)
-    local icons = buff.icons
-    if icons and icons.dynamic then
-        entry.dynamicIcon = icons.dynamic()
-    end
-end
-
 ---Pre-fill the icon cache for every static buff. The caller must wait until spell data
 ---settles.
 local function PreFillIconCaches()
@@ -167,7 +157,6 @@ end
 BR.Icons = {
     GetBuffTexture = GetBuffTexture,
     GetBuffIcons = GetBuffIcons,
-    ApplyDynamicIcon = ApplyDynamicIcon,
     PreFillIconCaches = PreFillIconCaches,
     ResolveFrameTexture = ResolveFrameTexture,
     ---Invalidate one spell ID's cached texture so the next resolve re-queries the API.

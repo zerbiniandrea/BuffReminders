@@ -667,19 +667,26 @@ local function PoisonRemaining()
     return soonest
 end
 
----Applies a poison to the first hand that misses one, else to the hand whose poison expires first.
----@return string
-local function PoisonMacro()
+---The hand that the click poisons: a hand with no poison first, else the soonest to expire.
+---@return {slot: number, column: string}?
+local function PoisonTargetHand()
     local hand = HandMissingPoison()
-    if not hand then
-        local soonest
-        for _, h in ipairs(POISON_HANDS) do
-            local id, remaining = BR.BuffState.GetWeaponImbue(h.slot)
-            if HandHoldsWeapon(h.slot) and id and remaining and (not soonest or remaining < soonest) then
-                hand, soonest = h, remaining
-            end
+    if hand then
+        return hand
+    end
+    local soonest
+    for _, h in ipairs(POISON_HANDS) do
+        local id, remaining = BR.BuffState.GetWeaponImbue(h.slot)
+        if HandHoldsWeapon(h.slot) and id and remaining and (not soonest or remaining < soonest) then
+            hand, soonest = h, remaining
         end
     end
+    return hand
+end
+
+---@return string
+local function PoisonMacro()
+    local hand = PoisonTargetHand()
     if not hand then
         return ""
     end
@@ -2287,7 +2294,7 @@ local BUFF_TABLES = {
             icons = {
                 spells = { 8679, 2823 }, -- Instant Poison, Deadly Poison
                 dynamic = function()
-                    local hand = HandMissingPoison()
+                    local hand = PoisonTargetHand()
                     local _, spellID = PickPoison(hand and hand.column or "mainHand")
                     return spellID and BR.Icons.GetBuffTexture(spellID)
                 end,

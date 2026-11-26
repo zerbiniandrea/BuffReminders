@@ -123,6 +123,16 @@ local UtilityBuffs = BUFF_TABLES.utility
 local CustomBuffs = BUFF_TABLES.custom
 local LoadoutRules = BUFF_TABLES.loadout
 
+---@type (RaidBuff|PresenceBuff|TargetedBuff|SelfBuff|ConsumableBuff|UtilityBuff)[]
+local DynamicIconBuffs = {}
+for _, list in ipairs({ RaidBuffs, PresenceBuffs, TargetedBuffs, SelfBuffs, PetBuffs, Consumables, UtilityBuffs }) do
+    for _, buff in ipairs(list) do
+        if buff.icons and buff.icons.dynamic then
+            DynamicIconBuffs[#DynamicIconBuffs + 1] = buff
+        end
+    end
+end
+
 -- ============================================================================
 -- MODULE STATE
 -- ============================================================================
@@ -2738,7 +2748,6 @@ local function RefreshSelf(isAuraRestricted, hideExpiring)
                             buff.overlayTextFn and buff.overlayTextFn() or buff.overlayText,
                             selfMissGlow
                         )
-                        BR.Icons.ApplyDynamicIcon(entry, buff)
                     end
                 else
                     local shouldShow = ShouldShowSelfBuff(buff, false, isAuraRestricted)
@@ -2751,7 +2760,6 @@ local function RefreshSelf(isAuraRestricted, hideExpiring)
                             buff.overlayTextFn and buff.overlayTextFn() or buff.overlayText,
                             selfMissGlow
                         )
-                        BR.Icons.ApplyDynamicIcon(entry, buff)
                     elseif
                         shouldShow == false
                         and not wantPresent
@@ -2778,14 +2786,9 @@ local function RefreshSelf(isAuraRestricted, hideExpiring)
                                 remaining,
                                 Lead.Of(duration, selfThreshold, selfFloor),
                                 selfExGlow
-                            )
+                            ) and expiringCastID
                         then
-                            if expiringCastID then
-                                entry.dynamicIcon = BR.Icons.GetBuffTexture(expiringCastID)
-                            elseif buff.enchantID then
-                                -- The icon shows the imbue that the click casts.
-                                BR.Icons.ApplyDynamicIcon(entry, buff)
-                            end
+                            entry.dynamicIcon = BR.Icons.GetBuffTexture(expiringCastID)
                         end
                     end
                 end
@@ -2818,13 +2821,10 @@ local function RefreshUtility(db, trackingMode, isAuraRestricted, hideExpiring)
                 if buff.countdown then
                     entry.countdownExpirationTime, entry.countdownDuration, entry.progressText = buff.countdown()
                 end
-                BR.Icons.ApplyDynamicIcon(entry, buff)
             elseif buff.renewAuraID and not hideExpiring and (not buff.canRenew or buff.canRenew(isAuraRestricted)) then
                 local _, remaining, _, duration = UnitHasBuff("player", buff.renewAuraID)
                 local lead = Lead.Of(duration, utilityThreshold, utilityFloor)
-                if TrySetEntryExpiring(entry, remaining, lead, utilityExGlow) then
-                    BR.Icons.ApplyDynamicIcon(entry, buff)
-                end
+                TrySetEntryExpiring(entry, remaining, lead, utilityExGlow)
             end
         end
     end
@@ -2905,7 +2905,6 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring)
                 if text then
                     SetEntryText(entry, text, presMissGlow)
                     entry.noClick = noClick
-                    BR.Icons.ApplyDynamicIcon(entry, buff)
                 end
             elseif showBuff and IsBuffEnabled(buff.key) then
                 local trackable = IsAuraTrackable(buff)
@@ -3027,7 +3026,6 @@ local function RefreshPet(isAuraRestricted)
             local shouldShow = ShouldShowSelfBuff(buff, false, isAuraRestricted)
             if shouldShow then
                 SetEntryText(entry, buff.overlayText, petMissGlow)
-                BR.Icons.ApplyDynamicIcon(entry, buff)
                 if buff.getPetActions then
                     local actions = buff.getPetActions()
                     if actions and #actions > 0 then
@@ -3388,6 +3386,14 @@ function BuffState.Refresh(refreshMode)
         -- in every restricted context, so the reminder there is unactionable noise.
         if not isAuraRestricted then
             RefreshLoadout()
+        end
+    end
+
+    -- One pass for every visible state, so the icon always shows what the click casts.
+    for _, buff in ipairs(DynamicIconBuffs) do
+        local entry = BuffState.entries[buff.key]
+        if entry and entry.visible and not entry.dynamicIcon then
+            entry.dynamicIcon = buff.icons.dynamic()
         end
     end
 
