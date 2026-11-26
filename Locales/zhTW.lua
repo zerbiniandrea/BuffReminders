@@ -1175,14 +1175,11 @@ L["CustomBuff.LineBreakHint"] = "（使用 \\n 換行）"
 
 -- Custom buff dialog tabs
 L["CustomBuff.Tab.Buff"] = "增益"
-L["CustomBuff.Tab.Rules"] = "規則"
-L["CustomBuff.Tab.Click"] = "點擊"
 
 -- Custom buff dialog section headers
 L["CustomBuff.Section.Track"] = "法術"
 L["CustomBuff.Section.ShowIcon"] = "顯示"
 L["CustomBuff.Section.Who"] = "角色"
-L["CustomBuff.Section.Item"] = "需要物品"
 L["CustomBuff.Section.Where"] = "顯示的地方"
 L["CustomBuff.Section.OnClick"] = "點擊動作"
 
@@ -1216,16 +1213,10 @@ L["Class.Warrior"] = "戰士"
 -- Custom buff fields
 L["CustomBuff.Spec"] = "專精"
 L["CustomBuff.Class"] = "職業"
-L["CustomBuff.RequireItem"] = "物品ID"
-L["CustomBuff.RequireItem.EquippedBags"] = "已裝備/背包中"
-L["CustomBuff.RequireItem.Equipped"] = "已裝備"
-L["CustomBuff.RequireItem.InBags"] = "背包中"
 L["CustomBuff.ItemCooldown"] = "冷卻"
 L["CustomBuff.ItemCooldown.Any"] = "任何"
 L["CustomBuff.ItemCooldown.OffCooldown"] = "關閉冷卻"
 L["CustomBuff.ItemCooldown.OnCooldown"] = "開啟冷卻"
-L["CustomBuff.RequireItem.Mode"] = "地點"
-L["CustomBuff.RequireItem.Disabled"] = "請先設定一個物品ID。"
 
 -- Bar glow options
 L["CustomBuff.BarGlow.WhenGlowing"] = "發光時檢測"

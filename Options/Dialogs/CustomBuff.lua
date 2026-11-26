@@ -365,6 +365,20 @@ local function CreateIdList(ctx, block, opts)
     return list
 end
 
+---Item IDs count before the client caches the item data.
+---@param rows CustomBuffIdRow[]?
+---@return number[]
+local function CollectIDs(rows)
+    local ids = {}
+    for _, row in ipairs(rows or {}) do
+        local id = tonumber(strtrim(row.editBox:GetText()))
+        if id then
+            tinsert(ids, id)
+        end
+    end
+    return ids
+end
+
 -- ============================================================================
 -- DELETE CONFIRMATION
 -- ============================================================================
@@ -553,10 +567,10 @@ local function BuildBuffTab(ctx, frame)
 end
 
 -- ============================================================================
--- RULES TAB
+-- WHEN TAB
 -- ============================================================================
 
-local function BuildRulesTab(ctx, frame)
+local function BuildWhenTab(ctx, frame)
     local draft = ctx.draft
     local lc = ctx.loadConditions
     local layout = Components.VerticalLayout(frame, { x = 0, y = -6 })
@@ -645,117 +659,6 @@ local function BuildRulesTab(ctx, frame)
             })
         ),
         FIELD_X
-    )
-
-    SectionHeader(layout, frame, L["CustomBuff.Section.Item"])
-
-    local itemRow = CreateFrame("Frame", nil, frame)
-    itemRow:SetSize(CONTENT_W, ROW_H)
-
-    local itemLabel = itemRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    itemLabel:SetPoint("LEFT", 0, 0)
-    itemLabel:SetWidth(LABEL_W)
-    itemLabel:SetJustifyH("LEFT")
-    itemLabel:SetText(L["CustomBuff.RequireItem"])
-
-    local itemContainer, itemEditBox = IdField(ctx, itemRow, ID_FIELD_W, ctx.editing and ctx.editing.requireItemID)
-    itemContainer:SetPoint("LEFT", FIELD_X, 0)
-    ctx.w.itemEditBox = itemEditBox
-
-    local itemIcon = CreateBuffIcon(itemRow, ICON_SIZE)
-    itemIcon:SetPoint("LEFT", itemContainer, "RIGHT", ICON_GAP, 0)
-    itemIcon:Hide()
-
-    local itemName = itemRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    itemName:SetPoint("LEFT", itemContainer, "RIGHT", NAME_GAP, 0)
-    itemName:SetPoint("RIGHT", itemRow, "RIGHT", 0, 0)
-    itemName:SetJustifyH("LEFT")
-    itemName:SetWordWrap(false)
-
-    local function ValidateItem()
-        local itemID = tonumber(itemEditBox:GetText())
-        local hadItem = draft.hasItem
-        draft.hasItem = itemID ~= nil
-        if not itemID then
-            itemIcon:Hide()
-            itemName:SetText("")
-        else
-            local valid, name, iconID = ValidateItemID(itemID)
-            if valid then
-                itemIcon:SetTexture(iconID)
-                itemIcon:Show()
-                itemName:SetText(name or "")
-            else
-                itemIcon:Hide()
-                itemName:SetText("|cffff4d4d" .. L["CustomBuff.NotFoundRetry"] .. "|r")
-                RequestItemData(itemID)
-            end
-        end
-        if hadItem ~= draft.hasItem then
-            Components.RefreshAll()
-        end
-        ctx.Sync()
-    end
-
-    itemEditBox:SetScript("OnTextChanged", function()
-        Debounce(itemRow, ValidateItem)
-    end)
-
-    ValidateItem()
-    AddControl(layout, itemRow)
-
-    AddControl(
-        layout,
-        Track(
-            ctx,
-            Components.Dropdown(frame, {
-                label = L["CustomBuff.RequireItem.Mode"],
-                labelWidth = LABEL_W,
-                width = FIELD_W,
-                options = {
-                    { value = "owned", label = L["CustomBuff.RequireItem.EquippedBags"] },
-                    { value = "equipped", label = L["CustomBuff.RequireItem.Equipped"] },
-                    { value = "bags", label = L["CustomBuff.RequireItem.InBags"] },
-                },
-                get = function()
-                    return draft.requireItemMode
-                end,
-                enabled = function()
-                    return draft.hasItem
-                end,
-                disabledReason = L["CustomBuff.RequireItem.Disabled"],
-                onChange = function(value)
-                    draft.requireItemMode = value
-                end,
-            })
-        )
-    )
-
-    AddControl(
-        layout,
-        Track(
-            ctx,
-            Components.Dropdown(frame, {
-                label = L["CustomBuff.ItemCooldown"],
-                labelWidth = LABEL_W,
-                width = FIELD_W,
-                options = {
-                    { value = nil, label = L["CustomBuff.ItemCooldown.Any"] },
-                    { value = "offCooldown", label = L["CustomBuff.ItemCooldown.OffCooldown"] },
-                    { value = "onCooldown", label = L["CustomBuff.ItemCooldown.OnCooldown"] },
-                },
-                get = function()
-                    return draft.itemCooldown
-                end,
-                enabled = function()
-                    return draft.hasItem
-                end,
-                disabledReason = L["CustomBuff.RequireItem.Disabled"],
-                onChange = function(value)
-                    draft.itemCooldown = value
-                end,
-            })
-        )
     )
 
     SectionHeader(layout, frame, L["CustomBuff.Section.Where"])
@@ -850,10 +753,13 @@ local function BuildRulesTab(ctx, frame)
 end
 
 -- ============================================================================
--- CLICK TAB
+-- USE TAB
 -- ============================================================================
+-- The click action and the item list answer one question: how the player gets
+-- the buff. The spell and macro inputs share one slot. The item list changes
+-- height, so each part below it anchors to the bottom edge of the part above.
 
-local function BuildClickTab(ctx, frame)
+local function BuildUseTab(ctx, frame)
     local draft = ctx.draft
     local layout = Components.VerticalLayout(frame, { x = 0, y = -6 })
 
@@ -889,69 +795,58 @@ local function BuildClickTab(ctx, frame)
         )
     )
 
-    -- All three inputs share one slot. The item list grows the slot, and the
-    -- hints anchor to its bottom edge.
-    local inputTop = -layout:GetY()
-    local inputHost = CreateFrame("Frame", nil, frame)
+    local clickTop = -layout:GetY()
+    local clickBlock = CreateFrame("Frame", nil, frame)
+    clickBlock:SetSize(CONTENT_W, ROW_H)
+    clickBlock:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -clickTop)
+
+    local inputHost = CreateFrame("Frame", nil, clickBlock)
     inputHost:SetSize(CONTENT_W, ROW_H)
-    inputHost:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -inputTop)
+    inputHost:SetPoint("TOPLEFT", 0, 0)
 
-    local function BuildLookupRow(labelText, initial, validate)
-        local row = CreateFrame("Frame", nil, inputHost)
-        row:SetSize(CONTENT_W, ROW_H)
-        row:SetPoint("TOPLEFT", 0, 0)
+    local spellRow = CreateFrame("Frame", nil, inputHost)
+    spellRow:SetSize(CONTENT_W, ROW_H)
+    spellRow:SetPoint("TOPLEFT", 0, 0)
 
-        local label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        label:SetPoint("LEFT", 0, 0)
-        label:SetWidth(LABEL_W)
-        label:SetJustifyH("LEFT")
-        label:SetText(labelText)
+    local spellLabel = spellRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    spellLabel:SetPoint("LEFT", 0, 0)
+    spellLabel:SetWidth(LABEL_W)
+    spellLabel:SetJustifyH("LEFT")
+    spellLabel:SetText(L["CustomBuff.Action.SpellID"])
 
-        local container, editBox = IdField(ctx, row, ID_FIELD_W, initial)
-        container:SetPoint("LEFT", FIELD_X, 0)
+    local spellContainer, spellEditBox = IdField(ctx, spellRow, ID_FIELD_W, ctx.editing and ctx.editing.castSpellID)
+    spellContainer:SetPoint("LEFT", FIELD_X, 0)
 
-        local icon = CreateBuffIcon(row, ICON_SIZE)
-        icon:SetPoint("LEFT", container, "RIGHT", ICON_GAP, 0)
-        icon:Hide()
+    local spellIcon = CreateBuffIcon(spellRow, ICON_SIZE)
+    spellIcon:SetPoint("LEFT", spellContainer, "RIGHT", ICON_GAP, 0)
+    spellIcon:Hide()
 
-        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        nameText:SetPoint("LEFT", container, "RIGHT", NAME_GAP, 0)
-        nameText:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-        nameText:SetJustifyH("LEFT")
-        nameText:SetWordWrap(false)
+    local spellName = spellRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    spellName:SetPoint("LEFT", spellContainer, "RIGHT", NAME_GAP, 0)
+    spellName:SetPoint("RIGHT", spellRow, "RIGHT", 0, 0)
+    spellName:SetJustifyH("LEFT")
+    spellName:SetWordWrap(false)
 
-        local function Run()
-            local id = tonumber(editBox:GetText())
-            if not id then
-                icon:Hide()
-                nameText:SetText("")
-                return
-            end
-            local valid, name, iconID = validate(id)
-            if valid then
-                icon:SetTexture(iconID)
-                icon:Show()
-                nameText:SetText(name or "")
-            else
-                icon:Hide()
-                nameText:SetText("|cffff4d4d" .. L["CustomBuff.NotFoundRetry"] .. "|r")
-            end
+    local function ValidateCastSpell()
+        local id = tonumber(spellEditBox:GetText())
+        local valid, name, iconID = false, nil, nil
+        if id then
+            valid, name, iconID = ValidateSpellID(id)
         end
-
-        editBox:SetScript("OnTextChanged", function()
-            Debounce(row, Run)
-        end)
-        row.Validate = Run
-        row.editBox = editBox
-        return row
+        spellIcon:SetShown(valid)
+        if valid then
+            spellIcon:SetTexture(iconID)
+            spellName:SetText(name or "")
+        elseif id then
+            spellName:SetText("|cffff4d4d" .. L["CustomBuff.NotFound"] .. "|r")
+        else
+            spellName:SetText("")
+        end
     end
 
-    local spellRow =
-        BuildLookupRow(L["CustomBuff.Action.SpellID"], ctx.editing and ctx.editing.castSpellID, ValidateSpellID)
-
-    local itemBlock = CreateFrame("Frame", nil, inputHost)
-    itemBlock:SetSize(CONTENT_W, ROW_PITCH + ROW_H)
-    itemBlock:SetPoint("TOPLEFT", 0, 0)
+    spellEditBox:SetScript("OnTextChanged", function()
+        Debounce(spellRow, ValidateCastSpell)
+    end)
 
     local macroInput = Components.TextInput(inputHost, {
         label = L["CustomBuff.Action.MacroText"],
@@ -959,15 +854,14 @@ local function BuildClickTab(ctx, frame)
         width = CONTENT_W - FIELD_X,
         value = ctx.editing and ctx.editing.castMacro or "",
     })
-    macroInput:SetPoint("LEFT", inputHost, "TOPLEFT", 0, -ROW_H / 2)
+    macroInput:SetPoint("LEFT", inputHost, "LEFT", 0, 0)
     tinsert(ctx.editBoxes, macroInput.editBox)
 
-    ctx.w.castSpell = spellRow.editBox
+    ctx.w.castSpell = spellEditBox
     ctx.w.castMacro = macroInput.editBox
 
     local function Hint(text)
-        local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-        hint:SetPoint("TOPLEFT", inputHost, "BOTTOMLEFT", FIELD_X, -ROW_GAP)
+        local hint = clickBlock:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
         hint:SetWidth(CONTENT_W - FIELD_X)
         hint:SetJustifyH("LEFT")
         hint:SetWordWrap(true)
@@ -975,23 +869,114 @@ local function BuildClickTab(ctx, frame)
         return hint
     end
     local hints = {
+        none = Hint(L["CustomBuff.Action.NoneHint"]),
         spell = Hint(L["CustomBuff.Action.SpellHint"]),
         item = Hint(L["CustomBuff.Action.ItemHint"]),
         macro = Hint(L["CustomBuff.Action.MacroHint"]),
     }
 
-    local function UpdateClickTabHeight()
-        inputHost:SetHeight(draft.action == "item" and itemBlock:GetHeight() or ROW_H)
+    local itemsHead = CreateFrame("Frame", nil, frame)
+    itemsHead:SetPoint("TOPLEFT", clickBlock, "BOTTOMLEFT", 0, 0)
+    local headLayout = Components.VerticalLayout(itemsHead, { x = 0, y = 0 })
+    headLayout._sections = 1
+    SectionHeader(headLayout, itemsHead, L["CustomBuff.Section.Items"])
+    local headHeight = -headLayout:GetY()
+    itemsHead:SetSize(CONTENT_W, headHeight)
+
+    local itemBlock = CreateFrame("Frame", nil, frame)
+    itemBlock:SetSize(CONTENT_W, ROW_PITCH + ROW_H)
+    itemBlock:SetPoint("TOPLEFT", itemsHead, "BOTTOMLEFT", 0, 0)
+
+    local rest = CreateFrame("Frame", nil, frame)
+    rest:SetSize(CONTENT_W, 10)
+    rest:SetPoint("TOPLEFT", itemBlock, "BOTTOMLEFT", 0, -ROW_GAP)
+    local restLayout = Components.VerticalLayout(rest, { x = 0, y = 0 })
+
+    local function HasItems()
+        return #CollectIDs(ctx.itemRows) > 0
+    end
+
+    AddControl(
+        restLayout,
+        Track(
+            ctx,
+            Components.Dropdown(rest, {
+                label = L["CustomBuff.ItemGate"],
+                labelWidth = LABEL_W,
+                width = FIELD_W,
+                options = {
+                    { value = "owned", label = L["CustomBuff.ItemGate.Owned"] },
+                    { value = "equipped", label = L["CustomBuff.ItemGate.Equipped"] },
+                    { value = "bags", label = L["CustomBuff.ItemGate.Bags"] },
+                    { value = "always", label = L["CustomBuff.ItemGate.Always"] },
+                },
+                get = function()
+                    return draft.itemGate
+                end,
+                tooltip = {
+                    title = L["CustomBuff.ItemGate.Title"],
+                    desc = L["CustomBuff.ItemGate.Desc"],
+                },
+                enabled = HasItems,
+                disabledReason = L["CustomBuff.ItemGate.Disabled"],
+                onChange = function(value)
+                    draft.itemGate = value
+                end,
+            })
+        )
+    )
+
+    AddControl(
+        restLayout,
+        Track(
+            ctx,
+            Components.Dropdown(rest, {
+                label = L["CustomBuff.ItemCooldown"],
+                labelWidth = LABEL_W,
+                width = FIELD_W,
+                options = {
+                    { value = nil, label = L["CustomBuff.ItemCooldown.Any"] },
+                    { value = "offCooldown", label = L["CustomBuff.ItemCooldown.OffCooldown"] },
+                    { value = "onCooldown", label = L["CustomBuff.ItemCooldown.OnCooldown"] },
+                },
+                get = function()
+                    return draft.itemCooldown
+                end,
+                enabled = HasItems,
+                disabledReason = L["CustomBuff.ItemGate.Disabled"],
+                onChange = function(value)
+                    draft.itemCooldown = value
+                end,
+            })
+        )
+    )
+
+    local restHeight = -restLayout:GetY()
+    rest:SetHeight(restHeight)
+
+    local function UpdateUseTabHeight()
         local hint = hints[draft.action]
-        local hintH = hint and (ROW_GAP + ceil(hint:GetStringHeight()) + COMPONENT_GAP) or ROW_GAP
-        frame:SetHeight(inputTop + inputHost:GetHeight() + hintH + TAB_BOTTOM_PAD)
-        if ctx.activeTab == "click" then
+        local slotH = (draft.action == "spell" or draft.action == "macro") and ROW_H or 0
+        local hintH = ceil(hint:GetStringHeight())
+        hint:ClearAllPoints()
+        hint:SetPoint("TOPLEFT", clickBlock, "TOPLEFT", FIELD_X, -(slotH + ROW_GAP))
+        clickBlock:SetHeight(slotH + ROW_GAP + hintH + COMPONENT_GAP)
+        frame:SetHeight(
+            clickTop
+                + clickBlock:GetHeight()
+                + headHeight
+                + itemBlock:GetHeight()
+                + ROW_GAP
+                + restHeight
+                + TAB_BOTTOM_PAD
+        )
+        if ctx.activeTab == "use" then
             ctx.scrollFrame:SetContentHeight(frame:GetHeight())
         end
     end
 
     local itemList = CreateIdList(ctx, itemBlock, {
-        label = L["CustomBuff.Action.ItemIDs"],
+        label = L["CustomBuff.ItemIDs"],
         addLabel = L["CustomBuff.AddItemID"],
         notFoundText = L["CustomBuff.NotFoundRetry"],
         validate = function(id)
@@ -1001,10 +986,10 @@ local function BuildClickTab(ctx, frame)
             end
             return valid, name, iconID
         end,
-        onResize = UpdateClickTabHeight,
+        onResize = UpdateUseTabHeight,
     })
     ctx.itemRows = itemList.rows
-    local savedItems = ctx.editing and ctx.editing.castItemID
+    local savedItems = ctx.editing and ctx.editing.itemIDs
     if type(savedItems) == "table" then
         for _, itemID in ipairs(savedItems) do
             itemList.Add(itemID)
@@ -1013,21 +998,25 @@ local function BuildClickTab(ctx, frame)
         itemList.Add(savedItems)
     end
 
+    local hadItems = HasItems()
+    function ctx.SyncItems()
+        local hasItems = HasItems()
+        if hasItems ~= hadItems then
+            hadItems = hasItems
+            Components.RefreshAll()
+        end
+    end
+
     function ctx.UpdateActionInputs()
         spellRow:SetShown(draft.action == "spell")
-        itemBlock:SetShown(draft.action == "item")
         macroInput:SetShown(draft.action == "macro")
         for action, hint in pairs(hints) do
             hint:SetShown(action == draft.action)
         end
         if draft.action == "spell" then
-            spellRow.Validate()
-        elseif draft.action == "item" then
-            for _, row in ipairs(itemList.rows) do
-                row.Validate()
-            end
+            ValidateCastSpell()
         end
-        UpdateClickTabHeight()
+        UpdateUseTabHeight()
     end
 
     ctx.UpdateActionInputs()
@@ -1099,24 +1088,23 @@ local function SaveBuff(ctx)
         overlayText = nil
     end
 
-    local castSpellID, castItemID, castMacro
-    if draft.action == "spell" then
-        castSpellID = tonumber(strtrim(ctx.w.castSpell:GetText()))
-    elseif draft.action == "item" then
-        local items = {}
-        for _, row in ipairs(ctx.itemRows) do
-            local itemID = tonumber(strtrim(row.editBox:GetText()))
-            if itemID then
-                tinsert(items, itemID)
-            end
-        end
-        castItemID = #items > 1 and items or items[1]
-    elseif draft.action == "macro" then
+    local action = draft.action ~= "none" and draft.action or nil
+    local castSpellID = action == "spell" and tonumber(strtrim(ctx.w.castSpell:GetText())) or nil
+    local castMacro
+    if action == "macro" then
         local text = strtrim(ctx.w.castMacro:GetText())
         castMacro = text ~= "" and text or nil
     end
 
-    local requireItemID = tonumber(strtrim(ctx.w.itemEditBox:GetText()))
+    local items = CollectIDs(ctx.itemRows)
+    local itemIDs = #items > 1 and items or items[1]
+
+    -- An action with an empty input saves as no action.
+    if (action == "spell" and not castSpellID) or (action == "macro" and not castMacro) then
+        action = nil
+    elseif action == "item" and not itemIDs then
+        action = nil
+    end
 
     local customBuff = {
         spellID = spellIDValue,
@@ -1129,12 +1117,12 @@ local function SaveBuff(ctx)
         requireSpellKnown = draft.requireSpellKnown or nil,
         glowMode = draft.glowMode ~= "disabled" and draft.glowMode or nil,
         expirationThreshold = draft.trigger == "missing" and draft.expiration or 0,
+        clickAction = action,
         castSpellID = castSpellID,
-        castItemID = castItemID,
         castMacro = castMacro,
-        requireItemID = requireItemID,
-        requireItemMode = draft.requireItemMode ~= "owned" and draft.requireItemMode or nil,
-        itemCooldownCondition = requireItemID and draft.itemCooldown or nil,
+        itemIDs = itemIDs,
+        itemGate = itemIDs and draft.itemGate ~= "owned" and draft.itemGate or nil,
+        itemCooldownCondition = itemIDs and draft.itemCooldown or nil,
         loadConditions = CollectLoadConditions(ctx.loadConditions),
     }
 
@@ -1154,17 +1142,6 @@ end
 -- ============================================================================
 
 local function BuildDraft(editing)
-    local action = "none"
-    if editing then
-        if editing.castMacro and editing.castMacro ~= "" then
-            action = "macro"
-        elseif editing.castItemID then
-            action = "item"
-        elseif editing.castSpellID then
-            action = "spell"
-        end
-    end
-
     return {
         trigger = editing and editing.showWhenPresent and "active" or "missing",
         expiration = editing and editing.expirationThreshold or 15,
@@ -1172,10 +1149,9 @@ local function BuildDraft(editing)
         class = editing and editing.class or nil,
         specId = editing and editing.requireSpecId or nil,
         requireSpellKnown = editing and editing.requireSpellKnown or false,
-        requireItemMode = editing and editing.requireItemMode or "owned",
+        itemGate = editing and editing.itemGate or "owned",
         itemCooldown = editing and editing.itemCooldownCondition or nil,
-        hasItem = editing and editing.requireItemID ~= nil or false,
-        action = action,
+        action = editing and editing.clickAction or "none",
     }
 end
 
@@ -1288,7 +1264,7 @@ local function Show(existingKey, refreshPanelCallback)
     ctx.scrollFrame = scrollFrame
 
     local tabFrames = {}
-    for _, id in ipairs({ "buff", "rules", "click" }) do
+    for _, id in ipairs({ "buff", "use", "when" }) do
         local frame = CreateFrame("Frame", nil, content)
         frame:SetPoint("TOPLEFT", 0, 0)
         frame:SetSize(CONTENT_W, BODY_H)
@@ -1348,11 +1324,11 @@ local function Show(existingKey, refreshPanelCallback)
     -- "unacknowledged new feature", and a second meaning reads as an alert.
     -- The header summary carries the rules worth seeing from any tab.
     local tabs = {}
-    local TAB_IDS = { "buff", "rules", "click" }
+    local TAB_IDS = { "buff", "use", "when" }
     local TAB_LABELS = {
         buff = L["CustomBuff.Tab.Buff"],
-        rules = L["CustomBuff.Tab.Rules"],
-        click = L["CustomBuff.Tab.Click"],
+        use = L["CustomBuff.Tab.Use"],
+        when = L["CustomBuff.Tab.When"],
     }
 
     local function Activate(id)
@@ -1429,6 +1405,9 @@ local function Show(existingKey, refreshPanelCallback)
 
         saveBtn:SetEnabled(validCount > 0)
         saveHint:SetText(validCount > 0 and "" or L["CustomBuff.ValidateError"])
+        if ctx.SyncItems then
+            ctx.SyncItems()
+        end
     end
 
     nameBox:SetScript("OnTextChanged", function()
@@ -1436,8 +1415,8 @@ local function Show(existingKey, refreshPanelCallback)
     end)
 
     BuildBuffTab(ctx, tabFrames.buff)
-    BuildRulesTab(ctx, tabFrames.rules)
-    BuildClickTab(ctx, tabFrames.click)
+    BuildUseTab(ctx, tabFrames.use)
+    BuildWhenTab(ctx, tabFrames.when)
 
     if editing then
         local saved = editing.spellID

@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 71
+BR.Migrations.DB_VERSION = 72
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -581,6 +581,80 @@ function BR.Migrations.StampUnversionedProfiles(profiles)
     end
 end
 
+---@param ids any number|number[] from a raw table
+---@return number[]
+local function IDList(ids)
+    if type(ids) == "table" then
+        return ids
+    end
+    return { ids }
+end
+
+---@param a any
+---@param b any
+---@return boolean
+local function SameIDs(a, b)
+    local listA, listB = IDList(a), IDList(b)
+    if #listA ~= #listB then
+        return false
+    end
+    for i = 1, #listA do
+        if listA[i] ~= listB[i] then
+            return false
+        end
+    end
+    return true
+end
+
+---Convert one raw custom buff from the click item and required item keys to one item
+---list and an explicit click action. Click priority was macro, then item, then spell.
+---A buff with no required item checked its click items. A click item that differs from
+---the required item becomes a /use macro, so the click and the check stay the same.
+---Single custom buff strings skip the migrations, so the import also calls this.
+---@param buff table Raw custom buff
+function BR.Migrations.ConvertCustomBuffItems(buff)
+    local castItems, requiredItems = buff.castItemID, buff.requireItemID
+    local hasMacro = type(buff.castMacro) == "string" and buff.castMacro ~= ""
+
+    if buff.clickAction == nil then
+        if hasMacro then
+            buff.clickAction = "macro"
+        elseif castItems ~= nil then
+            buff.clickAction = "item"
+        elseif buff.castSpellID ~= nil then
+            buff.clickAction = "spell"
+        end
+    end
+
+    if buff.itemIDs == nil and (requiredItems ~= nil or castItems ~= nil) then
+        local firstCastItem = castItems ~= nil and IDList(castItems)[1] or nil
+        if
+            buff.clickAction == "item"
+            and requiredItems ~= nil
+            and type(firstCastItem) == "number"
+            and not SameIDs(castItems, requiredItems)
+        then
+            buff.castMacro = "/use item:" .. math.floor(firstCastItem)
+            buff.clickAction = "macro"
+        end
+        buff.itemIDs = requiredItems ~= nil and requiredItems or castItems
+    end
+
+    if buff.itemGate == nil and (buff.requireItemMode == "equipped" or buff.requireItemMode == "bags") then
+        buff.itemGate = buff.requireItemMode
+    end
+
+    if buff.clickAction ~= "spell" then
+        buff.castSpellID = nil
+    end
+    if buff.clickAction ~= "macro" then
+        buff.castMacro = nil
+    end
+    buff.castItemID = nil
+    buff.requireItemID = nil
+    buff.requireItemMode = nil
+end
+
 ---Run the pending migrations on one raw profile table and stamp it. A profile below
 ---MIN_DB_VERSION resets to empty. A profile above DB_VERSION comes from a newer build
 ---and stays untouched.
@@ -787,6 +861,18 @@ function BR.Migrations.RunProfile(profile, isImport)
         -- (BR.Migrations.RecordTextSizesForScale).
         [71] = function()
             BR.Migrations.RecordTextSizesForScale(profile)
+        end,
+        -- [72] A custom buff gets one item list and an explicit click action
+        -- (BR.Migrations.ConvertCustomBuffItems).
+        [72] = function()
+            local customBuffs = profile.customBuffs
+            if type(customBuffs) == "table" then
+                for _, buff in pairs(customBuffs) do
+                    if type(buff) == "table" then
+                        BR.Migrations.ConvertCustomBuffItems(buff)
+                    end
+                end
+            end
         end,
     }
 

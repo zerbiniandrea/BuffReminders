@@ -233,12 +233,12 @@ local DK_RUNEFORGES = {
 ---@field requireSpellKnown? boolean -- Only show if player knows at least one of the tracked spells
 ---@field showWhenPresent? boolean  -- Show icon when buff IS on player (default: show when missing)
 ---@field glowMode? "whenGlowing"|"whenNotGlowing"|"disabled"  -- Action bar glow fallback mode: nil/"whenGlowing" = detect when glowing (default), "whenNotGlowing" = detect when NOT glowing, "disabled" = don't track glow
+---@field clickAction? "spell"|"item"|"macro" -- What a click does (nil = cast the tracked spell)
 ---@field castSpellID? number       -- Spell to cast on click (separate from tracked aura)
----@field castItemID? number|number[] -- Items to use on click: the first one the player has
 ---@field castMacro? string         -- Raw macro text for click action
----@field requireItemID? number    -- Only show if this item is owned/equipped/in bags (see requireItemMode)
----@field requireItemMode? "owned"|"equipped"|"bags" -- How to check requireItemID: "owned" (default) = bags or equipped, "equipped" = equipped only, "bags" = bags only
----@field itemCooldownCondition? "offCooldown"|"onCooldown" -- Gate visibility on item cooldown state (nil = ignore cooldown)
+---@field itemIDs? number|number[]  -- Items of the reminder: "item" clicks use the first one found, itemGate checks them
+---@field itemGate? "always"|"equipped"|"bags" -- When itemIDs show the icon: nil = one is in the bags or equipped, "always" = no check
+---@field itemCooldownCondition? "offCooldown"|"onCooldown" -- Gate visibility on the cooldown of the found item (nil = ignore cooldown)
 ---@field expirationThreshold? number  -- Per-buff expiration threshold in minutes (0 = off)
 ---@field loadConditions? LoadConditions  -- Per-buff content visibility (nil = show everywhere)
 

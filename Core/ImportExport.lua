@@ -216,7 +216,8 @@ local ID_LIST_LIMIT = 64
 -- out. An imported default then reads back as nil, the same as a locally saved
 -- one.
 local GLOW_MODES = { whenGlowing = true, whenNotGlowing = true }
-local ITEM_MODES = { equipped = true, bags = true }
+local ITEM_GATES = { always = true, equipped = true, bags = true }
+local CLICK_ACTIONS = { spell = true, item = true, macro = true }
 local ITEM_COOLDOWNS = { offCooldown = true, onCooldown = true }
 local LEVEL_FILTERS = { maxLevel = true, belowMaxLevel = true }
 
@@ -341,7 +342,23 @@ local function SanitizeCustomBuff(data)
         expiration = 0
     end
 
-    local requireItemID = PositiveInt(data.requireItemID)
+    -- The ID lists are checked before the conversion, which can write one into a macro.
+    data.castItemID = SanitizeIDList(data.castItemID)
+    data.requireItemID = SanitizeIDList(data.requireItemID)
+    BR.Migrations.ConvertCustomBuffItems(data)
+
+    local clickAction = CLICK_ACTIONS[data.clickAction] and data.clickAction or nil
+    local itemIDs = SanitizeIDList(data.itemIDs)
+    local castSpellID = clickAction == "spell" and PositiveInt(data.castSpellID) or nil
+    local castMacro = clickAction == "macro" and BoundedString(data.castMacro, MACRO_LIMIT) or nil
+    -- An action with an empty input saves as no action, as the editor does.
+    if
+        (clickAction == "spell" and not castSpellID)
+        or (clickAction == "macro" and not castMacro)
+        or (clickAction == "item" and not itemIDs)
+    then
+        clickAction = nil
+    end
 
     return {
         spellID = spellID,
@@ -353,14 +370,12 @@ local function SanitizeCustomBuff(data)
         requireSpellKnown = data.requireSpellKnown == true or nil,
         glowMode = GLOW_MODES[data.glowMode] and data.glowMode or nil,
         expirationThreshold = expiration,
-        castSpellID = PositiveInt(data.castSpellID),
-        castItemID = SanitizeIDList(data.castItemID),
-        castMacro = BoundedString(data.castMacro, MACRO_LIMIT),
-        requireItemID = requireItemID,
-        requireItemMode = requireItemID and ITEM_MODES[data.requireItemMode] and data.requireItemMode or nil,
-        itemCooldownCondition = requireItemID
-                and ITEM_COOLDOWNS[data.itemCooldownCondition]
-                and data.itemCooldownCondition
+        clickAction = clickAction,
+        castSpellID = castSpellID,
+        castMacro = castMacro,
+        itemIDs = itemIDs,
+        itemGate = itemIDs and ITEM_GATES[data.itemGate] and data.itemGate or nil,
+        itemCooldownCondition = itemIDs and ITEM_COOLDOWNS[data.itemCooldownCondition] and data.itemCooldownCondition
             or nil,
         loadConditions = SanitizeLoadConditions(data.loadConditions),
     }

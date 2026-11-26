@@ -114,16 +114,14 @@ local function DescribeIDs(ids)
     return table.concat(ids, ", ")
 end
 
--- Same order the secure button resolves in, so the preview names what a click
--- will really do when a string carries more than one action.
 local function DescribeAction(buff)
-    if buff.castMacro then
+    if buff.clickAction == "macro" then
         return buff.castMacro
     end
-    if buff.castItemID then
-        return L["CustomBuff.Action.Item"] .. " " .. DescribeIDs(buff.castItemID)
+    if buff.clickAction == "item" then
+        return L["CustomBuff.Action.Item"]
     end
-    if buff.castSpellID then
+    if buff.clickAction == "spell" and buff.castSpellID then
         return L["CustomBuff.Action.Spell"] .. " " .. buff.castSpellID
     end
     return nil
@@ -192,6 +190,9 @@ local function CreatePreview(parent)
         local action = DescribeAction(buff)
         if action then
             lines[#lines + 1] = L["CustomBuff.Share.Runs"] .. " " .. action
+        end
+        if buff.itemIDs then
+            lines[#lines + 1] = L["CustomBuff.Share.Items"] .. " " .. DescribeIDs(buff.itemIDs)
         end
         detail:SetText(table.concat(lines, "\n"))
 

@@ -28,6 +28,7 @@ local Plain = BR.Secret.Plain
 local BuffTargets = BR.StateHelpers.BuffTargets
 local IsCountdownEntry = BR.StateHelpers.IsCountdownEntry
 local FirstOwnedItem = BR.StateHelpers.FirstOwnedItem
+local CustomItemMode = BR.StateHelpers.CustomItemMode
 local AsSpellList = BR.StateHelpers.AsSpellList
 local SubIcons = BR.SubIcons
 local Pixels = BR.Pixels
@@ -107,23 +108,30 @@ local function GetActionSpellID(buff)
     return GetCastableSpellID(buff.castSpellID or buff.spellID)
 end
 
----Priority: castMacro > castItemID > castSpellID > spellID[1] that the player knows.
----@param buff table The custom buff definition
+---With no click action, a click casts the first tracked spell that the player knows.
+---@param buff CustomBuff?
 ---@return string? actionType "spell"|"item"|"macro" or nil
----@return any actionValue The spell ID, item string, or macro text
+---@return any actionValue The spell ID, item ID, or macro text
 local function ResolveCustomClickAction(buff)
     if not buff then
         return nil, nil
     end
-    if buff.castMacro and buff.castMacro ~= "" then
-        return "macro", buff.castMacro
+    local action = buff.clickAction
+    if action == "macro" then
+        if buff.castMacro and buff.castMacro ~= "" then
+            return "macro", buff.castMacro
+        end
+        return nil, nil
     end
-    local items = buff.castItemID
-    if items then
-        return "item", FirstOwnedItem(items) or AsSpellList(items)[1]
+    if action == "item" then
+        local items = buff.itemIDs
+        if items then
+            return "item", FirstOwnedItem(items, CustomItemMode(buff)) or AsSpellList(items)[1]
+        end
+        return nil, nil
     end
-    if buff.castSpellID then
-        if IsSpellKnown(buff.castSpellID) then
+    if action == "spell" then
+        if buff.castSpellID and IsSpellKnown(buff.castSpellID) then
             return "spell", buff.castSpellID
         end
         return nil, nil
@@ -167,7 +175,7 @@ local function HasCustomClickAction(def)
     if not def then
         return false
     end
-    return def.castSpellID ~= nil or def.castItemID ~= nil or (def.castMacro ~= nil and def.castMacro ~= "")
+    return def.clickAction ~= nil
 end
 
 -- ============================================================================

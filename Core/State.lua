@@ -732,6 +732,20 @@ local function FirstOwnedItem(items, mode)
     return nil
 end
 
+---Where a custom buff looks for its items. With no item check, the click still
+---needs an item that the player has.
+---@param buff CustomBuff
+---@return "owned"|"equipped"|"bags"
+local function CustomItemMode(buff)
+    local gate = buff.itemGate
+    if gate == "equipped" then
+        return "equipped"
+    elseif gate == "bags" then
+        return "bags"
+    end
+    return "owned"
+end
+
 -- Item count cache (charges included), invalidated together with
 -- cachedItemOwnership. Item counts only change on bag updates. Charge counts do
 -- change without a bag event, so they stay out of this cache.
@@ -3171,16 +3185,15 @@ local function RefreshCustom(isAuraRestricted, hideExpiring)
             end
         end
 
+        local itemIDs = buff.itemIDs
+        local foundItemID = itemIDs and FirstOwnedItem(itemIDs, CustomItemMode(buff)) or nil
         if shouldProcess then
-            local gateItems = buff.requireItemID or buff.castItemID
-            local gateItemID
-            if gateItems then
-                gateItemID = FirstOwnedItem(gateItems, buff.requireItemMode)
-                shouldProcess = gateItemID ~= nil
+            if itemIDs and buff.itemGate ~= "always" and not foundItemID then
+                shouldProcess = false
             end
-            if shouldProcess and gateItemID and buff.itemCooldownCondition and not CooldownsRestricted() then
-                -- pcall: gateItemID is user-entered and an invalid ID can throw.
-                local ok, _, duration = pcall(C_Item.GetItemCooldown, gateItemID)
+            if shouldProcess and foundItemID and buff.itemCooldownCondition and not CooldownsRestricted() then
+                -- pcall: foundItemID is user-entered and an invalid ID can throw.
+                local ok, _, duration = pcall(C_Item.GetItemCooldown, foundItemID)
                 duration = ok and Plain(duration) or nil
                 if duration then
                     local isReady = duration == 0
@@ -3229,11 +3242,10 @@ local function RefreshCustom(isAuraRestricted, hideExpiring)
         end
 
         entry.stackText = nil
-        if entry.visible and buff.castItemID then
-            local ownedItemID = FirstOwnedItem(buff.castItemID)
-            -- Same pick as the click: the first owned item, else the first listed item.
-            entry.dynamicIcon = GetItemIconCached(ownedItemID or AsSpellList(buff.castItemID)[1])
-            local count = ownedItemID and GetItemCountCached(ownedItemID) or 0
+        if entry.visible and itemIDs and buff.clickAction == "item" then
+            -- Same pick as the click: the first found item, else the first listed item.
+            entry.dynamicIcon = GetItemIconCached(foundItemID or AsSpellList(itemIDs)[1])
+            local count = foundItemID and GetItemCountCached(foundItemID) or 0
             if count > 1 then
                 entry.stackText = tostring(count)
             end
@@ -3872,6 +3884,7 @@ BR.StateHelpers = {
     GetItemCountCached = GetItemCountCached,
     HasItemInBags = HasItemInBags,
     FirstOwnedItem = FirstOwnedItem,
+    CustomItemMode = CustomItemMode,
     IsPlayerTank = IsPlayerTank,
     AsSpellList = AsSpellList,
     BuffTargets = BuffTargets,

@@ -41,8 +41,9 @@ local function FormatRestrictions(buff)
         local localized = L["Class." .. buff.class:sub(1, 1) .. buff.class:sub(2):lower()]
         tinsert(parts, localized or buff.class)
     end
-    if buff.requireItemID then
-        tinsert(parts, L["CustomBuff.RequireItem"] .. " " .. buff.requireItemID)
+    if buff.itemIDs then
+        local ids = buff.itemIDs
+        tinsert(parts, L["CustomBuff.ItemIDs"] .. " " .. (type(ids) == "table" and table.concat(ids, ", ") or ids))
     end
     if buff.glowMode and buff.glowMode ~= "disabled" then
         tinsert(parts, L["CustomBuff.BarGlow"] or "Bar glow")

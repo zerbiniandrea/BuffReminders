@@ -926,14 +926,11 @@ L["CustomBuff.LineBreakHint"] = "(\\n을 사용해서 줄바꿈)"
 
 -- Custom buff dialog tabs
 L["CustomBuff.Tab.Buff"] = "버프"
-L["CustomBuff.Tab.Rules"] = "규칙"
-L["CustomBuff.Tab.Click"] = "클릭"
 
 -- Custom buff dialog section headers
 L["CustomBuff.Section.Track"] = "주문"
 L["CustomBuff.Section.ShowIcon"] = "디스플레이"
 L["CustomBuff.Section.Who"] = "캐릭터"
-L["CustomBuff.Section.Item"] = "필요 아이템"
 L["CustomBuff.Section.Where"] = "표시 위치"
 L["CustomBuff.Section.OnClick"] = "클릭 동작"
 
@@ -967,16 +964,11 @@ L["Class.Warrior"] = "전사"
 -- Custom buff fields
 L["CustomBuff.Spec"] = "전문화:"
 L["CustomBuff.Class"] = "직업:"
-L["CustomBuff.RequireItem.EquippedBags"] = "착용 중/소지품"
-L["CustomBuff.RequireItem.Equipped"] = "착용 중"
-L["CustomBuff.RequireItem.InBags"] = "소지품"
 L["CustomBuff.RequireItem.Hint"] = "아이템 ID - 없으면 숨김"
 L["CustomBuff.ItemCooldown"] = "쿨타임:"
 L["CustomBuff.ItemCooldown.Any"] = "모두"
 L["CustomBuff.ItemCooldown.OffCooldown"] = "쿨타임 아님"
 L["CustomBuff.ItemCooldown.OnCooldown"] = "쿨타임 상태"
-L["CustomBuff.RequireItem.Mode"] = "위치"
-L["CustomBuff.RequireItem.Disabled"] = "먼저 아이템 ID를 설정하세요."
 
 -- Bar glow options
 L["CustomBuff.BarGlow.WhenGlowing"] = "반짝일 때 감지"

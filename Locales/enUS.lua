@@ -1237,14 +1237,14 @@ english["CustomBuff.LineBreakHint"] = "Type \\n for a line break."
 
 -- Custom buff dialog tabs
 english["CustomBuff.Tab.Buff"] = "Buff"
-english["CustomBuff.Tab.Rules"] = "Rules"
-english["CustomBuff.Tab.Click"] = "Click"
+english["CustomBuff.Tab.Use"] = "Use"
+english["CustomBuff.Tab.When"] = "When"
 
 -- Custom buff dialog section headers
 english["CustomBuff.Section.Track"] = "Spells"
 english["CustomBuff.Section.ShowIcon"] = "Display"
 english["CustomBuff.Section.Who"] = "Character"
-english["CustomBuff.Section.Item"] = "Required item"
+english["CustomBuff.Section.Items"] = "Items"
 english["CustomBuff.Section.Where"] = "Where it shows"
 english["CustomBuff.Section.OnClick"] = "Click action"
 
@@ -1278,16 +1278,19 @@ english["Class.Warrior"] = "Warrior"
 -- Custom buff fields
 english["CustomBuff.Spec"] = "Spec"
 english["CustomBuff.Class"] = "Class"
-english["CustomBuff.RequireItem"] = "Item ID"
-english["CustomBuff.RequireItem.EquippedBags"] = "Equipped/Bags"
-english["CustomBuff.RequireItem.Equipped"] = "Equipped"
-english["CustomBuff.RequireItem.InBags"] = "In bags"
 english["CustomBuff.ItemCooldown"] = "Cooldown"
 english["CustomBuff.ItemCooldown.Any"] = "Any"
 english["CustomBuff.ItemCooldown.OffCooldown"] = "Off cooldown"
 english["CustomBuff.ItemCooldown.OnCooldown"] = "On cooldown"
-english["CustomBuff.RequireItem.Mode"] = "Location"
-english["CustomBuff.RequireItem.Disabled"] = "Set an item ID first."
+english["CustomBuff.ItemGate"] = "Needs item"
+english["CustomBuff.ItemGate.Owned"] = "In bags or equipped"
+english["CustomBuff.ItemGate.Equipped"] = "Equipped"
+english["CustomBuff.ItemGate.Bags"] = "In bags"
+english["CustomBuff.ItemGate.Always"] = "Not needed"
+english["CustomBuff.ItemGate.Title"] = "Item check"
+english["CustomBuff.ItemGate.Desc"] =
+    "The icon shows only if you have at least one item from the list in this place. A click on Item uses that item."
+english["CustomBuff.ItemGate.Disabled"] = "Add an item ID first."
 
 -- Bar glow options
 english["CustomBuff.BarGlow.WhenGlowing"] = "Detect when glowing"
@@ -1317,10 +1320,11 @@ english["CustomBuff.Action.Desc"] =
     "What happens when you click this buff icon. Spell casts a spell, Item uses an item, Macro runs a macro command."
 english["CustomBuff.Action.MacroHint"] = "e.g. /use item:12345\\n/use 13"
 english["CustomBuff.Action.SpellID"] = "Spell ID"
-english["CustomBuff.Action.ItemIDs"] = "Item IDs"
+english["CustomBuff.ItemIDs"] = "Item IDs"
 english["CustomBuff.Action.MacroText"] = "Macro"
 english["CustomBuff.Action.SpellHint"] = "This can differ from the tracked spell. Track the buff, cast the ability."
-english["CustomBuff.Action.ItemHint"] = "A click uses the first item in the list that you have."
+english["CustomBuff.Action.ItemHint"] = "A click uses the first item from the Items list that you have."
+english["CustomBuff.Action.NoneHint"] = "A click casts the tracked spell if you know it and click-to-cast is on."
 
 -- Save/Cancel/Delete
 english["CustomBuff.Save"] = "Save"
@@ -1338,6 +1342,7 @@ english["CustomBuff.Share.ImportDisabled"] = "Paste a custom buff string first."
 english["CustomBuff.Share.MacroWarning"] = "A click on this buff runs the macro above. Import it only from a source you trust."
 english["CustomBuff.Share.Spells"] = "Spells:"
 english["CustomBuff.Share.Runs"] = "Click runs:"
+english["CustomBuff.Share.Items"] = "Items:"
 
 -- Custom buff status
 english["CustomBuff.NotFound"] = "Not found"
