@@ -464,6 +464,26 @@ local function HighestKnownSpell(spellIDs)
     return nil
 end
 
+local SKYBORNE_AURAS = { 1259691, 1270893 } -- Attuned, Charged
+
+---The expiration warning shows the aura that expires, not the racial that the missing state shows.
+---@return number? remaining
+---@return number? auraID
+---@return number? duration
+local function SkyborneAuraExpiration()
+    for _, id in ipairs(SKYBORNE_AURAS) do
+        local aura = C_UnitAuras.GetUnitAuraBySpellID("player", id)
+        if aura then
+            local exp = AuraField(aura, "expirationTime")
+            if not exp or exp <= 0 then
+                return nil
+            end
+            return exp - GetTime(), id, AuraField(aura, "duration")
+        end
+    end
+    return nil
+end
+
 -- The macro names the highest spell that the player knows.
 ---@param spellIDs number[] Highest rank first
 ---@return string
@@ -2026,7 +2046,8 @@ local BUFF_TABLES = {
         -- spellID holds the racials for the known-spell gate. Each Skyborne race knows one of them.
         {
             spellID = SKYBORNE_RACIALS,
-            buffIdOverride = { 1259691, 1270893 }, -- Attuned, Charged
+            buffIdOverride = SKYBORNE_AURAS,
+            getExpirationInfo = SkyborneAuraExpiration,
             key = "skyborneAttunement",
             defaultEnabled = false, -- opt-in: ships disabled
             name = L["Buff.SkyborneAttunement"],

@@ -165,7 +165,7 @@ local DK_RUNEFORGES = {
 ---@field enchantDuration? number Full enchant duration in seconds, that sets its warning lead
 ---@field visibilityCondition? fun(): boolean Return false to hide the buff
 ---@field requiresBuffWithEnchant? boolean -- When true, require both enchant AND buff to be present (for Paladin Rites)
----@field getExpirationInfo? fun(): number?, number? -- Remaining seconds and expiring spell ID, for a buff with no single aura
+---@field getExpirationInfo? fun(): number?, number?, number? -- Remaining seconds, expiring spell ID, full duration (else enchantDuration)
 ---@field castSpellID? number|number[] -- Click-to-cast spell when different from spellID. A list casts the first known spell
 ---@field clickMacro? fun(spellID: number?): string -- Macro text override for click-to-cast, receives castable spell ID
 ---@field buffIdOverride? number|number[]

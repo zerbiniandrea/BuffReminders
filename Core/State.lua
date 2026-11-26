@@ -2752,8 +2752,8 @@ local function RefreshSelf(isAuraRestricted, hideExpiring)
                             remaining = GetWeaponEnchantRemaining(buff.enchantID)
                             duration = buff.enchantDuration
                         elseif buff.getExpirationInfo then
-                            remaining, expiringCastID = buff.getExpirationInfo()
-                            duration = buff.enchantDuration
+                            remaining, expiringCastID, duration = buff.getExpirationInfo()
+                            duration = duration or buff.enchantDuration
                         elseif buff.buffIdOverride or buff.spellID then
                             _, remaining, _, duration =
                                 UnitHasBuff("player", (buff.buffIdOverride or buff.spellID) --[[@as SpellID]])
