@@ -219,7 +219,7 @@ BR.defaults = {
         driveByEmote = "WAVE",
         driveByAllowPvP = false,
         soulstoneVisibility = BR.SOULSTONE_DEFAULT_VISIBILITY,
-        soulstoneHideCooldown = false,
+        soulstoneHideCooldown = BR.ByClient({ retail = false, forever = true }),
         -- soulstonePinnedTarget: deliberately absent - nil means "no pin" (set via BuffPanel drawer)
         consumableDisplayMode = "sub_icons",
         itemTextSize = BR.ByClient({ retail = 15, forever = 16 }),
