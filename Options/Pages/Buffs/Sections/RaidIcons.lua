@@ -14,8 +14,6 @@ local Helpers = BR.Options.Helpers
 
 local GetCategorySetting = Helpers.GetCategorySetting
 
-local mfloor, mmax = math.floor, math.max
-
 local function Build(ctx, layout)
     local parent = ctx.content
     local defaults = BR.defaults
@@ -46,16 +44,12 @@ local function Build(ctx, layout)
         size = {
             min = 6,
             max = 40,
+            suffix = "px",
             get = function()
-                local explicit = GetCategorySetting("raid", "buffTextSize", nil)
-                if explicit then
-                    return explicit
-                end
-                local textSize = GetCategorySetting("raid", "textSize", defaults.defaults.textSize)
-                return mmax(6, mfloor(textSize * 0.8))
+                return BR.Config.Get("defaults.captionTextSize", defaults.defaults.captionTextSize)
             end,
             set = function(val)
-                BR.Config.Set("categorySettings.raid.buffTextSize", val)
+                BR.Config.Set("defaults.captionTextSize", val)
             end,
         },
         offsets = {

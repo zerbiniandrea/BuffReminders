@@ -34,7 +34,7 @@ local function Build(ctx, layout)
         L["Options.BuffReminderText"],
         L["Options.PetLabels"],
         L["Options.PetLabels.Classes"],
-        L["Options.ConsumableTextScale"],
+        L["Options.ItemTextSize"],
         L["Options.TextPositions.StatLabel"],
         L["Options.TextPositions.Badge"],
         L["Options.TextPositions.StackCount"],

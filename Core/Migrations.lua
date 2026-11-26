@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 69
+BR.Migrations.DB_VERSION = 71
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -171,6 +171,188 @@ function BR.Migrations.BorderInside(profile)
     if type(externals) == "table" and externals.useCustomAppearance then
         GrowScopeByBorder(externals, 2, true, 40, 4)
     end
+end
+
+---Effective appearance values of a category, as the display resolved them: its own under
+---the appearance override, else the Defaults values.
+---@param profile table One profile
+---@param category string
+---@param key string
+---@param codeDefault any
+---@return any
+local function EffectiveAppearance(profile, category, key, codeDefault)
+    local catSettings = type(profile.categorySettings) == "table" and profile.categorySettings[category]
+    if type(catSettings) == "table" and catSettings.useCustomAppearance then
+        if catSettings[key] ~= nil then
+            return catSettings[key]
+        end
+        return codeDefault
+    end
+    local profileDefaults = type(profile.defaults) == "table" and profile.defaults or nil
+    if profileDefaults and profileDefaults[key] ~= nil then
+        return profileDefaults[key]
+    end
+    return codeDefault
+end
+
+---Text sizes become screen pixels, and no size derives from another setting or from the
+---icon size. A value from a stored size keeps the font size that the display drew: "NO X"
+---labels (0.6 of the text size), BUFF! and the loadout names (0.8 of the raid text size), the
+---consumable texts (a percentage of the icon art) and the pet labels (a share of the icon
+---width). The numbers of the other sizes stay as they are. Each size key names its text:
+---textSize becomes countTextSize.
+---@param profile table One profile
+function BR.Migrations.TextSizesToPixels(profile)
+    local floor = math.floor
+    if type(profile.defaults) ~= "table" then
+        profile.defaults = {}
+    end
+    local profileDefaults = profile.defaults
+
+    -- A size derives only from a stored value. A profile on the old defaults gets the new
+    -- defaults, which can differ by client.
+    local textSize = tonumber(profileDefaults.textSize)
+    if textSize then
+        profileDefaults.missingTextSize = math.max(6, floor(textSize * 0.6))
+    end
+    local categorySettings = type(profile.categorySettings) == "table" and profile.categorySettings or {}
+    for category, catSettings in pairs(categorySettings) do
+        if category ~= "main" and type(catSettings) == "table" then
+            local own = tonumber(catSettings.textSize)
+            if own then
+                catSettings.missingTextSize = math.max(6, floor(own * 0.6))
+            end
+        end
+    end
+
+    local raid = categorySettings.raid
+    local caption = type(raid) == "table" and tonumber(raid.buffTextSize)
+    if not caption then
+        local raidTextSize = tonumber(EffectiveAppearance(profile, "raid", "textSize", nil))
+        caption = raidTextSize and math.max(6, floor(raidTextSize * 0.8))
+    end
+    if caption then
+        profileDefaults.captionTextSize = caption
+    end
+    if type(raid) == "table" then
+        raid.buffTextSize = nil
+    end
+
+    -- The art is the icon frame minus the native border, which the Blizzard style and a
+    -- Masque skin do not draw. The Masque check is an estimate, as in BorderInside.
+    local iconStyle = profileDefaults.iconStyle or (BR.CLIENT == BR.ClientType.Forever and "blizzard" or "modern")
+    local masqueLoaded = C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("Masque")
+    local function ArtWidth(category)
+        local height = tonumber(EffectiveAppearance(profile, category, "iconSize", 64)) or 64
+        local width = tonumber(EffectiveAppearance(profile, category, "iconWidth", nil)) or height
+        local border = 0
+        if iconStyle ~= "blizzard" and not masqueLoaded then
+            border = tonumber(EffectiveAppearance(profile, category, "borderSize", 2)) or 2
+        end
+        return width, width - 2 * border
+    end
+
+    local _, consumableArt = ArtWidth("consumable")
+    local basePercent = tonumber(profileDefaults.consumableTextScale) or 25
+    profileDefaults.itemTextSize = math.max(6, floor(consumableArt * basePercent / 100))
+    profileDefaults.consumableTextScale = nil
+    if type(profileDefaults.textSizes) == "table" then
+        for item, percent in pairs(profileDefaults.textSizes) do
+            if type(percent) == "number" then
+                profileDefaults.textSizes[item] = math.max(6, floor(consumableArt * percent / 100))
+            end
+        end
+    end
+
+    local petWidth = ArtWidth("pet")
+    local petPercent = tonumber(profileDefaults.petLabelScale) or 100
+    profileDefaults.petLabelSize = math.max(7, floor(petWidth * 0.18 * petPercent / 100))
+    profileDefaults.petLabelScale = nil
+
+    -- textSize becomes countTextSize, after every read of the old key above.
+    profileDefaults.countTextSize = profileDefaults.textSize
+    profileDefaults.textSize = nil
+    for _, catSettings in pairs(categorySettings) do
+        if type(catSettings) == "table" then
+            catSettings.countTextSize = catSettings.textSize
+            catSettings.textSize = nil
+        end
+    end
+end
+
+---Record, for the one-time conversion at login, each text size of the profile in UI units.
+---Migration 70 kept the numbers, so a UI scale that is not pixel-perfect drew them at another
+---pixel size. The conversion multiplies each recorded value by the live pixels per UI unit,
+---which only exists after login. A key that the profile does not store keeps its default,
+---except where the default of the client equals the old look: then the default is recorded.
+---@param profile table One profile
+function BR.Migrations.RecordTextSizesForScale(profile)
+    local retail = BR.CLIENT ~= BR.ClientType.Forever
+    local pending = {}
+    local profileDefaults = type(profile.defaults) == "table" and profile.defaults or {}
+    -- Forever count, missing and caption sizes got new defaults with the pixel unit.
+    local mainDefaults = {
+        { "countTextSize", retail and 20 or nil },
+        { "missingTextSize", retail and 12 or nil },
+        { "captionTextSize", retail and 16 or nil },
+        { "itemTextSize", retail and 15 or 16 },
+        { "petLabelSize", 11 },
+    }
+    for _, entry in ipairs(mainDefaults) do
+        local value = tonumber(profileDefaults[entry[1]]) or entry[2]
+        if value then
+            pending["defaults." .. entry[1]] = value
+        end
+    end
+    if type(profileDefaults.textSizes) == "table" then
+        for item, value in pairs(profileDefaults.textSizes) do
+            if type(value) == "number" then
+                pending["defaults.textSizes." .. item] = value
+            end
+        end
+    end
+    if type(profile.categorySettings) == "table" then
+        for category, catSettings in pairs(profile.categorySettings) do
+            if type(catSettings) == "table" then
+                for _, key in ipairs({ "countTextSize", "missingTextSize" }) do
+                    if type(catSettings[key]) == "number" then
+                        pending["categorySettings." .. category .. "." .. key] = catSettings[key]
+                    end
+                end
+            end
+        end
+    end
+    if retail then
+        local externals = type(profile.externals) == "table" and profile.externals or {}
+        pending["externals.durationSize"] = tonumber(externals.durationSize) or 16
+        pending["externals.casterNameSize"] = tonumber(externals.casterNameSize) or 12
+    end
+    profile.textScalePending = pending
+end
+
+---Apply the recorded text sizes, scaled by the live pixels per UI unit, and clear the
+---record. Safe to call on any profile: one without a record is left as it is.
+---@param profile table The active profile
+---@param pixelsPerUnit number Screen pixels per UI unit at the UIParent scale
+---@return boolean applied
+function BR.Migrations.ApplyTextScale(profile, pixelsPerUnit)
+    local pending = profile.textScalePending
+    if type(pending) ~= "table" then
+        return false
+    end
+    profile.textScalePending = nil
+    for path, value in pairs(pending) do
+        local target = profile
+        local keys = { strsplit(".", path) }
+        for i = 1, #keys - 1 do
+            if type(target[keys[i]]) ~= "table" then
+                target[keys[i]] = {}
+            end
+            target = target[keys[i]]
+        end
+        target[keys[#keys]] = math.max(1, math.floor(value * pixelsPerUnit + 0.5))
+    end
+    return true
 end
 
 -- The categories that had each interaction control, and the global default of the control.
@@ -596,6 +778,15 @@ function BR.Migrations.RunProfile(profile, isImport)
         -- [69] The icon border moves inside the icon frame (BR.Migrations.BorderInside).
         [69] = function()
             BR.Migrations.BorderInside(profile)
+        end,
+        -- [70] Text sizes become screen pixels, with a key per text (BR.Migrations.TextSizesToPixels).
+        [70] = function()
+            BR.Migrations.TextSizesToPixels(profile)
+        end,
+        -- [71] Record the text sizes for a one-time conversion with the live UI scale
+        -- (BR.Migrations.RecordTextSizesForScale).
+        [71] = function()
+            BR.Migrations.RecordTextSizesForScale(profile)
         end,
     }
 

@@ -582,6 +582,7 @@ function Helpers.LayoutTextRow(layout, parent, opts)
             max = spec.max,
             step = spec.step or 1,
             formatValue = spec.format,
+            suffix = spec.suffix,
             get = spec.get,
             onChange = spec.set,
             enabled = opts.enabled,

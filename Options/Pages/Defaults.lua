@@ -270,7 +270,9 @@ local function Build(content)
     -- One label column for both groups: the grid measures its own labels, and
     -- the text rows join that column.
     local textLabelWidth = Components.MeasureSharedLabelWidth({
-        L["Appearance.Text"],
+        L["Appearance.CountSize"],
+        L["Appearance.MissingSize"],
+        L["Appearance.CaptionSize"],
         L["Options.Font"],
         L["Options.TextOutline"],
     })
@@ -331,6 +333,21 @@ local function Build(content)
 
     local defTextStyleHolder = Components.TextStyleRow(content, defAccess, labelWidth)
     layout:Add(defTextStyleHolder, nil, COMPONENT_GAP)
+    layout:Add(defTextStyleHolder.missingSize, nil, COMPONENT_GAP)
+
+    local captionTextSizeHolder = Components.NumericStepper(content, {
+        label = L["Appearance.CaptionSize"],
+        labelWidth = labelWidth,
+        min = 6,
+        max = 40,
+        suffix = "px",
+        tooltip = { title = L["Appearance.CaptionSize"], desc = L["Appearance.CaptionSize.Desc"] },
+        get = MakeDefaultsGetter("captionTextSize", BR.defaults.defaults.captionTextSize),
+        onChange = function(val)
+            BR.Config.Set("defaults.captionTextSize", val)
+        end,
+    })
+    layout:Add(captionTextSizeHolder, nil, COMPONENT_GAP)
 
     local defFontHolder = Components.Dropdown(content, {
         label = L["Options.Font"],

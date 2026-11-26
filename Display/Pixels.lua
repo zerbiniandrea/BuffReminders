@@ -31,6 +31,7 @@ local function OnePixel(frame)
     end
     return 768 / (lastPhysicalHeight * scale)
 end
+Pixels.OnePixel = OnePixel
 
 ---@param length number UI units
 ---@param onePixel number

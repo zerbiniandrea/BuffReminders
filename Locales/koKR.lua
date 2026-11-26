@@ -637,8 +637,6 @@ L["Options.PetLabels.Desc"] = "각 아이콘 아래에 소환수 이름과 특�
 -- ============================================================================
 L["Options.ConsumableTextScale"] = "기본 크기"
 L["Options.ConsumableTextScale.Title"] = "기본 텍스트 크기"
-L["Options.ConsumableTextScale.Desc"] =
-    "아이콘 크기 비율에 따른 개수, 능력치 라벨, 등급의 글꼴 크기입니다. 아래에서 3개 항목을 각자 설정할 수 있습니다."
 L["Options.ItemDisplay"] = "아이템 표시"
 L["Options.ItemDisplay.IconOnly"] = "아이콘만 표시"
 L["Options.ItemDisplay.IconOnlyDesc"] = "수량이 가장 많은 아이템 표시"

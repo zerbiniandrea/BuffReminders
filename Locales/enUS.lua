@@ -796,10 +796,10 @@ english["Options.PetLabels.Desc"] = "Show pet name and specialization below each
 -- ============================================================================
 -- OPTIONS: CONSUMABLE DISPLAY
 -- ============================================================================
-english["Options.ConsumableTextScale"] = "Base size"
-english["Options.ConsumableTextScale.Title"] = "Base text size"
-english["Options.ConsumableTextScale.Desc"] =
-    "Font size for stack counts, stat labels and badges, as a percentage of icon size. Each of the three can override it below."
+english["Options.ItemTextSize"] = "Item text size"
+english["Options.ItemTextSize.Title"] = "Item text size"
+english["Options.ItemTextSize.Desc"] =
+    "Font size for stack counts, stat labels and badges. Each of the three can override it below."
 english["Options.ConsumableBadgeOnSubIcons"] = "Show quality badge on alternatives"
 english["Options.ConsumableBadgeOnSubIcons.Title"] = "Quality badge on alternatives"
 english["Options.ConsumableBadgeOnSubIcons.Desc"] =
@@ -1425,7 +1425,10 @@ english["Appearance.Zoom"] = "Zoom"
 english["Appearance.Border"] = "Border"
 english["Appearance.Spacing"] = "Spacing"
 english["Appearance.Alpha"] = "Alpha"
-english["Appearance.Text"] = "Text size"
+english["Appearance.CountSize"] = "Count size"
+english["Appearance.MissingSize"] = "Missing label size"
+english["Appearance.CaptionSize"] = "Caption size"
+english["Appearance.CaptionSize.Desc"] = "Font size of the BUFF! text and the loadout names."
 
 -- Slider tooltip
 english["Component.AdjustValue"] = "Adjust value"

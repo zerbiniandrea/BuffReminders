@@ -2971,7 +2971,7 @@ end
 
 ---Create a compact numeric stepper with [-] value [+] buttons
 ---@param parent table Parent frame
----@param config table Configuration: label, min, max, step?, labelWidth?, get?, enabled?, inherited?, onChange?, formatValue?, tooltip?
+---@param config table Configuration: label, min, max, step?, labelWidth?, get?, enabled?, inherited?, onChange?, formatValue?, suffix?, tooltip?
 ---@return table holder Frame with .SetValue(n), .GetValue(), .SetEnabled(bool), .Refresh()
 function Components.NumericStepper(parent, config)
     local step = config.step or 1
@@ -2986,7 +2986,12 @@ function Components.NumericStepper(parent, config)
         labelWidth = 70
     end
 
-    local displayText = config.formatValue or tostring
+    local suffix = config.suffix
+    local displayText = config.formatValue
+        or (suffix and function(val)
+            return val .. suffix
+        end)
+        or tostring
 
     -- Auto-grow value box: at the default font 4-digit numbers fit in 26px, at
     -- bigger fonts they do not. Measure the actual extents of min and max.
@@ -3697,28 +3702,29 @@ end
 ---@field borderBlocked? fun(): boolean               True when the border does not draw (disables the border slider)
 ---@field borderBlockedReason? string|fun(): string Hover text while `borderBlocked` returns true
 
----Text size stepper + color swatch on one row. The swatch writes textColor and
----textAlpha as a pair.
+---Count size stepper + color swatch on one row, and the missing label size stepper for the
+---next row. The swatch writes textColor and textAlpha as a pair.
 ---@param parent Frame
 ---@param config AppearanceGridConfig Same get/set/setMulti/enabled contract as AppearanceGrid
 ---@param labelWidth number?
----@return Frame holder The size stepper; the swatch is anchored to its right
+---@return Frame holder The count size stepper. holder.missingSize is the second row; the caller lays it out
 function Components.TextStyleRow(parent, config, labelWidth)
     local enabled = config.enabled
 
     local sizeHolder = Components.NumericStepper(parent, {
-        label = L["Appearance.Text"],
+        label = L["Appearance.CountSize"],
         labelWidth = labelWidth,
         min = 6,
         max = 32,
+        suffix = "px",
         get = function()
-            return config.get("textSize", BR.defaults.defaults.textSize)
+            return config.get("countTextSize", BR.defaults.defaults.countTextSize)
         end,
         enabled = enabled,
         inherited = config.inherited,
         disabledReason = config.disabledReason,
         onChange = function(val)
-            config.set("textSize", val)
+            config.set("countTextSize", val)
         end,
     })
 
@@ -3739,7 +3745,25 @@ function Components.TextStyleRow(parent, config, labelWidth)
     })
     colorHolder:SetPoint("LEFT", sizeHolder, "RIGHT", 12, 0)
 
+    local missingSizeHolder = Components.NumericStepper(parent, {
+        label = L["Appearance.MissingSize"],
+        labelWidth = labelWidth,
+        min = 6,
+        max = 32,
+        suffix = "px",
+        get = function()
+            return config.get("missingTextSize", BR.defaults.defaults.missingTextSize)
+        end,
+        enabled = enabled,
+        inherited = config.inherited,
+        disabledReason = config.disabledReason,
+        onChange = function(val)
+            config.set("missingTextSize", val)
+        end,
+    })
+
     sizeHolder.colorSwatch = colorHolder
+    sizeHolder.missingSize = missingSizeHolder
     return sizeHolder
 end
 

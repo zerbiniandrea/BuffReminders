@@ -14,6 +14,18 @@ local pendingSwitch = nil
 -- When true, OnProfileEvent skips RefreshAfterProfileChange.
 local suppressRefresh = false
 
+-- The UI scale is final only after login: UI addons set it at PLAYER_LOGIN.
+local scaleKnown = false
+
+---Apply the one-time text size conversion of the active profile, if it has one pending.
+---@return boolean applied
+local function ApplyPendingTextScale()
+    if not scaleKnown or not BR.aceDB then
+        return false
+    end
+    return BR.Migrations.ApplyTextScale(BR.aceDB.profile, 1 / BR.Pixels.OnePixel(UIParent))
+end
+
 -- ============================================================================
 -- INITIALIZATION
 -- ============================================================================
@@ -217,6 +229,9 @@ end
 
 ---Full display refresh after profile data changes (switch, copy, reset, import).
 function BR.Profiles.RefreshAfterProfileChange()
+    -- A switched, copied or imported profile can hold a pending conversion.
+    ApplyPendingTextScale()
+
     -- An import replaces whole profile keys outside AceDB, so the defaults that the
     -- string leaves out must be filled here.
     if BR.defaults then
@@ -285,7 +300,19 @@ end
 
 local eventFrame = CreateFrame("Frame")
 BR.Client.RegisterEvent(eventFrame, "PLAYER_REGEN_ENABLED")
+BR.Client.RegisterEvent(eventFrame, "PLAYER_ENTERING_WORLD")
 eventFrame:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_ENTERING_WORLD" and not scaleKnown then
+        scaleKnown = true
+        -- Next frame: the display builds its frames in its own handler of this event.
+        C_Timer.After(0, function()
+            if ApplyPendingTextScale() then
+                BR.CallbackRegistry:TriggerEvent("VisualsRefresh")
+                BR.CallbackRegistry:TriggerEvent("ExternalsRefresh")
+            end
+        end)
+        return
+    end
     if event == "PLAYER_REGEN_ENABLED" and pendingSwitch then
         local name = pendingSwitch
         pendingSwitch = nil

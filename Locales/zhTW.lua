@@ -769,8 +769,6 @@ L["Options.PetLabels.Desc"] = "在每個圖示下方顯示寵物名稱和專精�
 -- ============================================================================
 L["Options.ConsumableTextScale"] = "基礎大小"
 L["Options.ConsumableTextScale.Title"] = "基礎文字大小"
-L["Options.ConsumableTextScale.Desc"] =
-    "堆疊計數、屬性標籤和標誌的字體大小，以圖示大小的百分比表示。三者中的每一個都可以覆蓋下面的。"
 L["Options.ConsumableBadgeOnSubIcons"] = "在子圖示上顯示品質標記"
 L["Options.ConsumableBadgeOnSubIcons.Title"] = "品質標記在子圖示上"
 L["Options.ConsumableBadgeOnSubIcons.Desc"] =

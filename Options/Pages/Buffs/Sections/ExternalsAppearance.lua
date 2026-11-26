@@ -179,6 +179,7 @@ local function BuildOverlays(parent, layout)
         size = {
             min = 8,
             max = 32,
+            suffix = "px",
             get = function()
                 return Setting("durationSize") or 16
             end,
@@ -227,6 +228,7 @@ local function BuildOverlays(parent, layout)
         size = {
             min = 6,
             max = 40,
+            suffix = "px",
             get = function()
                 return Setting("casterNameSize") or 12
             end,

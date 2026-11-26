@@ -389,7 +389,8 @@ local CategorySettingKeys = {
     iconWidth = "VisualsRefresh",
     iconZoom = "VisualsRefresh",
     borderSize = "VisualsRefresh",
-    textSize = "VisualsRefresh",
+    countTextSize = "VisualsRefresh",
+    missingTextSize = "VisualsRefresh",
     iconAlpha = "VisualsRefresh",
     textAlpha = "VisualsRefresh",
     textColor = "VisualsRefresh",
@@ -403,7 +404,6 @@ local CategorySettingKeys = {
     priority = "LayoutRefresh",
     -- Behavior
     showBuffReminder = "VisualsRefresh",
-    buffTextSize = "VisualsRefresh",
     showText = "VisualsRefresh",
     showDescriptionTooltips = "VisualsRefresh", -- Toggles hover capture vs click-through
     -- Toggles
@@ -459,7 +459,9 @@ local DefaultSettingKeys = {
     iconZoom = "VisualsRefresh",
     borderSize = "VisualsRefresh",
     iconStyle = "VisualsRefresh",
-    textSize = "VisualsRefresh",
+    countTextSize = "VisualsRefresh",
+    missingTextSize = "VisualsRefresh",
+    captionTextSize = "VisualsRefresh",
     iconAlpha = "VisualsRefresh",
     textAlpha = "VisualsRefresh",
     textColor = "VisualsRefresh",
@@ -537,7 +539,7 @@ local DefaultSettingKeys = {
     -- Consumable display mode
     consumableDisplayMode = "DisplayRefresh",
     consumableBadgeOnSubIcons = "DisplayRefresh",
-    consumableTextScale = "VisualsRefresh",
+    itemTextSize = "VisualsRefresh",
     hideConsumableLabels = "VisualsRefresh",
     tooltipModifier = false, -- Read at hover time
     rightClickMenu = "DisplayRefresh", -- Re-wires the type2 attribute of the click overlays
@@ -549,7 +551,7 @@ local DefaultSettingKeys = {
     -- Pet display mode
     petDisplayMode = "DisplayRefresh",
     petLabels = "DisplayRefresh",
-    petLabelScale = "DisplayRefresh",
+    petLabelSize = "DisplayRefresh",
     petSpecIconOnHover = "DisplayRefresh",
     useFelDomination = "DisplayRefresh",
     warlockWrongDemon = "DisplayRefresh",
@@ -869,7 +871,8 @@ end
 local AppearanceKeys = {
     iconSize = true,
     iconWidth = true,
-    textSize = true,
+    countTextSize = true,
+    missingTextSize = true,
     iconAlpha = true,
     textAlpha = true,
     textColor = true,

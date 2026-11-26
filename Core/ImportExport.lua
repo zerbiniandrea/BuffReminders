@@ -29,6 +29,7 @@ local EXTRA_PROFILE_KEYS = {
     "readyCheckOnlyOverrides",
     "groupCast",
     "customAnchorFrames",
+    "textScalePending",
 }
 
 -- A tag names both the payload encoding and the kind of data it carries, so an

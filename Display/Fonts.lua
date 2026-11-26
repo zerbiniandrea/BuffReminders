@@ -13,6 +13,7 @@ local BR = ns
 local LSM = LibStub("LibSharedMedia-3.0")
 local abs = math.abs
 local floor = math.floor
+local max = math.max
 
 -- The stock client font, captured at file load, before any addon can
 -- reassign the STANDARD_TEXT_FONT global at login. The client preloads this
@@ -29,7 +30,7 @@ local outlineFlag = "OUTLINE"
 ---is ignored: fontstrings can return `true` without a real apply, and Font
 ---objects return nothing. Only a GetFont read-back that matches the request
 ---counts as success. Outline flags are not compared - the client reformats
----the flags string.
+---the flags string. The size tolerance allows a client that rounds a fractional height.
 ---@param target FontInstance any Font object, fontstring, or edit box
 ---@param path string
 ---@param size number
@@ -40,20 +41,33 @@ local function TrySetFont(target, path, size, outline)
         return false
     end
     local okRead, appliedPath, appliedSize = pcall(target.GetFont, target)
-    return okRead and appliedPath == path and appliedSize ~= nil and abs(appliedSize - size) < 0.5
+    return okRead and appliedPath == path and appliedSize ~= nil and abs(appliedSize - size) < 1
 end
 
 -- Shared Font objects, keyed by (outline, size). Each size gets its own
--- object because SetTextScale sizing snaps to discrete steps. Sizes come
--- from integer sliders, so the set stays small.
+-- object because SetTextScale sizing snaps to discrete steps. Unit sizes round
+-- to a tenth and pixel sizes to a whole pixel, so the set stays small.
 -- healthy = the configured face passed a verified apply on the object.
 local fontObjects = {} ---@type table<string, Font>
 local objectSize = {} ---@type table<string, number>
+-- Screen pixels of a pixel-sized object. Its height in UI units follows the UI scale.
+local objectPixels = {} ---@type table<string, number>
 local objectOutline = {} ---@type table<string, string>
 local objectHealthy = {} ---@type table<string, boolean>
 local objectCount = 0
 
 local ScheduleReassert
+
+---Height in UI units that the object must carry now.
+---@param key string
+---@return number
+local function TargetHeight(key)
+    local pixels = objectPixels[key]
+    if pixels then
+        return pixels * BR.Pixels.OnePixel(UIParent)
+    end
+    return objectSize[key]
+end
 
 ---Apply the configured face to one Font object, with fallbacks. The object
 ---must always carry a font: SetText on a fontstring linked to a font-less
@@ -61,7 +75,8 @@ local ScheduleReassert
 ---@param key string
 local function AssertObject(key)
     local obj = fontObjects[key]
-    local size = objectSize[key]
+    local size = TargetHeight(key)
+    objectSize[key] = size
     local outline = objectOutline[key]
     if TrySetFont(obj, fontPath, size, outline) then
         objectHealthy[key] = true
@@ -76,12 +91,13 @@ local function AssertObject(key)
     ScheduleReassert()
 end
 
----Re-apply every object that the client reverted or never accepted.
+---Re-apply every object that the client reverted or never accepted, and every
+---pixel-sized object whose height a UI scale change made stale.
 local function ReassertObjects()
     for key, obj in pairs(fontObjects) do
         local okRead, path, size = pcall(obj.GetFont, obj)
-        local intact = okRead and path == fontPath and size ~= nil and abs(size - objectSize[key]) < 0.5
-        if not intact then
+        local intact = okRead and path == fontPath and size ~= nil and abs(size - objectSize[key]) < 1
+        if not intact or abs(TargetHeight(key) - objectSize[key]) > 0.001 then
             AssertObject(key)
         else
             objectHealthy[key] = true
@@ -90,17 +106,19 @@ local function ReassertObjects()
 end
 
 ---@param outline string
----@param size number integer pixel size
+---@param size number font height, rounded to a tenth, or whole screen pixels with pixels
+---@param pixels? boolean
 ---@return Font obj
 ---@return string key
-local function GetObject(outline, size)
-    local key = outline .. "@" .. size
+local function GetObject(outline, size, pixels)
+    local key = outline .. "@" .. size .. (pixels and "px" or "")
     local obj = fontObjects[key]
     if not obj then
         objectCount = objectCount + 1
         obj = CreateFont("BuffRemindersDisplayFont" .. objectCount)
         fontObjects[key] = obj
         objectSize[key] = size
+        objectPixels[key] = pixels and size or nil
         objectOutline[key] = outline
         AssertObject(key)
     end
@@ -183,12 +201,12 @@ end
 ---SetTextScale marker method, so they get a direct verified apply with
 ---fallback.
 ---@param fs FontString|EditBox any FontInstance
----@param size number pixel size, rounded to an integer here
+---@param size number font height, rounded to a tenth here
 ---@param outline? string overrides the shared outlineFlag (e.g. "" for edit boxes)
 ---@return boolean healthy true when the configured face is on the shared object
 local function Apply(fs, size, outline)
     outline = outline or outlineFlag
-    size = floor(size + 0.5)
+    size = floor(size * 10 + 0.5) / 10
     if fs.SetTextScale then
         local obj, key = GetObject(outline, size)
         if fs:GetFontObject() ~= obj then
@@ -205,6 +223,20 @@ local function Apply(fs, size, outline)
     return false
 end
 
+---Apply with the size in whole screen pixels. Each step of a pixel setting then
+---changes the drawn text at any UI scale.
+---@param fs FontString
+---@param pixels number screen pixels, rounded to a whole number here
+---@return boolean healthy true when the configured face is on the shared object
+local function ApplyPixels(fs, pixels)
+    pixels = max(1, floor(pixels + 0.5))
+    local obj, key = GetObject(outlineFlag, pixels, true)
+    if fs:GetFontObject() ~= obj then
+        fs:SetFontObject(obj)
+    end
+    return objectHealthy[key] == true
+end
+
 BR.DisplayFonts = {
     Resolve = Resolve,
     GetFontPath = function()
@@ -215,6 +247,7 @@ BR.DisplayFonts = {
     end,
     IsFontPathValid = IsFontPathValid,
     Apply = Apply,
+    ApplyPixels = ApplyPixels,
     ---Measured size of a fontstring's current text. GetStringWidth/Height
     ---do not include the text scale, so it is multiplied back in here.
     ---@param fs FontString

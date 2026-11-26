@@ -169,17 +169,14 @@ local function BuildOverlays(ctx, layout)
         },
         isOff = petLabelOff.get,
         size = {
-            min = 50,
-            max = 200,
-            step = 10,
-            format = function(val)
-                return val .. "%"
-            end,
+            min = 6,
+            max = 32,
+            suffix = "px",
             get = function()
-                return BR.Config.Get("defaults.petLabelScale")
+                return BR.Config.Get("defaults.petLabelSize")
             end,
             set = function(val)
-                BR.Config.Set("defaults.petLabelScale", val)
+                BR.Config.Set("defaults.petLabelSize", val)
             end,
         },
         offsets = {

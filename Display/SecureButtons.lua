@@ -1185,11 +1185,10 @@ local BADGE_COLORS = {
     [L["Badge.Cauldron"]] = { r = 0.4, g = 0.7, b = 1 },
 }
 
----@param mainIconSize number The consumable category's main icon size
 ---@param item string? A BR.TextPositions.SizedItems key; nil uses the shared base
----@return number fontSize
-local function ComputeConsumableFontSize(mainIconSize, item)
-    return max(6, floor(mainIconSize * BR.TextPositions.GetSizePercent(item) / 100))
+---@return number fontSize Screen pixels
+local function ComputeConsumableFontSize(item)
+    return BR.TextPositions.GetSizePixels(item)
 end
 
 ---@param owner table An item row button
@@ -1890,7 +1889,7 @@ local function SyncSecureButtons()
         return
     end
     local outlineFlag = BR.DisplayFonts.GetOutline()
-    local ApplyFont = BR.DisplayFonts.Apply
+    local ApplyFont = BR.DisplayFonts.ApplyPixels
     for frame in pairs(secureHostFrames) do
         -- Sync click overlay
         local overlay = frame.clickOverlay
@@ -1941,7 +1940,7 @@ local function SyncSecureButtons()
                     width, height = width - 2 * hostInset, height - 2 * hostInset
                     local effectiveCat = GetEffectiveCategory(frame)
                     local catSettings = GetCategorySettings(effectiveCat)
-                    local baseIconSize = (catSettings.iconSize or 64) - 2 * hostInset
+                    local baseIconSize = (catSettings.iconSize or 64) - 2 * (frame._br_artBorder or 0)
                     local size, btnSpacing = SubIcons.Metrics(baseIconSize)
                     size = Pixels.Snap(size, frame)
                     btnSpacing = Pixels.Snap(btnSpacing, frame)
@@ -1953,8 +1952,8 @@ local function SyncSecureButtons()
                         end
                     end
                     if visibleCount > 0 then
-                        local stackFontSize = ComputeConsumableFontSize(baseIconSize, "stackCount")
-                        local badgeFontSize = ComputeConsumableFontSize(baseIconSize, "badge")
+                        local stackFontSize = ComputeConsumableFontSize("stackCount")
+                        local badgeFontSize = ComputeConsumableFontSize("badge")
                         local showSubIconBadge = BR.Config.Get("defaults.consumableBadgeOnSubIcons") == true
                         local blizzardArt = BR.IconStyle.UsesBlizzardArt()
                         -- The buttons already inherit the UIParent alpha.

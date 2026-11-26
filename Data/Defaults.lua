@@ -166,7 +166,10 @@ BR.defaults = {
         -- Appearance
         iconSize = 64,
         -- iconWidth: nil = same as iconSize (square). Set explicitly for non-square icons.
-        textSize = BR.ByClient({ retail = 20, forever = 17 }),
+        -- Text sizes count screen pixels.
+        countTextSize = BR.ByClient({ retail = 20, forever = 20 }),
+        missingTextSize = BR.ByClient({ retail = 12, forever = 13 }), -- "NO X" labels
+        captionTextSize = BR.ByClient({ retail = 16, forever = 16 }), -- BUFF! and loadout names below the icon
         textOutline = "OUTLINE",
         slugOutline = true,
         iconAlpha = 1,
@@ -219,7 +222,7 @@ BR.defaults = {
         soulstoneHideCooldown = false,
         -- soulstonePinnedTarget: deliberately absent - nil means "no pin" (set via BuffPanel drawer)
         consumableDisplayMode = "sub_icons",
-        consumableTextScale = 25,
+        itemTextSize = BR.ByClient({ retail = 15, forever = 16 }),
         consumableBadgeOnSubIcons = false,
         hideConsumableLabels = false,
         clickable = true,
@@ -233,7 +236,7 @@ BR.defaults = {
         placeAtPlayer = true,
         petDisplayMode = "generic", -- "generic" or "expanded"
         petLabels = true,
-        petLabelScale = 100,
+        petLabelSize = 11,
         petSpecIconOnHover = true,
         petLabelClasses = {
             HUNTER = true,
@@ -307,8 +310,8 @@ BR.defaults = {
         -- thornsRequest: absent - nil means off
         righteousFuryShow = BR.ByClient({ retail = BR.NONE, forever = "tank" }),
         mageArmorPreference = BR.ByClient({ retail = BR.NONE, forever = "mage" }),
-        -- Per-text-item size override, as a percentage of the icon size. An
-        -- absent key follows consumableTextScale.
+        -- Per-text-item size override in screen pixels. An
+        -- absent key follows itemTextSize.
         textSizes = {},
         -- Per-text-item placement (zone + pixel nudge). See Core/TextPositions.lua
         -- for zone constants. Defaults preserve the prior hard-coded anchors so

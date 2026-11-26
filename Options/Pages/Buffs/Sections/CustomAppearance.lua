@@ -33,7 +33,8 @@ local COMPONENT_GAP = BR.Options.Constants.COMPONENT_GAP
 local APPEARANCE_KEYS = {
     "iconSize",
     "iconWidth",
-    "textSize",
+    "countTextSize",
+    "missingTextSize",
     "spacing",
     "iconZoom",
     "borderSize",
@@ -172,7 +173,8 @@ local function BuildAppearance(ctx, layout)
 
     -- One label column for both groups: the grid measures its own labels, and the
     -- text row joins that column.
-    local textLabelWidth = Components.MeasureSharedLabelWidth({ L["Appearance.Text"] })
+    local textLabelWidth =
+        Components.MeasureSharedLabelWidth({ L["Appearance.CountSize"], L["Appearance.MissingSize"] })
 
     Helpers.LayoutSubsectionHeader(layout, parent, L["Options.Icons"])
     local appFrame = CreateFrame("Frame", nil, parent)
@@ -205,6 +207,7 @@ local function BuildAppearance(ctx, layout)
     Helpers.LayoutSubsectionHeader(layout, parent, L["Options.Text"])
     local catTextStyleHolder = Components.TextStyleRow(parent, catAccess, catGrid.labelWidth)
     layout:Add(catTextStyleHolder, nil, COMPONENT_GAP)
+    layout:Add(catTextStyleHolder.missingSize, nil, COMPONENT_GAP)
 end
 
 local function BuildGlow(ctx, layout)

@@ -227,30 +227,30 @@ end
 local function BuildOverlays(ctx, layout)
     local parent = ctx.content
 
-    local consumableTextScaleHolder = Components.Slider(parent, {
-        label = L["Options.ConsumableTextScale"],
+    local itemTextSizeHolder = Components.Slider(parent, {
+        label = L["Options.ItemTextSize"],
         labelWidth = ctx.overlayLabelWidth,
-        min = 5,
-        max = 80,
+        min = 6,
+        max = 40,
         step = 1,
-        suffix = "%",
+        suffix = "px",
         get = function()
-            return BR.Config.Get("defaults.consumableTextScale")
+            return BR.Config.Get("defaults.itemTextSize")
         end,
         tooltip = {
-            title = L["Options.ConsumableTextScale.Title"],
-            desc = L["Options.ConsumableTextScale.Desc"],
+            title = L["Options.ItemTextSize.Title"],
+            desc = L["Options.ItemTextSize.Desc"],
         },
         onChange = function(val)
-            BR.Config.Set("defaults.consumableTextScale", val)
+            BR.Config.Set("defaults.itemTextSize", val)
         end,
     })
-    layout:Add(consumableTextScaleHolder, nil, COMPONENT_GAP)
+    layout:Add(itemTextSizeHolder, nil, COMPONENT_GAP)
 
     local labelWidth = ctx.overlayLabelWidth
 
     local function FormatSize(val)
-        return val == 0 and L["Options.Auto"] or (val .. "%")
+        return val == 0 and L["Options.Auto"] or (val .. "px")
     end
 
     ---@param item string
@@ -273,7 +273,7 @@ local function BuildOverlays(ctx, layout)
             -- 0 is the inherit sentinel: it stores nil, so the item follows the base size.
             size = {
                 min = 0,
-                max = 80,
+                max = 40,
                 format = FormatSize,
                 get = function()
                     return BR.TextPositions.GetSizeOverride(item) or 0
