@@ -3088,9 +3088,13 @@ local function RefreshConsumables(db, trackingMode, isAuraRestricted, hideExpiri
                     freeReadyCheckOk = not buff.casterClass or buff.casterClass == playerClass
                 end
             end
+            -- The suppressor is a presence entry. A "group" refresh recomputes it without this
+            -- entry, so the two icons can overlap until the next full refresh.
+            local suppressor = buff.suppressedByEntry and BuffState.entries[buff.suppressedByEntry]
             -- Boolean gates run first; IsAuraTrackable and PassesPreChecks come later.
             if
-                IsBuffEnabled(settingKey)
+                not (suppressor and suppressor.visible)
+                and IsBuffEnabled(settingKey)
                 and (catVisible or isFreeConsumable or (buff.freeConsumable and consumableContentVisible))
                 and not (competitivePvP and buff.disabledInCompetitivePvP)
                 and freeReadyCheckOk

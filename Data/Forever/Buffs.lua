@@ -2580,6 +2580,23 @@ local BUFF_TABLES = {
                 return CastHighestKnownMacro(CONJURE_MANA_GEM)
             end,
         },
+        -- Create Soulstone has no cooldown, so a stone can wait in the bags while the last one is on a target.
+        {
+            itemID = SOULSTONE_ITEMS,
+            key = "soulstoneItem",
+            name = L["Buff.SoulstoneItem"],
+            casterClass = "WARLOCK",
+            overlayText = L["Overlay.NoSoulstone"],
+            icons = { spells = { 693 } }, -- Create Soulstone (Minor)
+            defaultEnabled = false, -- opt-in: ships disabled
+            suppressedByEntry = "soulstone", -- the Soulstone click creates a stone too
+            visibilityCondition = function()
+                return playerClass == "WARLOCK" and HighestKnownSpell(CREATE_SOULSTONE) ~= nil
+            end,
+            clickMacro = function()
+                return CastHighestKnownMacro(CREATE_SOULSTONE)
+            end,
+        },
         {
             checkWeaponEnchant = true,
             enchantDuration = 1800, -- seconds

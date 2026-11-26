@@ -309,6 +309,7 @@ english["Buff.Food"] = "Food"
 english["Buff.MageFood"] = "Mage Food"
 english["Buff.Healthstone"] = "Healthstone"
 english["Buff.ManaGem"] = "Mana Gem"
+english["Buff.SoulstoneItem"] = "Soulstone (in bags)"
 english["Buff.Weapon"] = "Weapon"
 english["Buff.WeaponOH"] = "Weapon (OH)"
 
