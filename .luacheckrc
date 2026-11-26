@@ -119,6 +119,7 @@ read_globals = {
     "IsMouseButtonDown",
     "IsControlKeyDown",
     "IsShiftKeyDown",
+    "IsMetaKeyDown",
     "IsAltKeyDown",
     "PlaySoundFile",
     "NUM_BAG_SLOTS",
