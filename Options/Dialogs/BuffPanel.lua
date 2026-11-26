@@ -211,7 +211,8 @@ end
 ---@param hintText string
 ---@param choices ContentGridChoice[]
 ---@param single? boolean A row holds at most one choice. A click on the selected choice clears the row.
----@param rows? { key: string, label: string, desc: string? }[] The content rows if nil
+---@param rows? { key: string, label: string, desc: string?, choices: ContentGridChoice[]? }[] The content rows if nil.
+---A row with its own choices ignores the choices argument. Cells wrap at the body width.
 local function AddContentGrid(layout, setting, hintText, choices, single, rows)
     rows = rows or GRID_ROWS
     local IsContentChoiceAllowed = BR.Visibility.IsContentChoiceAllowed
@@ -234,7 +235,14 @@ local function AddContentGrid(layout, setting, hintText, choices, single, rows)
     end
 
     local holder = CreateFrame("Frame", nil, body)
-    holder:SetSize(bodyW, #rows * (GRID_CELL + GRID_GAP) - GRID_GAP)
+    local step = GRID_CELL + GRID_GAP
+    local perLine = math.max(1, math.floor((bodyW - labelW) / step))
+    local rowY, height = {}, 0
+    for r, row in ipairs(rows) do
+        rowY[r] = -height
+        height = height + math.ceil(#(row.choices or choices) / perLine) * step
+    end
+    holder:SetSize(bodyW, height - GRID_GAP)
     local cells = {}
 
     function holder:Refresh()
@@ -248,7 +256,8 @@ local function AddContentGrid(layout, setting, hintText, choices, single, rows)
     end
 
     for r, row in ipairs(rows) do
-        local y = -(r - 1) * (GRID_CELL + GRID_GAP)
+        local y = rowY[r]
+        local rowChoices = row.choices or choices
         local label = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         label:SetPoint("LEFT", holder, "TOPLEFT", 0, y - GRID_CELL / 2)
         label:SetWidth(labelW)
@@ -270,10 +279,11 @@ local function AddContentGrid(layout, setting, hintText, choices, single, rows)
             hit:SetScript("OnLeave", BR.HideTooltip)
         end
 
-        for c, choice in ipairs(choices) do
+        for c, choice in ipairs(rowChoices) do
             local cell = CreateFrame("Button", nil, holder, "BackdropTemplate")
             cell:SetSize(GRID_CELL, GRID_CELL)
-            cell:SetPoint("TOPLEFT", labelW + GRID_GAP + (c - 1) * (GRID_CELL + GRID_GAP), y)
+            local line, column = math.floor((c - 1) / perLine), (c - 1) % perLine
+            cell:SetPoint("TOPLEFT", labelW + GRID_GAP + column * step, y - line * step)
             cell:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
             cell.icon = BR.CreateBuffIcon(cell, GRID_CELL - 2, choice.icon)
             cell.icon:SetPoint("CENTER")
@@ -290,7 +300,7 @@ local function AddContentGrid(layout, setting, hintText, choices, single, rows)
                 if single then
                     -- Every choice gets an explicit value, because a missing key reads the code default.
                     local changes = {}
-                    for _, other in ipairs(choices) do
+                    for _, other in ipairs(rowChoices) do
                         changes[rowPath .. other.key] = other == choice and not allowed
                     end
                     BR.Config.SetMulti(changes)
@@ -382,6 +392,8 @@ end
 -- Stance grids of the client. A client with spec-based stance rules has none.
 local WARRIOR_STANCE_GRID = BR.BuffData.stanceRules.WARRIOR.grid
 local DRUID_FORM_GRID = BR.BuffData.stanceRules.DRUID.grid
+-- Minimap tracking spells. nil on a client without the tracking reminder.
+local TRACKING_SPELLS = BR.TRACKING_SPELLS
 
 ---True when no row of the stance grid allows a choice, so no reminder can fire.
 ---@param grid StanceGrid
@@ -1676,26 +1688,37 @@ local SPECIAL_SECTIONS = {
         end,
     },
 
-    tracking = {
+    tracking = TRACKING_SPELLS and {
         build = function(layout)
-            local scope = Components.Dropdown(body, {
-                label = L["BuffPanel.Tracking.Scope"],
-                labelWidth = DRAWER_LABEL_W,
-                width = DRAWER_FIELD_W,
-                options = {
-                    { label = L["BuffPanel.Tracking.Scope.Gathering"], value = "gathering" },
-                    { label = L["BuffPanel.Tracking.Scope.All"], value = "all" },
-                },
-                get = function()
-                    return BR.Config.Get("defaults.trackingScope", "gathering")
-                end,
-                tooltip = { title = L["BuffPanel.Tracking.Scope"], desc = L["BuffPanel.Tracking.Scope.Desc"] },
-                onChange = function(val)
-                    BR.Config.Set("defaults.trackingScope", val)
-                end,
-            })
-            tinsert(bodyHolders, scope)
-            layout:Add(scope, 26, COMPONENT_GAP)
+            local rows = {
+                { key = "profession", label = L["BuffPanel.Tracking.Profession"], choices = {} },
+                { key = "racial", label = L["BuffPanel.Tracking.Racial"], choices = {} },
+                { key = "class", label = L["BuffPanel.Tracking.Class"], choices = {} },
+            }
+            local rowByKind = {}
+            for _, row in ipairs(rows) do
+                rowByKind[row.key] = row
+            end
+            for _, spell in ipairs(TRACKING_SPELLS) do
+                local row = rowByKind[spell.kind]
+                row.choices[#row.choices + 1] = {
+                    key = spell.key,
+                    label = BR.GetSpellName(spell.spellID) or spell.key,
+                    icon = C_Spell.GetSpellTexture(spell.spellID),
+                }
+            end
+            AddContentGrid(layout, "trackingSpells", L["BuffPanel.Tracking.Hint"], {}, false, rows)
+        end,
+        warn = function()
+            if not BR.StateHelpers.IsBuffEnabled("tracking") then
+                return false
+            end
+            for _, spell in ipairs(TRACKING_SPELLS) do
+                if BR.Visibility.IsContentChoiceAllowed("trackingSpells", spell.kind, spell.key) then
+                    return false
+                end
+            end
+            return true
         end,
     },
 

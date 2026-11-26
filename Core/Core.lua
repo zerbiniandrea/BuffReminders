@@ -558,7 +558,6 @@ local DefaultSettingKeys = {
     paladinBlessingScope = "DisplayRefresh",
     paladinBlessingsByClass = "DisplayRefresh",
     paladinAuraOrder = "DisplayRefresh",
-    trackingScope = "DisplayRefresh",
     thornsRequest = "DisplayRefresh",
     righteousFuryShow = "DisplayRefresh",
     mageArmorPreference = "DisplayRefresh",
@@ -576,6 +575,7 @@ local ContentGridKeys = {
     warlockStones = true,
     warriorStances = true,
     druidForms = true,
+    trackingSpells = true,
 }
 
 -- Canonical buff category list. The order is the display stacking order.

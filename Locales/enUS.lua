@@ -980,11 +980,11 @@ english["DisabledReason.BlessingDefaults"] = "All classes use their defaults."
 english["BuffPanel.BlessSelfOnly"] = "Only bless myself"
 english["BuffPanel.BlessSelfOnly.Desc"] =
     "Check and bless only yourself."
-english["BuffPanel.Tracking.Scope"] = "Track"
-english["BuffPanel.Tracking.Scope.Desc"] =
-    "The tracking that the reminder offers. Only one tracking can be active. If any tracking is active, the reminder hides."
-english["BuffPanel.Tracking.Scope.Gathering"] = "Gathering only"
-english["BuffPanel.Tracking.Scope.All"] = "All tracking"
+english["BuffPanel.Tracking.Hint"] =
+    "Select the tracking that the reminder can offer. It offers the last one you cast. Only one tracking can be active, and any active tracking hides the reminder."
+english["BuffPanel.Tracking.Profession"] = "Profession"
+english["BuffPanel.Tracking.Racial"] = "Racial"
+english["BuffPanel.Tracking.Class"] = "Class"
 english["BuffPanel.GroupCast"] = "Auto group version (uses a reagent)"
 english["BuffPanel.GroupCast.Desc"] =
     "If enough members of your party lack the buff and are in range, and you have the reagent, a left click casts the group version on you. Otherwise it casts the single-target version. Hover the icon to pick the other version for one cast."

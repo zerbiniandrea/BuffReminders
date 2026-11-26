@@ -8,9 +8,10 @@ end
 
 -- Tracking reminder: the spell to offer is the last tracking spell that the player
 -- cast, kept per character, else the first known spell of BR.TRACKING_SPELLS.
--- Only spells of the kinds in defaults.trackingScope count.
+-- Only the spells that defaults.trackingSpells allows count.
 
 local IsPlayerSpellCached = BR.StateHelpers.IsPlayerSpellCached
+local IsContentChoiceAllowed = BR.Visibility.IsContentChoiceAllowed
 local Plain = BR.Secret.Plain
 
 local SPELLS = BR.TRACKING_SPELLS
@@ -30,17 +31,10 @@ local function CharDB()
     return BR.aceDB and BR.aceDB.char
 end
 
----@return "gathering"|"all"
-local function Scope()
-    local profile = BR.aceDB and BR.aceDB.profile
-    local defaults = profile and profile.defaults
-    return defaults and defaults.trackingScope or "gathering"
-end
-
 ---@param spell TrackingSpell
 ---@return boolean
 local function InScope(spell)
-    return spell.kind == "gathering" or Scope() == "all"
+    return BR.aceDB ~= nil and IsContentChoiceAllowed("trackingSpells", spell.kind, spell.key)
 end
 
 ---@param spell TrackingSpell

@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 72
+BR.Migrations.DB_VERSION = 73
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -873,6 +873,36 @@ function BR.Migrations.RunProfile(profile, isImport)
                     end
                 end
             end
+        end,
+        -- [73] The tracking scope becomes a set of tracking spells. The defaults allow the
+        -- profession and racial spells, so only the "all" scope writes the class spells.
+        [73] = function()
+            local profileDefaults = profile.defaults
+            if type(profileDefaults) ~= "table" then
+                return
+            end
+            if profileDefaults.trackingScope == "all" then
+                local spells = type(profileDefaults.trackingSpells) == "table" and profileDefaults.trackingSpells or {}
+                profileDefaults.trackingSpells = spells
+                local class = type(spells.class) == "table" and spells.class or {}
+                spells.class = class
+                for _, key in ipairs({
+                    "beasts",
+                    "humanoids",
+                    "undead",
+                    "demons",
+                    "elementals",
+                    "giants",
+                    "dragonkin",
+                    "hidden",
+                    "humanoidsCat",
+                    "senseUndead",
+                    "senseDemons",
+                }) do
+                    class[key] = true
+                end
+            end
+            profileDefaults.trackingScope = nil
         end,
     }
 

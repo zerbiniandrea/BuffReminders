@@ -293,8 +293,15 @@ BR.defaults = {
         }),
         -- WoW Forever: "self" checks and blesses only the player.
         paladinBlessingScope = BR.ByClient({ retail = BR.NONE, forever = "group" }),
-        -- WoW Forever: "all" adds creature tracking to the gathering tracking.
-        trackingScope = BR.ByClient({ retail = BR.NONE, forever = "gathering" }),
+        -- The tracking spells that the reminder offers (WoW Forever), per kind.
+        trackingSpells = BR.ByClient({
+            retail = BR.NONE,
+            forever = {
+                profession = { herbs = true, minerals = true },
+                racial = { treasure = true },
+                class = {},
+            },
+        }),
         -- The paladin auras of each content row (WoW Forever): the main aura, then the
         -- backup. An empty row accepts any aura. Every slot holds a value, so that AceDB
         -- cannot fill a slot that the user emptied.

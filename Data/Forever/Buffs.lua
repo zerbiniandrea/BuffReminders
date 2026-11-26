@@ -1798,9 +1798,10 @@ local CAMP_ROW = {
     others = CampFeatureChoices,
 }
 
----@alias TrackingKind "gathering"|"creature"
+---@alias TrackingKind "profession"|"racial"|"class"
 
 ---@class TrackingSpell
+---@field key string Choice key in defaults.trackingSpells[kind]
 ---@field spellID number
 ---@field kind TrackingKind
 ---@field form? number Stance spell that the cast needs. The game ends the tracking when the form ends
@@ -1808,20 +1809,20 @@ local CAMP_ROW = {
 -- Minimap tracking spells, in the order of the fallback pick. The game allows one active tracking.
 ---@type TrackingSpell[]
 BR.TRACKING_SPELLS = {
-    { spellID = 2383, kind = "gathering" }, -- Find Herbs
-    { spellID = 2580, kind = "gathering" }, -- Find Minerals
-    { spellID = 2481, kind = "gathering" }, -- Find Treasure
-    { spellID = 1494, kind = "creature" }, -- Track Beasts
-    { spellID = 19883, kind = "creature" }, -- Track Humanoids
-    { spellID = 19884, kind = "creature" }, -- Track Undead
-    { spellID = 19878, kind = "creature" }, -- Track Demons
-    { spellID = 19880, kind = "creature" }, -- Track Elementals
-    { spellID = 19882, kind = "creature" }, -- Track Giants
-    { spellID = 19879, kind = "creature" }, -- Track Dragonkin
-    { spellID = 19885, kind = "creature" }, -- Track Hidden
-    { spellID = 5225, kind = "creature", form = 768 }, -- Track Humanoids (Druid), Cat Form
-    { spellID = 5502, kind = "creature" }, -- Sense Undead
-    { spellID = 5500, kind = "creature" }, -- Sense Demons
+    { key = "herbs", spellID = 2383, kind = "profession" }, -- Find Herbs
+    { key = "minerals", spellID = 2580, kind = "profession" }, -- Find Minerals
+    { key = "treasure", spellID = 2481, kind = "racial" }, -- Find Treasure
+    { key = "beasts", spellID = 1494, kind = "class" }, -- Track Beasts
+    { key = "humanoids", spellID = 19883, kind = "class" }, -- Track Humanoids
+    { key = "undead", spellID = 19884, kind = "class" }, -- Track Undead
+    { key = "demons", spellID = 19878, kind = "class" }, -- Track Demons
+    { key = "elementals", spellID = 19880, kind = "class" }, -- Track Elementals
+    { key = "giants", spellID = 19882, kind = "class" }, -- Track Giants
+    { key = "dragonkin", spellID = 19879, kind = "class" }, -- Track Dragonkin
+    { key = "hidden", spellID = 19885, kind = "class" }, -- Track Hidden
+    { key = "humanoidsCat", spellID = 5225, kind = "class", form = 768 }, -- Track Humanoids (Druid), Cat Form
+    { key = "senseUndead", spellID = 5502, kind = "class" }, -- Sense Undead
+    { key = "senseDemons", spellID = 5500, kind = "class" }, -- Sense Demons
 }
 
 ---@type number[]
