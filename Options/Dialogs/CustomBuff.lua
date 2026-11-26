@@ -237,6 +237,134 @@ local function Track(ctx, holder)
     return holder
 end
 
+---@class CustomBuffIdRow
+---@field frame table
+---@field editBox table
+---@field removeBtn table
+---@field validated boolean
+---@field id number?
+---@field name string?
+---@field iconID number?
+---@field Validate fun()
+
+---@class CustomBuffIdListOpts
+---@field label string
+---@field addLabel string
+---@field notFoundText string
+---@field validate fun(id: number): boolean, string?, number?
+---@field onResize fun()
+
+---A labeled list of ID rows with a "-" on each row and an add button below.
+---The block height changes with the row count. opts.onResize runs after each change.
+---@param ctx table
+---@param block table
+---@param opts CustomBuffIdListOpts
+---@return { rows: CustomBuffIdRow[], addBtn: table, Add: fun(initialID: number?): CustomBuffIdRow }
+local function CreateIdList(ctx, block, opts)
+    local list = { rows = {} }
+    local rows = list.rows
+
+    local label = block:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetPoint("TOPLEFT", 0, -(ROW_H - LABEL_H) / 2)
+    label:SetWidth(LABEL_W)
+    label:SetJustifyH("LEFT")
+    label:SetText(opts.label)
+
+    local addBtn
+    local function Relayout()
+        local count = #rows
+        for i, row in ipairs(rows) do
+            row.frame:ClearAllPoints()
+            row.frame:SetPoint("TOPLEFT", block, "TOPLEFT", 0, -((i - 1) * ROW_PITCH))
+            row.removeBtn:SetShown(count > 1)
+        end
+        addBtn:ClearAllPoints()
+        addBtn:SetPoint("TOPLEFT", block, "TOPLEFT", FIELD_X, -(count * ROW_PITCH))
+        block:SetHeight(count * ROW_PITCH + ROW_H)
+        opts.onResize()
+    end
+
+    function list.Add(initialID)
+        local rowFrame = CreateFrame("Frame", nil, block)
+        rowFrame:SetSize(CONTENT_W, ROW_H)
+
+        local container, editBox = IdField(ctx, rowFrame, ID_FIELD_W, initialID)
+        container:SetPoint("LEFT", FIELD_X, 0)
+
+        local icon = CreateBuffIcon(rowFrame, ICON_SIZE)
+        icon:SetPoint("LEFT", container, "RIGHT", ICON_GAP, 0)
+        icon:Hide()
+
+        local nameText = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        nameText:SetPoint("LEFT", container, "RIGHT", NAME_GAP, 0)
+        nameText:SetPoint("RIGHT", rowFrame, "RIGHT", -(REMOVE_W + ICON_GAP), 0)
+        nameText:SetJustifyH("LEFT")
+        nameText:SetWordWrap(false)
+
+        local removeBtn = CreateButton(rowFrame, "-", nil)
+        removeBtn:SetSize(REMOVE_W, FIELD_H)
+        removeBtn:SetPoint("RIGHT", 0, 0)
+
+        local row ---@type CustomBuffIdRow
+
+        local function Validate()
+            local id = tonumber(editBox:GetText())
+            local valid, name, iconID = false, nil, nil
+            if id then
+                valid, name, iconID = opts.validate(id)
+            end
+            if valid then
+                icon:SetTexture(iconID)
+                icon:Show()
+                nameText:SetText(name or "")
+                row.validated, row.id, row.name, row.iconID = true, id, name, iconID
+            else
+                icon:Hide()
+                if editBox:GetText() == "" then
+                    nameText:SetText("")
+                else
+                    nameText:SetText("|cffff4d4d" .. opts.notFoundText .. "|r")
+                end
+                row.validated, row.id, row.name, row.iconID = false, nil, nil, nil
+            end
+            ctx.Sync()
+        end
+
+        row = { frame = rowFrame, editBox = editBox, removeBtn = removeBtn, validated = false, Validate = Validate }
+
+        editBox:SetScript("OnTextChanged", function()
+            Debounce(row, Validate)
+        end)
+
+        removeBtn:SetScript("OnClick", function()
+            for i, other in ipairs(rows) do
+                if other == row then
+                    rowFrame:Hide()
+                    table.remove(rows, i)
+                    break
+                end
+            end
+            Relayout()
+            ctx.Sync()
+        end)
+
+        tinsert(rows, row)
+        if initialID then
+            row.Validate()
+        end
+        Relayout()
+        return row
+    end
+
+    addBtn = CreateButton(block, opts.addLabel, function()
+        list.Add(nil)
+    end)
+    addBtn:SetSize(110, FIELD_H)
+    list.addBtn = addBtn
+
+    return list
+end
+
 -- ============================================================================
 -- DELETE CONFIRMATION
 -- ============================================================================
@@ -284,100 +412,18 @@ local function BuildBuffTab(ctx, frame)
     trackBlock:SetSize(CONTENT_W, ROW_PITCH + ROW_H)
     trackBlock:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -trackTop)
 
-    local idsLabel = trackBlock:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    idsLabel:SetPoint("TOPLEFT", 0, -(ROW_H - LABEL_H) / 2)
-    idsLabel:SetWidth(LABEL_W)
-    idsLabel:SetJustifyH("LEFT")
-    idsLabel:SetText(L["CustomBuff.SpellIDs"])
-
-    local addBtn
-    local function Relayout()
-        local count = #ctx.spellRows
-        for i, row in ipairs(ctx.spellRows) do
-            row.frame:ClearAllPoints()
-            row.frame:SetPoint("TOPLEFT", trackBlock, "TOPLEFT", 0, -((i - 1) * ROW_PITCH))
-            row.removeBtn:SetShown(count > 1)
-        end
-        addBtn:ClearAllPoints()
-        addBtn:SetPoint("TOPLEFT", trackBlock, "TOPLEFT", FIELD_X, -(count * ROW_PITCH))
-        trackBlock:SetHeight(count * ROW_PITCH + ROW_H)
-        ctx.UpdateBuffTabHeight()
-    end
-
-    function ctx.AddSpellRow(initialID)
-        local rowFrame = CreateFrame("Frame", nil, trackBlock)
-        rowFrame:SetSize(CONTENT_W, ROW_H)
-
-        local container, editBox = IdField(ctx, rowFrame, ID_FIELD_W, initialID)
-        container:SetPoint("LEFT", FIELD_X, 0)
-
-        local icon = CreateBuffIcon(rowFrame, ICON_SIZE)
-        icon:SetPoint("LEFT", container, "RIGHT", ICON_GAP, 0)
-        icon:Hide()
-
-        local nameText = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        nameText:SetPoint("LEFT", container, "RIGHT", NAME_GAP, 0)
-        nameText:SetPoint("RIGHT", rowFrame, "RIGHT", -(REMOVE_W + ICON_GAP), 0)
-        nameText:SetJustifyH("LEFT")
-        nameText:SetWordWrap(false)
-
-        local removeBtn = CreateButton(rowFrame, "-", nil)
-        removeBtn:SetSize(REMOVE_W, FIELD_H)
-        removeBtn:SetPoint("RIGHT", 0, 0)
-
-        local row = { frame = rowFrame, editBox = editBox, removeBtn = removeBtn, validated = false }
-
-        local function Validate()
-            local spellID = tonumber(editBox:GetText())
-            local valid, name, iconID = false, nil, nil
-            if spellID then
-                valid, name, iconID = ValidateSpellID(spellID)
-            end
-            if valid then
-                icon:SetTexture(iconID)
-                icon:Show()
-                nameText:SetText(name or "")
-                row.validated, row.spellID, row.spellName, row.iconID = true, spellID, name, iconID
-            else
-                icon:Hide()
-                if editBox:GetText() == "" then
-                    nameText:SetText("")
-                else
-                    nameText:SetText("|cffff4d4d" .. L["CustomBuff.NotFound"] .. "|r")
-                end
-                row.validated, row.spellID, row.spellName, row.iconID = false, nil, nil, nil
-            end
-            ctx.Sync()
-        end
-
-        editBox:SetScript("OnTextChanged", function()
-            Debounce(row, Validate)
-        end)
-
-        removeBtn:SetScript("OnClick", function()
-            for i, other in ipairs(ctx.spellRows) do
-                if other == row then
-                    rowFrame:Hide()
-                    table.remove(ctx.spellRows, i)
-                    break
-                end
-            end
-            Relayout()
-            ctx.Sync()
-        end)
-
-        tinsert(ctx.spellRows, row)
-        if initialID then
-            Validate()
-        end
-        Relayout()
-        return row
-    end
-
-    addBtn = CreateButton(trackBlock, L["CustomBuff.AddSpellID"], function()
-        ctx.AddSpellRow(nil)
-    end)
-    addBtn:SetSize(110, FIELD_H)
+    local spellList = CreateIdList(ctx, trackBlock, {
+        label = L["CustomBuff.SpellIDs"],
+        addLabel = L["CustomBuff.AddSpellID"],
+        notFoundText = L["CustomBuff.NotFound"],
+        validate = ValidateSpellID,
+        onResize = function()
+            ctx.UpdateBuffTabHeight()
+        end,
+    })
+    ctx.spellRows = spellList.rows
+    ctx.AddSpellRow = spellList.Add
+    local addBtn = spellList.addBtn
 
     local pickBtn = CreateButton(trackBlock, L["CustomBuff.PickFromAuras"], function()
         BR.Options.Dialogs.AuraPicker.Show("player", function(spellID)
@@ -843,11 +889,12 @@ local function BuildClickTab(ctx, frame)
         )
     )
 
-    -- All three inputs share one slot. Nothing is laid out under them, so
-    -- swapping which one shows cannot shift the rest of the tab.
+    -- All three inputs share one slot. The item list grows the slot, and the
+    -- hints anchor to its bottom edge.
+    local inputTop = -layout:GetY()
     local inputHost = CreateFrame("Frame", nil, frame)
     inputHost:SetSize(CONTENT_W, ROW_H)
-    layout:Add(inputHost, ROW_H, ROW_GAP)
+    inputHost:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -inputTop)
 
     local function BuildLookupRow(labelText, initial, validate)
         local row = CreateFrame("Frame", nil, inputHost)
@@ -901,13 +948,10 @@ local function BuildClickTab(ctx, frame)
 
     local spellRow =
         BuildLookupRow(L["CustomBuff.Action.SpellID"], ctx.editing and ctx.editing.castSpellID, ValidateSpellID)
-    local itemRow = BuildLookupRow(L["CustomBuff.Action.ItemID"], ctx.editing and ctx.editing.castItemID, function(id)
-        local valid, name, iconID = ValidateItemID(id)
-        if not valid then
-            RequestItemData(id)
-        end
-        return valid, name, iconID
-    end)
+
+    local itemBlock = CreateFrame("Frame", nil, inputHost)
+    itemBlock:SetSize(CONTENT_W, ROW_PITCH + ROW_H)
+    itemBlock:SetPoint("TOPLEFT", 0, 0)
 
     local macroInput = Components.TextInput(inputHost, {
         label = L["CustomBuff.Action.MacroText"],
@@ -915,35 +959,78 @@ local function BuildClickTab(ctx, frame)
         width = CONTENT_W - FIELD_X,
         value = ctx.editing and ctx.editing.castMacro or "",
     })
-    macroInput:SetPoint("LEFT", 0, 0)
+    macroInput:SetPoint("LEFT", inputHost, "TOPLEFT", 0, -ROW_H / 2)
     tinsert(ctx.editBoxes, macroInput.editBox)
 
     ctx.w.castSpell = spellRow.editBox
-    ctx.w.castItem = itemRow.editBox
     ctx.w.castMacro = macroInput.editBox
 
-    local spellHint = SectionNote(layout, frame, L["CustomBuff.Action.SpellHint"], FIELD_X)
-    local macroHint = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    macroHint:SetPoint("TOPLEFT", spellHint, "TOPLEFT", 0, 0)
-    macroHint:SetWidth(CONTENT_W - FIELD_X)
-    macroHint:SetJustifyH("LEFT")
-    macroHint:SetText(L["CustomBuff.Action.MacroHint"])
+    local function Hint(text)
+        local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        hint:SetPoint("TOPLEFT", inputHost, "BOTTOMLEFT", FIELD_X, -ROW_GAP)
+        hint:SetWidth(CONTENT_W - FIELD_X)
+        hint:SetJustifyH("LEFT")
+        hint:SetWordWrap(true)
+        hint:SetText(text)
+        return hint
+    end
+    local hints = {
+        spell = Hint(L["CustomBuff.Action.SpellHint"]),
+        item = Hint(L["CustomBuff.Action.ItemHint"]),
+        macro = Hint(L["CustomBuff.Action.MacroHint"]),
+    }
 
-    function ctx.UpdateActionInputs()
-        spellRow:SetShown(draft.action == "spell")
-        itemRow:SetShown(draft.action == "item")
-        macroInput:SetShown(draft.action == "macro")
-        spellHint:SetShown(draft.action == "spell" or draft.action == "item")
-        macroHint:SetShown(draft.action == "macro")
-        if draft.action == "spell" then
-            spellRow.Validate()
-        elseif draft.action == "item" then
-            itemRow.Validate()
+    local function UpdateClickTabHeight()
+        inputHost:SetHeight(draft.action == "item" and itemBlock:GetHeight() or ROW_H)
+        local hint = hints[draft.action]
+        local hintH = hint and (ROW_GAP + ceil(hint:GetStringHeight()) + COMPONENT_GAP) or ROW_GAP
+        frame:SetHeight(inputTop + inputHost:GetHeight() + hintH + TAB_BOTTOM_PAD)
+        if ctx.activeTab == "click" then
+            ctx.scrollFrame:SetContentHeight(frame:GetHeight())
         end
     end
 
+    local itemList = CreateIdList(ctx, itemBlock, {
+        label = L["CustomBuff.Action.ItemIDs"],
+        addLabel = L["CustomBuff.AddItemID"],
+        notFoundText = L["CustomBuff.NotFoundRetry"],
+        validate = function(id)
+            local valid, name, iconID = ValidateItemID(id)
+            if not valid then
+                RequestItemData(id)
+            end
+            return valid, name, iconID
+        end,
+        onResize = UpdateClickTabHeight,
+    })
+    ctx.itemRows = itemList.rows
+    local savedItems = ctx.editing and ctx.editing.castItemID
+    if type(savedItems) == "table" then
+        for _, itemID in ipairs(savedItems) do
+            itemList.Add(itemID)
+        end
+    else
+        itemList.Add(savedItems)
+    end
+
+    function ctx.UpdateActionInputs()
+        spellRow:SetShown(draft.action == "spell")
+        itemBlock:SetShown(draft.action == "item")
+        macroInput:SetShown(draft.action == "macro")
+        for action, hint in pairs(hints) do
+            hint:SetShown(action == draft.action)
+        end
+        if draft.action == "spell" then
+            spellRow.Validate()
+        elseif draft.action == "item" then
+            for _, row in ipairs(itemList.rows) do
+                row.Validate()
+            end
+        end
+        UpdateClickTabHeight()
+    end
+
     ctx.UpdateActionInputs()
-    frame:SetHeight(-layout:GetY() + TAB_BOTTOM_PAD)
 end
 
 -- ============================================================================
@@ -987,9 +1074,9 @@ end
 local function SaveBuff(ctx)
     local ids, firstName = {}, nil
     for _, row in ipairs(ctx.spellRows) do
-        if row.validated and row.spellID then
-            tinsert(ids, row.spellID)
-            firstName = firstName or row.spellName
+        if row.validated and row.id then
+            tinsert(ids, row.id)
+            firstName = firstName or row.name
         end
     end
     if #ids == 0 then
@@ -1016,7 +1103,14 @@ local function SaveBuff(ctx)
     if draft.action == "spell" then
         castSpellID = tonumber(strtrim(ctx.w.castSpell:GetText()))
     elseif draft.action == "item" then
-        castItemID = tonumber(strtrim(ctx.w.castItem:GetText()))
+        local items = {}
+        for _, row in ipairs(ctx.itemRows) do
+            local itemID = tonumber(strtrim(row.editBox:GetText()))
+            if itemID then
+                tinsert(items, itemID)
+            end
+        end
+        castItemID = #items > 1 and items or items[1]
     elseif draft.action == "macro" then
         local text = strtrim(ctx.w.castMacro:GetText())
         castMacro = text ~= "" and text or nil
@@ -1113,7 +1207,6 @@ local function Show(existingKey, refreshPanelCallback)
         editing = editing,
         draft = BuildDraft(editing),
         loadConditions = CopyLoadConditions(editing),
-        spellRows = {},
         holders = {},
         editBoxes = {},
         w = {},

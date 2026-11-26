@@ -234,7 +234,7 @@ local DK_RUNEFORGES = {
 ---@field showWhenPresent? boolean  -- Show icon when buff IS on player (default: show when missing)
 ---@field glowMode? "whenGlowing"|"whenNotGlowing"|"disabled"  -- Action bar glow fallback mode: nil/"whenGlowing" = detect when glowing (default), "whenNotGlowing" = detect when NOT glowing, "disabled" = don't track glow
 ---@field castSpellID? number       -- Spell to cast on click (separate from tracked aura)
----@field castItemID? number        -- Item to use on click
+---@field castItemID? number|number[] -- Items to use on click: the first one the player has
 ---@field castMacro? string         -- Raw macro text for click action
 ---@field requireItemID? number    -- Only show if this item is owned/equipped/in bags (see requireItemMode)
 ---@field requireItemMode? "owned"|"equipped"|"bags" -- How to check requireItemID: "owned" (default) = bags or equipped, "equipped" = equipped only, "bags" = bags only

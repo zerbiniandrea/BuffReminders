@@ -1255,7 +1255,6 @@ L["CustomBuff.Action.Desc"] =
     "設置點擊此增益圖示時的動作。法術會施放法術，物品會使用物品，巨集會執行巨集。"
 L["CustomBuff.Action.MacroHint"] = "例：/use item:12345\n/use 13"
 L["CustomBuff.Action.SpellID"] = "法術ID"
-L["CustomBuff.Action.ItemID"] = "物品ID"
 L["CustomBuff.Action.MacroText"] = "巨集"
 L["CustomBuff.Action.SpellHint"] = "這可能與被追蹤的法術不同。追蹤此增益並施放技能。"
 

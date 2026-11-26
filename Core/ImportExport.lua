@@ -209,8 +209,8 @@ local NAME_LIMIT = 100
 local OVERLAY_LIMIT = 100
 local MACRO_LIMIT = 1024
 local MAX_EXPIRATION = 600
--- Each tracked ID costs an aura read on every refresh.
-local SPELL_LIMIT = 64
+-- Each listed ID costs a lookup on every refresh.
+local ID_LIST_LIMIT = 64
 
 -- The editor stores its default choice as nil, so these sets leave the default
 -- out. An imported default then reads back as nil, the same as a locally saved
@@ -256,8 +256,8 @@ local function BoundedString(value, limit)
     return text:sub(1, limit)
 end
 
----@return SpellID?
-local function SanitizeSpellID(value)
+---@return number|number[]?
+local function SanitizeIDList(value)
     local single = PositiveInt(value)
     if single then
         return single
@@ -270,7 +270,7 @@ local function SanitizeSpellID(value)
         local id = PositiveInt(entry)
         if id then
             ids[#ids + 1] = id
-            if #ids == SPELL_LIMIT then
+            if #ids == ID_LIST_LIMIT then
                 break
             end
         end
@@ -330,7 +330,7 @@ local function SanitizeCustomBuff(data)
     if type(data) ~= "table" then
         return nil
     end
-    local spellID = SanitizeSpellID(data.spellID)
+    local spellID = SanitizeIDList(data.spellID)
     if not spellID then
         return nil
     end
@@ -354,7 +354,7 @@ local function SanitizeCustomBuff(data)
         glowMode = GLOW_MODES[data.glowMode] and data.glowMode or nil,
         expirationThreshold = expiration,
         castSpellID = PositiveInt(data.castSpellID),
-        castItemID = PositiveInt(data.castItemID),
+        castItemID = SanitizeIDList(data.castItemID),
         castMacro = BoundedString(data.castMacro, MACRO_LIMIT),
         requireItemID = requireItemID,
         requireItemMode = requireItemID and ITEM_MODES[data.requireItemMode] and data.requireItemMode or nil,

@@ -1005,7 +1005,6 @@ L["CustomBuff.Action.Desc"] =
     "이 버프 아이콘을 클릭했을 때의 동작을 설정합니다. 주문은 주문 시전, 아이템은 아이템 사용, 매크로는 매크로를 실행합니다."
 L["CustomBuff.Action.MacroHint"] = "예: /사용 item:12345\n/사용 13"
 L["CustomBuff.Action.SpellID"] = "주문 ID"
-L["CustomBuff.Action.ItemID"] = "아이템 ID"
 L["CustomBuff.Action.MacroText"] = "매크로"
 L["CustomBuff.Action.SpellHint"] = "추적한 주문과 다를 수 있습니다. 추적한 것이 버프고 시전은 어빌리티로 하는 경우입니다."
 

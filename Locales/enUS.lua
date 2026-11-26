@@ -1210,6 +1210,7 @@ english["CustomBuff.RestrictedNote"] =
     "WoW blocks aura reads in combat, boss fights and Mythic+. Glow tracking still works."
 english["CustomBuff.SpellIDs"] = "Spell IDs"
 english["CustomBuff.AddSpellID"] = "+ Add Spell ID"
+english["CustomBuff.AddItemID"] = "+ Add Item ID"
 english["CustomBuff.PickFromAuras"] = "Pick from my buffs"
 
 english["AuraPicker.Title"] = "Auras and Spell IDs"
@@ -1319,9 +1320,10 @@ english["CustomBuff.Action.Desc"] =
     "What happens when you click this buff icon. Spell casts a spell, Item uses an item, Macro runs a macro command."
 english["CustomBuff.Action.MacroHint"] = "e.g. /use item:12345\\n/use 13"
 english["CustomBuff.Action.SpellID"] = "Spell ID"
-english["CustomBuff.Action.ItemID"] = "Item ID"
+english["CustomBuff.Action.ItemIDs"] = "Item IDs"
 english["CustomBuff.Action.MacroText"] = "Macro"
 english["CustomBuff.Action.SpellHint"] = "This can differ from the tracked spell. Track the buff, cast the ability."
+english["CustomBuff.Action.ItemHint"] = "A click uses the first item in the list that you have."
 
 -- Save/Cancel/Delete
 english["CustomBuff.Save"] = "Save"

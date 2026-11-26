@@ -27,6 +27,8 @@ local IsSpellKnown = C_SpellBook.IsSpellKnown
 local Plain = BR.Secret.Plain
 local BuffTargets = BR.StateHelpers.BuffTargets
 local IsCountdownEntry = BR.StateHelpers.IsCountdownEntry
+local FirstOwnedItem = BR.StateHelpers.FirstOwnedItem
+local AsSpellList = BR.StateHelpers.AsSpellList
 local SubIcons = BR.SubIcons
 local Pixels = BR.Pixels
 
@@ -116,8 +118,9 @@ local function ResolveCustomClickAction(buff)
     if buff.castMacro and buff.castMacro ~= "" then
         return "macro", buff.castMacro
     end
-    if buff.castItemID then
-        return "item", buff.castItemID
+    local items = buff.castItemID
+    if items then
+        return "item", FirstOwnedItem(items) or AsSpellList(items)[1]
     end
     if buff.castSpellID then
         if IsSpellKnown(buff.castSpellID) then

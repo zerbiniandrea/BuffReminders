@@ -720,6 +720,18 @@ local function HasItemByMode(itemID, mode)
     return result
 end
 
+---@param items number|number[]
+---@param mode? "owned"|"equipped"|"bags"
+---@return number? itemID The first item in list order that the player has
+local function FirstOwnedItem(items, mode)
+    for _, itemID in ipairs(AsSpellList(items)) do
+        if HasItemByMode(itemID, mode) then
+            return itemID
+        end
+    end
+    return nil
+end
+
 -- Item count cache (charges included), invalidated together with
 -- cachedItemOwnership. Item counts only change on bag updates. Charge counts do
 -- change without a bag event, so they stay out of this cache.
@@ -3141,9 +3153,11 @@ local function RefreshCustom(isAuraRestricted, hideExpiring)
         end
 
         if shouldProcess then
-            local gateItemID = buff.requireItemID or buff.castItemID
-            if gateItemID and not HasItemByMode(gateItemID, buff.requireItemMode) then
-                shouldProcess = false
+            local gateItems = buff.requireItemID or buff.castItemID
+            local gateItemID
+            if gateItems then
+                gateItemID = FirstOwnedItem(gateItems, buff.requireItemMode)
+                shouldProcess = gateItemID ~= nil
             end
             if shouldProcess and gateItemID and buff.itemCooldownCondition and not CooldownsRestricted() then
                 -- pcall: gateItemID is user-entered and an invalid ID can throw.
@@ -3825,6 +3839,7 @@ BR.StateHelpers = {
     IsPlayerSpellCached = IsPlayerSpellCached,
     GetItemCountCached = GetItemCountCached,
     HasItemInBags = HasItemInBags,
+    FirstOwnedItem = FirstOwnedItem,
     IsPlayerTank = IsPlayerTank,
     AsSpellList = AsSpellList,
     BuffTargets = BuffTargets,

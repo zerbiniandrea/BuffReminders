@@ -107,6 +107,13 @@ end
 -- IMPORT PREVIEW
 -- ============================================================================
 
+local function DescribeIDs(ids)
+    if type(ids) ~= "table" then
+        return tostring(ids)
+    end
+    return table.concat(ids, ", ")
+end
+
 -- Same order the secure button resolves in, so the preview names what a click
 -- will really do when a string carries more than one action.
 local function DescribeAction(buff)
@@ -114,19 +121,12 @@ local function DescribeAction(buff)
         return buff.castMacro
     end
     if buff.castItemID then
-        return L["CustomBuff.Action.Item"] .. " " .. buff.castItemID
+        return L["CustomBuff.Action.Item"] .. " " .. DescribeIDs(buff.castItemID)
     end
     if buff.castSpellID then
         return L["CustomBuff.Action.Spell"] .. " " .. buff.castSpellID
     end
     return nil
-end
-
-local function DescribeSpells(spellID)
-    if type(spellID) ~= "table" then
-        return tostring(spellID)
-    end
-    return table.concat(spellID, ", ")
 end
 
 -- The box exists only while a string decodes, so the dialog stays a paste box
@@ -186,9 +186,9 @@ local function CreatePreview(parent)
             icon:SetTexture(texture)
         end
 
-        name:SetText(buff.name or DescribeSpells(buff.spellID))
+        name:SetText(buff.name or DescribeIDs(buff.spellID))
 
-        local lines = { L["CustomBuff.Share.Spells"] .. " " .. DescribeSpells(buff.spellID) }
+        local lines = { L["CustomBuff.Share.Spells"] .. " " .. DescribeIDs(buff.spellID) }
         local action = DescribeAction(buff)
         if action then
             lines[#lines + 1] = L["CustomBuff.Share.Runs"] .. " " .. action
