@@ -106,7 +106,7 @@ local BR = ns
 ---@field petLabelClasses? table<ClassName, boolean>
 ---@field useFelDomination? boolean
 ---@field warlockDemons? table<string, table<string, boolean>> Content row -> allowed demon keys
----@field warlockSacrificeDemons? table<string, table<string, boolean>> Content row -> demon keys to sacrifice (WoW Forever)
+---@field warlockSacrificeDemons? table<string, table<string, boolean>> Talent group row -> the demon to sacrifice, at most one (WoW Forever)
 ---@field warlockStones? table<string, table<string, boolean>> Talent group row -> the picked stone, at most one (WoW Forever)
 ---@field warlockWrongDemon? boolean
 ---@field warriorStances? table<string, table<string, boolean>> Content row -> allowed stance keys

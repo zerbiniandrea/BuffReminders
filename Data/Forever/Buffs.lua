@@ -312,16 +312,22 @@ local function DemonSetupStep()
     return nil
 end
 
----Known demon of the first choice that a content grid allows in the current row.
+---Row of a talent group grid for the active talent group.
+---@return string
+local function TalentGroupRow()
+    return "spec" .. BR.StateHelpers.GetPlayerSpecGroup()
+end
+
+---Known demon of the first choice that a grid allows in a row.
 ---@param setting string Key of the grid in profile.defaults
+---@param row string
 ---@param skipSpellID number?
 ---@return PetAction?
-local function GridDemonAction(setting, skipSpellID)
+local function GridDemonAction(setting, row, skipSpellID)
     local actions = BR.PetHelpers.GetPetActions("WARLOCK")
     if not actions then
         return nil
     end
-    local row = BR.Visibility.GetContentRow()
     for _, demon in ipairs(BR.PetHelpers.WARLOCK_DEMON_CHOICES) do
         if demon.spellID ~= skipSpellID and BR.Visibility.IsContentChoiceAllowed(setting, row, demon.key) then
             for _, action in ipairs(actions) do
@@ -354,16 +360,12 @@ local function PactSummonAction()
     if desired and desired.spellID ~= sacrificed then
         return desired
     end
-    return GridDemonAction("warlockDemons", sacrificed) or OtherDemonAction(sacrificed)
+    return GridDemonAction("warlockDemons", BR.Visibility.GetContentRow(), sacrificed) or OtherDemonAction(sacrificed)
 end
 
----Demon that the sacrifice click summons when no demon is out.
+---Demon that the sacrifice click summons when no demon is out and the talent group picks none.
 ---@return PetAction?
-local function SacrificeDemonAction()
-    local chosen = GridDemonAction("warlockSacrificeDemons")
-    if chosen then
-        return chosen
-    end
+local function FallbackSacrificeDemon()
     local actions = BR.PetHelpers.GetPetActions("WARLOCK")
     local desired = BR.PetHelpers.GetDesiredWarlockDemon() or (actions and actions[1])
     -- With Demonic Pact, the preferred demon is the one that stays out after the sacrifice.
@@ -491,12 +493,25 @@ local function SoulstoneReady()
     return true
 end
 
--- A demon must be out for the sacrifice, so with no demon the click summons one.
+-- The sacrifice needs a demon out. If the talent group picks a demon and another one is out,
+-- the click summons the picked demon first.
 ---@param spellID number?
 ---@return string
 local function DemonicSacrificeMacro(spellID)
     local sacrifice = BR.GetSpellName(spellID or DEMONIC_SACRIFICE.spellID) or ""
-    local demon = SacrificeDemonAction()
+    local picked = GridDemonAction("warlockSacrificeDemons", TalentGroupRow())
+    if picked then
+        local familyID = BR.BuffState.GetPetFamily()
+        if familyID == nil then
+            return "/cast [nopet] " .. picked.spellName .. "; " .. sacrifice
+        end
+        local families = BR.PetHelpers.WARLOCK_DEMON_FAMILIES[picked.spellID]
+        if familyID and families[familyID] and not UnitIsDead("pet") then
+            return "/cast " .. sacrifice
+        end
+        return "/cast " .. picked.spellName
+    end
+    local demon = FallbackSacrificeDemon()
     if not demon then
         return "/cast " .. sacrifice
     end
@@ -650,7 +665,7 @@ end
 ---The known stone that the active talent group picks, or nil when either stone counts.
 ---@return WarlockStone?
 local function PickedStone()
-    local row = "spec" .. BR.StateHelpers.GetPlayerSpecGroup()
+    local row = TalentGroupRow()
     for _, stone in ipairs(WARLOCK_STONES) do
         if BR.Visibility.IsContentChoiceAllowed("warlockStones", row, stone.key) then
             return HighestKnownSpell(stone.create) and stone or nil
@@ -2251,14 +2266,11 @@ local BUFF_TABLES = {
             overlayText = L["Overlay.WrongPet"],
             icons = { textures = { 136217 } }, -- Summon Felhunter
             groupId = "pets",
+            -- The setup reminder picks the demons, and a summon can cancel the sacrifice.
+            petSacrifice = DEMONIC_SACRIFICE,
             customCheck = function()
                 local defaults = BR.profile.defaults
                 if defaults and defaults.warlockWrongDemon == false then
-                    return false
-                end
-                -- A summon of the sacrificed demon cancels the Demonic Pact buff.
-                local desired = BR.PetHelpers.GetDesiredWarlockDemon()
-                if desired and desired.spellID == SacrificedDemon() and KnowsDemonicPact() then
                     return false
                 end
                 return BR.BuffState.IsWrongDemonPet()

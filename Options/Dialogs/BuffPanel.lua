@@ -170,6 +170,10 @@ local GRID_ROWS = {
     { key = "raid", label = L["BuffPanel.WarlockDemon.Raid"] },
     { key = "pvp", label = L["BuffPanel.WarlockDemon.PvP"] },
 }
+local TALENT_GROUP_ROWS = {
+    { key = "spec1", label = L["BuffPanel.TalentGroup.Primary"] },
+    { key = "spec2", label = L["BuffPanel.TalentGroup.Secondary"] },
+}
 local GRID_CELL = 24
 local GRID_GAP = 4
 local GRID_INFO_ICON = 14
@@ -1529,27 +1533,18 @@ local SPECIAL_SECTIONS = {
                 "warlockSacrificeDemons",
                 L["BuffPanel.SacrificeDemon.Hint"],
                 WarlockDemonGridChoices(),
-                true
+                true,
+                TALENT_GROUP_ROWS
             )
         end,
     },
 
     warlockStone = {
         build = function(layout)
-            AddContentGrid(
-                layout,
-                "warlockStones",
-                L["BuffPanel.WarlockStone.Hint"],
-                {
-                    { key = "spellstone", label = BR.GetSpellName(1237152) or L["Buff.Spellstone"], icon = 134131 },
-                    { key = "firestone", label = BR.GetSpellName(758) or L["Buff.Firestone"], icon = 134085 },
-                },
-                true,
-                {
-                    { key = "spec1", label = L["BuffPanel.WarlockStone.Spec1"] },
-                    { key = "spec2", label = L["BuffPanel.WarlockStone.Spec2"] },
-                }
-            )
+            AddContentGrid(layout, "warlockStones", L["BuffPanel.WarlockStone.Hint"], {
+                { key = "spellstone", label = BR.GetSpellName(1237152) or L["Buff.Spellstone"], icon = 134131 },
+                { key = "firestone", label = BR.GetSpellName(758) or L["Buff.Firestone"], icon = 134085 },
+            }, true, TALENT_GROUP_ROWS)
         end,
     },
 

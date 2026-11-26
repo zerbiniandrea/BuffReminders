@@ -259,16 +259,11 @@ BR.defaults = {
                 pvp = { succubus = true, felhunter = true },
             },
         }),
-        -- The demon that the sacrifice click summons per content row (WoW Forever), at most one.
+        -- The demon to sacrifice in each talent group (WoW Forever), at most one.
         -- The Imp gives +Shadow damage and costs no Soul Shard. An empty row uses the preferred demon.
         warlockSacrificeDemons = BR.ByClient({
             retail = BR.NONE,
-            forever = {
-                world = {},
-                dungeon = { imp = true },
-                raid = { imp = true },
-                pvp = {},
-            },
+            forever = { spec1 = { imp = true }, spec2 = { imp = true } },
         }),
         -- The stone of each talent group (WoW Forever), at most one. An empty row accepts either stone.
         warlockStones = BR.ByClient({
