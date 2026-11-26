@@ -1194,34 +1194,7 @@ local SPECIAL_SECTIONS = {
     },
 
     lowReagents = {
-        build = function(layout)
-            local thresholdHolder = Components.Slider(body, {
-                label = L["Options.Reagent.Threshold"],
-                labelWidth = 110,
-                min = 1,
-                max = 20,
-                step = 1,
-                get = function()
-                    return BR.Config.Get("defaults.reagentThreshold") or 5
-                end,
-                tooltip = { title = L["Options.Reagent.Threshold"], desc = L["Options.Reagent.Threshold.Desc"] },
-                onChange = function(val)
-                    BR.Config.Set("defaults.reagentThreshold", val)
-                end,
-            })
-            tinsert(bodyHolders, thresholdHolder)
-            layout:Add(thresholdHolder, nil, COMPONENT_GAP)
-            AddSpecialCheckbox(layout, {
-                label = L["Options.Reagent.RestedOnly"],
-                get = function()
-                    return BR.Config.Get("defaults.reagentRestedOnly") ~= false
-                end,
-                tooltip = { title = L["Options.Reagent.RestedOnly"], desc = L["Options.Reagent.RestedOnly.Desc"] },
-                onChange = function(checked)
-                    BR.Config.Set("defaults.reagentRestedOnly", checked)
-                end,
-            })
-        end,
+        editor = "Reagents",
     },
 
     camp = {

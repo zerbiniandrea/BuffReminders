@@ -2471,6 +2471,10 @@ local function ResolveDescriptionSubject(frame)
     if not def then
         return nil
     end
+    local tooltipItemID = def.tooltipItemID and def.tooltipItemID()
+    if tooltipItemID then
+        return "item", tooltipItemID
+    end
     -- ResolveAction fills the shared scratch action. A hover never runs inside a resolve.
     local action = ResolveAction(frame, frame.buffCategory, BR.profile)
     -- A chat request asks for the buff, so the buff spell describes it.
@@ -2561,7 +2565,17 @@ local function ShowDescriptionTooltip(owner, frame, opts)
     if not kind and not name then
         return false
     end
-    local addLines = opts and opts.addLines
+    local optLines = opts and opts.addLines
+    local defLines = def and def.tooltipLines
+    local addLines = optLines
+    if defLines then
+        addLines = function(tooltip)
+            defLines(tooltip)
+            if optLines then
+                optLines(tooltip)
+            end
+        end
+    end
     BR.Display.ShowHoverTooltip(owner, function()
         DrawDescriptionTooltip(owner, def, kind, id, name, addLines)
     end, opts and opts.fallback)

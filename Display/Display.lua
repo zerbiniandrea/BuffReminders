@@ -74,8 +74,9 @@ local BR = ns
 ---@field soulstonePinnedTarget? string
 ---@field repairThreshold? number Durability percent
 ---@field repairHideInCombat? boolean
----@field reagentThreshold? number
+---@field reagentThresholds? table<string, number> Reagent key -> count. nil = the warnBelow of the reagent
 ---@field reagentRestedOnly? boolean
+---@field reagentDropWarning? boolean
 ---@field campLightFire? boolean
 ---@field ammoThresholdStacks? number
 ---@field ammoThresholdShots? number

@@ -1319,59 +1319,141 @@ local function CheckOwnPaladinAura(isAuraRestricted)
     return WRONG_AURA_TEXT
 end
 
----@class ForeverReagent
+---@class ForeverReagentRank
 ---@field item number
 ---@field icon number
----@field class ClassName
----@field spells number[] Spells that consume the reagent
+---@field spells number[] Spells that use the item
 
--- Vendor reagents only. A reagent counts only while the player knows one of its spells,
--- so a rank-bound reagent lists only its own rank.
+---@class ForeverReagent
+---@field key string Key in defaults.reagentThresholds
+---@field classes ClassName[]
+---@field warnBelow number Default threshold. 0 turns the warning off
+---@field ranks ForeverReagentRank[] Highest first. Only the highest rank that the player knows counts
+
+-- Vendor reagents only. A spell rank can need its own item, and a player keeps the
+-- lower ranks, so only the item of the highest known rank counts.
 ---@type ForeverReagent[]
 local REAGENTS = {
-    { item = 17020, icon = 133848, class = "MAGE", spells = { 23028 } }, -- Arcane Powder
-    -- Rune of Teleportation
-    { item = 17031, icon = 134419, class = "MAGE", spells = { 3561, 3562, 3563, 3565, 3566, 3567, 1297659 } },
-    -- Rune of Portals
-    { item = 17032, icon = 134421, class = "MAGE", spells = { 10059, 11416, 11417, 11418, 11419, 11420 } },
-    { item = 17028, icon = 133752, class = "PRIEST", spells = { 21562 } }, -- Holy Candle
-    { item = 17029, icon = 133751, class = "PRIEST", spells = { 21564, 27681, 27683 } }, -- Sacred Candle
-    { item = 17021, icon = 133749, class = "DRUID", spells = { 21849 } }, -- Wild Berries
-    { item = 17026, icon = 134412, class = "DRUID", spells = { 21850 } }, -- Wild Thornroot
-    { item = 17034, icon = 133944, class = "DRUID", spells = { 20484 } }, -- Maple Seed
-    { item = 17035, icon = 133944, class = "DRUID", spells = { 20739 } }, -- Stranglethorn Seed
-    { item = 17036, icon = 133944, class = "DRUID", spells = { 20742 } }, -- Ashwood Seed
-    { item = 17037, icon = 133944, class = "DRUID", spells = { 20747 } }, -- Hornbeam Seed
-    { item = 17038, icon = 133944, class = "DRUID", spells = { 20748 } }, -- Ironwood Seed
-    -- Symbol of Kings
-    { item = 21177, icon = 134471, class = "PALADIN", spells = { 25782, 25916, 25894, 25918, 25898 } },
-    { item = 17030, icon = 133439, class = "SHAMAN", spells = { 20608 } }, -- Ankh
-    { item = 5140, icon = 134387, class = "ROGUE", spells = { 1856, 1857, 27617, 457437, 1285372 } }, -- Flash Powder
+    {
+        key = "arcanePowder",
+        classes = { "MAGE" },
+        warnBelow = 20,
+        ranks = { { item = 17020, icon = 133848, spells = { 23028 } } },
+    },
+    {
+        key = "teleportRune",
+        classes = { "MAGE" },
+        warnBelow = 3,
+        ranks = {
+            { item = 17031, icon = 134419, spells = { 3561, 3562, 3563, 3565, 3566, 3567, 1297659 } },
+        },
+    },
+    {
+        key = "portalRune",
+        classes = { "MAGE" },
+        warnBelow = 3,
+        ranks = { { item = 17032, icon = 134421, spells = { 10059, 11416, 11417, 11418, 11419, 11420 } } },
+    },
+    {
+        key = "lightFeather",
+        classes = { "MAGE", "PRIEST" },
+        warnBelow = 3,
+        ranks = { { item = 17056, icon = 132917, spells = { 130, 1706 } } }, -- Slow Fall, Levitate
+    },
+    {
+        key = "prayerCandle",
+        classes = { "PRIEST" },
+        warnBelow = 20,
+        ranks = {
+            { item = 17029, icon = 133751, spells = { 21564, 27681, 27683 } }, -- Sacred Candle
+            { item = 17028, icon = 133752, spells = { 21562 } }, -- Holy Candle
+        },
+    },
+    {
+        key = "wildReagent",
+        classes = { "DRUID" },
+        warnBelow = 20,
+        ranks = {
+            { item = 17026, icon = 134412, spells = { 21850 } }, -- Wild Thornroot
+            { item = 17021, icon = 133749, spells = { 21849 } }, -- Wild Berries
+        },
+    },
+    {
+        key = "rebirthSeed",
+        classes = { "DRUID" },
+        warnBelow = 3,
+        ranks = {
+            { item = 17038, icon = 133944, spells = { 20748 } }, -- Ironwood Seed
+            { item = 17037, icon = 133944, spells = { 20747 } }, -- Hornbeam Seed
+            { item = 17036, icon = 133944, spells = { 20742 } }, -- Ashwood Seed
+            { item = 17035, icon = 133944, spells = { 20739 } }, -- Stranglethorn Seed
+            { item = 17034, icon = 133944, spells = { 20484 } }, -- Maple Seed
+        },
+    },
+    {
+        key = "symbolOfKings",
+        classes = { "PALADIN" },
+        warnBelow = 20,
+        ranks = { { item = 21177, icon = 134471, spells = { 25782, 25916, 25894, 25918, 25898 } } },
+    },
+    {
+        key = "symbolOfDivinity",
+        classes = { "PALADIN" },
+        warnBelow = 3,
+        ranks = { { item = 17033, icon = 135259, spells = { 19752 } } }, -- Divine Intervention
+    },
+    {
+        key = "ankh",
+        classes = { "SHAMAN" },
+        warnBelow = 3,
+        ranks = { { item = 17030, icon = 133439, spells = { 20608 } } },
+    },
+    {
+        key = "fishScales",
+        classes = { "SHAMAN" },
+        warnBelow = 0,
+        ranks = { { item = 17057, icon = 134310, spells = { 131 } } }, -- Water Breathing
+    },
+    {
+        key = "fishOil",
+        classes = { "SHAMAN" },
+        warnBelow = 0,
+        ranks = { { item = 17058, icon = 134844, spells = { 546 } } }, -- Water Walking
+    },
+    {
+        key = "flashPowder",
+        classes = { "ROGUE" },
+        warnBelow = 10,
+        ranks = { { item = 5140, icon = 134387, spells = { 1856, 1857, 27617, 457437, 1285372 } } },
+    },
+    {
+        key = "infernalStone",
+        classes = { "WARLOCK" },
+        warnBelow = 3,
+        ranks = { { item = 5565, icon = 135231, spells = { 1122 } } }, -- Inferno
+    },
+    {
+        key = "demonicFigurine",
+        classes = { "WARLOCK" },
+        warnBelow = 0,
+        ranks = { { item = 16583, icon = 134337, spells = { 18540 } } }, -- Ritual of Doom
+    },
 }
 
----@type ForeverReagent[]
-local PLAYER_REAGENTS = {}
-for _, reagent in ipairs(REAGENTS) do
-    if reagent.class == playerClass then
-        PLAYER_REAGENTS[#PLAYER_REAGENTS + 1] = reagent
-    end
-end
-
----Reagent with the lowest count among those for known spells. Ties go to the first in list order.
----@return ForeverReagent?
----@return number? count
-local function LowestReagent()
-    local lowest, lowestCount
-    for _, reagent in ipairs(PLAYER_REAGENTS) do
-        if HighestKnownSpell(reagent.spells) then
-            local count = BR.StateHelpers.GetItemCountCached(reagent.item)
-            if not lowestCount or count < lowestCount then
-                lowest, lowestCount = reagent, count
+---The icon of the first reagent of the class, else Arcane Powder.
+---@return number
+local function DefaultReagentIcon()
+    for _, reagent in ipairs(REAGENTS) do
+        for _, class in ipairs(reagent.classes) do
+            if class == playerClass then
+                return reagent.ranks[1].icon
             end
         end
     end
-    return lowest, lowestCount
+    return 133848
 end
+
+BR.REAGENTS = REAGENTS
 
 local AMMO_ICON_ARROW = 132382
 local AMMO_ICON_BULLET = 132384
@@ -2649,27 +2731,39 @@ local BUFF_TABLES = {
             key = "lowReagents",
             name = L["Buff.LowReagents"],
             icons = {
-                textures = { PLAYER_REAGENTS[1] and PLAYER_REAGENTS[1].icon or 133848 }, -- else Arcane Powder
+                textures = { DefaultReagentIcon() },
                 dynamic = function()
-                    local reagent = LowestReagent()
+                    local reagent = BR.Reagents.Low()
                     return reagent and reagent.icon
                 end,
             },
             overlayText = REAGENTS_TEXT,
             overlayTextFn = function()
-                local _, count = LowestReagent()
+                local _, count = BR.Reagents.Low()
                 return count and (REAGENT_LABEL .. "\n" .. count) or REAGENTS_TEXT
+            end,
+            tooltipItemID = function()
+                local reagent = BR.Reagents.Low()
+                return reagent and reagent.item
+            end,
+            tooltipLines = function(tooltip)
+                BR.Reagents.AddTooltipLines(tooltip)
             end,
             customCheck = function()
                 if BR.GameContext.IsInCombat() then
                     return false
                 end
                 local defaults = BR.profile.defaults
-                if (not defaults or defaults.reagentRestedOnly ~= false) and not BR.GameContext.IsResting() then
+                local restedOnly = not defaults or defaults.reagentRestedOnly ~= false
+                local dropWarning = not defaults or defaults.reagentDropWarning ~= false
+                if
+                    restedOnly
+                    and not BR.GameContext.IsResting()
+                    and not (dropWarning and BR.Reagents.IsWindowOpen())
+                then
                     return false
                 end
-                local _, count = LowestReagent()
-                return count ~= nil and count < (defaults and defaults.reagentThreshold or 5)
+                return BR.Reagents.Low() ~= nil
             end,
         },
         {

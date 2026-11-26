@@ -76,6 +76,7 @@ Core\State\Equipment.lua
 Core\Ranks.lua
 Core\DriveBy.lua
 Core\Tracking.lua
+Core\Reagents.lua
 UI\Components.lua
 UI\Glow.lua
 Display\Icons.lua
@@ -99,6 +100,7 @@ Options\Dialogs\AuraPicker.lua
 Options\Dialogs\LoadoutReminder.lua
 Options\Dialogs\RoguePoison.lua
 Options\Dialogs\Runeforge.lua
+Options\Dialogs\Reagents.lua
 Options\Dialogs\BuffPanel.lua
 Options\Pages\Defaults.lua
 Options\Pages\Visibility.lua

@@ -612,12 +612,16 @@ english["Options.Repair.Threshold.Desc"] =
 english["Options.RepairHideInCombat"] = "Hide in combat"
 english["Options.RepairHideInCombat.Desc"] =
     "Hide the repair reminder in combat. You cannot repair during a fight."
-english["Options.Reagent.Threshold"] = "Warn below"
-english["Options.Reagent.Threshold.Desc"] =
-    "Warn when you carry fewer than this many of a reagent for a spell you know."
+english["Options.Reagent.Note"] = "Warn below this many. 0 turns it off."
+english["Options.Reagent.Off"] = "Off"
+english["Options.Reagent.Reset"] = "Reset to Default"
 english["Options.Reagent.RestedOnly"] = "Only in rested areas"
 english["Options.Reagent.RestedOnly.Desc"] =
-    "Warn only in inns and cities, where vendors sell reagents.\n\nIf |cffffcc00Hide while resting|r is on, the warning never shows."
+    "Warn only in inns and cities, where vendors sell reagents.\n\nIf |cffffcc00Hide while resting|r is on, the warning does not show in them."
+english["Options.Reagent.DropWarning"] = "Show for %d seconds when a count drops"
+english["Options.Reagent.DropWarning.Desc"] =
+    "Outside inns and cities, the warning shows for %d seconds when a reagent drops below its count. In combat, it shows when combat ends."
+english["DisabledReason.ReagentDropWarning"] = "Turn on Only in rested areas. Without it, the warning always shows."
 english["Options.Camp.LightFire"] = "Remind to place a campfire"
 english["Options.Camp.LightFire.Desc"] =
     "With no campfire near you, the reminder shows CAMP when you carry a Campfire Kit that you can use and at least one camp feature. Click to place the best kit, then click the ground."
@@ -638,6 +642,7 @@ english["Tooltip.PinNotInGroup"] = "(not in group)"
 english["Tooltip.TargetLine"] = "Casts on: %s"
 english["Tooltip.Next"] = "Next:"
 english["Tooltip.ChoiceSpell"] = "· %s"
+english["Tooltip.ReagentCounts"] = "Reagents:"
 
 -- ============================================================================
 -- OPTIONS: FREE CONSUMABLES
@@ -898,6 +903,7 @@ english["BuffRow.SettingsLink.Tooltip"] = "Sound alert, show mode, and detach op
 english["BuffRow.Extras"] = "Extras"
 english["BuffRow.Option.Poisons"] = "Poisons"
 english["BuffRow.Option.Runeforge"] = "Runeforge"
+english["BuffRow.Option.Reagents"] = "Reagents"
 -- Row state glyphs
 english["BuffRow.Glyph.Sound"] = "Sound alert"
 english["BuffRow.Glyph.Detached"] = "Detached icon"

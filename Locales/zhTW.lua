@@ -596,8 +596,6 @@ L["Options.Reagent.Threshold"] = "低於多少警告"
 L["Options.Reagent.Threshold.Desc"] =
     "當你攜帶的用於你所掌握的法術的材料數量少於多少數量時發出警告。"
 L["Options.Reagent.RestedOnly"] = "只有在休息區域"
-L["Options.Reagent.RestedOnly.Desc"] =
-    "只在旅館和城市發出警告，那裡有商人出售材料。\n\n如果 |cffffcc00當休息時隱藏|r 是啟用的，此警告從不顯示。"
 L["Options.Camp.LightFire"] = "提醒放置篝火"
 L["Options.Camp.LightFire.Desc"] =
     "如果附近沒有篝火，當你攜帶可用的篝火工具包和至少一件營地設施時，提醒會顯示「營地」。點擊放置最合適的工具包，然後點擊地面。"

@@ -15,7 +15,7 @@ local BR = ns
 
 BR.Migrations = {}
 
-BR.Migrations.DB_VERSION = 73
+BR.Migrations.DB_VERSION = 74
 BR.Migrations.MIN_DB_VERSION = 48
 
 ---Move a category's growth direction from growDirection, read only under the
@@ -903,6 +903,14 @@ function BR.Migrations.RunProfile(profile, isImport)
                 end
             end
             profileDefaults.trackingScope = nil
+        end,
+        -- [74] The reagent threshold becomes one count per reagent, with a default per
+        -- reagent. A single count does not fit every reagent, so it is not carried over.
+        [74] = function()
+            local profileDefaults = profile.defaults
+            if type(profileDefaults) == "table" then
+                profileDefaults.reagentThreshold = nil
+            end
         end,
     }
 

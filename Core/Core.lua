@@ -521,8 +521,8 @@ local DefaultSettingKeys = {
     healthstoneThreshold = "DisplayRefresh",
     repairThreshold = "DisplayRefresh",
     repairHideInCombat = "VisibilityRefresh",
-    reagentThreshold = "DisplayRefresh",
     reagentRestedOnly = "DisplayRefresh",
+    reagentDropWarning = "DisplayRefresh",
     campLightFire = "DisplayRefresh",
     ammoThresholdStacks = "DisplayRefresh",
     ammoThresholdShots = "DisplayRefresh",
@@ -678,6 +678,10 @@ local function ValidatePath(segments)
         -- defaults.textSizes.<item>; nil clears the override
         if segments[2] == "textSizes" and #segments == 3 then
             return true, "VisualsRefresh"
+        end
+        -- defaults.reagentThresholds.<reagent>; nil restores the reagent default
+        if segments[2] == "reagentThresholds" and #segments == 3 then
+            return true, "DisplayRefresh"
         end
         -- defaults.<grid>.<row>.<choice>
         if ContentGridKeys[segments[2]] and #segments == 4 then

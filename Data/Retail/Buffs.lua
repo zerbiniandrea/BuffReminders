@@ -180,6 +180,8 @@ local DK_RUNEFORGES = {
 ---@field glowDetectable? boolean Use action bar glow as fallback detection when aura API is restricted
 ---@field showWhenPresent? boolean Show when buff IS active (inverts normal "show when missing" logic)
 ---@field overlayTextFn? fun(): string Live overlay text, wins over overlayText
+---@field tooltipItemID? fun(): number? Item that the description tooltip shows, read at hover time
+---@field tooltipLines? fun(tooltip: table) Adds lines at the end of the description tooltip
 ---@field noClickToCast? boolean Suppress click-to-cast overlay (e.g., CastSpellByID can't toggle this spell)
 ---@field noExpirationGlow? boolean Show only the missing state, never the expiring state (permanent enchants, short buffs)
 ---@field skipSpellKnownCheck? boolean Skip the "player knows spell" check (for custom/dynamic entries)

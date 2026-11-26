@@ -41,6 +41,7 @@ read_globals = {
     "WOW_PROJECT_CAMELOT",
     "WOW_PROJECT_ID",
     "C_Item",
+    "Item",
     "C_PetInfo",
     "C_Minimap",
     "C_MountJournal",
