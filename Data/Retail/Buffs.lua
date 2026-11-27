@@ -199,6 +199,9 @@ local DK_RUNEFORGES = {
 ---@field auraIDs number[] Buffs that the sacrifice gives
 ---@field reminderKey? string Self-buff reminder of the sacrifice. While it shows, it covers the missing pet
 
+-- Returns the end of a countdown that replaces the label, the sweep length, the progress text and an icon.
+---@alias Countdown fun(): number?, number?, string?, number?
+
 ---@class ConsumableBuff
 ---@field spellID? SpellID
 ---@field key string
@@ -229,6 +232,7 @@ local DK_RUNEFORGES = {
 ---@field noExpirationGlow? boolean
 ---@field addedIn? string Version cohort for the what's-new dot
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it (e.g. non-warlock requesting a Healthstone)
+---@field countdown? Countdown Replaces the label while the reminder shows
 
 ---@class BuffGroup
 ---@field displayName string
@@ -657,7 +661,7 @@ local REPAIR_SOURCES = {
 ---@field showOnInstanceEntry? boolean  -- Only show briefly on dungeon entry (grouped, non-M+)
 ---@field visibilityCondition? fun(): boolean?
 ---@field customCheck? fun(isRestricted: boolean): boolean? true shows the reminder
----@field countdown? fun(): number?, number?, string? -- End of a countdown that replaces the label, sweep length, progress text
+---@field countdown? Countdown A running countdown shows the reminder
 ---@field renewAuraID? number Aura that the chore gives. While customCheck is false, the reminder warns before the aura ends
 ---@field canRenew? fun(isRestricted: boolean): boolean Gates the warning on whether the player can do the chore now
 ---@field addedIn? string Version cohort for the what's-new dot
@@ -1436,6 +1440,10 @@ local BUFF_TABLES = {
             overlayText = L["Overlay.NoFood"],
             groupId = "food",
             consumableCategory = "food",
+            -- State.lua loads after this file.
+            countdown = function()
+                return BR.StateHelpers.EatingCountdown()
+            end,
             visibilityCondition = IsNotEarthen,
             disabledInCompetitivePvP = true,
         },

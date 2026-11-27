@@ -1690,10 +1690,14 @@ local restInstanceID, restStartedAt
 
 ---GetTime()-based moment of the next Well-Rested gain while the player rests in the bag:
 ---the full stack, or at full stacks the duration refresh.
----@return number? endsAt nil when the player is not in the bag
+---@return number? endsAt nil when the player is not in the bag or is at max level
 ---@return number? sweepSeconds
 ---@return string? stacksText
 local function SleepingBagRestEnd()
+    local GameContext = BR.GameContext
+    if GameContext.GetPlayerLevel() >= GameContext.GetMaxExpansionLevel() then
+        return nil
+    end
     local GetPlayerAura = C_UnitAuras.GetUnitAuraBySpellID
     local resting = GetPlayerAura("player", SLEEPING_BAG.restingID)
     if not resting then
@@ -2552,6 +2556,10 @@ local BUFF_TABLES = {
             overlayText = L["Overlay.NoFood"],
             groupId = "food",
             consumableCategory = "food",
+            -- State.lua loads after this file.
+            countdown = function()
+                return BR.StateHelpers.EatingCountdown()
+            end,
             disabledInCompetitivePvP = true,
         },
         -- A healthstone is unique and has one use. No Soulwell exists.
@@ -2697,17 +2705,6 @@ local BUFF_TABLES = {
             clickItem = SLEEPING_BAG.itemID,
             countdown = SleepingBagRestEnd,
             customCheck = function(isAuraRestricted)
-                local GameContext = BR.GameContext
-                if isAuraRestricted or GameContext.IsInCombat() then
-                    return false
-                end
-                if GameContext.GetPlayerLevel() >= GameContext.GetMaxExpansionLevel() then
-                    return false
-                end
-                -- The bag itself makes the player rest, so this check comes before the rest check.
-                if SleepingBagRestEnd() then
-                    return true
-                end
                 return CanPlaceSleepingBag(isAuraRestricted)
                     and not C_UnitAuras.GetUnitAuraBySpellID("player", SLEEPING_BAG.auraID)
             end,

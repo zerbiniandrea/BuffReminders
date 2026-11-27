@@ -22,7 +22,7 @@ local BR = ns
 ---@field overlayText string?                -- "NO\nAURA" for non-raid
 ---@field shouldGlow boolean                 -- Expiration glow?
 ---@field rebuffWarning boolean?             -- Consumable rebuff pulsing border?
----@field isEating boolean?                 -- Food entry: player is currently eating
+---@field countdownIcon number?            -- Icon that replaces the reminder icon while the countdown runs
 ---@field countdownExpirationTime number?   -- GetTime()-based end of a live countdown
 ---@field countdownDuration number?         -- Length of the progress sweep that ends with the countdown
 ---@field progressText string?              -- Progress toward the goal of the countdown, e.g. "1/3"
@@ -1852,12 +1852,15 @@ local function UpdateEatingState(updateInfo)
     end
 end
 
----Get expiration time of the eating aura (O(1) lookup via cached instance ID).
+---Countdown of the food entry while the player eats.
 ---eatingAuraInstanceID is always a plain value (only ever assigned via AuraField).
 ---AuraByInstanceID guards the lookup (the call throws in restricted contexts); the
 ---returned struct's field can still be secret, hence AuraField.
 ---@return number? expirationTime GetTime()-based expiration, nil if not eating or no duration
-local function GetEatingExpirationTime()
+---@return number? duration
+---@return string? progressText
+---@return number? icon
+local function EatingCountdown()
     if not eatingAuraInstanceID then
         return nil
     end
@@ -1866,7 +1869,7 @@ local function GetEatingExpirationTime()
     if not exp or exp == 0 then
         return nil
     end
-    return exp
+    return exp, AuraField(auraData, "duration"), nil, EATING_AURA_ICON
 end
 
 ---Check if a consumable buff is free/reusable (freeConsumable flag, or a permanent item of its category in bags)
@@ -2816,11 +2819,15 @@ local function RefreshUtility(db, trackingMode, isAuraRestricted, hideExpiring)
             and IsBuffEnabled(settingKey)
             and PassesPreChecks(buff, nil, db, trackingMode)
         then
-            if not buff.customCheck or buff.customCheck(isAuraRestricted) then
+            -- A running countdown shows the reminder, whatever customCheck answers.
+            local endsAt, sweepSeconds, progressText, icon
+            if buff.countdown and not isAuraRestricted then
+                endsAt, sweepSeconds, progressText, icon = buff.countdown()
+            end
+            if endsAt or not buff.customCheck or buff.customCheck(isAuraRestricted) then
                 SetEntryText(entry, buff.overlayTextFn and buff.overlayTextFn() or buff.overlayText, utilityMissGlow)
-                if buff.countdown then
-                    entry.countdownExpirationTime, entry.countdownDuration, entry.progressText = buff.countdown()
-                end
+                entry.countdownExpirationTime, entry.countdownDuration = endsAt, sweepSeconds
+                entry.progressText, entry.countdownIcon = progressText, icon
             elseif buff.renewAuraID and not hideExpiring and (not buff.canRenew or buff.canRenew(isAuraRestricted)) then
                 local _, remaining, _, duration = UnitHasBuff("player", buff.renewAuraID)
                 local lead = Lead.Of(duration, utilityThreshold, utilityFloor)
@@ -3162,12 +3169,9 @@ local function RefreshConsumables(db, trackingMode, isAuraRestricted, hideExpiri
                                 end
                             end
                         end
-                        -- Eating state for food entries (display uses this for icon override + countdown)
-                        if entry.visible and buff.key == "food" then
-                            entry.isEating = IsPlayerEating()
-                            if entry.isEating then
-                                entry.countdownExpirationTime = GetEatingExpirationTime()
-                            end
+                        if entry.visible and buff.countdown then
+                            entry.countdownExpirationTime, entry.countdownDuration, entry.progressText, entry.countdownIcon =
+                                buff.countdown()
                         end
                     end
                 end
@@ -3326,7 +3330,7 @@ function BuffState.Refresh(refreshMode)
             entry.countText = nil
             entry.overlayText = nil
             entry.rebuffWarning = nil -- legacy field, still cleared for safety
-            entry.isEating = nil
+            entry.countdownIcon = nil
             entry.countdownExpirationTime = nil
             entry.countdownDuration = nil
             entry.progressText = nil
@@ -3897,12 +3901,12 @@ BR.StateHelpers = {
     ---@param entry BuffStateEntry
     ---@return boolean
     IsCountdownEntry = function(entry)
-        return entry.isEating == true or entry.countdownExpirationTime ~= nil
+        return entry.countdownExpirationTime ~= nil
     end,
     IsPlayerEating = IsPlayerEating,
     UpdateEatingState = UpdateEatingState,
     ScanEatingState = ScanEatingState,
-    GetEatingExpirationTime = GetEatingExpirationTime,
+    EatingCountdown = EatingCountdown,
     GetBuffSettingKey = GetBuffSettingKey,
     IsBuffEnabled = IsBuffEnabled,
     IsPlayerSpellCached = IsPlayerSpellCached,

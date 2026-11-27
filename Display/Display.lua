@@ -702,7 +702,7 @@ end
 ---@param entry BuffStateEntry
 ---@return boolean
 local function IsCountdownText(entry)
-    return entry.isEating or entry.countdownExpirationTime ~= nil or entry.displayType == "expiring"
+    return entry.countdownExpirationTime ~= nil or entry.displayType == "expiring"
 end
 
 ---Get effective icon width (falls back to iconSize for square icons)
@@ -1776,7 +1776,7 @@ local function GenerateTestEntries()
         entry.shouldGlow = false
         entry.countText = nil
         entry.overlayText = nil
-        entry.isEating = nil
+        entry.countdownIcon = nil
         entry.countdownExpirationTime = nil
         entry.countdownDuration = nil
         entry.progressText = nil
@@ -1966,8 +1966,6 @@ local function HideAllDisplayFrames()
     end
     BR.SecureButtons.HideAllSecureFrames()
 end
-
-local EATING_ICON = BR.EATING_AURA_ICON
 
 ---Apply consumable overlays (stat label top-left, badge/quality bottom-left) to a frame.
 ---@param frame table
@@ -2223,15 +2221,15 @@ local function RenderVisibleEntry(frame, entry)
 
     -- State provides these fields as a snapshot, so the display
     -- never reads a live flag that can change mid-cycle.
-    if entry.isEating or entry.countdownExpirationTime then
+    local expTime = entry.countdownExpirationTime
+    if expTime then
         SetIconDesaturated(frame.icon, false)
-        if entry.isEating then
-            frame.icon:SetTexture(EATING_ICON)
-            frame._br_eating_icon = true
+        local icon = entry.countdownIcon or entry.dynamicIcon
+        if icon then
+            frame.icon:SetTexture(icon)
         end
-        local expTime = entry.countdownExpirationTime
         frame._br_countdown_exp = expTime
-        local remaining = expTime and expTime - GetTime() or 0
+        local remaining = expTime - GetTime()
         if remaining > 0 then
             SetCountText(frame, FormatCountdownTime(remaining), COUNT_TEXT_KEY)
             frame.count:Show()
@@ -2268,10 +2266,6 @@ local function RenderVisibleEntry(frame, entry)
         frame._br_countdown_onupdate = nil
     end
     frame._br_countdown_exp = nil
-    if frame._br_eating_icon then
-        frame._br_eating_icon = nil
-        ResolveConsumableFrame(frame)
-    end
 
     local glowKind = entry.glowKindOverride or (entry.displayType == "expiring" and "expiring" or "missing")
     local cachedGlow = entry.category and GetCachedGlowSettings(entry.category, glowKind) or nil
@@ -2371,7 +2365,7 @@ local function ApplyConsumableDisplayMode(frame, entry, frameList, parentFrame)
     -- Every variant fans out when the buff is fully gone. An expiring buff fans out
     -- only the other qualities of the stat it refreshes; food being eaten keeps one icon.
     local expiring = entry.displayType == "expiring"
-    if (entry.displayType ~= "text" and not expiring) or entry.isEating then
+    if (entry.displayType ~= "text" and not expiring) or entry.countdownExpirationTime then
         BR.SecureButtons.SetItemRow(frame, nil)
         return
     end
