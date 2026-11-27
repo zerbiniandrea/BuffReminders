@@ -15,6 +15,9 @@ local AuraField = BR.Secret.AuraField
 local Plain = BR.Secret.Plain
 local CooldownsRestricted = BR.Restrictions.CooldownsRestricted
 local UnitIsUnit = UnitIsUnit
+local GetTime = GetTime
+-- The global cooldown reads as a cooldown of up to 1.5 s.
+local GLOBAL_COOLDOWN = 1.5
 
 local REPAIR_LABEL = L["Overlay.RepairLabel"]
 local REAGENT_LABEL = L["Overlay.ReagentLabel"]
@@ -503,13 +506,17 @@ local function SoulstoneInBags()
 end
 
 -- All Soulstone ranks share one cooldown. A stone outside the bags still reports it.
----@return boolean
+---@return boolean ready
+---@return number? readyIn
 local function SoulstoneReady()
     for _, id in ipairs(SOULSTONE_ITEMS) do
-        local _, duration = C_Item.GetItemCooldown(id)
-        duration = Plain(duration)
-        if duration and duration > 0 then
-            return false
+        local startTime, duration = C_Item.GetItemCooldown(id)
+        startTime, duration = Plain(startTime), Plain(duration)
+        if startTime and duration and duration > GLOBAL_COOLDOWN then
+            local readyIn = startTime + duration - GetTime()
+            if readyIn > 0 then
+                return false, readyIn
+            end
         end
     end
     return true

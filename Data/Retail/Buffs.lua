@@ -34,6 +34,9 @@ local Plain = BR.Secret.Plain
 
 -- Restriction predicate for the cooldown domain (see Core/Restrictions.lua)
 local CooldownsRestricted = BR.Restrictions.CooldownsRestricted
+-- The global cooldown reads as a cooldown of up to 1.5 s.
+local GLOBAL_COOLDOWN = 1.5
+local GetTime = GetTime
 
 -- ============================================================================
 -- BUFF DATA TABLES
@@ -125,7 +128,7 @@ local DK_RUNEFORGES = {
 ---@field groupOnly? boolean Only show when in a group (hide when solo)
 ---@field suppressedByEntry? string Hide when this entry key is already visible (e.g., self buff covers it)
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
----@field castReady? fun(isRestricted: boolean): boolean? For a caster of the class. false hides the missing reminder
+---@field castReady? fun(isRestricted: boolean): boolean?, number? For a caster of the class. false hides the missing reminder. The number is the seconds until ready
 ---@field castSpellID? number|number[] Click-to-cast spell when different from spellID. A list casts the first known spell
 ---@field casterCheck? fun(isRestricted: boolean): string?, boolean? For a player of the class, replaces the group scan. Returns the overlay text (nil = no reminder) and true when a click must cast nothing
 ---@field choiceOrder? ChoiceOrderGrid The user lists the buff choices per content row. An empty row accepts any
@@ -801,7 +804,15 @@ local BUFF_TABLES = {
                     return true
                 end
                 local duration = Plain(info.duration)
-                return duration == nil or duration == 0
+                local startTime = Plain(info.startTime)
+                if not (duration and startTime) or duration <= GLOBAL_COOLDOWN then
+                    return true
+                end
+                local readyIn = startTime + duration - GetTime()
+                if readyIn <= 0 then
+                    return true
+                end
+                return false, readyIn
             end,
             pinnedTarget = function()
                 local db = BR.profile

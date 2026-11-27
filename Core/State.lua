@@ -2107,7 +2107,7 @@ end
 
 -- Seconds until the earliest display change that no event announces: the countdown
 -- text ticks a minute, remaining time crosses the warning lead, an
--- expiring buff runs out, or item charges change.
+-- expiring buff runs out, item charges change, or a cooldown that hides a reminder ends.
 -- Accumulated per refresh; Display arms one timer for it instead of polling.
 local nextTimedChangeIn = nil
 
@@ -2929,7 +2929,14 @@ local function RefreshPresence(db, trackingMode, isAuraRestricted, hideExpiring)
                                 presFloor
                             )
                         end
-                        local canCast = hasBuff or not buff.castReady or buff.castReady(isAuraRestricted) ~= false
+                        local canCast = true
+                        if not hasBuff and buff.castReady then
+                            local ready, readyIn = buff.castReady(isAuraRestricted)
+                            canCast = ready ~= false
+                            if readyIn and readyIn > 0 then
+                                NoteChangeIn(readyIn)
+                            end
+                        end
                         if not hasBuff and canCast then
                             SetEntryText(entry, buff.overlayText, presMissGlow)
                         elseif not buff.noExpirationGlow and not hideExpiring then
