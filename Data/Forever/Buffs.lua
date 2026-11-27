@@ -16,6 +16,7 @@ local Plain = BR.Secret.Plain
 local CooldownsRestricted = BR.Restrictions.CooldownsRestricted
 local UnitIsUnit = UnitIsUnit
 local GetTime = GetTime
+local GetSpellCooldown = C_Spell.GetSpellCooldown
 -- The global cooldown reads as a cooldown of up to 1.5 s.
 local GLOBAL_COOLDOWN = 1.5
 
@@ -520,6 +521,27 @@ local function SoulstoneReady()
         end
     end
     return true
+end
+
+local FEAR_WARD = 6346
+
+---@return boolean ready
+---@return number? readyIn
+local function FearWardReady()
+    if CooldownsRestricted() then
+        return false
+    end
+    local info = GetSpellCooldown(FEAR_WARD)
+    local duration = info and Plain(info.duration)
+    local startTime = info and Plain(info.startTime)
+    if not (duration and startTime) or duration <= GLOBAL_COOLDOWN then
+        return true
+    end
+    local readyIn = startTime + duration - GetTime()
+    if readyIn <= 0 then
+        return true
+    end
+    return false, readyIn
 end
 
 -- The sacrifice needs a demon out. If the talent group picks a demon and another one is out,
@@ -2092,6 +2114,16 @@ local BUFF_TABLES = {
     },
     ---@type TargetedBuff[]
     targeted = {
+        {
+            spellID = FEAR_WARD,
+            key = "fearWard",
+            name = L["Buff.FearWard"],
+            class = "PRIEST",
+            overlayText = L["Overlay.NoFearWard"],
+            target = "allyOrSelf",
+            defaultEnabled = false,
+            castReady = FearWardReady,
+        },
         {
             spellID = 1328548,
             key = "oathOfLight",

@@ -2978,7 +2978,15 @@ local function RefreshTargeted(db, trackingMode, isAuraRestricted, hideExpiring)
                         shouldShow, remaining, lead, nextSlack = AllyTargetState(buff, targThreshold, targFloor)
                     end
 
-                    if shouldShow then
+                    local canCast = true
+                    if shouldShow and buff.castReady then
+                        local ready, readyIn = buff.castReady()
+                        canCast = ready ~= false
+                        if readyIn and readyIn > 0 then
+                            NoteChangeIn(readyIn)
+                        end
+                    end
+                    if shouldShow and canCast then
                         SetEntryText(entry, buff.overlayText, targMissGlow)
                     elseif shouldShow == false and not buff.noExpirationGlow and not hideExpiring then
                         TrySetEntryExpiring(entry, remaining, lead, targExGlow, nextSlack)

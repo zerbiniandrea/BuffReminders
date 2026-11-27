@@ -157,6 +157,7 @@ local DK_RUNEFORGES = {
 ---@field noExpirationGlow? boolean
 ---@field chatRequestable? boolean Offer "request this buff in chat" on click for players who can't provide it
 ---@field visibilityCondition? fun(): boolean Return false to hide the buff
+---@field castReady? fun(): boolean?, number? For the caster. false hides the missing reminder. The number is the seconds until ready
 
 ---@class SelfBuff
 ---@field spellID? SpellID
