@@ -1840,6 +1840,19 @@ local function ComputeCampStage()
     return nil
 end
 
+---GetTime()-based end of the Welcoming Campfire countdown while the player sits or crafts.
+---@return number? endsAt nil when no countdown runs
+---@return number? duration
+local function CampCountdownEnd()
+    for _, spellID in ipairs(CAMP.countdownIDs) do
+        local aura = C_UnitAuras.GetUnitAuraBySpellID("player", spellID)
+        if aura and aura.duration and aura.duration > 0 then
+            return aura.expirationTime, aura.duration
+        end
+    end
+    return nil
+end
+
 -- One refresh asks for the stage from several callbacks in the same frame.
 local campStageAt, campStage, campKitID
 ---@return "sit"|"camp"|nil stage
@@ -2689,6 +2702,7 @@ local BUFF_TABLES = {
                 end
                 return kitID and CAMP_KIT_MACROS[kitID]
             end,
+            countdown = CampCountdownEnd,
             customCheck = function(isAuraRestricted)
                 return CanRenewCamp(isAuraRestricted)
                     and not C_UnitAuras.GetUnitAuraBySpellID("player", CAMP.benefitsID)
